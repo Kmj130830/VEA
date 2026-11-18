@@ -73,3 +73,15 @@ Project data is stored in the app's private files directory as vea-project.json.
 - Changing the grid resolution changes only the visual grid and future snapping. Existing note positions and lengths remain stored in ticks and are not rewritten.
 - The editor is monophonic: time intervals cannot overlap, regardless of pitch. Rejected placements/resizes are ignored silently.
 - Undo and redo share a project snapshot history (up to 100 states).
+
+
+## Note-entry and lyric editing update
+
+- New notes start with the Japanese lyric `あ`.
+- Tap a note to open the compact lyric editor. It contains an X-SAMPA field, singer-language selector (JPN/KOR/ENG), lock toggle, lyric field, clear, previous/next, cancel, and confirm controls.
+- X-SAMPA suggestions are displayed above each note. The included mapper is a lightweight language-aware suggestion table; it is not the licensed VOCALOID voicebank's own G2P engine and may need voicebank-specific review.
+- Moving a note previews its destination as a translucent block before the edit is committed.
+- Tapping a note plays a short locally synthesized, decaying piano-like preview through Android AudioTrack. This preview is for pitch checking; it is not VOCALOID singing synthesis.
+- The piano-roll timeline starts compactly and keeps only a small amount of look-ahead after the last note.
+- Overlap rejection is silent. No toast or Logcat error is emitted for a rejected same-time note.
+- Project snapshots are maintained in a dedicated undo/redo history (up to 200 edits).

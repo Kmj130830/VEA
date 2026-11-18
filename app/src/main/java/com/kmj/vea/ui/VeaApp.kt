@@ -19,8 +19,6 @@ enum class EditorMode {
     PIANO_ROLL
 }
 
-private const val HISTORY_LIMIT = 100
-
 @Composable
 fun VeaApp() {
     val context = LocalContext.current
@@ -30,35 +28,27 @@ fun VeaApp() {
     var project by remember {
         mutableStateOf(ProjectStore.load(context) ?: VeaProject())
     }
-    var history by remember { mutableStateOf(listOf(project)) }
-    var historyIndex by remember { mutableIntStateOf(0) }
+    val history = remember(project.id) { ProjectHistory(project, limit = 200) }
 
     var selectedTrackId by rememberSaveable {
         mutableStateOf(project.tracks.firstOrNull()?.id.orEmpty())
     }
     var selectedClipId by rememberSaveable { mutableStateOf("") }
 
-    val canUndo = historyIndex > 0
-    val canRedo = historyIndex < history.lastIndex
+    val canUndo = history.canUndo
+    val canRedo = history.canRedo
 
     fun commitProject(next: VeaProject) {
         if (next == project) return
-        val branch = history.take(historyIndex + 1) + next
-        history = if (branch.size > HISTORY_LIMIT) branch.takeLast(HISTORY_LIMIT) else branch
-        historyIndex = history.lastIndex
-        project = next
+        project = history.push(next)
     }
 
     fun undoProject() {
-        if (!canUndo) return
-        historyIndex -= 1
-        project = history[historyIndex]
+        history.undo()?.let { project = it }
     }
 
     fun redoProject() {
-        if (!canRedo) return
-        historyIndex += 1
-        project = history[historyIndex]
+        history.redo()?.let { project = it }
     }
 
     LaunchedEffect(project) {
@@ -71,6 +61,24 @@ fun VeaApp() {
         }
     }
 
+    fun updateTrackLanguage(language: String) {
+        val trackId = selectedTrackId
+        val next = project.copy(
+            tracks = project.tracks.map { track ->
+                if (track.id != trackId) track
+                else track.copy(
+                    language = language,
+                    clips = track.clips.map { clip ->
+                        clip.copy(notes = clip.notes.map { note ->
+                            note.copy(phoneme = XsampaMapper.convert(note.lyric, language))
+                        })
+                    }
+                )
+            }
+        )
+        commitProject(next)
+    }
+
     fun saveProject() {
         val success = ProjectStore.save(context, project)
         Toast.makeText(
@@ -81,8 +89,8 @@ fun VeaApp() {
     }
 
     fun updateClipNotes(notes: List<VeaNote>) {
-        // Monophonic validation is deliberately silent: rejected placement/resize
-        // does not produce an error popup or log entry.
+        // Duplicate/overlapping notes are rejected silently. This path intentionally
+        // does not write to Logcat or show a toast.
         if (!hasNoOverlappingNotes(notes)) return
         val trackId = selectedTrackId
         val clipId = selectedClipId
@@ -101,7 +109,7 @@ fun VeaApp() {
 
     MaterialTheme(
         colorScheme = darkColorScheme(
-            primary = Color(0xFFB5E853),
+            primary = Color(0xFF84B94C),
             onPrimary = Color(0xFF17200A),
             secondary = Color(0xFF8C74C7),
             background = Color(0xFF17181B),
@@ -128,6 +136,7 @@ fun VeaApp() {
                         val track = VeaTrack(
                             name = "Vocal " + (project.tracks.size + 1),
                             kind = "VOCAL_AI",
+                            language = "jpn",
                             color = 0xFF8C74C7
                         )
                         commitProject(project.copy(tracks = project.tracks + track))
@@ -153,9 +162,7 @@ fun VeaApp() {
                     onOpenSelectedClip = {
                         val track = project.tracks.firstOrNull { it.id == selectedTrackId }
                         val clip = track?.clips?.firstOrNull { it.id == selectedClipId }
-                        if (track != null && clip != null) {
-                            modeName = EditorMode.PIANO_ROLL.name
-                        }
+                        if (track != null && clip != null) modeName = EditorMode.PIANO_ROLL.name
                     },
                     onUndo = ::undoProject,
                     onRedo = ::redoProject,
@@ -175,6 +182,7 @@ fun VeaApp() {
                         onBack = { modeName = EditorMode.ARRANGEMENT.name },
                         onSave = ::saveProject,
                         onNotesChanged = ::updateClipNotes,
+                        onLanguageChanged = ::updateTrackLanguage,
                         onUndo = ::undoProject,
                         onRedo = ::redoProject,
                         canUndo = canUndo,

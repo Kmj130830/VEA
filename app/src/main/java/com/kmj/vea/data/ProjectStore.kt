@@ -23,6 +23,7 @@ object ProjectStore {
                     .put("id", track.id)
                     .put("name", track.name)
                     .put("kind", track.kind)
+                    .put("language", track.language)
                     .put("color", track.color)
 
                 val clips = JSONArray()
@@ -57,7 +58,6 @@ object ProjectStore {
                 tracks.put(trackJson)
             }
             root.put("tracks", tracks)
-
             File(context.filesDir, FILE_NAME).writeText(root.toString(2), Charsets.UTF_8)
         }.isSuccess
     }
@@ -114,6 +114,7 @@ object ProjectStore {
                         id = trackJson.optString("id"),
                         name = trackJson.optString("name", "Track"),
                         kind = trackJson.optString("kind", "VOCAL_AI"),
+                        language = trackJson.optString("language", "jpn"),
                         color = trackJson.optLong("color", 0xFF8DBF4A),
                         clips = clips
                     ))
@@ -127,7 +128,6 @@ object ProjectStore {
                 denominator = root.optInt("denominator", 4),
                 tracks = tracks
             )
-            // Remove only the exact built-in starter arrangement from the earlier prototype.
             val oldPrototypeTrackNames = listOf("Main01", "Cho01", "Cho02", "Cho03", "MONO", "STEREO")
             if (loaded.name == "The voice of beginning" &&
                 loaded.tracks.map { it.name } == oldPrototypeTrackNames

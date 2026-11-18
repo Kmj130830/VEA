@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.sp
 enum class VeaIcon {
     HISTORY, UNDO, REDO, CONFIG, PROPERTY, ARRANGE, MIXER, METRONOME, KEYBOARD,
     COPY, PASTE, ERASER, LOOP, AUTO_SCROLL, EDIT, ACTION, CP_WINDOW, GRID,
-    HOME, PREVIOUS, NEXT, STOP, PLAY, RECORD, SUB_TOOL, TONE, CLOSE, ADD
+    HOME, PREVIOUS, NEXT, STOP, PLAY, RECORD, SUB_TOOL, TONE, CLOSE, LOCK, UNLOCK, ADD
 }
 
 @Composable
@@ -116,6 +116,17 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawVeaIcon(
         VeaIcon.SUB_TOOL -> { path(listOf(3f to 18f, 7f to 7f, 12f to 15f, 17f to 5f, 21f to 18f)); line(4f, 21f, 20f, 21f) }
         VeaIcon.TONE -> { path(listOf(4f to 10f, 8f to 10f, 14f to 5f, 14f to 19f, 8f to 14f, 4f to 14f), true); path(listOf(17f to 9f, 20f to 12f, 17f to 15f)) }
         VeaIcon.CLOSE -> { line(5f, 5f, 19f, 19f); line(19f, 5f, 5f, 19f) }
+        VeaIcon.LOCK -> {
+            rect(4f, 10f, 20f, 21f)
+            path(listOf(7f to 10f, 7f to 7f, 9f to 4f, 15f to 4f, 17f to 7f, 17f to 10f))
+            circle(12f, 15f, 1.2f)
+        }
+        VeaIcon.UNLOCK -> {
+            rect(4f, 10f, 20f, 21f)
+            path(listOf(7f to 10f, 7f to 7f, 9f to 4f, 15f to 4f, 17f to 7f))
+            line(17f, 7f, 17f, 10f)
+            circle(12f, 15f, 1.2f)
+        }
         VeaIcon.ADD -> { circle(12f, 12f, 9f); line(12f, 7f, 12f, 17f); line(7f, 12f, 17f, 12f) }
     }
 }
