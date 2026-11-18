@@ -1,6 +1,8 @@
 package com.kmj.vea.ui
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
@@ -15,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.kmj.vea.data.*
 import com.kmj.vea.audio.PianoPreview
+import com.kmj.vea.data.StandardMidiExporter
 import com.kmj.vea.ui.arrangement.ArrangementScreen
 import com.kmj.vea.ui.pianoroll.PianoRollScreen
 
@@ -31,6 +34,23 @@ fun VeaApp() {
 
     var project by remember {
         mutableStateOf(ProjectStore.load(context) ?: VeaProject())
+    }
+
+    val midiExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("audio/midi")
+    ) { uri ->
+        if (uri != null) {
+            val exported = runCatching {
+                val stream = context.contentResolver.openOutputStream(uri)
+                    ?: error("Could not open the selected destination")
+                stream.use { StandardMidiExporter.write(project, it) }
+            }.isSuccess
+            Toast.makeText(
+                context,
+                if (exported) "MIDI exported. Import it into VOCALOID7." else "MIDI export failed",
+                Toast.LENGTH_LONG
+            ).show()
+        }
     }
     val history = remember(project.id) { ProjectHistory(project, limit = 200) }
 
@@ -185,6 +205,10 @@ fun VeaApp() {
                         }
                     },
                     onSave = ::saveProject,
+                    onExportMidi = {
+                        val safeName = project.name.replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "VEA_Project" }
+                        midiExportLauncher.launch("$safeName.mid")
+                    },
                     onOpenSelectedClip = {
                         val track = project.tracks.firstOrNull { it.id == selectedTrackId }
                         val clip = track?.clips?.firstOrNull { it.id == selectedClipId }

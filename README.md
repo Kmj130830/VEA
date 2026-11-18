@@ -20,7 +20,7 @@ Implemented in this repository:
 Not implemented yet:
 - Actual VOCALOID6 / VOCALOID7 synthesis.
 - Voicebank parsing/import and authentication.
-- WAV rendering, MIDI/VPRX/VSQX import/export, effects, and realtime audio.
+- Direct Android VOCALOID rendering, VPRX/VSQX project import, effects, and realtime VOCALOID audio.
 
 ## Important: VOCALOID AI engine boundary
 
@@ -55,7 +55,7 @@ Arrangement:
 
 Piano roll:
 - Tap an unoccupied time cell to create a note. Overlapping notes and chords are rejected.
-- Tap an existing note to open its lyric editor and audition its pitch.
+- Tap an existing note once to select/audition it; double-tap it to open the lyric editor.
 - Use the note controls to change pitch, length, lyric, or delete it.
 - Tap the pitch lane to add or replace a pitch point.
 - BACK returns to the arrangement.
@@ -78,11 +78,11 @@ Project data is stored in the app's private files directory as vea-project.json.
 ## Note-entry and lyric editing update
 
 - New notes start with the Japanese lyric `あ`.
-- Tap a note to open the compact lyric editor. It contains an X-SAMPA field, singer-language selector (JPN/KOR/ENG), lock toggle, lyric field, clear, previous/next, cancel, and confirm controls.
+- Tap a note once to select and audition it; double-tap the note to open the compact lyric editor. It contains an X-SAMPA field, singer-language selector (JPN/ENG/CHN, plus Korean preview-only), an unlocked phoneme field, lyric field, clear, previous/next, cancel, and confirm controls.
 - X-SAMPA suggestions are displayed above each note. The included mapper is a lightweight language-aware suggestion table; it is not the licensed VOCALOID voicebank's own G2P engine and may need voicebank-specific review.
 - Moving a note previews its destination as a translucent block before the edit is committed.
 - Tapping a note plays a short locally synthesized, decaying piano-like preview through Android AudioTrack. This preview is for pitch checking; it is not VOCALOID singing synthesis.
-- The piano-roll timeline starts compactly and keeps only a small amount of look-ahead after the last note.
+- The piano-roll fills the usable screen width from the start and expands its scrollable area only when notes extend beyond the viewport.
 - Overlap rejection is silent. No toast or Logcat error is emitted for a rejected same-time note.
 - Project snapshots are maintained in a dedicated undo/redo history (up to 200 edits).
 
@@ -97,20 +97,20 @@ Project data is stored in the app's private files directory as vea-project.json.
 
 ## Supplied VOCALOID7 package inspection
 
-The three supplied ZIP archives are checked statically in CI. A compact metadata catalog for AI Megpoid V7 is bundled at `app/src/main/assets/voicebanks/megpoid_v7_catalog.json`. It includes the manifest identity, 13 style names, and SHA-256 model references, but does not bundle Windows DLLs or model weights. See docs/SUPPLIED_V7_ASSETS.md for the compatibility findings.
+The three supplied ZIP archives are checked statically in CI. A compact metadata catalog for AI Megpoid V7 is bundled at `app/src/main/assets/voicebanks/megpoid_v7_catalog.json`. It includes the manifest identity, 8 voice-type names, and SHA-256 model references, but does not bundle Windows DLLs or model weights. See docs/SUPPLIED_V7_ASSETS.md for the compatibility findings.
 
 
 ## Mobile editor refinements
 
 - Arrangement clips draw a compact piano-roll preview of their saved notes.
 - The empty arrangement contains only the timeline grid; it no longer draws a placeholder dash track.
-- Tap the `VOCAL AI` label in a vocal track header to choose the supplied AI Megpoid V7 identity and one of its 13 style entries. The portrait artwork is prepared from `megpoidV7.zip` by the CI allow-list asset step.
+- Tap the `VOCAL AI` label in a vocal track header to choose the supplied AI Megpoid V7 identity and one of its 8 official voice types. The portrait artwork is prepared from `megpoidV7.zip` by the CI allow-list asset step.
 - Selecting a singer records its identity and style in the project. This is voicebank metadata selection, not a claim that VOCALOID rendering is available on Android.
 - Piano-roll canvas width starts at the full usable screen width and expands only when notes extend past the viewport.
-- The piano-roll has DRAW, SELECT, and PITCH tools. New notes receive a gentle default pitch contour, even when no singer is selected. The curve is smoothly interpolated and drawn in `#E76B22`.
+- The piano-roll has DRAW, SELECT, and PITCH tools, bounded zoom (65–230%), and a wider right-edge resize hit area for note stretching. New notes receive a gentle default pitch contour, even when no singer is selected. The curve is smoothly interpolated and drawn in `#E76B22`.
 - The PLAY and STOP transport buttons now play/stop a locally synthesized piano audition of the clip's notes in timeline order. This is note audition, not voice synthesis.
 - The main UI applies Android safe-drawing insets so the status and navigation bars do not cover editor controls.
-- The lyric popup starts with the phoneme lock off and places the text cursor at the end of the lyric. English words with common alternate readings display selectable phoneme suggestions. The `me` default is `m i:`, with `m e` as an alternative.
+- The lyric popup starts with the phoneme lock off and places the text cursor at the end of the lyric. English words with common alternate readings display selectable phoneme suggestions. The English fallback includes a word lexicon, spelling-to-phoneme fallback, and multiple whole-phrase pronunciation combinations (up to six). For example, `me` defaults to `m i:` with `m e` as an alternative; `read`, `live`, `wind`, `lead`, `use`, `either`, and other common variants also offer alternatives.
 
 ### Prepare local singer artwork before building
 
@@ -122,3 +122,26 @@ gradle --no-daemon testDebugUnitTest assembleDebug
 ```
 
 The preparation script extracts only the two allow-listed PNG artwork files from `megpoidV7.zip`. It does not unpack DLLs or proprietary model payloads.
+
+
+## G2P and Korean input
+
+- English phoneme suggestions now use a curated word-pronunciation lexicon with multiple entries for common heteronyms and an approximate grapheme-to-phoneme fallback for other words.
+- Suggestions are combined across phrases (up to six alternatives), so alternatives are not limited to the word `me`.
+- Korean compatibility jamo from Android IMEs are composed into precomposed Hangul syllables before the onset/vowel/coda lookup; `ㅇㅡㅁ` is composed to `음`.
+- The app-side G2P remains a fallback. It is not the licensed Yamaha G2PA engine. The supplied G2P DLLs are Windows x64 and cannot be loaded by Android.
+
+## VOCALOID7 hand-off (real AI rendering)
+
+VEA now exports Standard MIDI (.mid) using the project tempo, time signature, track arrangement, note positions/durations/pitches, and UTF-8 lyric meta events. Japanese romaji is converted to hiragana for MIDI lyrics; Korean compatibility jamo are composed before export. This lets the official VOCALOID7 editor perform the actual G2P, AI synthesis, and its own automatic pitch/expression generation on the licensed desktop installation.
+
+Workflow:
+1. In VEA Arrangement, press **V7 MIDI** and save the `.mid` file.
+2. Transfer the file to the computer that has the licensed VOCALOID7 editor and the authorized AI Megpoid V7 voicebank installed.
+3. In VOCALOID7, choose **File → Import**, select the MIDI file, enable lyric import, choose UTF-8 as the lyric encoding, and set the imported vocal track type to **VOCALOID:AI**.
+4. Select **AI Megpoid** and the desired Voice Type (Native, Whisper, Cute, Downer, Power, Soft, Vivid, or Ballade).
+5. Let VOCALOID7 run its own G2P and AI rendering, then export WAV from VOCALOID7.
+
+VEA intentionally does not write its approximate pitch-preview curve as MIDI pitch bends. That leaves the imported notes/lyrics available for the original VOCALOID:AI renderer to generate its own performance and pitch, instead of imposing a different local approximation. The Voice Type selection itself must be made in VOCALOID7 after MIDI import; Standard MIDI does not carry Yamaha's proprietary singer/style metadata.
+
+This is a real project interchange path, not Android-native VOCALOID synthesis. The supplied Windows DLLs and proprietary model payloads are not invoked by VEA. See `docs/VOCALOID7_HANDOFF.md`.

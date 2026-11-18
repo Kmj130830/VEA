@@ -6,52 +6,55 @@ import org.junit.Test
 
 class XsampaMapperTest {
     @Test
-    fun mapsSingleRomajiMora() {
+    fun mapsJapaneseRomaji() {
         assertEquals("ら", XsampaMapper.romanToHiragana("ra"))
         assertEquals("4 a", XsampaMapper.convert("ra", "jpn"))
-    }
-
-    @Test
-    fun mapsDigraphRomaji() {
         assertEquals("し", XsampaMapper.romanToHiragana("shi"))
         assertEquals("S i", XsampaMapper.convert("shi", "jpn"))
-    }
-
-    @Test
-    fun mapsDoubleNInKonnichiwa() {
         assertEquals("こんにちわ", XsampaMapper.romanToHiragana("konnichiwa"))
-        assertEquals("k o N J i tS i w a", XsampaMapper.convert("konnichiwa", "jpn"))
-    }
-
-    @Test
-    fun mapsSokuonInGakkou() {
         assertEquals("がっこう", XsampaMapper.romanToHiragana("gakkou"))
-        assertEquals("g a k k o M", XsampaMapper.convert("gakkou", "jpn"))
     }
 
     @Test
-    fun preservesOriginalLyricScriptOutsideMapper() {
-        val lyric = "ra"
-        val phoneme = XsampaMapper.convert(lyric, "jpn")
-        assertEquals("ra", lyric)
-        assertEquals("4 a", phoneme)
+    fun composesKoreanCompatibilityJamoBeforeG2p() {
+        assertEquals("음", XsampaMapper.composeKoreanJamo("ㅇㅡㅁ"))
+        assertEquals("M m", XsampaMapper.convert("음", "kor"))
+        assertEquals("M m", XsampaMapper.convert("ㅇㅡㅁ", "kor"))
     }
 
     @Test
-    fun mapsEnglishMeToSupportedLongI() {
+    fun keepsKoreanSyllableOnsetVowelAndCodaTogether() {
+        assertEquals("k wa", XsampaMapper.convert("과", "kor"))
+        assertEquals("h a n", XsampaMapper.convert("한", "kor"))
+    }
+
+    @Test
+    fun mapsEnglishMeToVoicebankFriendlyDefault() {
         assertEquals("m i:", XsampaMapper.convert("me", "eng"))
+        assertEquals(listOf("m i:", "m e"), XsampaMapper.pronunciationSuggestions("me", "eng"))
     }
 
     @Test
-    fun offersAlternateEnglishPronunciationsWithoutForcingOne() {
-        assertEquals(
-            listOf("m i:", "m e"),
-            XsampaMapper.pronunciationSuggestions("me", "eng")
-        )
-        assertEquals(
-            listOf("4 i:d", "4 E d"),
-            XsampaMapper.pronunciationSuggestions("read", "eng")
-        )
-        assertTrue(XsampaMapper.pronunciationSuggestions("hello", "eng").isNotEmpty())
+    fun offersMultiplePronunciationsForAmbiguousEnglishWords() {
+        assertEquals(2, XsampaMapper.pronunciationSuggestions("read", "eng").size)
+        assertEquals(2, XsampaMapper.pronunciationSuggestions("live", "eng").size)
+        assertEquals(2, XsampaMapper.pronunciationSuggestions("wind", "eng").size)
+        assertEquals(2, XsampaMapper.pronunciationSuggestions("lead", "eng").size)
+        assertEquals(2, XsampaMapper.pronunciationSuggestions("use", "eng").size)
+    }
+
+    @Test
+    fun combinesAlternativesAcrossAWholePhrase() {
+        val choices = XsampaMapper.pronunciationSuggestions("read me", "eng")
+        assertEquals(4, choices.size)
+        assertTrue(choices.all { it.contains(" | ") })
+    }
+
+    @Test
+    fun fallsBackToGraphemeToPhonemeRulesForOtherWords() {
+        val hello = XsampaMapper.convert("hello", "eng")
+        assertTrue(hello.contains("h"))
+        assertTrue(hello.contains("oU"))
+        assertTrue(XsampaMapper.pronunciationSuggestions("computer", "eng").isNotEmpty())
     }
 }

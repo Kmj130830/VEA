@@ -44,7 +44,7 @@ The package contains 20 files, including:
 - `AI_Megpoid.vtb2` — header begins `VTBR`
 - `AI_Megpoid.vpit` — header begins `VPIT`
 - `BEAF64G3DYXLRECA.vmanifest`
-- 13 `.vsstyle` JSON style presets
+- 13 `.vsstyle` JSON style preset files (some describe non-voice-type presets/effects)
 - singer icons and installer artwork
 
 Readable manifest fields identify:
@@ -54,12 +54,12 @@ Readable manifest fields identify:
 - SingerName in the style catalog: `AI Megpoid`
 - Component ID: `BEAF64G3DYXLRECA`
 - Version: `7.0.0`
-- Languages: `19`
+- Raw manifest/catalog count: `19` (not a verified voicebank language count)
 - Default style: `181b8942-ba8d-41a2-bbbb-4a30bd64e470` (`MegpoidV7 Native`)
 
 The manifest's `NModelHash`, `PModelHash`, and `TModelHash` match the SHA-256 digests of `AI_Megpoid.vtb2`, `AI_Megpoid.vpit`, and the shared `VOCALOID7.vtmg` respectively. This establishes that the singer package refers to common VOCALOID7 model data from `AI Model.zip`; it does not establish that these data can be interpreted without the VOCALOID7 runtime.
 
-The 13 visible style names are Native, NativeForCho, Whisper, Cute, Downer, Power, Soft, Vivid, Ballade, Chorus, Delay, LoFi, and Phase.
+The voicebank offers exactly 8 official Voice Types: Native, Whisper, Cute, Downer, Power, Soft, Vivid, and Ballade. The additional `.vsstyle` JSON files in the package must not be presented as additional voice types. The official AI Megpoid product information describes Japanese, English, and Chinese; VEA's UI therefore displays those 3 languages, not the raw count 19.
 
 ## Android build conclusion
 
@@ -73,14 +73,14 @@ Consequently, the Android app must not package these Windows DLLs as if they wer
 
 ## What is included in the Android app at this milestone
 
-The small `megpoid_v7_catalog.json` asset contains the readable bank/style metadata and the verified model-reference hashes only. It does not include the 23.5 MB model payload or the Windows DLLs. The editor can use this catalog for future bank/style selection UI, while synthesis remains explicitly unavailable until a compatible runtime exists.
+The small `megpoid_v7_catalog.json` asset contains the readable bank/style metadata and the verified model-reference hashes only. It does not include the 23.5 MB model payload or the Windows DLLs. The editor can use this catalog for future bank/style selection UI, while direct Android synthesis remains unavailable. VEA now provides a Standard MIDI hand-off to the licensed VOCALOID7 desktop editor; see `docs/VOCALOID7_HANDOFF.md`.
 
 
 ## UI and playback refinements
 
 The arrangement uses note-block miniatures inside each clip. The piano-roll viewport begins at the actual usable display width, keeps its timeline ruler and pitch lane aligned, and extends only as the musical content extends. The left piano header reserves a small voice portrait slot.
 
-The piano-roll offers DRAW, SELECT, and PITCH tools. Each newly drawn note receives a five-point initial pitch contour independent of voicebank selection. The pitch path uses cubic interpolation and the requested `#E76B22` display color.
+The piano-roll offers DRAW, SELECT, and PITCH tools with bounded zoom (65–230%) and right-edge duration resizing. Each newly drawn note receives a visible five-point pitch preview independent of voicebank selection; the line is smoothly interpolated and drawn in `#E76B22`. The pitch path uses cubic interpolation and the requested `#E76B22` display color.
 
 PLAY and STOP audition the clip through a generated piano timbre. This is explicitly only a note/timing preview; it is not synthesized VOCALOID singing. Voice selection currently loads AI Megpoid identity/style metadata and the supplied artwork, while a licensed Android-compatible VOCALOID engine is still unavailable.
 
@@ -97,4 +97,4 @@ The static PE export/import scan found the following named exports:
 - `G2PAManager_ENG.dll`, `G2PAManager_JPN.dll`, `G2PAManager_KOR.dll`, and `G2PAManager_CHS.dll` each expose a named `G2PACreateManager` entry point.
 - `G2PA_ESP.dll` exports `g2paCreate`, `g2paDelete`, `g2paGet`, `g2paGetDefaultLyric`, `g2paGetDefaultPhoneme`, `g2paGetSyllable`, and `g2paPut`.
 
-The English G2P manager imports Windows system/runtime DLLs (including KERNEL32, MSVCP140, and VCRUNTIME140 variants). The scan did not recover function signatures, object layouts, calling conventions beyond the PE platform, or any Android ABI. Therefore these symbols identify a likely desktop G2P manager interface but are not enough to call it safely or port it. The current app does not invoke the DLLs. To use the real G2P, a documented and authorized runtime/API or a separately implemented compatible phoneme front-end is still needed.
+The English G2P manager imports Windows system/runtime DLLs (including KERNEL32, MSVCP140, and VCRUNTIME140 variants). The scan did not recover function signatures, object layouts, calling conventions beyond the PE platform, or any Android ABI. Therefore these symbols identify a likely desktop G2P manager interface but are not enough to call it safely or port it. The current app does not invoke the DLLs. Their named exports are not a usable Android API, and the inspection did not recover the signatures/ABI needed for a safe integration. The Android app uses its own fallback G2P; for genuine VOCALOID7 G2P and singing, use the new MIDI hand-off to the official editor.

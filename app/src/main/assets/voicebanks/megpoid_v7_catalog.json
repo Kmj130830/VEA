@@ -4,22 +4,41 @@
   "singerName": "AI Megpoid",
   "componentId": "BEAF64G3DYXLRECA",
   "version": "7.0.0",
-  "languagesCount": 19,
+  "languagesCount": 3,
   "defaultStyleId": "181b8942-ba8d-41a2-bbbb-4a30bd64e470",
   "styles": [
-    {"id":"181b8942-ba8d-41a2-bbbb-4a30bd64e470","name":"MegpoidV7 Native"},
-    {"id":"12afc179-c0ef-4394-a226-ac49b116e0b6","name":"MegpoidV7 NativeForCho"},
-    {"id":"c83aec32-d408-4793-8ee3-24b018d37124","name":"MegpoidV7 Whisper"},
-    {"id":"74e7be2f-649b-4d36-a0e2-5ee07ce4c9c7","name":"MegpoidV7 Cute"},
-    {"id":"680003fe-701b-43d0-b29d-8c5bb5866191","name":"MegpoidV7 Downer"},
-    {"id":"25f8e42e-f7bd-4906-8351-f7fc8959a121","name":"MegpoidV7 Power"},
-    {"id":"ceb8ff3b-14e2-4fed-b417-d50c5512feed","name":"MegpoidV7 Soft"},
-    {"id":"f417d92d-d2f2-4ad0-9bcb-1bd9e9960026","name":"MegpoidV7 Vivid"},
-    {"id":"8326ca31-9d53-44f9-8c0e-76a5810adc86","name":"MegpoidV7 Ballade"},
-    {"id":"5e0bb051-9105-473d-b761-d70e5311cade","name":"MegpoidV7 Chorus"},
-    {"id":"c9958794-cbd5-4699-a925-64cf58ca80b0","name":"MegpoidV7 Delay"},
-    {"id":"553897fa-8dff-46c1-87aa-80e5735110a1","name":"MegpoidV7 LoFi"},
-    {"id":"a58bcab6-af68-4e4a-be16-3be8b3b9bf14","name":"MegpoidV7 Phase"}
+    {
+      "id": "181b8942-ba8d-41a2-bbbb-4a30bd64e470",
+      "name": "Native"
+    },
+    {
+      "id": "c83aec32-d408-4793-8ee3-24b018d37124",
+      "name": "Whisper"
+    },
+    {
+      "id": "74e7be2f-649b-4d36-a0e2-5ee07ce4c9c7",
+      "name": "Cute"
+    },
+    {
+      "id": "680003fe-701b-43d0-b29d-8c5bb5866191",
+      "name": "Downer"
+    },
+    {
+      "id": "25f8e42e-f7bd-4906-8351-f7fc8959a121",
+      "name": "Power"
+    },
+    {
+      "id": "ceb8ff3b-14e2-4fed-b417-d50c5512feed",
+      "name": "Soft"
+    },
+    {
+      "id": "f417d92d-d2f2-4ad0-9bcb-1bd9e9960026",
+      "name": "Vivid"
+    },
+    {
+      "id": "8326ca31-9d53-44f9-8c0e-76a5810adc86",
+      "name": "Ballade"
+    }
   ],
   "manifestModelReferences": [
     {
@@ -43,12 +62,23 @@
     }
   ],
   "sharedModelFiles": [
-    {"file":"COMMON7.vpit","sha256":"2611bf3c7079ef97851f4103f7d88b9d900a1cbf7e4cffe61ae8d904c2273751"},
-    {"file":"VOCALOID7.vhnv","sha256":"d8de8bfbf6ef4c9829431e09a29e4b105524d22faaada9001552cd89cb61d570"}
+    {
+      "file": "COMMON7.vpit",
+      "sha256": "2611bf3c7079ef97851f4103f7d88b9d900a1cbf7e4cffe61ae8d904c2273751"
+    },
+    {
+      "file": "VOCALOID7.vhnv",
+      "sha256": "d8de8bfbf6ef4c9829431e09a29e4b105524d22faaada9001552cd89cb61d570"
+    }
   ],
   "runtimeCompatibility": {
     "androidNativeRuntimeIncluded": false,
     "suppliedEngineDllArchitecture": "PE AMD64 (Windows 64-bit)",
     "note": "This is a static metadata catalog only. It does not load the proprietary weights or perform VOCALOID synthesis."
-  }
+  },
+  "languages": [
+    "Japanese",
+    "English",
+    "Chinese"
+  ]
 }

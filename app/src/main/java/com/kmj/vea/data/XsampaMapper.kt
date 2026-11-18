@@ -88,45 +88,114 @@ object XsampaMapper {
         "jo", "u", "wV", "we", "wi", "ju", "M", "Mi", "i"
     )
     private val koCoda = listOf(
-        "", "k", "k", "k", "n", "n", "n", "t", "l", "lk", "lm", "lp", "lt",
-        "lp", "l", "m", "p", "p", "p", "t", "t", "N", "t", "t", "k", "t", "p", "t"
+        "", "k", "k", "k", "n", "n", "n", "t", "l", "lk", "lm", "lp", "ls",
+        "lt", "lp", "lh", "m", "p", "ps", "s", "s", "N", "tS", "tS", "k", "t", "p", "h"
     )
 
-    private val englishWords = mapOf(
-        "i" to "aI", "me" to "m i:", "you" to "j u:", "the" to "D @", "a" to "@",
-        "hello" to "h @ 'l oU", "world" to "w 3: l d", "love" to "l V v",
-        "music" to "'m j u: z I k", "vocaloid" to "'v oU k @ l OI d",
-        "voice" to "v OI s", "sing" to "s I N", "song" to "s O: N",
-        "read" to "4 i:d", "live" to "l I v", "wind" to "w I n d",
-        "lead" to "l i:d", "use" to "j u:z", "either" to "' i:D @r"
-    )
-
-    // Alternative pronunciations that are common in English. These are
-    // suggestions, not forced readings; the user can choose one in the lyric editor.
-    private val englishAlternatives = mapOf(
-        "me" to listOf("m i:", "m e"),
-        "read" to listOf("4 i:d", "4 E d"),
+    /**
+     * Curated North-American English pronunciation lexicon.
+     * Each word can carry multiple complete pronunciations. The notation uses
+     * the VEA English-phone display convention (X-SAMPA-like); this is a
+     * fallback, not Yamaha G2PA output.
+     */
+    private val englishLexicon: Map<String, List<String>> = mapOf(
+        "a" to listOf("@"), "an" to listOf("{ n"), "the" to listOf("D @", "D i:"),
+        "i" to listOf("aI"), "me" to listOf("m i:", "m e"),
+        "you" to listOf("j u:"), "he" to listOf("h i:"), "she" to listOf("S i:"),
+        "we" to listOf("w i:"), "they" to listOf("D eI"), "it" to listOf("I t"),
+        "this" to listOf("D I s"), "that" to listOf("D { t"),
+        "hello" to listOf("h @ . l oU"), "world" to listOf("w 3: l d"),
+        "love" to listOf("l V v"), "music" to listOf("m j u: . z I k"),
+        "voice" to listOf("v OI s"), "sing" to listOf("s I N"),
+        "song" to listOf("s O: N"), "vocaloid" to listOf("v oU . k @ . l OI d"),
+        "singing" to listOf("s I N . I N"), "singer" to listOf("s I N . 3:"),
+        "beautiful" to listOf("b j u: . t I . f @ l"),
+        "computer" to listOf("k @ m . p j u: . t 3:"),
+        "water" to listOf("w O . t 3:"), "little" to listOf("l I . t @ l"),
+        "coffee" to listOf("k O . f i:"), "people" to listOf("p i: . p @ l"),
+        "friend" to listOf("f r\\ E n d"), "dream" to listOf("d r\\ i: m"),
+        "night" to listOf("n aI t"), "day" to listOf("d eI"),
+        "today" to listOf("t @ . d eI"), "tomorrow" to listOf("t @ . m A . r oU"),
+        "rain" to listOf("r\\ eI n"), "rainbow" to listOf("r\\ eI n . b oU"),
+        "apple" to listOf("{ . p @ l"), "orange" to listOf("O . r\\ @ n dZ"),
+        "banana" to listOf("b @ . n { . n @"), "again" to listOf("@ . g E n", "@ . g eI n"),
+        "because" to listOf("b I . k O z"), "often" to listOf("O . f @ n", "O . f t @ n"),
+        "data" to listOf("d eI . t @", "d { . t @"),
+        "tomato" to listOf("t @ . m eI . t oU", "t @ . m A . t oU"),
+        "route" to listOf("r\\ u: t", "r\\ aU t"),
+        "either" to listOf("i: . D @ r\\", "aI . D @ r\\"),
+        "neither" to listOf("n i: . D @ r\\", "n aI . D @ r\\"),
+        "read" to listOf("r\\ i: d", "r\\ e d"),
         "live" to listOf("l I v", "l aI v"),
         "wind" to listOf("w I n d", "w aI n d"),
-        "lead" to listOf("l i:d", "l E d"),
-        "use" to listOf("j u:z", "j u:s"),
-        "either" to listOf("' i:D @r", "' aI D @r"),
-        "the" to listOf("D @", "D i:")
+        "lead" to listOf("l i: d", "l e d"),
+        "use" to listOf("j u: z", "j u: s"),
+        "close" to listOf("k l oU s", "k l oU z"),
+        "tear" to listOf("t E r\\", "t I r\\"),
+        "bow" to listOf("b aU", "b oU"),
+        "bass" to listOf("b eI s", "b { s"),
+        "desert" to listOf("d E . z @ r\\ t", "d I . z 3: t"),
+        "refuse" to listOf("r\\ I . f j u: z", "r\\ @ . f j u: s"),
+        "produce" to listOf("p r\\ @ . d u: s", "p r\\ oU . d u: s"),
+        "record" to listOf("r\\ E . k 3: d", "r\\ I . k O: r\\ d"),
+        "present" to listOf("p r\\ E . z @ n t", "p r\\ i: . z E n t"),
+        "object" to listOf("A b . dZ E k t", "@ b . dZ E k t"),
+        "minute" to listOf("m I . n I t", "m aI . n u: t"),
+        "row" to listOf("r\\ oU", "r\\ aU"),
+        "sow" to listOf("s oU", "s aU"),
+        "wound" to listOf("w u: n d", "w aU n d"),
+        "polish" to listOf("p A . l I S", "p oU . l I S"),
+        "separate" to listOf("s E . p @ . r\\ @ t", "s E . p @ . r\\ eI t"),
+        "house" to listOf("h aU s", "h aU z"),
+        "resume" to listOf("r\\ E . z u: m", "r\\ I . z u: m eI"),
+        "affect" to listOf("@ . f E k t", "{ . f E k t"),
+        "contract" to listOf("k A n . t r\\ { k t", "k @ n . t r\\ { k t"),
+        "content" to listOf("k A n . t E n t", "k @ n . t E n t"),
+        "invalid" to listOf("I n . v { . l I d", "I n . v @ . l I d"),
+        "permit" to listOf("p 3: . m I t", "p 3: . m I t"),
+        "learned" to listOf("l 3: n d", "l 3: n I d"),
+        "entrance" to listOf("{ n . t r\\ @ n s", "E n . t r\\ @ n s"),
+        "bassoon" to listOf("b @ . s u: n"),
+        "sugar" to listOf("S U . g 3:"),
+        "sure" to listOf("S U r\\", "S O: r\\"),
+        "schedule" to listOf("s k E . dZ u: l", "S E . dZ u: l"),
+        "garage" to listOf("g @ . r\\ A Z", "g @ . r\\ A dZ"),
+        "address" to listOf("{ . d r\\ E s", "@ . d r\\ E s"),
+        "adult" to listOf("{ . d V l t", "@ . d V l t"),
+        "mature" to listOf("m @ . t j U r\\", "m @ . tS U r\\"),
+        "eitherway" to listOf("i: . D @ r\\ . w eI"),
+        "though" to listOf("D oU"), "through" to listOf("T r\\ u:"),
+        "thought" to listOf("T O: t"), "tough" to listOf("t V f"),
+        "cough" to listOf("k O f"), "bough" to listOf("b aU"),
+        "rough" to listOf("r\\ V f"), "enough" to listOf("I . n V f")
     )
 
-    fun pronunciationSuggestions(text: String, language: String): List<String> {
-        val normalized = text.trim().lowercase(Locale.ROOT)
-        if (normalized.isBlank()) return emptyList()
-        if (language.lowercase(Locale.ROOT) !in setOf("eng", "en")) {
-            return listOf(convert(text, language)).filter { it.isNotBlank() }
-        }
-        val words = normalized.split(Regex("\\s+"))
-        if (words.size == 1) {
-            return englishAlternatives[words.first()]
-                ?: listOf(convert(text, language)).filter { it.isNotBlank() }
-        }
-        return listOf(convert(text, language)).filter { it.isNotBlank() }
-    }
+    private val englishVowelPhones = setOf(
+        "A", "{", "V", "O:", "aU", "aI", "e", "E", "3:", "eI",
+        "I", "i:", "oU", "OI", "U", "u:", "@"
+    )
+
+    private val englishGraphemes = listOf(
+        "tion" to "S @ n", "sion" to "Z @ n", "ture" to "tS 3:",
+        "ough" to "V f", "eigh" to "eI", "igh" to "aI",
+        "ph" to "f", "sh" to "S", "ch" to "tS", "th" to "T",
+        "ng" to "N", "ck" to "k", "qu" to "k w", "wh" to "w",
+        "wr" to "r\\", "kn" to "n", "gn" to "n", "mb" to "m",
+        "ee" to "i:", "ea" to "i:", "ai" to "eI", "ay" to "eI",
+        "oa" to "oU", "oe" to "oU", "oo" to "u:",
+        "oi" to "OI", "oy" to "OI", "ou" to "aU", "ow" to "aU",
+        "ar" to "A r\\", "er" to "3:", "ir" to "3:", "ur" to "3:",
+        "or" to "O: r\\"
+    ).sortedByDescending { it.first.length }
+
+    private val englishSinglePhones = mapOf(
+        'b' to "b", 'c' to "k", 'd' to "d", 'f' to "f", 'g' to "g",
+        'h' to "h", 'j' to "dZ", 'k' to "k", 'l' to "l", 'm' to "m",
+        'n' to "n", 'p' to "p", 'q' to "k", 'r' to "r\\", 's' to "s",
+        't' to "t", 'v' to "v", 'w' to "w", 'x' to "k s", 'y' to "j",
+        'z' to "z", 'a' to "{", 'e' to "E", 'i' to "I", 'o' to "Q",
+        'u' to "V"
+    )
 
     fun convert(text: String, language: String): String {
         val normalized = Normalizer.normalize(text.trim(), Normalizer.Form.NFC)
@@ -250,9 +319,93 @@ object XsampaMapper {
         return output.joinToString(" ")
     }
 
+    // Compatibility-jamo order used by Korean mobile keyboards.
+    private val koreanInitials = listOf(
+        "ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ",
+        "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"
+    )
+    private val koreanVowels = listOf(
+        "ㅏ", "ㅐ", "ㅑ", "ㅒ", "ㅓ", "ㅔ", "ㅕ", "ㅖ", "ㅗ", "ㅘ",
+        "ㅙ", "ㅚ", "ㅛ", "ㅜ", "ㅝ", "ㅞ", "ㅟ", "ㅠ", "ㅡ", "ㅢ", "ㅣ"
+    )
+    private val koreanFinals = listOf(
+        "", "ㄱ", "ㄲ", "ㄳ", "ㄴ", "ㄵ", "ㄶ", "ㄷ", "ㄹ", "ㄺ",
+        "ㄻ", "ㄼ", "ㄽ", "ㄾ", "ㄿ", "ㅀ", "ㅁ", "ㅂ", "ㅄ", "ㅅ",
+        "ㅆ", "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"
+    )
+    private val compoundVowels = mapOf(
+        "ㅗㅏ" to "ㅘ", "ㅗㅐ" to "ㅙ", "ㅗㅣ" to "ㅚ",
+        "ㅜㅓ" to "ㅝ", "ㅜㅔ" to "ㅞ", "ㅜㅣ" to "ㅟ",
+        "ㅡㅣ" to "ㅢ"
+    )
+    private val compoundFinals = mapOf(
+        "ㄱㅅ" to "ㄳ", "ㄴㅈ" to "ㄵ", "ㄴㅎ" to "ㄶ",
+        "ㄹㄱ" to "ㄺ", "ㄹㅁ" to "ㄻ", "ㄹㅂ" to "ㄼ",
+        "ㄹㅅ" to "ㄽ", "ㄹㅌ" to "ㄾ", "ㄹㅍ" to "ㄿ",
+        "ㄹㅎ" to "ㅀ", "ㅂㅅ" to "ㅄ"
+    )
+
+    /**
+     * Join compatibility jamo emitted by some IMEs into precomposed Hangul.
+     * NFC alone does not combine compatibility jamo such as ㅇ + ㅡ + ㅁ.
+     */
+    fun composeKoreanJamo(input: String): String {
+        val source = Normalizer.normalize(input, Normalizer.Form.NFC)
+        val output = StringBuilder()
+        var i = 0
+        while (i < source.length) {
+            val initial = koreanInitials.indexOf(source[i].toString())
+            val vowelAt = i + 1
+            val vowel = source.getOrNull(vowelAt)?.toString().orEmpty()
+            val vowelIndex = koreanVowels.indexOf(vowel)
+            if (initial < 0 || vowelIndex < 0) {
+                output.append(source[i])
+                i++
+                continue
+            }
+
+            var resolvedVowel = vowel
+            var consumed = 2
+            val compound = source.substring(i + 1, (i + 3).coerceAtMost(source.length))
+            compoundVowels[compound]?.let {
+                resolvedVowel = it
+                consumed = 3
+            }
+            val resolvedVowelIndex = koreanVowels.indexOf(resolvedVowel)
+            var finalJamo = ""
+            val finalAt = i + consumed
+            val firstFinal = source.getOrNull(finalAt)?.toString().orEmpty()
+            val firstFinalIndex = koreanFinals.indexOf(firstFinal)
+
+            if (firstFinalIndex > 0) {
+                val afterFinalIsVowel = source.getOrNull(finalAt + 1)?.toString()
+                    ?.let { koreanVowels.contains(it) } == true
+                if (!afterFinalIsVowel) {
+                    finalJamo = firstFinal
+                    consumed += 1
+                    val secondFinal = source.getOrNull(finalAt + 1)?.toString().orEmpty()
+                    val combined = compoundFinals[firstFinal + secondFinal]
+                    val afterCombinedIsVowel = source.getOrNull(finalAt + 2)?.toString()
+                        ?.let { koreanVowels.contains(it) } == true
+                    if (combined != null && !afterCombinedIsVowel) {
+                        finalJamo = combined
+                        consumed += 1
+                    }
+                }
+            }
+
+            val finalIndex = koreanFinals.indexOf(finalJamo).coerceAtLeast(0)
+            val syllableCode = 0xAC00 + ((initial * 21 + resolvedVowelIndex) * 28) + finalIndex
+            output.append(syllableCode.toChar())
+            i += consumed
+        }
+        return output.toString()
+    }
+
     private fun korean(input: String): String {
+        val composed = composeKoreanJamo(input)
         val result = mutableListOf<String>()
-        input.forEach { char ->
+        composed.forEach { char ->
             if (char in '가'..'힣') {
                 val code = char.code - 0xAC00
                 val onset = code / 588
@@ -264,28 +417,83 @@ object XsampaMapper {
             } else if (char.isWhitespace()) {
                 result += "|"
             } else {
-                result += char.toString()
+                val jamo = char.toString()
+                val onsetIndex = koreanInitials.indexOf(jamo)
+                val vowelIndex = koreanVowels.indexOf(jamo)
+                when {
+                    onsetIndex >= 0 -> koOnset[onsetIndex].takeIf { it.isNotBlank() }?.let { result += it }
+                    vowelIndex >= 0 -> result += koVowel[vowelIndex]
+                    else -> result += jamo
+                }
             }
         }
         return result.joinToString(" ")
     }
 
-    private fun english(input: String): String {
-        val words = input.lowercase(Locale.ROOT).split(Regex("\\s+")).filter { it.isNotBlank() }
-        return words.joinToString(" | ") { word ->
-            englishWords[word] ?: word
-                .replace("th", "T").replace("sh", "S").replace("ch", "tS")
-                .replace("ng", "N").replace("ee", "i:").replace("oo", "u:")
-                .replace("ai", "eI").replace("ay", "eI").replace("ow", "aU")
-                .replace("oi", "OI").replace("a", "{").replace("e", "E")
-                .replace("i", "I").replace("o", "Q").replace("u", "V")
-                .map { ch ->
-                    when (ch) {
-                        'r' -> "r"
-                        'j' -> "dZ"
-                        else -> ch.toString()
-                    }
-                }.joinToString(" ")
+    private fun englishWordSuggestions(wordInput: String): List<String> {
+        val word = wordInput.lowercase(Locale.ROOT).trim()
+        englishLexicon[word]?.let { return it }
+        return listOf(englishFallback(word))
+    }
+
+    private fun englishFallback(word: String): String {
+        if (word.isBlank()) return ""
+        val out = mutableListOf<String>()
+        var i = 0
+        while (i < word.length) {
+            val remaining = word.substring(i)
+            val match = englishGraphemes.firstOrNull { remaining.startsWith(it.first) }
+            if (match != null) {
+                out += match.second.split(" ")
+                i += match.first.length
+                continue
+            }
+            if (word[i] == 'e' && i == word.lastIndex && i > 1) {
+                i++
+                continue
+            }
+            when (word[i]) {
+                'c' -> out += if (word.getOrNull(i + 1)?.let { it in "eiy" } == true) "s" else "k"
+                'g' -> out += if (word.getOrNull(i + 1)?.let { it in "eiy" } == true) "dZ" else "g"
+                'a', 'e', 'i', 'o', 'u', 'b', 'd', 'f', 'h', 'j', 'k', 'l', 'm', 'n',
+                'p', 'q', 'r', 's', 't', 'v', 'w', 'x', 'y', 'z' ->
+                    englishSinglePhones[word[i]]?.split(" ")?.let { out += it }
+            }
+            i++
         }
+        return out.joinToString(" ")
+    }
+
+    private fun english(input: String): String {
+        return input.lowercase(Locale.ROOT)
+            .split(Regex("\\s+"))
+            .filter { it.isNotBlank() }
+            .joinToString(" | ") { englishWordSuggestions(it).firstOrNull().orEmpty() }
+    }
+
+    /**
+     * Returns up to six phrase-level pronunciation variants. Alternative
+     * readings are produced per word, then combined without losing word boundaries.
+     */
+    fun pronunciationSuggestions(text: String, language: String): List<String> {
+        val normalized = text.trim().lowercase(Locale.ROOT)
+        if (normalized.isBlank()) return emptyList()
+        if (language.lowercase(Locale.ROOT) !in setOf("eng", "en")) {
+            return listOf(convert(text, language)).filter { it.isNotBlank() }
+        }
+
+        val words = normalized.split(Regex("\\s+")).filter { it.isNotBlank() }
+        var combinations = listOf(emptyList<String>())
+        for (word in words) {
+            val choices = englishWordSuggestions(word).distinct().take(3)
+            combinations = combinations.flatMap { existing ->
+                choices.map { existing + it }
+            }.take(6)
+        }
+        return combinations
+            .map { it.joinToString(" | ") }
+            .distinct()
+            .filter { it.isNotBlank() }
+            .take(6)
     }
 }

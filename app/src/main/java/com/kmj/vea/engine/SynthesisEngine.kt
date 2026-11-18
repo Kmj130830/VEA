@@ -37,7 +37,7 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
     override fun status(): EngineStatus = EngineStatus(
         engineName = "VOCALOID AI (V6 / V7 target)",
         isAvailable = false,
-        message = "No licensed Android synthesis runtime or SDK is connected."
+        message = "No Android VOCALOID runtime is available. Export V7 MIDI and render with the authorized desktop VOCALOID7 AI engine."
     )
 
     override suspend fun render(

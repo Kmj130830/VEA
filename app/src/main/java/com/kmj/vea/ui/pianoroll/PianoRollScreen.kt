@@ -66,14 +66,27 @@ private enum class PianoTool { DRAW, SELECT, PITCH }
 private fun defaultPitchPoints(lengthTick: Int): List<PitchPoint> {
     val end = lengthTick.coerceAtLeast(1)
     return listOf(
-        PitchPoint(0, -12),
-        PitchPoint((end * 0.08f).toInt(), 0),
-        PitchPoint((end * 0.48f).toInt(), 3),
-        PitchPoint((end * 0.78f).toInt(), 0),
-        PitchPoint(end, -8)
+        PitchPoint(0, -36),
+        PitchPoint((end * 0.08f).toInt(), 12),
+        PitchPoint((end * 0.48f).toInt(), 34),
+        PitchPoint((end * 0.78f).toInt(), 10),
+        PitchPoint(end, -28)
     ).distinctBy { it.tick }.sortedBy { it.tick }
 }
 private val GridValues = listOf(1, 2, 4, 8, 16, 32)
+
+private fun rescalePitchPoints(
+    points: List<PitchPoint>,
+    oldLength: Int,
+    newLength: Int
+): List<PitchPoint> {
+    if (points.isEmpty()) return defaultPitchPoints(newLength)
+    val safeOld = oldLength.coerceAtLeast(1)
+    val safeNew = newLength.coerceAtLeast(1)
+    return points.map { point ->
+        point.copy(tick = (point.tick.toFloat() * safeNew / safeOld).roundToInt().coerceIn(0, safeNew))
+    }.distinctBy { it.tick }.sortedBy { it.tick }
+}
 
 @Composable
 fun PianoRollScreen(
@@ -91,8 +104,12 @@ fun PianoRollScreen(
 ) {
     val configuration = LocalConfiguration.current
     val isPortrait = configuration.screenWidthDp < configuration.screenHeightDp
-    val rowHeight = if (isPortrait) 21.dp else 23.dp
-    val beatWidth = if (isPortrait) 32.dp else 48.dp
+    val baseRowHeight = if (isPortrait) 21.dp else 23.dp
+    val baseBeatWidth = if (isPortrait) 32.dp else 48.dp
+    var zoomScale by remember(clip.id) { mutableFloatStateOf(1.0f) }
+    val boundedZoom = zoomScale.coerceIn(0.65f, 2.30f)
+    val rowHeight = baseRowHeight * boundedZoom
+    val beatWidth = baseBeatWidth * boundedZoom
     val laneHeight = if (isPortrait) 50.dp else 60.dp
     val headerHeight = if (isPortrait) 40.dp else 34.dp
     val toolsHeight = 49.dp
@@ -154,7 +171,9 @@ fun PianoRollScreen(
         selectedNoteId = note.id
         lyricDialogNoteId = note.id
         lyricInput = note.lyric.ifBlank { "あ" }
-        phonemeInput = note.phoneme.ifBlank { XsampaMapper.convert(lyricInput, track.language) }
+        // Recompute the unlocked G2P suggestion when opening the editor so
+        // notes created by older builds do not keep obsolete automatic phones.
+        phonemeInput = XsampaMapper.convert(lyricInput, track.language)
         phonemeLocked = false
     }
 
@@ -220,6 +239,25 @@ fun PianoRollScreen(
             ToolbarIcon(VeaIcon.KEYBOARD, "KEYS", modifier = Modifier.width(42.dp))
             ToolbarIcon(VeaIcon.LOOP, "LOOP", modifier = Modifier.width(40.dp))
             ToolbarIcon(VeaIcon.TONE, "TONE", modifier = Modifier.width(40.dp), selected = true)
+            TextButton(
+                onClick = { zoomScale = (boundedZoom - 0.10f).coerceAtLeast(0.65f) },
+                contentPadding = PaddingValues(horizontal = 2.dp)
+            ) { Text("−", fontSize = 16.sp) }
+            Slider(
+                value = boundedZoom,
+                onValueChange = { zoomScale = it.coerceIn(0.65f, 2.30f) },
+                valueRange = 0.65f..2.30f,
+                modifier = Modifier.width(94.dp).height(32.dp)
+            )
+            Text(
+                (boundedZoom * 100f).roundToInt().toString() + "%",
+                color = Color(0xFFE6E6E6),
+                fontSize = 9.sp
+            )
+            TextButton(
+                onClick = { zoomScale = (boundedZoom + 0.10f).coerceAtMost(2.30f) },
+                contentPadding = PaddingValues(horizontal = 2.dp)
+            ) { Text("+", fontSize = 16.sp) }
             Box {
                 TextButton(onClick = { gridMenuExpanded = true }, contentPadding = PaddingValues(horizontal = 5.dp)) {
                     Text("1/$gridDenominator", color = NoteGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
@@ -264,8 +302,11 @@ fun PianoRollScreen(
                     tool = currentTool,
                     onSelectNote = { note ->
                         selectedNoteId = note.id
-                        openLyricEditor(note)
                         PianoPreview.play(note.pitch)
+                    },
+                    onEditNote = { note ->
+                        selectedNoteId = note.id
+                        openLyricEditor(note)
                     },
                     onAddNote = { candidate ->
                         if (canPlaceNote(clip.notes, candidate)) {
@@ -285,7 +326,10 @@ fun PianoRollScreen(
                     onResizeNote = { noteId, length ->
                         val current = clip.notes.firstOrNull { it.id == noteId }
                         if (current != null) {
-                            val resized = current.copy(lengthTick = length)
+                            val resized = current.copy(
+                                lengthTick = length,
+                                pitchPoints = rescalePitchPoints(current.pitchPoints, current.lengthTick, length)
+                            )
                             val others = clip.notes.filterNot { it.id == noteId }
                             if (canPlaceNote(others, resized)) {
                                 commitNotes(clip.notes.map { if (it.id == noteId) resized else it })
@@ -452,6 +496,15 @@ private fun LyricEditorPopup(
     var languageMenuExpanded by remember { mutableStateOf(false) }
     val lyricFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
+    var lyricFieldValue by remember {
+        mutableStateOf(TextFieldValue(text = lyric, selection = TextRange(lyric.length)))
+    }
+
+    LaunchedEffect(lyric) {
+        if (lyric != lyricFieldValue.text) {
+            lyricFieldValue = TextFieldValue(text = lyric, selection = TextRange(lyric.length))
+        }
+    }
 
     LaunchedEffect(Unit) {
         lyricFocusRequester.requestFocus()
@@ -501,9 +554,18 @@ private fun LyricEditorPopup(
                             expanded = languageMenuExpanded,
                             onDismissRequest = { languageMenuExpanded = false }
                         ) {
-                            listOf("jpn", "kor", "eng").forEach { code ->
+                            listOf("jpn", "eng", "zho", "kor").forEach { code ->
                                 DropdownMenuItem(
-                                    text = { Text(code.uppercase()) },
+                                    text = {
+                                        Text(
+                                            when (code) {
+                                                "jpn" -> "JAPANESE"
+                                                "eng" -> "ENGLISH"
+                                                "zho" -> "CHINESE"
+                                                else -> "KOREAN · PREVIEW ONLY"
+                                            }
+                                        )
+                                    },
                                     onClick = {
                                         languageMenuExpanded = false
                                         onLanguageChange(code)
@@ -527,8 +589,11 @@ private fun LyricEditorPopup(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     OutlinedTextField(
-                        value = TextFieldValue(text = lyric, selection = TextRange(lyric.length)),
-                        onValueChange = { onLyricChange(it.text) },
+                        value = lyricFieldValue,
+                        onValueChange = {
+                            lyricFieldValue = it
+                            onLyricChange(it.text)
+                        },
                         modifier = Modifier.weight(1f).height(56.dp).focusRequester(lyricFocusRequester),
                         singleLine = true,
                         textStyle = LocalTextStyle.current.copy(
@@ -551,17 +616,17 @@ private fun LyricEditorPopup(
                     }
                 }
 
-                if (suggestions.size > 1) {
+                if (language.lowercase() in setOf("eng", "en") && suggestions.isNotEmpty()) {
                     Row(
                         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
-                        Text("PHONEME", color = Color(0xFF666666), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        Text("G2P", color = Color(0xFF666666), fontSize = 9.sp, fontWeight = FontWeight.Bold)
                         suggestions.forEach { suggestion ->
                             OutlinedButton(
                                 onClick = { onSuggestionSelected(suggestion) },
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 1.dp),
+                                contentPadding = PaddingValues(horizontal = 7.dp, vertical = 1.dp),
                                 modifier = Modifier.height(29.dp)
                             ) {
                                 Text(suggestion, fontSize = 11.sp, color = Color(0xFF333333))
@@ -673,12 +738,14 @@ private fun NoteGrid(
     language: String,
     tool: PianoTool,
     onSelectNote: (VeaNote) -> Unit,
+    onEditNote: (VeaNote) -> Unit,
     onAddNote: (VeaNote) -> Unit,
     onMoveNote: (VeaNote) -> Unit,
     onResizeNote: (String, Int) -> Unit
 ) {
     val latestNotes = rememberUpdatedState(notes)
     val latestSelect = rememberUpdatedState(onSelectNote)
+    val latestEdit = rememberUpdatedState(onEditNote)
     val latestAdd = rememberUpdatedState(onAddNote)
     val latestMove = rememberUpdatedState(onMoveNote)
     val latestResize = rememberUpdatedState(onResizeNote)
@@ -724,6 +791,18 @@ private fun NoteGrid(
                                 )
                             )
                         }
+                    },
+                    onDoubleTap = { position ->
+                        if (tool != PianoTool.PITCH) {
+                            val hit = latestNotes.value.firstOrNull { note ->
+                                val left = note.startTick.toFloat() / TICKS_PER_BEAT * beatWidthPx
+                                val right = left + note.lengthTick.toFloat() / TICKS_PER_BEAT * beatWidthPx
+                                val top = (MAX_PITCH - note.pitch) * rowHeightPx
+                                position.x >= left && position.x < right &&
+                                    position.y >= top && position.y <= top + rowHeightPx
+                            }
+                            if (hit != null) latestEdit.value(hit)
+                        }
                     }
                 )
             }
@@ -752,15 +831,10 @@ private fun NoteGrid(
                         val hitRight = hit?.let {
                             (it.startTick + it.lengthTick).toFloat() / TICKS_PER_BEAT * beatWidthPx
                         } ?: 0f
-                        val resizeThreshold = hit?.let {
-                            minOf(
-                                edgeThresholdPx,
-                                max(with(density) { 3.dp.toPx() }, it.lengthTick.toFloat() / TICKS_PER_BEAT * beatWidthPx * 0.25f)
-                            )
-                        } ?: edgeThresholdPx
+                        val resizeThreshold = with(density) { 20.dp.toPx() }
                         activeGesture = when {
                             tool == PianoTool.PITCH || hit == null -> "NONE"
-                            abs(position.x - hitRight) <= resizeThreshold -> "RESIZE"
+                            position.x >= hitRight - resizeThreshold && position.x <= hitRight + with(density) { 7.dp.toPx() } -> "RESIZE"
                             else -> "MOVE"
                         }
                         previewStartTick = initialStart
@@ -931,11 +1005,11 @@ private fun NoteGrid(
                 )
             }
             // Right-edge grip for length resizing.
-            drawLine(
+            drawRoundRect(
                 color = Color(0xFF60763A),
-                start = Offset(right - 3f, noteBlockTop + 2f),
-                end = Offset(right - 3f, noteBlockTop + noteBlockHeight - 2f),
-                strokeWidth = 1.5f
+                topLeft = Offset(right - 5f, noteBlockTop + noteBlockHeight * 0.22f),
+                size = Size(4f, noteBlockHeight * 0.56f),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(2f, 2f)
             )
         }
     }
@@ -969,8 +1043,13 @@ private fun PitchLane(
                             val cents = ((size.height / 2f - position.y) / (size.height / 700f))
                                 .roundToInt().coerceIn(-300, 300)
                             val point = PitchPoint(relativeTick, cents)
+                            val basePoints = if (current.pitchPoints.isEmpty()) {
+                                defaultPitchPoints(current.lengthTick)
+                            } else {
+                                current.pitchPoints
+                            }
                             val updated = (
-                                current.pitchPoints.filterNot { abs(it.tick - relativeTick) <= 30 } + point
+                                basePoints.filterNot { abs(it.tick - relativeTick) <= 30 } + point
                             ).sortedBy { it.tick }
                             onPointsChanged(updated)
                         }
@@ -988,7 +1067,10 @@ private fun PitchLane(
                         strokeWidth = if (index % 4 == 0) 1.1f else 0.6f
                     )
                 }
-                val points = note?.pitchPoints.orEmpty().sortedBy { it.tick }
+                val points = note?.let {
+                    if (it.pitchPoints.isEmpty()) defaultPitchPoints(it.lengthTick)
+                    else it.pitchPoints
+                }.orEmpty().sortedBy { it.tick }
                 if (points.size >= 2 && note != null) {
                     val offsets = points.map { point ->
                         Offset(

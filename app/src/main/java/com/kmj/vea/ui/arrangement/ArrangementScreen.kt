@@ -47,6 +47,7 @@ fun ArrangementScreen(
     onAddTrack: () -> Unit,
     onAddClip: () -> Unit,
     onSave: () -> Unit,
+    onExportMidi: () -> Unit,
     onOpenSelectedClip: () -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
@@ -79,7 +80,10 @@ fun ArrangementScreen(
                 Text("${project.bpm} BPM    ${project.numerator}/${project.denominator}",
                     color = Color(0xFF555555), fontSize = 9.sp)
             }
-            TextButton(onClick = onSave, contentPadding = PaddingValues(horizontal = 6.dp)) {
+            TextButton(onClick = onExportMidi, contentPadding = PaddingValues(horizontal = 5.dp)) {
+                Text("V7 MIDI", fontSize = 10.sp)
+            }
+            TextButton(onClick = onSave, contentPadding = PaddingValues(horizontal = 5.dp)) {
                 Text("SAVE", fontSize = 10.sp)
             }
         }
@@ -237,7 +241,7 @@ fun ArrangementScreen(
                         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(voicebank.displayName, fontWeight = FontWeight.Bold)
                             Text("VOCALOID 7 · " + voicebank.version, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
-                            Text(voicebank.languageCount.toString() + " languages · local package metadata", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
+                            Text(voicebank.languages.joinToString(" · "), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
                         }
                     }
                     Divider()
