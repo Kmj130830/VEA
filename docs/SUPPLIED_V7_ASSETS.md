@@ -87,3 +87,14 @@ PLAY and STOP audition the clip through a generated piano timbre. This is explic
 ## G2P DLL compatibility
 
 The archive inventory step also reads the PE import DLL table and named export table from the supplied Windows DLLs. This is static inspection only. The language-specific `G2PAManager_*.dll` components remain Windows AMD64 libraries and are not loaded or invoked from Android. Their presence is useful for identifying the desktop G2P boundary, but does not provide an Android-callable G2P library.
+
+
+## G2P PE export/import observations
+
+The static PE export/import scan found the following named exports:
+
+- `G2PAManager.dll` exports the manager wrapper surface, including `VIS_G2PAManager_WG2PAManager_canConvert`, `defaultLyric`, `setLyricsAndPhonemes`, `setPhonemes`, `normalizeAllLyrics`, `normalizeAllPhonemes`, `createManager`, and syllable-segment array helpers.
+- `G2PAManager_ENG.dll`, `G2PAManager_JPN.dll`, `G2PAManager_KOR.dll`, and `G2PAManager_CHS.dll` each expose a named `G2PACreateManager` entry point.
+- `G2PA_ESP.dll` exports `g2paCreate`, `g2paDelete`, `g2paGet`, `g2paGetDefaultLyric`, `g2paGetDefaultPhoneme`, `g2paGetSyllable`, and `g2paPut`.
+
+The English G2P manager imports Windows system/runtime DLLs (including KERNEL32, MSVCP140, and VCRUNTIME140 variants). The scan did not recover function signatures, object layouts, calling conventions beyond the PE platform, or any Android ABI. Therefore these symbols identify a likely desktop G2P manager interface but are not enough to call it safely or port it. The current app does not invoke the DLLs. To use the real G2P, a documented and authorized runtime/API or a separately implemented compatible phoneme front-end is still needed.
