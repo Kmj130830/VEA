@@ -1,9 +1,9 @@
 package com.kmj.vea.ui.pianoroll
 
 import android.graphics.Paint as AndroidPaint
-import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -23,12 +23,13 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.kmj.vea.data.PitchPoint
 import com.kmj.vea.data.VeaClip
 import com.kmj.vea.data.VeaNote
@@ -38,13 +39,16 @@ import com.kmj.vea.data.hasNoOverlappingNotes
 import com.kmj.vea.ui.components.ToolbarIcon
 import com.kmj.vea.ui.components.VeaIcon
 import kotlin.math.floor
+import kotlin.math.max
 import kotlin.math.roundToInt
 
 private const val MIN_PITCH = 48
 private const val MAX_PITCH = 72
 private const val TICKS_PER_BEAT = 480
+private const val TICKS_PER_WHOLE_NOTE = 1920
 private val NoteGreen = Color(0xFFB5E853)
 private val EditorBackground = Color(0xFF282A2E)
+private val GridValues = listOf(1, 2, 4, 8, 16, 32)
 
 @Composable
 fun PianoRollScreen(
@@ -53,51 +57,71 @@ fun PianoRollScreen(
     bpm: Int,
     onBack: () -> Unit,
     onSave: () -> Unit,
-    onNotesChanged: (List<VeaNote>) -> Unit
+    onNotesChanged: (List<VeaNote>) -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    canUndo: Boolean,
+    canRedo: Boolean
 ) {
     val configuration = LocalConfiguration.current
     val isPortrait = configuration.screenWidthDp < configuration.screenHeightDp
-    val context = LocalContext.current
 
-    // The same editor remains usable in both orientations; only its density changes.
+    // Portrait and landscape use the same editing model with different screen density.
     val rowHeight = if (isPortrait) 15.dp else 17.dp
     val beatWidth = if (isPortrait) 32.dp else 48.dp
     val laneHeight = if (isPortrait) 54.dp else 66.dp
     val headerHeight = if (isPortrait) 42.dp else 34.dp
     val topToolsHeight = if (isPortrait) 38.dp else 32.dp
-    val editHeight = if (isPortrait) 40.dp else 34.dp
-    val transportHeight = if (isPortrait) 38.dp else 32.dp
+    val editHeight = if (isPortrait) 38.dp else 34.dp
+    val transportHeight = if (isPortrait) 42.dp else 36.dp
+    val keyWidth = if (isPortrait) 39.dp else 48.dp
 
     var selectedNoteId by remember(clip.id) {
         mutableStateOf(clip.notes.firstOrNull()?.id.orEmpty())
     }
     val selectedNote = clip.notes.firstOrNull { it.id == selectedNoteId }
-    var lyricValue by remember(selectedNote?.id) { mutableStateOf(selectedNote?.lyric.orEmpty()) }
+    var lyricDialogNoteId by remember(clip.id) { mutableStateOf<String?>(null) }
+    var lyricInput by remember { mutableStateOf("") }
 
-    val density = LocalDensity.current
+    // Grid resolution only changes drawing and future input/resize snapping.
+    // Existing note startTick and lengthTick values are never rewritten.
+    var gridDenominator by remember(clip.id) { mutableIntStateOf(4) }
+    var gridMenuExpanded by remember { mutableStateOf(false) }
+    val gridTicks = TICKS_PER_WHOLE_NOTE / gridDenominator
+
+    val density = androidx.compose.ui.platform.LocalDensity.current
     val beatWidthPx = with(density) { beatWidth.toPx() }
     val rowHeightPx = with(density) { rowHeight.toPx() }
-    val visibleBeats = (clip.lengthBars.coerceAtLeast(1) * 4)
+    val visibleBeats = clip.lengthBars.coerceAtLeast(1) * 4
     val contentWidth = beatWidth * visibleBeats
     val contentHeight = rowHeight * (MAX_PITCH - MIN_PITCH + 1).toFloat()
     val verticalScroll = rememberScrollState()
     val horizontalScroll = rememberScrollState()
 
     fun updateNotesSafely(updatedNotes: List<VeaNote>) {
-        if (!hasNoOverlappingNotes(updatedNotes)) {
-            Toast.makeText(context, "Overlapping notes are disabled", Toast.LENGTH_SHORT).show()
-            return
-        }
-        onNotesChanged(updatedNotes)
+        if (hasNoOverlappingNotes(updatedNotes)) onNotesChanged(updatedNotes)
     }
 
     fun updateNote(updated: VeaNote) {
         updateNotesSafely(clip.notes.map { if (it.id == updated.id) updated else it })
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().background(Color(0xFF17181B))
-    ) {
+    fun resizeNote(noteId: String, requestedLength: Int) {
+        val note = clip.notes.firstOrNull { it.id == noteId } ?: return
+        val snappedLength = max(
+            gridTicks,
+            ((requestedLength + gridTicks / 2) / gridTicks) * gridTicks
+        )
+        if (snappedLength == note.lengthTick) return
+        updateNote(note.copy(lengthTick = snappedLength))
+    }
+
+    val lyricNote = clip.notes.firstOrNull { it.id == lyricDialogNoteId }
+    if (lyricDialogNoteId != null && lyricNote == null) {
+        lyricDialogNoteId = null
+    }
+
+    Column(modifier = Modifier.fillMaxSize().background(Color(0xFF17181B))) {
         Row(
             modifier = Modifier.fillMaxWidth().height(headerHeight).padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -117,7 +141,7 @@ fun PianoRollScreen(
                 .background(Color(0xFF303238)).padding(horizontal = 5.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            ToolbarIcon(VeaIcon.GRID, "SNAP", modifier = Modifier.width(43.dp), selected = true)
+            ToolbarIcon(VeaIcon.GRID, "GRID", modifier = Modifier.width(43.dp), selected = true)
             ToolbarIcon(VeaIcon.ACTION, "ACTION", modifier = Modifier.width(43.dp))
             ToolbarIcon(VeaIcon.CP_WINDOW, "CP WINDOW", modifier = Modifier.width(49.dp))
             ToolbarIcon(VeaIcon.KEYBOARD, "KEYBOARD", modifier = Modifier.width(49.dp))
@@ -125,21 +149,44 @@ fun PianoRollScreen(
             ToolbarIcon(VeaIcon.AUTO_SCROLL, "AUTO SCROLL", modifier = Modifier.width(49.dp), selected = true)
             ToolbarIcon(VeaIcon.TONE, "TONE", modifier = Modifier.width(42.dp))
             Spacer(Modifier.weight(1f))
-            Text("1/4", color = NoteGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Box {
+                TextButton(
+                    onClick = { gridMenuExpanded = true },
+                    contentPadding = PaddingValues(horizontal = 5.dp)
+                ) {
+                    Text("1/$gridDenominator", color = NoteGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+                DropdownMenu(
+                    expanded = gridMenuExpanded,
+                    onDismissRequest = { gridMenuExpanded = false }
+                ) {
+                    GridValues.forEach { denominator ->
+                        DropdownMenuItem(
+                            text = { Text("1/$denominator") },
+                            onClick = {
+                                // Do not quantize, truncate or remap existing notes here.
+                                gridDenominator = denominator
+                                gridMenuExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
         }
 
         Row(
             modifier = Modifier.fillMaxWidth().height(22.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Spacer(Modifier.width(if (isPortrait) 39.dp else 48.dp))
+            Spacer(Modifier.width(keyWidth))
             Box(modifier = Modifier.weight(1f).fillMaxHeight().horizontalScroll(horizontalScroll)) {
-                PianoRuler(width = contentWidth, beatWidth = beatWidth)
+                PianoRuler(width = contentWidth, beatWidth = beatWidth, gridTicks = gridTicks)
             }
         }
 
-        Row(modifier = Modifier.fillMaxWidth().weight(1f).padding(bottom = 2.dp).verticalScroll(verticalScroll)) {
-            val keyWidth = if (isPortrait) 39.dp else 48.dp
+        Row(
+            modifier = Modifier.fillMaxWidth().weight(1f).padding(bottom = 2.dp).verticalScroll(verticalScroll)
+        ) {
             PianoKeyboard(
                 modifier = Modifier.width(keyWidth).height(contentHeight),
                 rowHeight = rowHeight
@@ -152,21 +199,29 @@ fun PianoRollScreen(
                     height = contentHeight,
                     beatWidthPx = beatWidthPx,
                     rowHeightPx = rowHeightPx,
+                    gridTicks = gridTicks,
                     onSelectNote = { selectedNoteId = it },
+                    onEditLyric = { note ->
+                        selectedNoteId = note.id
+                        lyricInput = note.lyric
+                        lyricDialogNoteId = note.id
+                    },
                     onAddNote = { candidate ->
+                        // A rejected overlapping note is intentionally ignored without
+                        // showing a toast, dialog, or error-log entry.
                         if (canPlaceNote(clip.notes, candidate)) {
                             onNotesChanged(clip.notes + candidate)
                             selectedNoteId = candidate.id
-                        } else {
-                            Toast.makeText(context, "This time position is already occupied", Toast.LENGTH_SHORT).show()
                         }
-                    }
+                    },
+                    onResizeNote = ::resizeNote
                 )
             }
         }
 
         Row(
-            modifier = Modifier.fillMaxWidth().height(editHeight).background(Color(0xFF222429)).padding(horizontal = 4.dp),
+            modifier = Modifier.fillMaxWidth().height(editHeight)
+                .background(Color(0xFF222429)).padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
@@ -184,16 +239,14 @@ fun PianoRollScreen(
             ) { Text("+", fontSize = 10.sp) }
             TextButton(
                 onClick = {
-                    selectedNote?.let { note ->
-                        updateNote(note.copy(lengthTick = (note.lengthTick - 120).coerceAtLeast(120)))
-                    }
+                    selectedNote?.let { note -> resizeNote(note.id, note.lengthTick - gridTicks) }
                 },
-                enabled = selectedNote != null,
+                enabled = selectedNote != null && selectedNote.lengthTick > gridTicks,
                 contentPadding = PaddingValues(horizontal = 3.dp)
             ) { Text("−LEN", fontSize = 9.sp) }
             TextButton(
                 onClick = {
-                    selectedNote?.let { note -> updateNote(note.copy(lengthTick = note.lengthTick + 120)) }
+                    selectedNote?.let { note -> resizeNote(note.id, note.lengthTick + gridTicks) }
                 },
                 enabled = selectedNote != null,
                 contentPadding = PaddingValues(horizontal = 3.dp)
@@ -217,18 +270,23 @@ fun PianoRollScreen(
             Text("LYRIC", color = Color.LightGray, fontSize = 9.sp)
             Spacer(Modifier.width(5.dp))
             OutlinedTextField(
-                value = lyricValue,
-                onValueChange = { value ->
-                    lyricValue = value
-                    selectedNote?.let { updateNote(it.copy(lyric = value)) }
-                },
+                value = lyricInput,
+                onValueChange = { lyricInput = it },
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 singleLine = true,
                 textStyle = LocalTextStyle.current.copy(fontSize = 11.sp),
-                enabled = selectedNote != null
+                enabled = selectedNote != null,
+                placeholder = { Text("Double-tap a note", fontSize = 10.sp) }
             )
             Spacer(Modifier.width(6.dp))
             Text(selectedNote?.phoneme.orEmpty(), color = Color.LightGray, fontSize = 9.sp)
+            TextButton(
+                onClick = {
+                    selectedNote?.let { note -> updateNote(note.copy(lyric = lyricInput)) }
+                },
+                enabled = selectedNote != null,
+                contentPadding = PaddingValues(horizontal = 5.dp)
+            ) { Text("SET", fontSize = 9.sp) }
         }
 
         Text(
@@ -242,7 +300,7 @@ fun PianoRollScreen(
             width = contentWidth,
             beatWidth = beatWidth,
             laneHeight = laneHeight,
-            keyWidth = if (isPortrait) 39.dp else 48.dp,
+            keyWidth = keyWidth,
             scrollState = horizontalScroll,
             onPointsChanged = { points ->
                 selectedNote?.let { updateNote(it.copy(pitchPoints = points)) }
@@ -250,7 +308,7 @@ fun PianoRollScreen(
         )
 
         Row(
-            modifier = Modifier.fillMaxWidth().height(45.dp).background(Color(0xFF111214)),
+            modifier = Modifier.fillMaxWidth().height(transportHeight).background(Color(0xFF111214)),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
@@ -260,14 +318,54 @@ fun PianoRollScreen(
             ToolbarIcon(VeaIcon.PLAY, "PLAY", modifier = Modifier.weight(1f), selected = true)
             ToolbarIcon(VeaIcon.RECORD, "REC", modifier = Modifier.weight(1f))
             ToolbarIcon(VeaIcon.SUB_TOOL, "SUB TOOL", modifier = Modifier.weight(1f), selected = true)
-            ToolbarIcon(VeaIcon.UNDO, "UNDO", modifier = Modifier.weight(1f))
-            ToolbarIcon(VeaIcon.REDO, "REDO", modifier = Modifier.weight(1f))
+            ToolbarIcon(VeaIcon.UNDO, "UNDO", modifier = Modifier.weight(1f), enabled = canUndo, onClick = onUndo)
+            ToolbarIcon(VeaIcon.REDO, "REDO", modifier = Modifier.weight(1f), enabled = canRedo, onClick = onRedo)
+        }
+    }
+
+    if (lyricDialogNoteId != null) {
+        Dialog(
+            onDismissRequest = { lyricDialogNoteId = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(0.88f),
+                shape = RoundedCornerShape(8.dp),
+                color = Color(0xFF2B2D32)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("LYRIC", fontWeight = FontWeight.Bold, color = Color.White)
+                    OutlinedTextField(
+                        value = lyricInput,
+                        onValueChange = { lyricInput = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        textStyle = LocalTextStyle.current.copy(fontSize = 16.sp)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(onClick = { lyricDialogNoteId = null }) { Text("CANCEL") }
+                        TextButton(
+                            onClick = {
+                                lyricNote?.let { updateNote(it.copy(lyric = lyricInput)) }
+                                lyricDialogNoteId = null
+                            }
+                        ) { Text("OK") }
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun PianoRuler(width: Dp, beatWidth: Dp) {
+private fun PianoRuler(width: Dp, beatWidth: Dp, gridTicks: Int) {
     Box(modifier = Modifier.width(width).fillMaxHeight().background(Color(0xFF25272C))) {
         Canvas(Modifier.fillMaxSize()) {
             val beat = beatWidth.toPx()
@@ -330,38 +428,107 @@ private fun NoteGrid(
     height: Dp,
     beatWidthPx: Float,
     rowHeightPx: Float,
+    gridTicks: Int,
     onSelectNote: (String) -> Unit,
-    onAddNote: (VeaNote) -> Unit
+    onEditLyric: (VeaNote) -> Unit,
+    onAddNote: (VeaNote) -> Unit,
+    onResizeNote: (String, Int) -> Unit
 ) {
+    val latestNotes = rememberUpdatedState(notes)
+    val latestResize = rememberUpdatedState(onResizeNote)
+    val latestSelect = rememberUpdatedState(onSelectNote)
+    val latestEdit = rememberUpdatedState(onEditLyric)
+    val latestAdd = rememberUpdatedState(onAddNote)
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val edgeThresholdPx = with(density) { 18.dp.toPx() }
+    var activeResizeNoteId by remember { mutableStateOf<String?>(null) }
+    var previewLengthTick by remember { mutableIntStateOf(0) }
+
     Canvas(
         modifier = Modifier.width(width).height(height).background(EditorBackground)
-            .pointerInput(notes, selectedNoteId) {
-                detectTapGestures { position ->
-                    val hit = notes.firstOrNull { note ->
-                        val left = note.startTick.toFloat() / TICKS_PER_BEAT * beatWidthPx
-                        val right = left + note.lengthTick.toFloat() / TICKS_PER_BEAT * beatWidthPx
-                        val top = (MAX_PITCH - note.pitch) * rowHeightPx
-                        position.x >= left && position.x < right &&
-                            position.y >= top && position.y < top + rowHeightPx
-                    }
-                    if (hit != null) {
-                        onSelectNote(hit.id)
-                    } else {
-                        val beat = floor(position.x / beatWidthPx).toInt().coerceAtLeast(0)
-                        val row = floor(position.y / rowHeightPx).toInt()
-                        val pitch = (MAX_PITCH - row).coerceIn(MIN_PITCH, MAX_PITCH)
-                        onAddNote(
-                            VeaNote(
-                                startTick = beat * TICKS_PER_BEAT,
-                                lengthTick = TICKS_PER_BEAT,
-                                pitch = pitch,
-                                lyric = "",
-                                phoneme = "",
-                                pitchPoints = emptyList()
+            .pointerInput(gridTicks, beatWidthPx, rowHeightPx) {
+                detectTapGestures(
+                    onTap = { position ->
+                        val hit = latestNotes.value.firstOrNull { note ->
+                            val left = note.startTick.toFloat() / TICKS_PER_BEAT * beatWidthPx
+                            val right = left + note.lengthTick.toFloat() / TICKS_PER_BEAT * beatWidthPx
+                            val top = (MAX_PITCH - note.pitch) * rowHeightPx
+                            position.x >= left && position.x < right &&
+                                position.y >= top && position.y < top + rowHeightPx
+                        }
+                        if (hit != null) {
+                            latestSelect.value(hit.id)
+                        } else {
+                            val rawTick = (position.x / beatWidthPx * TICKS_PER_BEAT).roundToInt().coerceAtLeast(0)
+                            val snappedTick = ((rawTick + gridTicks / 2) / gridTicks) * gridTicks
+                            val row = floor(position.y / rowHeightPx).toInt()
+                            val pitch = (MAX_PITCH - row).coerceIn(MIN_PITCH, MAX_PITCH)
+                            latestAdd.value(
+                                VeaNote(
+                                    startTick = snappedTick,
+                                    lengthTick = gridTicks,
+                                    pitch = pitch,
+                                    lyric = "",
+                                    phoneme = "",
+                                    pitchPoints = emptyList()
+                                )
                             )
-                        )
+                        }
+                    },
+                    onDoubleTap = { position ->
+                        val hit = latestNotes.value.firstOrNull { note ->
+                            val left = note.startTick.toFloat() / TICKS_PER_BEAT * beatWidthPx
+                            val right = left + note.lengthTick.toFloat() / TICKS_PER_BEAT * beatWidthPx
+                            val top = (MAX_PITCH - note.pitch) * rowHeightPx
+                            position.x >= left && position.x < right &&
+                                position.y >= top && position.y < top + rowHeightPx
+                        }
+                        if (hit != null) latestEdit.value(hit)
                     }
-                }
+                )
+            }
+            .pointerInput(gridTicks, beatWidthPx, rowHeightPx, edgeThresholdPx) {
+                var activeNoteId: String? = null
+                var initialLength = 0
+                var accumulatedDeltaPx = 0f
+
+                detectDragGestures(
+                    onDragStart = { position ->
+                        val noteAtEdge = latestNotes.value.firstOrNull { note ->
+                            val right = (note.startTick + note.lengthTick).toFloat() /
+                                TICKS_PER_BEAT * beatWidthPx
+                            val top = (MAX_PITCH - note.pitch) * rowHeightPx
+                            kotlin.math.abs(position.x - right) <= edgeThresholdPx &&
+                                position.y >= top && position.y <= top + rowHeightPx
+                        }
+                        activeNoteId = noteAtEdge?.id
+                        initialLength = noteAtEdge?.lengthTick ?: 0
+                        accumulatedDeltaPx = 0f
+                        activeResizeNoteId = noteAtEdge?.id
+                        previewLengthTick = initialLength
+                    },
+                    onDrag = { change, dragAmount ->
+                        val noteId = activeNoteId ?: return@detectDragGestures
+                        accumulatedDeltaPx += dragAmount.x
+                        val deltaTicks = (accumulatedDeltaPx / beatWidthPx * TICKS_PER_BEAT).roundToInt()
+                        val requested = initialLength + deltaTicks
+                        previewLengthTick = max(
+                            gridTicks,
+                            ((requested + gridTicks / 2) / gridTicks) * gridTicks
+                        )
+                        change.consume()
+                    },
+                    onDragEnd = {
+                        val noteId = activeNoteId
+                        if (noteId != null) latestResize.value(noteId, previewLengthTick)
+                        activeNoteId = null
+                        activeResizeNoteId = null
+                    },
+                    onDragCancel = {
+                        activeNoteId = null
+                        activeResizeNoteId = null
+                    }
+                )
             }
     ) {
         val rowHeight = rowHeightPx
@@ -383,26 +550,42 @@ private fun NoteGrid(
             )
         }
 
-        val totalBeats = (size.width / beatWidth).toInt()
-        for (beat in 0..totalBeats) {
-            val x = beat * beatWidth
+        val totalTicks = (size.width / beatWidth * TICKS_PER_BEAT).toInt()
+        var tick = 0
+        while (tick <= totalTicks) {
+            val x = tick.toFloat() / TICKS_PER_BEAT * beatWidth
+            val isBar = tick % (TICKS_PER_BEAT * 4) == 0
             drawLine(
-                color = if (beat % 4 == 0) Color(0xFF777A81) else Color(0xFF414349),
+                color = if (isBar) Color(0xFF777A81) else Color(0xFF414349),
                 start = Offset(x, 0f),
                 end = Offset(x, size.height),
-                strokeWidth = if (beat % 4 == 0) 1.4f else 0.7f
+                strokeWidth = if (isBar) 1.4f else 0.7f
             )
+            tick += gridTicks
         }
 
         notes.forEach { note ->
             val left = note.startTick.toFloat() / TICKS_PER_BEAT * beatWidth
+            val displayLength = if (note.id == activeResizeNoteId && previewLengthTick > 0) {
+                previewLengthTick
+            } else {
+                note.lengthTick
+            }
+            val right = (note.startTick + displayLength).toFloat() / TICKS_PER_BEAT * beatWidth
             val top = (MAX_PITCH - note.pitch) * rowHeight + 1f
-            val noteWidth = (note.lengthTick.toFloat() / TICKS_PER_BEAT * beatWidth).coerceAtLeast(7f) - 1f
+            val noteWidth = (right - left).coerceAtLeast(7f) - 1f
             drawRoundRect(
                 color = NoteGreen,
                 topLeft = Offset(left + 0.5f, top),
                 size = Size(noteWidth, rowHeight - 2f),
                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(2f, 2f)
+            )
+            // Small grip at the right edge indicates the draggable note-length handle.
+            drawLine(
+                color = Color(0xFF60763A),
+                start = Offset(right - 3f, top + 3f),
+                end = Offset(right - 3f, top + rowHeight - 5f),
+                strokeWidth = 1.5f
             )
             if (note.id == selectedNoteId) {
                 drawRoundRect(
@@ -438,7 +621,7 @@ private fun PitchLane(
     scrollState: androidx.compose.foundation.ScrollState,
     onPointsChanged: (List<PitchPoint>) -> Unit
 ) {
-    val density = LocalDensity.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
     val beatWidthPx = with(density) { beatWidth.toPx() }
 
     Row(modifier = Modifier.fillMaxWidth().height(laneHeight)) {
@@ -464,9 +647,8 @@ private fun PitchLane(
                 drawRect(Color(0xFF59624F))
                 val centerY = size.height / 2f
                 drawLine(Color(0xFFAAB39B), Offset(0f, centerY), Offset(size.width, centerY), 1f)
-                val beat = beatWidthPx
-                for (index in 0..(size.width / beat).toInt()) {
-                    val x = index * beat
+                for (index in 0..(size.width / beatWidthPx).toInt()) {
+                    val x = index * beatWidthPx
                     drawLine(
                         color = Color(0xFF7A836D),
                         start = Offset(x, 0f),
@@ -478,7 +660,7 @@ private fun PitchLane(
                 if (points.size >= 2 && note != null) {
                     val offsets = points.map { point ->
                         Offset(
-                            x = (note.startTick + point.tick).toFloat() / TICKS_PER_BEAT * beat,
+                            x = (note.startTick + point.tick).toFloat() / TICKS_PER_BEAT * beatWidthPx,
                             y = centerY - point.cents.coerceIn(-300, 300) * (size.height / 700f)
                         )
                     }

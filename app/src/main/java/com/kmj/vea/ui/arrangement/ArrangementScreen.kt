@@ -10,12 +10,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.border
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -33,12 +36,18 @@ private const val TRACK_HEADER_DP = 88
 fun ArrangementScreen(
     project: VeaProject,
     selectedTrackId: String,
+    selectedClipId: String,
     onSelectTrack: (String) -> Unit,
+    onSelectClip: (String) -> Unit,
     onOpenClip: (String, String) -> Unit,
     onAddTrack: () -> Unit,
     onAddClip: () -> Unit,
     onSave: () -> Unit,
-    onOpenSelectedClip: () -> Unit
+    onOpenSelectedClip: () -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    canUndo: Boolean,
+    canRedo: Boolean
 ) {
     val selectedTrack = project.tracks.firstOrNull { it.id == selectedTrackId }
 
@@ -84,15 +93,15 @@ fun ArrangementScreen(
             verticalArrangement = Arrangement.spacedBy(1.dp)
         ) {
             if (project.tracks.isEmpty()) {
-                item {
-                    EmptyArrangementGrid()
-                }
+                item { EmptyArrangementGrid() }
             } else {
                 items(project.tracks, key = { it.id }) { track ->
                     ArrangementTrackRow(
                         track = track,
                         selected = track.id == selectedTrackId,
+                        selectedClipId = selectedClipId,
                         onSelect = { onSelectTrack(track.id) },
+                        onSelectClip = onSelectClip,
                         onOpenClip = { clip -> onOpenClip(track.id, clip.id) }
                     )
                 }
@@ -120,11 +129,16 @@ fun ArrangementScreen(
             Text("ADD TRACK", fontSize = 9.sp, color = Color.LightGray,
                 modifier = Modifier.clickable(onClick = onAddTrack))
             Spacer(Modifier.weight(1f))
-            TextButton(onClick = onAddClip, enabled = selectedTrack != null && selectedTrack.kind != "AUDIO",
-                contentPadding = PaddingValues(horizontal = 5.dp)) { Text("ADD CLIP", fontSize = 9.sp) }
-            TextButton(onClick = onOpenSelectedClip,
-                enabled = selectedTrack?.clips?.isNotEmpty() == true,
-                contentPadding = PaddingValues(horizontal = 5.dp)) { Text("PIANO ROLL", fontSize = 9.sp) }
+            TextButton(
+                onClick = onAddClip,
+                enabled = selectedTrack != null && selectedTrack.kind != "AUDIO",
+                contentPadding = PaddingValues(horizontal = 5.dp)
+            ) { Text("ADD CLIP", fontSize = 9.sp) }
+            TextButton(
+                onClick = onOpenSelectedClip,
+                enabled = selectedTrack?.clips?.any { it.id == selectedClipId } == true,
+                contentPadding = PaddingValues(horizontal = 5.dp)
+            ) { Text("PIANO ROLL", fontSize = 9.sp) }
         }
 
         ToolbarRow(
@@ -140,7 +154,14 @@ fun ArrangementScreen(
                 VeaIcon.KEYBOARD to "KEYBOARD"
             ),
             selected = emptySet(),
-            onAction = { if (it == "UNDO" || it == "REDO") Unit }
+            canUndo = canUndo,
+            canRedo = canRedo,
+            onAction = { label ->
+                when (label) {
+                    "UNDO" -> onUndo()
+                    "REDO" -> onRedo()
+                }
+            }
         )
         ToolbarRow(
             items = listOf(
@@ -154,6 +175,8 @@ fun ArrangementScreen(
                 VeaIcon.GRID to "1/1"
             ),
             selected = setOf("AUTO SCROLL"),
+            canUndo = canUndo,
+            canRedo = canRedo,
             onAction = {}
         )
         ToolbarRow(
@@ -168,6 +191,8 @@ fun ArrangementScreen(
                 VeaIcon.GRID to "SNAP"
             ),
             selected = setOf("SUB TOOL", "SNAP"),
+            canUndo = canUndo,
+            canRedo = canRedo,
             onAction = {}
         )
     }
@@ -177,6 +202,8 @@ fun ArrangementScreen(
 private fun ToolbarRow(
     items: List<Pair<VeaIcon, String>>,
     selected: Set<String>,
+    canUndo: Boolean,
+    canRedo: Boolean,
     onAction: (String) -> Unit
 ) {
     Row(
@@ -186,11 +213,17 @@ private fun ToolbarRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         items.forEach { (icon, label) ->
+            val enabled = when (label) {
+                "UNDO" -> canUndo
+                "REDO" -> canRedo
+                else -> true
+            }
             ToolbarIcon(
                 icon = icon,
                 label = label,
                 modifier = Modifier.width(43.dp),
                 selected = label in selected,
+                enabled = enabled,
                 onClick = { onAction(label) }
             )
         }
@@ -251,7 +284,9 @@ private fun TimelineRuler() {
 private fun ArrangementTrackRow(
     track: VeaTrack,
     selected: Boolean,
+    selectedClipId: String,
     onSelect: () -> Unit,
+    onSelectClip: (String) -> Unit,
     onOpenClip: (VeaClip) -> Unit
 ) {
     Row(modifier = Modifier.fillMaxWidth().height(76.dp).background(Color(0xFF1F2024))) {
@@ -283,6 +318,7 @@ private fun ArrangementTrackRow(
                     }
                 }
                 track.clips.forEach { clip ->
+                    val isSelected = clip.id == selectedClipId
                     Box(
                         modifier = Modifier
                             .offset(x = BAR_WIDTH_DP.dp * (clip.startBar - 1).toFloat())
@@ -291,7 +327,16 @@ private fun ArrangementTrackRow(
                             .fillMaxHeight()
                             .clip(RoundedCornerShape(3.dp))
                             .background(Color(track.color.toInt()))
-                            .clickable { onOpenClip(clip) }
+                            .then(
+                                if (isSelected) Modifier.border(1.5.dp, Color.White, RoundedCornerShape(3.dp))
+                                else Modifier
+                            )
+                            .pointerInput(clip.id) {
+                                detectTapGestures(
+                                    onTap = { onSelectClip(clip.id) },
+                                    onDoubleTap = { onOpenClip(clip) }
+                                )
+                            }
                             .padding(horizontal = 6.dp, vertical = 5.dp)
                     ) {
                         Text(clip.name, fontWeight = FontWeight.Bold, fontSize = 11.sp,

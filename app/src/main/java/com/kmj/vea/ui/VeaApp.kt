@@ -19,20 +19,57 @@ enum class EditorMode {
     PIANO_ROLL
 }
 
+private const val HISTORY_LIMIT = 100
+
 @Composable
 fun VeaApp() {
     val context = LocalContext.current
     var modeName by rememberSaveable { mutableStateOf(EditorMode.ARRANGEMENT.name) }
     val mode = EditorMode.valueOf(modeName)
 
-    // New installations open an intentionally empty project.
     var project by remember {
         mutableStateOf(ProjectStore.load(context) ?: VeaProject())
     }
+    var history by remember { mutableStateOf(listOf(project)) }
+    var historyIndex by remember { mutableIntStateOf(0) }
+
     var selectedTrackId by rememberSaveable {
         mutableStateOf(project.tracks.firstOrNull()?.id.orEmpty())
     }
     var selectedClipId by rememberSaveable { mutableStateOf("") }
+
+    val canUndo = historyIndex > 0
+    val canRedo = historyIndex < history.lastIndex
+
+    fun commitProject(next: VeaProject) {
+        if (next == project) return
+        val branch = history.take(historyIndex + 1) + next
+        history = if (branch.size > HISTORY_LIMIT) branch.takeLast(HISTORY_LIMIT) else branch
+        historyIndex = history.lastIndex
+        project = next
+    }
+
+    fun undoProject() {
+        if (!canUndo) return
+        historyIndex -= 1
+        project = history[historyIndex]
+    }
+
+    fun redoProject() {
+        if (!canRedo) return
+        historyIndex += 1
+        project = history[historyIndex]
+    }
+
+    LaunchedEffect(project) {
+        if (project.tracks.none { it.id == selectedTrackId }) {
+            selectedTrackId = project.tracks.firstOrNull()?.id.orEmpty()
+        }
+        val selectedTrack = project.tracks.firstOrNull { it.id == selectedTrackId }
+        if (selectedTrack?.clips?.none { it.id == selectedClipId } != false) {
+            selectedClipId = selectedTrack?.clips?.firstOrNull()?.id.orEmpty()
+        }
+    }
 
     fun saveProject() {
         val success = ProjectStore.save(context, project)
@@ -44,13 +81,12 @@ fun VeaApp() {
     }
 
     fun updateClipNotes(notes: List<VeaNote>) {
-        if (!hasNoOverlappingNotes(notes)) {
-            Toast.makeText(context, "Notes cannot overlap in monophonic mode", Toast.LENGTH_SHORT).show()
-            return
-        }
+        // Monophonic validation is deliberately silent: rejected placement/resize
+        // does not produce an error popup or log entry.
+        if (!hasNoOverlappingNotes(notes)) return
         val trackId = selectedTrackId
         val clipId = selectedClipId
-        project = project.copy(
+        val next = project.copy(
             tracks = project.tracks.map { track ->
                 if (track.id != trackId) track
                 else track.copy(
@@ -60,6 +96,7 @@ fun VeaApp() {
                 )
             }
         )
+        commitProject(next)
     }
 
     MaterialTheme(
@@ -79,7 +116,9 @@ fun VeaApp() {
                 ArrangementScreen(
                     project = project,
                     selectedTrackId = selectedTrackId,
+                    selectedClipId = selectedClipId,
                     onSelectTrack = { selectedTrackId = it },
+                    onSelectClip = { selectedClipId = it },
                     onOpenClip = { trackId, clipId ->
                         selectedTrackId = trackId
                         selectedClipId = clipId
@@ -91,22 +130,23 @@ fun VeaApp() {
                             kind = "VOCAL_AI",
                             color = 0xFF8C74C7
                         )
-                        project = project.copy(tracks = project.tracks + track)
+                        commitProject(project.copy(tracks = project.tracks + track))
                         selectedTrackId = track.id
+                        selectedClipId = ""
                     },
                     onAddClip = {
                         val track = project.tracks.firstOrNull { it.id == selectedTrackId }
                         if (track != null && track.kind != "AUDIO") {
                             val startBar = track.clips.maxOfOrNull { it.startBar + it.lengthBars } ?: 1
                             val clip = VeaClip(name = "Clip", startBar = startBar, lengthBars = 4)
-                            project = project.copy(
+                            val next = project.copy(
                                 tracks = project.tracks.map { current ->
                                     if (current.id == track.id) current.copy(clips = current.clips + clip)
                                     else current
                                 }
                             )
+                            commitProject(next)
                             selectedClipId = clip.id
-                            modeName = EditorMode.PIANO_ROLL.name
                         }
                     },
                     onSave = ::saveProject,
@@ -114,10 +154,13 @@ fun VeaApp() {
                         val track = project.tracks.firstOrNull { it.id == selectedTrackId }
                         val clip = track?.clips?.firstOrNull { it.id == selectedClipId }
                         if (track != null && clip != null) {
-                            selectedClipId = clip.id
                             modeName = EditorMode.PIANO_ROLL.name
                         }
-                    }
+                    },
+                    onUndo = ::undoProject,
+                    onRedo = ::redoProject,
+                    canUndo = canUndo,
+                    canRedo = canRedo
                 )
             } else {
                 val track = project.tracks.firstOrNull { it.id == selectedTrackId }
@@ -131,7 +174,11 @@ fun VeaApp() {
                         bpm = project.bpm,
                         onBack = { modeName = EditorMode.ARRANGEMENT.name },
                         onSave = ::saveProject,
-                        onNotesChanged = ::updateClipNotes
+                        onNotesChanged = ::updateClipNotes,
+                        onUndo = ::undoProject,
+                        onRedo = ::redoProject,
+                        canUndo = canUndo,
+                        canRedo = canRedo
                     )
                 }
             }

@@ -61,3 +61,15 @@ Piano roll:
 - BACK returns to the arrangement.
 
 Project data is stored in the app's private files directory as vea-project.json.
+
+
+## Editing gestures and history
+
+- Single tap a clip to select it; double-tap the clip to open its piano roll.
+- Single tap an empty piano-roll cell to add a note.
+- Double-tap a note to edit its lyric.
+- Drag the right-edge handle of a note to resize it.
+- Resize and note-entry snapping follow the selected grid (1/1, 1/2, 1/4, 1/8, 1/16, 1/32).
+- Changing the grid resolution changes only the visual grid and future snapping. Existing note positions and lengths remain stored in ticks and are not rewritten.
+- The editor is monophonic: time intervals cannot overlap, regardless of pitch. Rejected placements/resizes are ignored silently.
+- Undo and redo share a project snapshot history (up to 100 states).
