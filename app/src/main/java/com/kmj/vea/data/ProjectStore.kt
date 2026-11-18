@@ -106,7 +106,7 @@ object ProjectStore {
                                 name = clipJson.optString("name", "Clip"),
                                 startBar = clipJson.optInt("startBar", 1),
                                 lengthBars = clipJson.optInt("lengthBars", 4),
-                                notes = notes
+                                notes = sanitizeMonophonicNotes(notes)
                             ))
                         }
                     }
@@ -119,7 +119,7 @@ object ProjectStore {
                     ))
                 }
             }
-            VeaProject(
+            val loaded = VeaProject(
                 id = root.optString("id"),
                 name = root.optString("name", "Untitled Project"),
                 bpm = root.optInt("bpm", 120),
@@ -127,6 +127,15 @@ object ProjectStore {
                 denominator = root.optInt("denominator", 4),
                 tracks = tracks
             )
+            // Remove only the exact built-in starter arrangement from the earlier prototype.
+            val oldPrototypeTrackNames = listOf("Main01", "Cho01", "Cho02", "Cho03", "MONO", "STEREO")
+            if (loaded.name == "The voice of beginning" &&
+                loaded.tracks.map { it.name } == oldPrototypeTrackNames
+            ) {
+                VeaProject().also { emptyProject -> save(context, emptyProject) }
+            } else {
+                loaded
+            }
         }.getOrNull()
     }
 }

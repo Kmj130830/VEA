@@ -10,11 +10,12 @@ VEA is an Android-first vocal editing workstation. Its interface is based on the
 Implemented in this repository:
 - Android application project targeting Android 16 (API 36).
 - Portrait arrangement view with track lanes and timeline clips.
-- Landscape piano-roll view with a touch-to-add/select note grid.
+- Portrait and landscape piano-roll layouts that adapt without forcing device rotation.
+- A monophonic note rule: note time intervals cannot overlap, regardless of pitch.
 - Note pitch and duration controls, lyric editing, and a pitch-curve lane.
 - Local JSON project save/load in app-private storage.
 - A synthesis-engine contract and an explicit unavailable adapter for VOCALOID AI.
-- Demo arrangement and notes so the screens are testable immediately.
+- Starts with an empty project: no default tracks, clips, or notes.
 
 Not implemented yet:
 - Actual VOCALOID6 / VOCALOID7 synthesis.
@@ -53,7 +54,7 @@ Arrangement:
 - SAVE stores the current project locally.
 
 Piano roll:
-- Tap an empty grid cell to create a note.
+- Tap an unoccupied time cell to create a note. Overlapping notes and chords are rejected.
 - Tap an existing note to select it.
 - Use the note controls to change pitch, length, lyric, or delete it.
 - Tap the pitch lane to add or replace a pitch point.

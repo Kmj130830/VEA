@@ -32,8 +32,8 @@ data class VeaNote(
     val startTick: Int,
     val lengthTick: Int = 480,
     val pitch: Int = 60,
-    val lyric: String = "あ",
-    val phoneme: String = "a",
+    val lyric: String = "",
+    val phoneme: String = "",
     val pitchPoints: List<PitchPoint> = emptyList()
 )
 
@@ -42,69 +42,35 @@ data class PitchPoint(
     val cents: Int
 )
 
-object ProjectFactory {
-    fun demoProject(): VeaProject {
-        val mainNotes = listOf(
-            note(0, 55, "は", "ha"),
-            note(480, 60, "じ", "j i"),
-            note(960, 62, "ま", "m a"),
-            note(1440, 60, "り", "r i"),
-            note(1920, 62, "わ", "w a"),
-            note(2880, 67, "い", "i"),
-            note(3360, 69, "ま", "m a"),
-            note(3840, 72, "あ", "a"),
-            note(4800, 67, "な", "n a"),
-            note(5760, 71, "ひ", "h i")
-        )
-        val main = VeaTrack(
-            name = "Main01",
-            kind = "VOCAL_AI",
-            color = 0xFF8C74C7,
-            clips = listOf(
-                VeaClip(name = "Main", startBar = 1, lengthBars = 8, notes = mainNotes),
-                VeaClip(name = "Main", startBar = 9, lengthBars = 8, notes = mainNotes),
-                VeaClip(name = "Main", startBar = 17, lengthBars = 8, notes = mainNotes)
-            )
-        )
-        val cho1 = VeaTrack(
-            name = "Cho01",
-            kind = "VOCAL_AI",
-            color = 0xFFD27C63,
-            clips = listOf(
-                VeaClip(name = "Cho1", startBar = 5, lengthBars = 4, notes = listOf(note(0, 64, "あ", "a"))),
-                VeaClip(name = "Cho1", startBar = 21, lengthBars = 4, notes = listOf(note(0, 64, "あ", "a")))
-            )
-        )
-        val cho2 = VeaTrack(
-            name = "Cho02",
-            kind = "VOCAL_AI",
-            color = 0xFF69A96B,
-            clips = listOf(VeaClip(name = "Cho2", startBar = 13, lengthBars = 2))
-        )
-        val cho3 = VeaTrack(
-            name = "Cho03",
-            kind = "VOCAL_AI",
-            color = 0xFF42BFC4,
-            clips = listOf(VeaClip(name = "Cho3", startBar = 15, lengthBars = 4))
-        )
-        val mono = VeaTrack(name = "MONO", kind = "AUDIO", color = 0xFF777777)
-        val stereo = VeaTrack(
-            name = "STEREO",
-            kind = "AUDIO",
-            color = 0xFF777777,
-            clips = listOf(VeaClip(name = "Audio placeholder", startBar = 1, lengthBars = 24))
-        )
-        return VeaProject(name = "The voice of beginning", tracks = listOf(main, cho1, cho2, cho3, mono, stereo))
+/**
+ * The current editor is monophonic: a note occupies a time interval, and no
+ * other note may overlap that interval, regardless of pitch.
+ */
+fun hasNoOverlappingNotes(notes: List<VeaNote>): Boolean {
+    val ordered = notes.sortedBy { it.startTick }
+    return ordered.zipWithNext().all { (left, right) ->
+        left.startTick + left.lengthTick <= right.startTick
     }
+}
 
-    private fun note(tick: Int, pitch: Int, lyric: String, phoneme: String): VeaNote {
-        return VeaNote(
-            startTick = tick,
-            lengthTick = 480,
-            pitch = pitch,
-            lyric = lyric,
-            phoneme = phoneme,
-            pitchPoints = listOf(PitchPoint(0, 0), PitchPoint(480, 0))
-        )
+fun canPlaceNote(existing: List<VeaNote>, candidate: VeaNote): Boolean {
+    if (candidate.lengthTick <= 0 || candidate.startTick < 0) return false
+    val candidateEnd = candidate.startTick + candidate.lengthTick
+    return existing.none { note ->
+        candidate.startTick < note.startTick + note.lengthTick &&
+            note.startTick < candidateEnd
     }
+}
+
+/** Keeps the earliest note in any collision and removes later overlapping notes. */
+fun sanitizeMonophonicNotes(notes: List<VeaNote>): List<VeaNote> {
+    val accepted = mutableListOf<VeaNote>()
+    var occupiedUntil = 0
+    notes.sortedWith(compareBy<VeaNote> { it.startTick }.thenBy { it.id }).forEach { note ->
+        if (note.lengthTick > 0 && note.startTick >= occupiedUntil) {
+            accepted += note
+            occupiedUntil = note.startTick + note.lengthTick
+        }
+    }
+    return accepted
 }
