@@ -810,6 +810,32 @@ private fun NoteGrid(
                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(2f, 2f)
             )
 
+            // Render the actual lyric inside the note. Earlier builds only drew
+            // X-SAMPA above the note, which made committed lyrics appear missing.
+            if (note.lyric.isNotBlank()) {
+                drawIntoCanvas { canvas ->
+                    val paint = AndroidPaint().apply {
+                        color = android.graphics.Color.rgb(35, 40, 28)
+                        textSize = 8.dp.toPx()
+                        isAntiAlias = true
+                        typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    }
+                    val availableWidth = (noteWidth - 5f).coerceAtLeast(1f)
+                    val visibleLyric = android.text.TextUtils.ellipsize(
+                        note.lyric,
+                        paint,
+                        availableWidth,
+                        android.text.TextUtils.TruncateAt.END
+                    ).toString()
+                    canvas.nativeCanvas.drawText(
+                        visibleLyric,
+                        left + 2.5f,
+                        noteBlockTop + noteBlockHeight * 0.76f,
+                        paint
+                    )
+                }
+            }
+
             // Phoneme label is drawn immediately above the note block.
             val phoneme = note.phoneme.ifBlank { XsampaMapper.convert(note.lyric, language) }
             if (phoneme.isNotBlank()) {
