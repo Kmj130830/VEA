@@ -131,7 +131,10 @@ class StandardMidiExporterTest {
             )
         )
         // 3/4: bar 2 starts at 1,440 ticks; VLQ 0x8B 0x20.
-        assertTrue(indexOf(bytes, byteArrayOf(0x8B.toByte(), 0x20, 0xFF.toByte(), 0x05, 0x02, 'r'.code.toByte(), 'a'.code.toByte())) >= 0)
+        // Japanese romaji is normalized to hiragana before the V7 hand-off.
+        val lyric = "ら".toByteArray(Charsets.UTF_8)
+        val expected = byteArrayOf(0x8B.toByte(), 0x20, 0xFF.toByte(), 0x05, lyric.size.toByte()) + lyric
+        assertTrue(indexOf(bytes, expected) >= 0)
     }
 
     private fun indexOf(haystack: ByteArray, needle: ByteArray): Int {
