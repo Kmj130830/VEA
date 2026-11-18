@@ -54,19 +54,19 @@ fun ArrangementScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF17181B))
+            .background(Color(0xFFE7E7E7))
             .padding(horizontal = 5.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(48.dp),
+            modifier = Modifier.fillMaxWidth().height(48.dp).background(Color(0xFFD1D1D1)),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("VEA", color = Color(0xFFB5E853), fontWeight = FontWeight.Black, fontSize = 19.sp)
+            Text("VEA", color = Color(0xFF596A3D), fontWeight = FontWeight.Black, fontSize = 19.sp)
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text(project.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text(project.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF222222))
                 Text("${project.bpm} BPM    ${project.numerator}/${project.denominator}",
-                    color = Color.LightGray, fontSize = 9.sp)
+                    color = Color(0xFF555555), fontSize = 9.sp)
             }
             TextButton(onClick = onSave, contentPadding = PaddingValues(horizontal = 6.dp)) {
                 Text("SAVE", fontSize = 10.sp)
@@ -78,10 +78,10 @@ fun ArrangementScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.width(TRACK_HEADER_DP.dp).fillMaxHeight().background(Color(0xFF303238)),
+                modifier = Modifier.width(TRACK_HEADER_DP.dp).fillMaxHeight().background(Color(0xFFC9CACC)),
                 contentAlignment = Alignment.CenterStart
             ) {
-                Text("TRACK", modifier = Modifier.padding(start = 8.dp), fontSize = 9.sp, color = Color.LightGray)
+                Text("TRACK", modifier = Modifier.padding(start = 8.dp), fontSize = 9.sp, color = Color(0xFF333333))
             }
             Box(Modifier.weight(1f).fillMaxHeight().horizontalScroll(rememberScrollState())) {
                 TimelineRuler()
@@ -232,7 +232,7 @@ private fun ToolbarRow(
 
 @Composable
 private fun EmptyArrangementGrid() {
-    Row(modifier = Modifier.fillMaxWidth().height(170.dp).background(Color(0xFF202226))) {
+    Row(modifier = Modifier.fillMaxWidth().height(170.dp).background(Color(0xFFE7E7E7))) {
         Box(
             modifier = Modifier.width(TRACK_HEADER_DP.dp).fillMaxHeight().background(Color(0xFF303238)),
             contentAlignment = Alignment.Center
@@ -244,7 +244,7 @@ private fun EmptyArrangementGrid() {
             for (bar in 0..24) {
                 val x = bar * barWidth
                 drawLine(
-                    color = if (bar % 4 == 0) Color(0xFF565960) else Color(0xFF34363B),
+                    color = if (bar % 4 == 0) Color(0xFFB5B7BA) else Color(0xFFD0D2D4),
                     start = androidx.compose.ui.geometry.Offset(x, 0f),
                     end = androidx.compose.ui.geometry.Offset(x, size.height),
                     strokeWidth = if (bar % 4 == 0) 1.2f else 0.7f
@@ -289,28 +289,28 @@ private fun ArrangementTrackRow(
     onSelectClip: (String) -> Unit,
     onOpenClip: (VeaClip) -> Unit
 ) {
-    Row(modifier = Modifier.fillMaxWidth().height(76.dp).background(Color(0xFF1F2024))) {
+    Row(modifier = Modifier.fillMaxWidth().height(76.dp).background(Color(0xFFE0E1E2))) {
         Column(
             modifier = Modifier.width(TRACK_HEADER_DP.dp).fillMaxHeight()
-                .background(if (selected) Color(0xFF41444A) else Color(0xFF303238))
+                .background(if (selected) Color(0xFFBFC1C3) else Color(0xFF303238))
                 .clickable(onClick = onSelect)
                 .padding(start = 8.dp, top = 9.dp, end = 4.dp),
             verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
-            Text(track.name, fontWeight = FontWeight.SemiBold, fontSize = 11.sp,
+            Text(track.name, color = Color(0xFF222222), fontWeight = FontWeight.SemiBold, fontSize = 11.sp,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(if (track.kind == "AUDIO") "AUDIO" else "VOCAL AI",
-                fontSize = 8.sp, color = Color.LightGray)
+                fontSize = 8.sp, color = Color(0xFF555555))
         }
 
         Box(modifier = Modifier.weight(1f).fillMaxHeight().horizontalScroll(rememberScrollState())) {
-            Box(modifier = Modifier.width(1260.dp).fillMaxHeight().background(Color(0xFF222429))) {
+            Box(modifier = Modifier.width(1260.dp).fillMaxHeight().background(Color(0xFFECEDEE))) {
                 Canvas(Modifier.fillMaxSize()) {
                     val barWidth = BAR_WIDTH_DP.dp.toPx()
                     for (bar in 0..30) {
                         val x = bar * barWidth
                         drawLine(
-                            color = if (bar % 4 == 0) Color(0xFF4D5056) else Color(0xFF34363B),
+                            color = if (bar % 4 == 0) Color(0xFFB7B9BC) else Color(0xFF34363B),
                             start = androidx.compose.ui.geometry.Offset(x, 0f),
                             end = androidx.compose.ui.geometry.Offset(x, size.height),
                             strokeWidth = if (bar % 4 == 0) 1.2f else 0.7f

@@ -46,8 +46,8 @@ private const val MIN_PITCH = 48
 private const val MAX_PITCH = 72
 private const val TICKS_PER_BEAT = 480
 private const val TICKS_PER_WHOLE_NOTE = 1920
-private val NoteGreen = Color(0xFFB5E853)
-private val EditorBackground = Color(0xFF282A2E)
+private val NoteGreen = Color(0xFFA8DA55)
+private val EditorBackground = Color(0xFFE8E9EA)
 private val GridValues = listOf(1, 2, 4, 8, 16, 32)
 
 @Composable
@@ -366,13 +366,13 @@ fun PianoRollScreen(
 
 @Composable
 private fun PianoRuler(width: Dp, beatWidth: Dp, gridTicks: Int) {
-    Box(modifier = Modifier.width(width).fillMaxHeight().background(Color(0xFF25272C))) {
+    Box(modifier = Modifier.width(width).fillMaxHeight().background(Color(0xFFD9DADD))) {
         Canvas(Modifier.fillMaxSize()) {
             val beat = beatWidth.toPx()
             val barCount = (size.width / (beat * 4f)).toInt()
             for (bar in 0..barCount) {
                 val x = bar * beat * 4f
-                drawLine(Color(0xFF72757C), Offset(x, 0f), Offset(x, size.height), 1f)
+                drawLine(Color(0xFF92969A), Offset(x, 0f), Offset(x, size.height), 1f)
             }
             drawIntoCanvas { canvas ->
                 val paint = AndroidPaint().apply {
@@ -390,14 +390,14 @@ private fun PianoRuler(width: Dp, beatWidth: Dp, gridTicks: Int) {
 
 @Composable
 private fun PianoKeyboard(modifier: Modifier = Modifier, rowHeight: Dp) {
-    Canvas(modifier = modifier.background(Color(0xFF4A4C51))) {
+    Canvas(modifier = modifier.background(Color(0xFF777A7E))) {
         val rowPx = rowHeight.toPx()
         val blackKeys = setOf(1, 3, 6, 8, 10)
         for (row in 0..(MAX_PITCH - MIN_PITCH)) {
             val pitch = MAX_PITCH - row
             val y = row * rowPx
             drawRect(
-                color = if (pitch % 12 in blackKeys) Color(0xFF4A4C51) else Color(0xFFF1F1F1),
+                color = if (pitch % 12 in blackKeys) Color(0xFF4A4C51) else Color(0xFFFFFFFF),
                 topLeft = Offset(0f, y),
                 size = Size(size.width, rowPx - 1f)
             )
@@ -538,12 +538,12 @@ private fun NoteGrid(
         for (row in 0..(MAX_PITCH - MIN_PITCH)) {
             val pitch = MAX_PITCH - row
             drawRect(
-                color = if (pitch % 12 in blackKeys) Color(0xFF292B2F) else Color(0xFF34363B),
+                color = if (pitch % 12 in blackKeys) Color(0xFFE4E5E6) else Color(0xFFF5F5F5),
                 topLeft = Offset(0f, row * rowHeight),
                 size = Size(size.width, rowHeight - 1f)
             )
             drawLine(
-                color = Color(0xFF45474D),
+                color = Color(0xFFC9CBCE),
                 start = Offset(0f, row * rowHeight),
                 end = Offset(size.width, row * rowHeight),
                 strokeWidth = 0.8f
@@ -556,7 +556,7 @@ private fun NoteGrid(
             val x = tick.toFloat() / TICKS_PER_BEAT * beatWidth
             val isBar = tick % (TICKS_PER_BEAT * 4) == 0
             drawLine(
-                color = if (isBar) Color(0xFF777A81) else Color(0xFF414349),
+                color = if (isBar) Color(0xFF92969A) else Color(0xFFD1D3D5),
                 start = Offset(x, 0f),
                 end = Offset(x, size.height),
                 strokeWidth = if (isBar) 1.4f else 0.7f
@@ -589,7 +589,7 @@ private fun NoteGrid(
             )
             if (note.id == selectedNoteId) {
                 drawRoundRect(
-                    color = Color(0xFFFF5CB8),
+                    color = Color(0xFFDA4C94),
                     topLeft = Offset(left, top - 0.5f),
                     size = Size(noteWidth + 1f, rowHeight - 1f),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(2f, 2f),
@@ -644,13 +644,13 @@ private fun PitchLane(
                         }
                     }
             ) {
-                drawRect(Color(0xFF59624F))
+                drawRect(Color(0xFFD4DDC8))
                 val centerY = size.height / 2f
-                drawLine(Color(0xFFAAB39B), Offset(0f, centerY), Offset(size.width, centerY), 1f)
+                drawLine(Color(0xFF929C84), Offset(0f, centerY), Offset(size.width, centerY), 1f)
                 for (index in 0..(size.width / beatWidthPx).toInt()) {
                     val x = index * beatWidthPx
                     drawLine(
-                        color = Color(0xFF7A836D),
+                        color = Color(0xFFB5BEA8),
                         start = Offset(x, 0f),
                         end = Offset(x, size.height),
                         strokeWidth = if (index % 4 == 0) 1.1f else 0.6f
@@ -665,7 +665,7 @@ private fun PitchLane(
                         )
                     }
                     for (index in 0 until offsets.lastIndex) {
-                        drawLine(Color(0xFFDBE98B), offsets[index], offsets[index + 1], 2.2f)
+                        drawLine(Color(0xFFE17845), offsets[index], offsets[index + 1], 2.2f)
                     }
                     offsets.forEach { drawCircle(Color(0xFFFF5CB8), radius = 3.5f, center = it) }
                 }
