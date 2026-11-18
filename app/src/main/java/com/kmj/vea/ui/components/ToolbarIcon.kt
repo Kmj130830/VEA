@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.sp
 enum class VeaIcon {
     HISTORY, UNDO, REDO, CONFIG, PROPERTY, ARRANGE, MIXER, METRONOME, KEYBOARD,
     COPY, PASTE, ERASER, LOOP, AUTO_SCROLL, EDIT, ACTION, CP_WINDOW, GRID,
-    HOME, PREVIOUS, NEXT, STOP, PLAY, RECORD, SUB_TOOL, TONE, CLOSE, LOCK, UNLOCK, ADD
+    HOME, PREVIOUS, NEXT, STOP, PLAY, RECORD, SUB_TOOL, TONE, CLOSE, LOCK, UNLOCK, ADD, SELECT, PITCH
 }
 
 @Composable
@@ -128,5 +128,13 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawVeaIcon(
             circle(12f, 15f, 1.2f)
         }
         VeaIcon.ADD -> { circle(12f, 12f, 9f); line(12f, 7f, 12f, 17f); line(7f, 12f, 17f, 12f) }
+        VeaIcon.SELECT -> {
+            path(listOf(5f to 3f, 5f to 19f, 9f to 15f, 12f to 21f, 15f to 19f, 12f to 13f, 19f to 13f, 5f to 3f), true)
+        }
+        VeaIcon.PITCH -> {
+            path(listOf(3f to 16f, 7f to 13f, 10f to 15f, 14f to 7f, 18f to 10f, 21f to 5f))
+            circle(14f, 7f, 1.1f)
+            circle(21f, 5f, 1.1f)
+        }
     }
 }

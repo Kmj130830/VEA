@@ -2,6 +2,9 @@ package com.kmj.vea.ui
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
@@ -11,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.kmj.vea.data.*
+import com.kmj.vea.audio.PianoPreview
 import com.kmj.vea.ui.arrangement.ArrangementScreen
 import com.kmj.vea.ui.pianoroll.PianoRollScreen
 
@@ -59,6 +63,25 @@ fun VeaApp() {
         if (selectedTrack?.clips?.none { it.id == selectedClipId } != false) {
             selectedClipId = selectedTrack?.clips?.firstOrNull()?.id.orEmpty()
         }
+    }
+
+    fun updateTrackVoice(trackId: String, singerId: String, singerName: String, styleId: String) {
+        val next = project.copy(
+            tracks = project.tracks.map { track ->
+                if (track.id == trackId) track.copy(
+                    singerId = singerId,
+                    singerName = singerName,
+                    singerStyleId = styleId
+                ) else track
+            }
+        )
+        commitProject(next)
+    }
+
+    fun playSelectedClip() {
+        val track = project.tracks.firstOrNull { it.id == selectedTrackId } ?: return
+        val clip = track.clips.firstOrNull { it.id == selectedClipId } ?: return
+        PianoPreview.playNotes(clip.notes, project.bpm)
     }
 
     fun updateTrackLanguage(language: String) {
@@ -119,7 +142,10 @@ fun VeaApp() {
             onSurface = Color(0xFFE8E9E7)
         )
     ) {
-        Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF17181B)) {
+        Surface(
+            modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),
+            color = Color(0xFF17181B)
+        ) {
             if (mode == EditorMode.ARRANGEMENT) {
                 ArrangementScreen(
                     project = project,
@@ -166,6 +192,9 @@ fun VeaApp() {
                     },
                     onUndo = ::undoProject,
                     onRedo = ::redoProject,
+                    onPlay = ::playSelectedClip,
+                    onStop = PianoPreview::stop,
+                    onAssignVoice = ::updateTrackVoice,
                     canUndo = canUndo,
                     canRedo = canRedo
                 )

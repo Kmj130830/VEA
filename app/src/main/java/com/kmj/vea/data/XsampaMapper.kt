@@ -93,11 +93,40 @@ object XsampaMapper {
     )
 
     private val englishWords = mapOf(
-        "i" to "aI", "you" to "j u:", "the" to "D @", "a" to "@",
+        "i" to "aI", "me" to "m i:", "you" to "j u:", "the" to "D @", "a" to "@",
         "hello" to "h @ 'l oU", "world" to "w 3: l d", "love" to "l V v",
         "music" to "'m j u: z I k", "vocaloid" to "'v oU k @ l OI d",
-        "voice" to "v OI s", "sing" to "s I N", "song" to "s O: N"
+        "voice" to "v OI s", "sing" to "s I N", "song" to "s O: N",
+        "read" to "4 i:d", "live" to "l I v", "wind" to "w I n d",
+        "lead" to "l i:d", "use" to "j u:z", "either" to "' i:D @r"
     )
+
+    // Alternative pronunciations that are common in English. These are
+    // suggestions, not forced readings; the user can choose one in the lyric editor.
+    private val englishAlternatives = mapOf(
+        "me" to listOf("m i:", "m e"),
+        "read" to listOf("4 i:d", "4 E d"),
+        "live" to listOf("l I v", "l aI v"),
+        "wind" to listOf("w I n d", "w aI n d"),
+        "lead" to listOf("l i:d", "l E d"),
+        "use" to listOf("j u:z", "j u:s"),
+        "either" to listOf("' i:D @r", "' aI D @r"),
+        "the" to listOf("D @", "D i:")
+    )
+
+    fun pronunciationSuggestions(text: String, language: String): List<String> {
+        val normalized = text.trim().lowercase(Locale.ROOT)
+        if (normalized.isBlank()) return emptyList()
+        if (language.lowercase(Locale.ROOT) !in setOf("eng", "en")) {
+            return listOf(convert(text, language)).filter { it.isNotBlank() }
+        }
+        val words = normalized.split(Regex("\\s+"))
+        if (words.size == 1) {
+            return englishAlternatives[words.first()]
+                ?: listOf(convert(text, language)).filter { it.isNotBlank() }
+        }
+        return listOf(convert(text, language)).filter { it.isNotBlank() }
+    }
 
     fun convert(text: String, language: String): String {
         val normalized = Normalizer.normalize(text.trim(), Normalizer.Form.NFC)

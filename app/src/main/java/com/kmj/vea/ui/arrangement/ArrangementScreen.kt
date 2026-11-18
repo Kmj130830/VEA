@@ -12,7 +12,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.border
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,6 +27,8 @@ import androidx.compose.ui.unit.sp
 import com.kmj.vea.data.VeaClip
 import com.kmj.vea.data.VeaProject
 import com.kmj.vea.data.VeaTrack
+import com.kmj.vea.data.VoicebankCatalog
+import com.kmj.vea.data.MegpoidPortrait
 import com.kmj.vea.ui.components.ToolbarIcon
 import com.kmj.vea.ui.components.VeaIcon
 
@@ -46,10 +49,17 @@ fun ArrangementScreen(
     onOpenSelectedClip: () -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
+    onPlay: () -> Unit,
+    onStop: () -> Unit,
+    onAssignVoice: (String, String, String, String) -> Unit,
     canUndo: Boolean,
     canRedo: Boolean
 ) {
     val selectedTrack = project.tracks.firstOrNull { it.id == selectedTrackId }
+    val context = LocalContext.current
+    val voicebank = remember(context) { VoicebankCatalog.loadMegpoid(context) }
+    var voicePickerTrack by remember { mutableStateOf<VeaTrack?>(null) }
+    var selectedVoiceStyleId by remember { mutableStateOf(voicebank.defaultStyleId) }
 
     Column(
         modifier = Modifier
@@ -102,7 +112,11 @@ fun ArrangementScreen(
                         selectedClipId = selectedClipId,
                         onSelect = { onSelectTrack(track.id) },
                         onSelectClip = onSelectClip,
-                        onOpenClip = { clip -> onOpenClip(track.id, clip.id) }
+                        onOpenClip = { clip -> onOpenClip(track.id, clip.id) },
+                        onOpenVoice = {
+                            voicePickerTrack = track
+                            selectedVoiceStyleId = track.singerStyleId.ifBlank { voicebank.defaultStyleId }
+                        }
                     )
                 }
             }
@@ -193,7 +207,75 @@ fun ArrangementScreen(
             selected = setOf("SUB TOOL", "SNAP"),
             canUndo = canUndo,
             canRedo = canRedo,
-            onAction = {}
+            onAction = { label ->
+                when (label) {
+                    "PLAY" -> onPlay()
+                    "STOP" -> onStop()
+                }
+            }
+        )
+    }
+
+    val targetTrack = voicePickerTrack
+    if (targetTrack != null) {
+        AlertDialog(
+            onDismissRequest = { voicePickerTrack = null },
+            title = { Text("Select Voicebank") },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 390.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        MegpoidPortrait(68.dp)
+                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(voicebank.displayName, fontWeight = FontWeight.Bold)
+                            Text("VOCALOID 7 · " + voicebank.version, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                            Text(voicebank.languageCount.toString() + " languages · local package metadata", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
+                        }
+                    }
+                    Divider()
+                    Text("VOICE STYLE", style = MaterialTheme.typography.labelSmall)
+                    voicebank.styles.forEach { style ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp))
+                                .clickable { selectedVoiceStyleId = style.id }
+                                .padding(vertical = 3.dp, horizontal = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = selectedVoiceStyleId == style.id,
+                                onClick = { selectedVoiceStyleId = style.id }
+                            )
+                            Text(style.name, fontSize = 13.sp)
+                        }
+                    }
+                    Text(
+                        "Singer identity and styles are loaded from the supplied package. VOCALOID rendering still requires an authorized Android engine.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 10.sp
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onAssignVoice(
+                        targetTrack.id,
+                        voicebank.id,
+                        voicebank.displayName,
+                        selectedVoiceStyleId
+                    )
+                    voicePickerTrack = null
+                }) { Text("LOAD VOICE") }
+            },
+            dismissButton = {
+                TextButton(onClick = { voicePickerTrack = null }) { Text("CANCEL") }
+            }
         )
     }
 }
@@ -233,12 +315,10 @@ private fun ToolbarRow(
 @Composable
 private fun EmptyArrangementGrid() {
     Row(modifier = Modifier.fillMaxWidth().height(170.dp).background(Color(0xFFE7E7E7))) {
-        Box(
-            modifier = Modifier.width(TRACK_HEADER_DP.dp).fillMaxHeight().background(Color(0xFF303238)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("—", color = Color(0xFF77797E), fontSize = 18.sp)
-        }
+        Spacer(
+            modifier = Modifier.width(TRACK_HEADER_DP.dp).fillMaxHeight()
+                .background(Color(0xFFE7E7E7))
+        )
         Canvas(Modifier.weight(1f).fillMaxHeight()) {
             val barWidth = BAR_WIDTH_DP.dp.toPx()
             for (bar in 0..24) {
@@ -287,7 +367,8 @@ private fun ArrangementTrackRow(
     selectedClipId: String,
     onSelect: () -> Unit,
     onSelectClip: (String) -> Unit,
-    onOpenClip: (VeaClip) -> Unit
+    onOpenClip: (VeaClip) -> Unit,
+    onOpenVoice: () -> Unit
 ) {
     Row(modifier = Modifier.fillMaxWidth().height(76.dp).background(Color(0xFFE0E1E2))) {
         Column(
@@ -299,8 +380,27 @@ private fun ArrangementTrackRow(
         ) {
             Text(track.name, color = Color(0xFF222222), fontWeight = FontWeight.SemiBold, fontSize = 11.sp,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(if (track.kind == "AUDIO") "AUDIO" else "VOCAL AI",
-                fontSize = 8.sp, color = Color(0xFF555555))
+            if (track.kind == "AUDIO") {
+                Text("AUDIO", fontSize = 8.sp, color = Color(0xFF555555))
+            } else {
+                Row(
+                    modifier = Modifier.clip(RoundedCornerShape(5.dp))
+                        .background(Color(0xFF45494F))
+                        .clickable(onClick = onOpenVoice)
+                        .padding(horizontal = 4.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (track.singerName.isNotBlank()) MegpoidPortrait(19.dp)
+                    Text(
+                        track.singerName.ifBlank { "VOCAL AI" },
+                        fontSize = 8.sp,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
         }
 
         Box(modifier = Modifier.weight(1f).fillMaxHeight().horizontalScroll(rememberScrollState())) {
@@ -339,8 +439,31 @@ private fun ArrangementTrackRow(
                             }
                             .padding(horizontal = 6.dp, vertical = 5.dp)
                     ) {
-                        Text(clip.name, fontWeight = FontWeight.Bold, fontSize = 11.sp,
-                            color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Canvas(Modifier.fillMaxSize()) {
+                            val totalTicks = (clip.lengthBars * 1920).coerceAtLeast(1).toFloat()
+                            clip.notes.forEach { note ->
+                                val left = (note.startTick / totalTicks * size.width).coerceIn(0f, size.width)
+                                val right = ((note.startTick + note.lengthTick) / totalTicks * size.width)
+                                    .coerceAtLeast(left + 2f).coerceAtMost(size.width)
+                                val normalizedPitch = ((note.pitch - 48f) / 24f).coerceIn(0f, 1f)
+                                val y = (1f - normalizedPitch) * (size.height - 13f) + 8f
+                                drawRoundRect(
+                                    color = Color(0xFFE7F6B8),
+                                    topLeft = androidx.compose.ui.geometry.Offset(left, y),
+                                    size = androidx.compose.ui.geometry.Size((right - left).coerceAtLeast(2f), 3.5f),
+                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(2f, 2f)
+                                )
+                            }
+                        }
+                        Text(
+                            clip.name,
+                            modifier = Modifier.align(Alignment.TopStart),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
             }

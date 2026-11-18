@@ -98,3 +98,27 @@ Project data is stored in the app's private files directory as vea-project.json.
 ## Supplied VOCALOID7 package inspection
 
 The three supplied ZIP archives are checked statically in CI. A compact metadata catalog for AI Megpoid V7 is bundled at `app/src/main/assets/voicebanks/megpoid_v7_catalog.json`. It includes the manifest identity, 13 style names, and SHA-256 model references, but does not bundle Windows DLLs or model weights. See docs/SUPPLIED_V7_ASSETS.md for the compatibility findings.
+
+
+## Mobile editor refinements
+
+- Arrangement clips draw a compact piano-roll preview of their saved notes.
+- The empty arrangement contains only the timeline grid; it no longer draws a placeholder dash track.
+- Tap the `VOCAL AI` label in a vocal track header to choose the supplied AI Megpoid V7 identity and one of its 13 style entries. The portrait artwork is prepared from `megpoidV7.zip` by the CI allow-list asset step.
+- Selecting a singer records its identity and style in the project. This is voicebank metadata selection, not a claim that VOCALOID rendering is available on Android.
+- Piano-roll canvas width starts at the full usable screen width and expands only when notes extend past the viewport.
+- The piano-roll has DRAW, SELECT, and PITCH tools. New notes receive a gentle default pitch contour, even when no singer is selected. The curve is smoothly interpolated and drawn in `#E76B22`.
+- The PLAY and STOP transport buttons now play/stop a locally synthesized piano audition of the clip's notes in timeline order. This is note audition, not voice synthesis.
+- The main UI applies Android safe-drawing insets so the status and navigation bars do not cover editor controls.
+- The lyric popup starts with the phoneme lock off and places the text cursor at the end of the lyric. English words with common alternate readings display selectable phoneme suggestions. The `me` default is `m i:`, with `m e` as an alternative.
+
+### Prepare local singer artwork before building
+
+The checked-in CI runs this step before Gradle:
+
+```bash
+python3 tools/prepare_voicebank_assets.py
+gradle --no-daemon testDebugUnitTest assembleDebug
+```
+
+The preparation script extracts only the two allow-listed PNG artwork files from `megpoidV7.zip`. It does not unpack DLLs or proprietary model payloads.

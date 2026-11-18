@@ -29,6 +29,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,6 +42,7 @@ import com.kmj.vea.data.VeaClip
 import com.kmj.vea.data.VeaNote
 import com.kmj.vea.data.VeaTrack
 import com.kmj.vea.data.XsampaMapper
+import com.kmj.vea.data.MegpoidPortrait
 import com.kmj.vea.data.canPlaceNote
 import com.kmj.vea.data.hasNoOverlappingNotes
 import com.kmj.vea.ui.components.ToolbarIcon
@@ -55,7 +58,21 @@ private const val MAX_PITCH = 72
 private const val TICKS_PER_BEAT = 480
 private const val TICKS_PER_BAR = 1920
 private val NoteGreen = Color(0xFFA8DA55)
+private val PitchCurveColor = Color(0xFFE76B22)
 private val EditorBackground = Color(0xFFE8E9EA)
+
+private enum class PianoTool { DRAW, SELECT, PITCH }
+
+private fun defaultPitchPoints(lengthTick: Int): List<PitchPoint> {
+    val end = lengthTick.coerceAtLeast(1)
+    return listOf(
+        PitchPoint(0, -12),
+        PitchPoint((end * 0.08f).toInt(), 0),
+        PitchPoint((end * 0.48f).toInt(), 3),
+        PitchPoint((end * 0.78f).toInt(), 0),
+        PitchPoint(end, -8)
+    ).distinctBy { it.tick }.sortedBy { it.tick }
+}
 private val GridValues = listOf(1, 2, 4, 8, 16, 32)
 
 @Composable
@@ -78,7 +95,7 @@ fun PianoRollScreen(
     val beatWidth = if (isPortrait) 32.dp else 48.dp
     val laneHeight = if (isPortrait) 50.dp else 60.dp
     val headerHeight = if (isPortrait) 40.dp else 34.dp
-    val toolsHeight = if (isPortrait) 36.dp else 31.dp
+    val toolsHeight = 49.dp
     val editHeight = if (isPortrait) 35.dp else 32.dp
     val transportHeight = if (isPortrait) 43.dp else 35.dp
     val keyWidth = if (isPortrait) 39.dp else 48.dp
@@ -90,7 +107,8 @@ fun PianoRollScreen(
     var lyricDialogNoteId by remember(clip.id) { mutableStateOf<String?>(null) }
     var lyricInput by remember { mutableStateOf("") }
     var phonemeInput by remember { mutableStateOf("") }
-    var phonemeLocked by remember { mutableStateOf(true) }
+    var phonemeLocked by remember { mutableStateOf(false) }
+    var currentTool by remember(clip.id) { mutableStateOf(PianoTool.DRAW) }
 
     // Changing this value only changes snap points and grid lines.
     // Existing startTick/lengthTick values remain untouched.
@@ -108,7 +126,6 @@ fun PianoRollScreen(
     val lastNoteEnd = clip.notes.maxOfOrNull { it.startTick + it.lengthTick } ?: 0
     val canvasEndTick = max(TICKS_PER_BAR, lastNoteEnd + TICKS_PER_BEAT)
     val visibleBeats = ceil(canvasEndTick / TICKS_PER_BEAT.toDouble()).toInt()
-    val contentWidth = beatWidth * visibleBeats
     val contentHeight = rowHeight * (MAX_PITCH - MIN_PITCH + 1).toFloat()
     val verticalScroll = rememberScrollState()
     val horizontalScroll = rememberScrollState()
@@ -138,14 +155,14 @@ fun PianoRollScreen(
         lyricDialogNoteId = note.id
         lyricInput = note.lyric.ifBlank { "あ" }
         phonemeInput = note.phoneme.ifBlank { XsampaMapper.convert(lyricInput, track.language) }
-        phonemeLocked = true
+        phonemeLocked = false
     }
 
     fun commitLyricEditor(noteId: String) {
         val resolvedPhoneme = if (phonemeLocked) {
-            XsampaMapper.convert(lyricInput, track.language)
-        } else {
             phonemeInput.trim()
+        } else {
+            XsampaMapper.convert(lyricInput, track.language)
         }
         updateLyric(noteId, lyricInput, resolvedPhoneme)
     }
@@ -159,15 +176,27 @@ fun PianoRollScreen(
         openLyricEditor(target)
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color(0xFF17181B))) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color(0xFF17181B))) {
+        val viewportWidth = (maxWidth - keyWidth).coerceAtLeast(1.dp)
+        val contentWidth = maxOf(viewportWidth, beatWidth * visibleBeats)
+        Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier.fillMaxWidth().height(headerHeight).padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             ToolbarIcon(VeaIcon.HOME, "BACK", modifier = Modifier.width(42.dp), onClick = onBack)
+            if (track.singerName.isNotBlank()) {
+                MegpoidPortrait(26.dp)
+                Spacer(Modifier.width(5.dp))
+            }
             Column(modifier = Modifier.weight(1f).padding(start = 4.dp)) {
                 Text(track.name + " / " + clip.name, fontWeight = FontWeight.Bold, maxLines = 1, fontSize = 12.sp)
-                Text("${bpm} BPM · ${track.language.uppercase()}", fontSize = 9.sp, color = Color.LightGray)
+                Text(
+                    "${bpm} BPM · ${track.language.uppercase()} · " + track.singerName.ifBlank { "NO SINGER" },
+                    fontSize = 9.sp,
+                    color = Color.LightGray,
+                    maxLines = 1
+                )
             }
             TextButton(onClick = onSave, contentPadding = PaddingValues(horizontal = 7.dp)) {
                 Text("SAVE", fontSize = 10.sp)
@@ -176,42 +205,40 @@ fun PianoRollScreen(
 
         Row(
             modifier = Modifier.fillMaxWidth().height(toolsHeight)
-                .background(Color(0xFF303238)).padding(horizontal = 4.dp),
+                .background(Color(0xFF303238)).horizontalScroll(rememberScrollState())
+                .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            ToolbarIcon(VeaIcon.EDIT, "DRAW", modifier = Modifier.width(45.dp),
+                selected = currentTool == PianoTool.DRAW, onClick = { currentTool = PianoTool.DRAW })
+            ToolbarIcon(VeaIcon.SELECT, "SELECT", modifier = Modifier.width(48.dp),
+                selected = currentTool == PianoTool.SELECT, onClick = { currentTool = PianoTool.SELECT })
+            ToolbarIcon(VeaIcon.PITCH, "PITCH", modifier = Modifier.width(45.dp),
+                selected = currentTool == PianoTool.PITCH, onClick = { currentTool = PianoTool.PITCH })
             ToolbarIcon(VeaIcon.GRID, "GRID", modifier = Modifier.width(42.dp), selected = true)
-            ToolbarIcon(VeaIcon.ACTION, "ACTION", modifier = Modifier.width(42.dp))
-            ToolbarIcon(VeaIcon.CP_WINDOW, "CP WINDOW", modifier = Modifier.width(48.dp))
-            ToolbarIcon(VeaIcon.KEYBOARD, "KEYBOARD", modifier = Modifier.width(48.dp))
+            ToolbarIcon(VeaIcon.CP_WINDOW, "CP", modifier = Modifier.width(40.dp))
+            ToolbarIcon(VeaIcon.KEYBOARD, "KEYS", modifier = Modifier.width(42.dp))
             ToolbarIcon(VeaIcon.LOOP, "LOOP", modifier = Modifier.width(40.dp))
             ToolbarIcon(VeaIcon.TONE, "TONE", modifier = Modifier.width(40.dp), selected = true)
-            Spacer(Modifier.weight(1f))
             Box {
-                TextButton(
-                    onClick = { gridMenuExpanded = true },
-                    contentPadding = PaddingValues(horizontal = 4.dp)
-                ) {
+                TextButton(onClick = { gridMenuExpanded = true }, contentPadding = PaddingValues(horizontal = 5.dp)) {
                     Text("1/$gridDenominator", color = NoteGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
-                DropdownMenu(
-                    expanded = gridMenuExpanded,
-                    onDismissRequest = { gridMenuExpanded = false }
-                ) {
+                DropdownMenu(expanded = gridMenuExpanded, onDismissRequest = { gridMenuExpanded = false }) {
                     GridValues.forEach { denominator ->
                         DropdownMenuItem(
                             text = { Text("1/$denominator") },
-                            onClick = {
-                                gridDenominator = denominator
-                                gridMenuExpanded = false
-                            }
+                            onClick = { gridDenominator = denominator; gridMenuExpanded = false }
                         )
                     }
                 }
             }
         }
 
-        Row(modifier = Modifier.fillMaxWidth().height(22.dp), verticalAlignment = Alignment.CenterVertically) {
-            Spacer(Modifier.width(keyWidth))
+        Row(modifier = Modifier.fillMaxWidth().height(28.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.width(keyWidth).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                if (track.singerName.isNotBlank()) MegpoidPortrait(23.dp)
+            }
             Box(modifier = Modifier.weight(1f).fillMaxHeight().horizontalScroll(horizontalScroll)) {
                 PianoRuler(width = contentWidth, beatWidth = beatWidth, gridTicks = gridTicks)
             }
@@ -234,6 +261,7 @@ fun PianoRollScreen(
                     rowHeightPx = rowHeightPx,
                     gridTicks = gridTicks,
                     language = track.language,
+                    tool = currentTool,
                     onSelectNote = { note ->
                         selectedNoteId = note.id
                         openLyricEditor(note)
@@ -331,6 +359,7 @@ fun PianoRollScreen(
         )
         PitchLane(
             note = selectedNote,
+            enabled = currentTool == PianoTool.PITCH,
             width = contentWidth,
             beatWidth = beatWidth,
             laneHeight = laneHeight,
@@ -349,12 +378,16 @@ fun PianoRollScreen(
             ToolbarIcon(VeaIcon.PREVIOUS, "PREVIOUS", modifier = Modifier.weight(1f))
             ToolbarIcon(VeaIcon.NEXT, "NEXT", modifier = Modifier.weight(1f))
             ToolbarIcon(VeaIcon.STOP, "STOP", modifier = Modifier.weight(1f), onClick = PianoPreview::stop)
-            ToolbarIcon(VeaIcon.PLAY, "PLAY", modifier = Modifier.weight(1f), selected = true)
+            ToolbarIcon(
+                VeaIcon.PLAY, "PLAY", modifier = Modifier.weight(1f),
+                onClick = { PianoPreview.playNotes(clip.notes, bpm) }
+            )
             ToolbarIcon(VeaIcon.RECORD, "REC", modifier = Modifier.weight(1f))
             ToolbarIcon(VeaIcon.SUB_TOOL, "SUB TOOL", modifier = Modifier.weight(1f), selected = true)
             ToolbarIcon(VeaIcon.UNDO, "UNDO", modifier = Modifier.weight(1f), enabled = canUndo, onClick = onUndo)
             ToolbarIcon(VeaIcon.REDO, "REDO", modifier = Modifier.weight(1f), enabled = canRedo, onClick = onRedo)
         }
+    }
     }
 
     if (lyricDialogNoteId != null && lyricNote != null) {
@@ -363,17 +396,30 @@ fun PianoRollScreen(
             phoneme = phonemeInput,
             language = track.language,
             phonemeLocked = phonemeLocked,
+            suggestions = XsampaMapper.pronunciationSuggestions(lyricInput, track.language),
             onLyricChange = {
                 lyricInput = it
-                if (phonemeLocked) phonemeInput = XsampaMapper.convert(it, track.language)
+                if (!phonemeLocked) phonemeInput = XsampaMapper.convert(it, track.language)
             },
-            onPhonemeChange = { phonemeInput = it },
-            onToggleLock = { phonemeLocked = !phonemeLocked },
+            onPhonemeChange = { phonemeInput = it; phonemeLocked = true },
+            onSuggestionSelected = { suggestion ->
+                phonemeInput = suggestion
+                phonemeLocked = true
+            },
+            onToggleLock = {
+                val wasLocked = phonemeLocked
+                phonemeLocked = !wasLocked
+                if (wasLocked) phonemeInput = XsampaMapper.convert(lyricInput, track.language)
+            },
             onLanguageChange = { language ->
                 phonemeInput = XsampaMapper.convert(lyricInput, language)
+                phonemeLocked = false
                 onLanguageChanged(language)
             },
-            onClearLyric = { lyricInput = "" },
+            onClearLyric = {
+                lyricInput = ""
+                if (!phonemeLocked) phonemeInput = ""
+            },
             onPrevious = { selectAdjacentLyricNote(-1) },
             onNext = { selectAdjacentLyricNote(1) },
             onCancel = { lyricDialogNoteId = null },
@@ -391,8 +437,10 @@ private fun LyricEditorPopup(
     phoneme: String,
     language: String,
     phonemeLocked: Boolean,
+    suggestions: List<String>,
     onLyricChange: (String) -> Unit,
     onPhonemeChange: (String) -> Unit,
+    onSuggestionSelected: (String) -> Unit,
     onToggleLock: () -> Unit,
     onLanguageChange: (String) -> Unit,
     onClearLyric: () -> Unit,
@@ -434,7 +482,7 @@ private fun LyricEditorPopup(
                         onValueChange = onPhonemeChange,
                         modifier = Modifier.weight(1f).height(52.dp),
                         singleLine = true,
-                        readOnly = phonemeLocked,
+                        readOnly = false,
                         textStyle = LocalTextStyle.current.copy(
                             color = Color(0xFF222222),
                             fontSize = 18.sp,
@@ -479,8 +527,8 @@ private fun LyricEditorPopup(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     OutlinedTextField(
-                        value = lyric,
-                        onValueChange = onLyricChange,
+                        value = TextFieldValue(text = lyric, selection = TextRange(lyric.length)),
+                        onValueChange = { onLyricChange(it.text) },
                         modifier = Modifier.weight(1f).height(56.dp).focusRequester(lyricFocusRequester),
                         singleLine = true,
                         textStyle = LocalTextStyle.current.copy(
@@ -500,6 +548,25 @@ private fun LyricEditorPopup(
                     }
                     TextButton(onClick = onNext, contentPadding = PaddingValues(horizontal = 5.dp)) {
                         Text(">>", color = Color(0xFFB00067), fontSize = 16.sp)
+                    }
+                }
+
+                if (suggestions.size > 1) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Text("PHONEME", color = Color(0xFF666666), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        suggestions.forEach { suggestion ->
+                            OutlinedButton(
+                                onClick = { onSuggestionSelected(suggestion) },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 1.dp),
+                                modifier = Modifier.height(29.dp)
+                            ) {
+                                Text(suggestion, fontSize = 11.sp, color = Color(0xFF333333))
+                            }
+                        }
                     }
                 }
 
@@ -604,6 +671,7 @@ private fun NoteGrid(
     rowHeightPx: Float,
     gridTicks: Int,
     language: String,
+    tool: PianoTool,
     onSelectNote: (VeaNote) -> Unit,
     onAddNote: (VeaNote) -> Unit,
     onMoveNote: (VeaNote) -> Unit,
@@ -627,9 +695,10 @@ private fun NoteGrid(
 
     Canvas(
         modifier = Modifier.width(width).height(height).background(EditorBackground)
-            .pointerInput(gridTicks, beatWidthPx, rowHeightPx, language) {
+            .pointerInput(gridTicks, beatWidthPx, rowHeightPx, language, tool) {
                 detectTapGestures(
                     onTap = { position ->
+                        if (tool == PianoTool.PITCH) return@detectTapGestures
                         val hit = latestNotes.value.firstOrNull { note ->
                             val left = note.startTick.toFloat() / TICKS_PER_BEAT * beatWidthPx
                             val right = left + note.lengthTick.toFloat() / TICKS_PER_BEAT * beatWidthPx
@@ -639,7 +708,7 @@ private fun NoteGrid(
                         }
                         if (hit != null) {
                             latestSelect.value(hit)
-                        } else {
+                        } else if (tool == PianoTool.DRAW) {
                             val rawTick = (position.x / beatWidthPx * TICKS_PER_BEAT).roundToInt().coerceAtLeast(0)
                             val startTick = ((rawTick + gridTicks / 2) / gridTicks) * gridTicks
                             val row = floor(position.y / rowHeightPx).toInt()
@@ -651,14 +720,14 @@ private fun NoteGrid(
                                     pitch = pitch,
                                     lyric = "あ",
                                     phoneme = XsampaMapper.convert("あ", language),
-                                    pitchPoints = emptyList()
+                                    pitchPoints = defaultPitchPoints(gridTicks)
                                 )
                             )
                         }
                     }
                 )
             }
-            .pointerInput(gridTicks, beatWidthPx, rowHeightPx, edgeThresholdPx) {
+            .pointerInput(gridTicks, beatWidthPx, rowHeightPx, edgeThresholdPx, tool) {
                 var initialStart = 0
                 var initialPitch = 60
                 var initialLength = 0
@@ -674,7 +743,7 @@ private fun NoteGrid(
                             position.x >= left && position.x <= right &&
                                 position.y >= top && position.y <= top + rowHeightPx
                         }
-                        activeNoteId = hit?.id
+                        activeNoteId = if (tool == PianoTool.PITCH) null else hit?.id
                         initialStart = hit?.startTick ?: 0
                         initialPitch = hit?.pitch ?: 60
                         initialLength = hit?.lengthTick ?: 0
@@ -689,7 +758,11 @@ private fun NoteGrid(
                                 max(with(density) { 3.dp.toPx() }, it.lengthTick.toFloat() / TICKS_PER_BEAT * beatWidthPx * 0.25f)
                             )
                         } ?: edgeThresholdPx
-                        activeGesture = if (hit != null && abs(position.x - hitRight) <= resizeThreshold) "RESIZE" else "MOVE"
+                        activeGesture = when {
+                            tool == PianoTool.PITCH || hit == null -> "NONE"
+                            abs(position.x - hitRight) <= resizeThreshold -> "RESIZE"
+                            else -> "MOVE"
+                        }
                         previewStartTick = initialStart
                         previewPitch = initialPitch
                         previewLengthTick = initialLength
@@ -871,6 +944,7 @@ private fun NoteGrid(
 @Composable
 private fun PitchLane(
     note: VeaNote?,
+    enabled: Boolean,
     width: Dp,
     beatWidth: Dp,
     laneHeight: Dp,
@@ -886,8 +960,9 @@ private fun PitchLane(
         Box(modifier = Modifier.weight(1f).fillMaxHeight().horizontalScroll(scrollState)) {
             Canvas(
                 modifier = Modifier.width(width).fillMaxHeight()
-                    .pointerInput(note) {
+                    .pointerInput(note, enabled) {
                         detectTapGestures { position ->
+                            if (!enabled) return@detectTapGestures
                             val current = note ?: return@detectTapGestures
                             val absoluteTick = (position.x / beatWidthPx * TICKS_PER_BEAT).roundToInt()
                             val relativeTick = (absoluteTick - current.startTick).coerceIn(0, current.lengthTick)
@@ -921,10 +996,25 @@ private fun PitchLane(
                             y = centerY - point.cents.coerceIn(-300, 300) * (size.height / 700f)
                         )
                     }
-                    for (index in 0 until offsets.lastIndex) {
-                        drawLine(Color(0xFFE17845), offsets[index], offsets[index + 1], 2.2f)
+                    val smoothPath = Path().apply {
+                        moveTo(offsets.first().x, offsets.first().y)
+                        for (index in 0 until offsets.lastIndex) {
+                            val start = offsets[index]
+                            val end = offsets[index + 1]
+                            val dx = end.x - start.x
+                            cubicTo(
+                                start.x + dx * 0.36f, start.y,
+                                end.x - dx * 0.36f, end.y,
+                                end.x, end.y
+                            )
+                        }
                     }
-                    offsets.forEach { drawCircle(Color(0xFFE17845), radius = 3.5f, center = it) }
+                    drawPath(
+                        path = smoothPath,
+                        color = PitchCurveColor,
+                        style = Stroke(width = 2.6f)
+                    )
+                    offsets.forEach { drawCircle(PitchCurveColor, radius = 2.4f, center = it) }
                 }
             }
         }

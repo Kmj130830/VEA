@@ -1,6 +1,7 @@
 package com.kmj.vea.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class XsampaMapperTest {
@@ -34,5 +35,23 @@ class XsampaMapperTest {
         val phoneme = XsampaMapper.convert(lyric, "jpn")
         assertEquals("ra", lyric)
         assertEquals("4 a", phoneme)
+    }
+
+    @Test
+    fun mapsEnglishMeToSupportedLongI() {
+        assertEquals("m i:", XsampaMapper.convert("me", "eng"))
+    }
+
+    @Test
+    fun offersAlternateEnglishPronunciationsWithoutForcingOne() {
+        assertEquals(
+            listOf("m i:", "m e"),
+            XsampaMapper.pronunciationSuggestions("me", "eng")
+        )
+        assertEquals(
+            listOf("4 i:d", "4 E d"),
+            XsampaMapper.pronunciationSuggestions("read", "eng")
+        )
+        assertTrue(XsampaMapper.pronunciationSuggestions("hello", "eng").isNotEmpty())
     }
 }

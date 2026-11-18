@@ -74,3 +74,16 @@ Consequently, the Android app must not package these Windows DLLs as if they wer
 ## What is included in the Android app at this milestone
 
 The small `megpoid_v7_catalog.json` asset contains the readable bank/style metadata and the verified model-reference hashes only. It does not include the 23.5 MB model payload or the Windows DLLs. The editor can use this catalog for future bank/style selection UI, while synthesis remains explicitly unavailable until a compatible runtime exists.
+
+
+## UI and playback refinements
+
+The arrangement uses note-block miniatures inside each clip. The piano-roll viewport begins at the actual usable display width, keeps its timeline ruler and pitch lane aligned, and extends only as the musical content extends. The left piano header reserves a small voice portrait slot.
+
+The piano-roll offers DRAW, SELECT, and PITCH tools. Each newly drawn note receives a five-point initial pitch contour independent of voicebank selection. The pitch path uses cubic interpolation and the requested `#E76B22` display color.
+
+PLAY and STOP audition the clip through a generated piano timbre. This is explicitly only a note/timing preview; it is not synthesized VOCALOID singing. Voice selection currently loads AI Megpoid identity/style metadata and the supplied artwork, while a licensed Android-compatible VOCALOID engine is still unavailable.
+
+## G2P DLL compatibility
+
+The archive inventory step also reads the PE import DLL table and named export table from the supplied Windows DLLs. This is static inspection only. The language-specific `G2PAManager_*.dll` components remain Windows AMD64 libraries and are not loaded or invoked from Android. Their presence is useful for identifying the desktop G2P boundary, but does not provide an Android-callable G2P library.

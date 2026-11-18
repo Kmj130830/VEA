@@ -33,6 +33,87 @@ def pe_architecture(data: bytes) -> str:
         return "MZ header, invalid PE header"
 
 
+def pe_static_symbols(data: bytes) -> tuple[list[str], list[str]]:
+    """Read PE import DLL names and exported names; never loads or executes the image."""
+    if not data.startswith(b"MZ") or len(data) < 0x100:
+        return [], []
+    try:
+        pe = struct.unpack_from("<I", data, 0x3C)[0]
+        if data[pe:pe + 4] != b"PE\0\0":
+            return [], []
+        coff = pe + 4
+        section_count = struct.unpack_from("<H", data, coff + 2)[0]
+        optional_size = struct.unpack_from("<H", data, coff + 16)[0]
+        optional = coff + 20
+        magic = struct.unpack_from("<H", data, optional)[0]
+        if magic == 0x20B:
+            data_dir = optional + 112
+        elif magic == 0x10B:
+            data_dir = optional + 96
+        else:
+            return [], []
+
+        sections = []
+        section_start = optional + optional_size
+        for index in range(section_count):
+            offset = section_start + index * 40
+            virtual_size, virtual_address, raw_size, raw_pointer = struct.unpack_from("<IIII", data, offset + 8)
+            sections.append((virtual_address, max(virtual_size, raw_size), raw_pointer, raw_size))
+
+        def rva_to_offset(rva: int) -> int | None:
+            if rva == 0:
+                return None
+            for virtual_address, span, raw_pointer, raw_size in sections:
+                if virtual_address <= rva < virtual_address + span:
+                    offset = raw_pointer + (rva - virtual_address)
+                    if offset < raw_pointer + raw_size and offset < len(data):
+                        return offset
+            return None
+
+        def c_string(offset: int | None) -> str:
+            if offset is None or offset < 0 or offset >= len(data):
+                return ""
+            end = data.find(b"\0", offset, min(len(data), offset + 4096))
+            if end < 0:
+                return ""
+            return data[offset:end].decode("ascii", errors="replace")
+
+        exports: list[str] = []
+        imports: list[str] = []
+        export_rva = struct.unpack_from("<I", data, data_dir)[0]
+        if export_rva:
+            export_offset = rva_to_offset(export_rva)
+            if export_offset is not None and export_offset + 40 <= len(data):
+                name_count = struct.unpack_from("<I", data, export_offset + 24)[0]
+                names_rva = struct.unpack_from("<I", data, export_offset + 32)[0]
+                names_offset = rva_to_offset(names_rva)
+                if names_offset is not None:
+                    for index in range(min(name_count, 10000)):
+                        name_rva = struct.unpack_from("<I", data, names_offset + index * 4)[0]
+                        name = c_string(rva_to_offset(name_rva))
+                        if name:
+                            exports.append(name)
+
+        import_rva = struct.unpack_from("<I", data, data_dir + 8)[0]
+        if import_rva:
+            import_offset = rva_to_offset(import_rva)
+            if import_offset is not None:
+                for index in range(1000):
+                    descriptor = import_offset + index * 20
+                    if descriptor + 20 > len(data):
+                        break
+                    original_thunk, timestamp, chain, name_rva, first_thunk = struct.unpack_from("<IIIII", data, descriptor)
+                    if not any((original_thunk, timestamp, chain, name_rva, first_thunk)):
+                        break
+                    name = c_string(rva_to_offset(name_rva))
+                    if name:
+                        imports.append(name)
+
+        return exports, imports
+    except (IndexError, struct.error, ValueError):
+        return [], []
+
+
 def describe_magic(data: bytes) -> str:
     if data.startswith(b"MZ"):
         return pe_architecture(data)
@@ -85,6 +166,16 @@ def inspect_zip(zf: zipfile.ZipFile, label: str, depth: int = 0) -> None:
         )
 
         suffix = Path(item.filename).suffix.lower()
+        if suffix == ".dll":
+            exports, imports = pe_static_symbols(data)
+            if imports:
+                print(f"--- PE IMPORT DLLS {item.filename} ---")
+                print(", ".join(imports[:80]))
+            if exports:
+                print(f"--- PE EXPORTS {item.filename} ---")
+                print(", ".join(exports[:160]))
+            else:
+                print(f"PE_EXPORTS {item.filename}: no named exports decoded")
         if suffix in {".vmanifest", ".json", ".xml", ".txt", ".md", ".ini", ".cfg", ".properties", ".vsstyle"}:
             try:
                 decoded = data.decode("utf-8-sig").replace("\\x00", "")

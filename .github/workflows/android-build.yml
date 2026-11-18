@@ -26,6 +26,8 @@ jobs:
           packages: "platform-tools"
       - name: Install Android 16 SDK
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Prepare AI Megpoid artwork assets
+        run: python3 tools/prepare_voicebank_assets.py
       - name: Run editor unit tests and assemble debug APK
         run: gradle --no-daemon testDebugUnitTest assembleDebug
       - name: Upload debug APK
