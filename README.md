@@ -40,7 +40,7 @@ The app module uses:
 - minSdk: 28
 - Android Gradle Plugin: 8.13.2
 - Kotlin: 2.4.21
-- Jetpack Compose BOM: 2026.09.00
+- Jetpack Compose BOM: 2026.06.00
 
 Package: com.kmj.vea
 
