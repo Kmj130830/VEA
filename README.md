@@ -49,13 +49,13 @@ Package: com.kmj.vea
 
 Arrangement:
 - Tap a track name to select it.
-- Tap a clip to open its piano roll.
+- Double-tap a clip to open its piano roll.
 - Add Track and Add Clip create editable items.
 - SAVE stores the current project locally.
 
 Piano roll:
 - Tap an unoccupied time cell to create a note. Overlapping notes and chords are rejected.
-- Tap an existing note to select it.
+- Tap an existing note to open its lyric editor and audition its pitch.
 - Use the note controls to change pitch, length, lyric, or delete it.
 - Tap the pitch lane to add or replace a pitch point.
 - BACK returns to the arrangement.
@@ -67,12 +67,12 @@ Project data is stored in the app's private files directory as vea-project.json.
 
 - Single tap a clip to select it; double-tap the clip to open its piano roll.
 - Single tap an empty piano-roll cell to add a note.
-- Double-tap a note to edit its lyric.
+- The lyric text is rendered inside the note; X-SAMPA appears immediately above it.
 - Drag the right-edge handle of a note to resize it.
 - Resize and note-entry snapping follow the selected grid (1/1, 1/2, 1/4, 1/8, 1/16, 1/32).
 - Changing the grid resolution changes only the visual grid and future snapping. Existing note positions and lengths remain stored in ticks and are not rewritten.
 - The editor is monophonic: time intervals cannot overlap, regardless of pitch. Rejected placements/resizes are ignored silently.
-- Undo and redo share a project snapshot history (up to 100 states).
+- Undo and redo share a project snapshot history (up to 200 states).
 
 
 ## Note-entry and lyric editing update
@@ -85,3 +85,16 @@ Project data is stored in the app's private files directory as vea-project.json.
 - The piano-roll timeline starts compactly and keeps only a small amount of look-ahead after the last note.
 - Overlap rejection is silent. No toast or Logcat error is emitted for a rejected same-time note.
 - Project snapshots are maintained in a dedicated undo/redo history (up to 200 edits).
+
+
+## Romaji and note lyric rendering
+
+- Japanese lyric input accepts kana and common Hepburn/Kunrei-style romaji.
+- Examples covered by unit tests: `ra → ら → 4 a`, `shi → し → S i`, `konnichiwa`, and `gakkou`.
+- The lyric is preserved as typed and displayed inside the note. X-SAMPA is derived separately and displayed above the note.
+- This mapper is a deterministic editor-side fallback, not Yamaha's proprietary G2PA implementation. Voicebank-specific phoneme validation remains an engine integration task.
+- CI runs `testDebugUnitTest` before assembling the APK.
+
+## Supplied VOCALOID7 package inspection
+
+The three supplied ZIP archives are checked statically in CI. A compact metadata catalog for AI Megpoid V7 is bundled at `app/src/main/assets/voicebanks/megpoid_v7_catalog.json`. It includes the manifest identity, 13 style names, and SHA-256 model references, but does not bundle Windows DLLs or model weights. See docs/SUPPLIED_V7_ASSETS.md for the compatibility findings.
