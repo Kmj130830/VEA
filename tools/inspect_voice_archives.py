@@ -85,17 +85,17 @@ def inspect_zip(zf: zipfile.ZipFile, label: str, depth: int = 0) -> None:
         )
 
         suffix = Path(item.filename).suffix.lower()
-        if suffix in {".vmanifest", ".json", ".xml", ".txt", ".md", ".ini", ".cfg", ".properties"}:
+        if suffix in {".vmanifest", ".json", ".xml", ".txt", ".md", ".ini", ".cfg", ".properties", ".vsstyle"}:
             try:
-                decoded = data.decode("utf-8-sig")
-                visible = sum(char.isprintable() or char in "\r\n\t" for char in decoded) / max(1, len(decoded))
-                if visible > 0.90 and len(decoded) <= 24000:
+                decoded = data.decode("utf-8-sig").replace("\\x00", "")
+                visible = sum(char.isprintable() or char in "\\r\\n\\t" for char in decoded) / max(1, len(decoded))
+                if (visible > 0.70 or suffix == ".vmanifest") and len(decoded) <= 24000:
                     print(f"--- TEXT {label}!/{item.filename} ---")
                     print(decoded)
             except UnicodeDecodeError:
                 pass
 
-        if suffix in {".vpit", ".vhnv", ".vtmg", ".vtb2"}:
+        if suffix in {".vpit", ".vhnv", ".vtmg", ".vtb2", ".vmanifest"}:
             strings = printable_strings(data)
             if strings:
                 print(f"--- ASCII STRINGS {label}!/{item.filename} ---")

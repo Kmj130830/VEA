@@ -814,7 +814,7 @@ private fun NoteGrid(
             // X-SAMPA above the note, which made committed lyrics appear missing.
             if (note.lyric.isNotBlank()) {
                 drawIntoCanvas { canvas ->
-                    val paint = AndroidPaint().apply {
+                    val paint = android.text.TextPaint().apply {
                         color = android.graphics.Color.rgb(35, 40, 28)
                         textSize = 8.dp.toPx()
                         isAntiAlias = true
