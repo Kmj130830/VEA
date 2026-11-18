@@ -86,7 +86,7 @@ object XsampaMapper {
                 japaneseMora.containsKey(pair) -> pair
                 japaneseMora.containsKey(current) -> current
                 current == "ー" -> ""
-                current.isWhitespace() -> ""
+                current.first().isWhitespace() -> ""
                 else -> current
             }
             japaneseMora[matched]?.let { output += it }

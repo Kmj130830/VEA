@@ -357,7 +357,6 @@ fun PianoRollScreen(
         }
     }
 
-    val lyricNote = clip.notes.firstOrNull { it.id == lyricDialogNoteId }
     if (lyricDialogNoteId != null && lyricNote != null) {
         LyricEditorPopup(
             lyric = lyricInput,
