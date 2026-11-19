@@ -156,7 +156,9 @@ def main() -> None:
         output.append("")
     rendered = "\n".join(output)
     print(rendered)
-    Path("build/v7-engine-analysis/CLR_METADATA.md").write_text(rendered, encoding="utf-8")
+    report_path = Path("build/v7-engine-analysis/CLR_METADATA.md")
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(rendered, encoding="utf-8")
 
 
 if __name__ == "__main__":
