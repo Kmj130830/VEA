@@ -118,7 +118,7 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_pack_row_major_f32(
     uint32_t axis1_count,
     VeaS5MatrixDescriptor** out_descriptor);
 
-/* Decode S5API tagged Base64 arrays: *F32/*F16 to float32, *S32 to int32. */
+/* Decode S5API tagged Base64 arrays: float32, float16 and signed int32 types. */
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_decode_typed_float_array(
     VeaS5Arena* arena, const char* encoded, size_t encoded_size,
     float** out_values, size_t* out_count);

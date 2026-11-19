@@ -68,6 +68,32 @@ object NativeS5TensorBridge {
         ) ?: throw IllegalStateException("S5 matrix packing failed.")
     }
 
+
+    /**
+     * Decodes an S5API *F32 or *F16 Base64-tagged tensor string to FloatArray.
+     * String is restricted to ASCII, as required by the binary encoding.
+     */
+    fun decodeTypedFloatArray(encoded: String): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(encoded.length >= 4 && encoded.all { it.code in 0x00..0x7f }) {
+            "Typed S5 tensor data must be ASCII."
+        }
+        return nativeDecodeTypedFloatArray(encoded.toByteArray(Charsets.US_ASCII))
+            ?: throw IllegalArgumentException("Malformed or unsupported S5 float tensor.")
+    }
+
+    /** Decodes an S5API *S32 Base64-tagged tensor string to IntArray. */
+    fun decodeTypedInt32Array(encoded: String): IntArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(encoded.length >= 4 && encoded.all { it.code in 0x00..0x7f }) {
+            "Typed S5 tensor data must be ASCII."
+        }
+        return nativeDecodeTypedInt32Array(encoded.toByteArray(Charsets.US_ASCII))
+            ?: throw IllegalArgumentException("Malformed or unsupported S5 int32 tensor.")
+    }
+
+    private external fun nativeDecodeTypedFloatArray(encoded: ByteArray): FloatArray?
+    private external fun nativeDecodeTypedInt32Array(encoded: ByteArray): IntArray?
     private external fun nativeAbiVersion(): Int
     private external fun nativePackMatrixBank(
         source: FloatArray,

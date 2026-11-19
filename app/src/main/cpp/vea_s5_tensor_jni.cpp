@@ -229,3 +229,92 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativePackRowMajor(
         return nullptr;
     }
 }
+
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeDecodeTypedFloatArray(
+    JNIEnv* env, jobject, jbyteArray encoded_array) {
+    if (encoded_array == nullptr) return nullptr;
+    const jsize length = env->GetArrayLength(encoded_array);
+    if (length < 4) return nullptr;
+
+    try {
+        std::vector<char> encoded(static_cast<size_t>(length));
+        env->GetByteArrayRegion(
+            encoded_array, 0, length, reinterpret_cast<jbyte*>(encoded.data()));
+        if (env->ExceptionCheck()) return nullptr;
+
+        size_t capacity = 0;
+        if (static_cast<size_t>(length) > (std::numeric_limits<size_t>::max() - 64u) / 4u) {
+            return nullptr;
+        }
+        capacity = static_cast<size_t>(length) * 4u + 64u;
+        VeaS5Arena* arena = nullptr;
+        if (vea_s5_arena_create(capacity, &arena) != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+
+        float* values = nullptr;
+        size_t count = 0;
+        const VeaS5TensorStatus status = vea_s5_decode_typed_float_array(
+            arena, encoded.data(), encoded.size(), &values, &count);
+        if (status != VEA_S5_TENSOR_STATUS_OK ||
+            count > static_cast<size_t>(std::numeric_limits<jsize>::max())) {
+            vea_s5_arena_destroy(arena);
+            return nullptr;
+        }
+
+        jfloatArray result = env->NewFloatArray(static_cast<jsize>(count));
+        if (result != nullptr && count != 0) {
+            env->SetFloatArrayRegion(result, 0, static_cast<jsize>(count), values);
+        }
+        vea_s5_arena_destroy(arena);
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+extern "C" JNIEXPORT jintArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeDecodeTypedInt32Array(
+    JNIEnv* env, jobject, jbyteArray encoded_array) {
+    if (encoded_array == nullptr) return nullptr;
+    const jsize length = env->GetArrayLength(encoded_array);
+    if (length < 4) return nullptr;
+
+    try {
+        std::vector<char> encoded(static_cast<size_t>(length));
+        env->GetByteArrayRegion(
+            encoded_array, 0, length, reinterpret_cast<jbyte*>(encoded.data()));
+        if (env->ExceptionCheck()) return nullptr;
+
+        if (static_cast<size_t>(length) > (std::numeric_limits<size_t>::max() - 64u) / 4u) {
+            return nullptr;
+        }
+        const size_t capacity = static_cast<size_t>(length) * 4u + 64u;
+        VeaS5Arena* arena = nullptr;
+        if (vea_s5_arena_create(capacity, &arena) != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+
+        int32_t* values = nullptr;
+        size_t count = 0;
+        const VeaS5TensorStatus status = vea_s5_decode_typed_int32_array(
+            arena, encoded.data(), encoded.size(), &values, &count);
+        if (status != VEA_S5_TENSOR_STATUS_OK ||
+            count > static_cast<size_t>(std::numeric_limits<jsize>::max())) {
+            vea_s5_arena_destroy(arena);
+            return nullptr;
+        }
+
+        jintArray result = env->NewIntArray(static_cast<jsize>(count));
+        if (result != nullptr && count != 0) {
+            env->SetIntArrayRegion(result, 0, static_cast<jsize>(count),
+                                   reinterpret_cast<const jint*>(values));
+        }
+        vea_s5_arena_destroy(arena);
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
