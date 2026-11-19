@@ -1,4 +1,5 @@
 #include "vea_s5_tensor.h"
+#include "vea_s5_container.h"
 
 #include <jni.h>
 
@@ -132,4 +133,38 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativePackMatrixBank(
     } catch (...) {
         return nullptr;
     }
+}
+
+extern "C" JNIEXPORT jlongArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeParseContainerHeader(
+    JNIEnv* env,
+    jobject,
+    jbyteArray header_array,
+    jlong total_file_size) {
+    if (header_array == nullptr || total_file_size < static_cast<jlong>(VEA_S5_CONTAINER_HEADER_SIZE)) {
+        return nullptr;
+    }
+    if (env->GetArrayLength(header_array) != static_cast<jsize>(VEA_S5_CONTAINER_HEADER_SIZE)) {
+        return nullptr;
+    }
+
+    uint8_t header_bytes[VEA_S5_CONTAINER_HEADER_SIZE] = {};
+    env->GetByteArrayRegion(
+        header_array, 0, static_cast<jsize>(VEA_S5_CONTAINER_HEADER_SIZE),
+        reinterpret_cast<jbyte*>(header_bytes));
+    if (env->ExceptionCheck()) return nullptr;
+
+    VeaS5ContainerHeader parsed{};
+    const VeaS5ContainerStatus status = vea_s5_parse_container_header(
+        header_bytes, static_cast<uint64_t>(total_file_size), &parsed);
+    if (status != VEA_S5_CONTAINER_STATUS_OK) return nullptr;
+
+    const jlong values[3] = {
+        static_cast<jlong>(parsed.kind),
+        static_cast<jlong>(parsed.payload_size),
+        static_cast<jlong>(parsed.format_word)
+    };
+    jlongArray result = env->NewLongArray(3);
+    if (result != nullptr) env->SetLongArrayRegion(result, 0, 3, values);
+    return env->ExceptionCheck() ? nullptr : result;
 }

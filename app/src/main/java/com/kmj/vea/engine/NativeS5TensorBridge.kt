@@ -1,10 +1,16 @@
 package com.kmj.vea.engine
 
+data class S5ContainerHeaderInfo(
+    val kind: String,
+    val payloadSize: Long,
+    val formatWord: Long
+)
+
 /**
- * Native implementation of the recovered S5API tensor memory boundary.
+ * Native implementation of the recovered S5API tensor and container boundary.
  *
- * This is not a VOCALOID neural renderer. It converts numeric arrays and
- * packs already-decoded tensor values into the recovered padded matrix layout.
+ * This is not a VOCALOID neural renderer. It validates the fixed outer header
+ * and packs already-decoded tensor values into the recovered matrix layout.
  */
 object NativeS5TensorBridge {
     private val loaded: Boolean = runCatching {
@@ -17,6 +23,23 @@ object NativeS5TensorBridge {
 
     val abiVersion: Int
         get() = if (loaded) nativeAbiVersion() else 0
+
+    /** Parses exactly the first 136 bytes; the opaque header bytes are preserved natively but not interpreted. */
+    fun parseContainerHeader(header: ByteArray, totalFileSize: Long): S5ContainerHeaderInfo? {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(header.size == 136) { "The V7 container header is exactly 136 bytes." }
+        require(totalFileSize >= 136L)
+        val fields = nativeParseContainerHeader(header, totalFileSize) ?: return null
+        if (fields.size != 3) return null
+        val kind = when (fields[0].toInt()) {
+            1 -> "VTBR"
+            2 -> "VPIT"
+            3 -> "VHNV"
+            4 -> "VTMG"
+            else -> return null
+        }
+        return S5ContainerHeaderInfo(kind, fields[1], fields[2])
+    }
 
     /**
      * Returns matrices concatenated in matrix-index order. Each matrix is
@@ -46,11 +69,14 @@ object NativeS5TensorBridge {
     }
 
     private external fun nativeAbiVersion(): Int
-
     private external fun nativePackMatrixBank(
         source: FloatArray,
         axis0Count: Int,
         axis1Count: Int,
         matrixCount: Int
     ): FloatArray?
+    private external fun nativeParseContainerHeader(
+        header: ByteArray,
+        totalFileSize: Long
+    ): LongArray?
 }
