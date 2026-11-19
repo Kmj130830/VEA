@@ -205,6 +205,7 @@ object NativeS5TensorBridge {
     private external fun nativeResidualAffineAdd(dst: FloatArray, residual: FloatArray, scale: Float, bias: Float): FloatArray?
     private external fun nativeDepthwiseConv7x7Reflect(inputRows: FloatArray, weights: FloatArray, width: Int): FloatArray?
     private external fun nativeApplyGelu(values: FloatArray, scale: Float, bias: Float): FloatArray?
+    private external fun nativeComputeMeanInvStd(sum: Float, sumSquares: Float, count: Int, epsilon: Float): FloatArray?
     private external fun nativeReduceSumAndSquares(values: FloatArray): FloatArray?
     private external fun nativeApplyGatedActivation(planes: FloatArray, count: Int, mode: Int): FloatArray?
     private external fun nativeDecodeTypedFloatArray(encoded: ByteArray): FloatArray?
