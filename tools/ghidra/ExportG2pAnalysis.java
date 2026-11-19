@@ -9,6 +9,8 @@ import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.FunctionIterator;
 import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.listing.InstructionIterator;
+import ghidra.program.model.mem.MemoryAccessException;
+import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.symbol.Reference;
 import ghidra.program.model.symbol.Symbol;
 import ghidra.program.model.symbol.SymbolIterator;
@@ -62,6 +64,7 @@ public class ExportG2pAnalysis extends GhidraScript {
             writeFunctionIndex(out);
 
             LinkedHashMap<Address, Function> selected = selectCallClosure(interestingSymbols);
+            writeFactoryVtableEvidence(out, interestingSymbols, selected);
             writeDecompilation(out, selected);
         }
 
@@ -227,6 +230,108 @@ public class ExportG2pAnalysis extends GhidraScript {
             }
         }
         return selected;
+    }
+
+    /**
+     * Recover vtable pointer runs referenced by concrete G2PACreateManager factories.
+     * This avoids guessing from unrelated read-only data or arbitrary pointer arrays.
+     */
+    private void writeFactoryVtableEvidence(
+            PrintWriter out,
+            List<Symbol> symbols,
+            LinkedHashMap<Address, Function> selected) throws Exception {
+        out.println("## Factory-referenced virtual table candidates");
+        out.println();
+        out.println("Pointer slots are read from read-only data only when a G2PACreateManager instruction "
+                + "references that address. A slot is listed only when its value resolves to a function "
+                + "in an executable memory block.");
+        out.println();
+
+        Set<Address> emittedTables = new HashSet<>();
+        int tableCount = 0;
+        int addedMethods = 0;
+
+        for (Symbol symbol : symbols) {
+            if (symbol.getSymbolType() != SymbolType.FUNCTION
+                    || !"G2PACreateManager".equalsIgnoreCase(symbol.getName())) {
+                continue;
+            }
+
+            Function factory = currentProgram.getFunctionManager().getFunctionAt(symbol.getAddress());
+            if (factory == null) continue;
+
+            InstructionIterator instructions =
+                    currentProgram.getListing().getInstructions(factory.getBody(), true);
+            while (instructions.hasNext()) {
+                monitor.checkCancelled();
+                Instruction instruction = instructions.next();
+                for (Reference reference : instruction.getReferencesFrom()) {
+                    Address tableAddress = reference.getToAddress();
+                    MemoryBlock sourceBlock = currentProgram.getMemory().getBlock(tableAddress);
+                    if (sourceBlock == null
+                            || !sourceBlock.getName().toLowerCase().contains("rdata")
+                            || !emittedTables.add(tableAddress)) {
+                        continue;
+                    }
+
+                    tableCount++;
+                    out.println("### Table " + tableCount + " referenced by "
+                            + factory.getName() + " at " + factory.getEntryPoint()
+                            + ", data address " + tableAddress);
+                    out.println();
+                    out.println("| Slot | Target | Function | Bytes |");
+                    out.println("|---:|---:|---|---:|");
+
+                    int slotCount = 0;
+                    for (int slotIndex = 0; slotIndex < 32; slotIndex++) {
+                        Address slot = tableAddress.add(
+                                (long) slotIndex * currentProgram.getDefaultPointerSize());
+                        if (!sourceBlock.contains(slot)) break;
+
+                        long pointerValue;
+                        try {
+                            pointerValue = currentProgram.getMemory().getLong(slot);
+                        } catch (MemoryAccessException ex) {
+                            break;
+                        }
+                        if (pointerValue == 0) break;
+
+                        Address target = currentProgram.getAddressFactory()
+                                .getDefaultAddressSpace().getAddress(pointerValue);
+                        MemoryBlock targetBlock = currentProgram.getMemory().getBlock(target);
+                        Function targetFunction = currentProgram.getFunctionManager().getFunctionAt(target);
+                        if (targetFunction == null) {
+                            targetFunction = currentProgram.getFunctionManager().getFunctionContaining(target);
+                        }
+                        if (targetFunction == null || targetBlock == null || !targetBlock.isExecute()) break;
+
+                        out.printf("| +0x%x | %s | %s | %d |%n",
+                                (long) slotIndex * currentProgram.getDefaultPointerSize(),
+                                target, escapeCell(targetFunction.getName()),
+                                targetFunction.getBody().getNumAddresses());
+                        slotCount++;
+
+                        if (!selected.containsKey(targetFunction.getEntryPoint())
+                                && selected.size() < 160) {
+                            selected.put(targetFunction.getEntryPoint(), targetFunction);
+                            addedMethods++;
+                        }
+                    }
+                    if (slotCount == 0) {
+                        out.println("| — | — | No executable function-pointer run resolved | — |");
+                    }
+                    out.println();
+                }
+            }
+        }
+
+        if (tableCount == 0) {
+            out.println("No direct read-only-data references from a G2PACreateManager factory were recovered.");
+            out.println();
+        }
+        out.println("Factory-referenced table count: " + tableCount);
+        out.println("Additional virtual methods added to decompilation: " + addedMethods);
+        out.println();
     }
 
     private void writeDecompilation(PrintWriter out, LinkedHashMap<Address, Function> selected)
