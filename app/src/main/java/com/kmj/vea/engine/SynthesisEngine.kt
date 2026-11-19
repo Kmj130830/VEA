@@ -36,6 +36,15 @@ interface SynthesisEngine {
  */
 class VocaloidAiEngineAdapter : SynthesisEngine {
     override fun status(): EngineStatus {
+        val vsmMessage = if (NativeVsmCallbackBridge.isLoaded) {
+            "VSM callback bridge loaded (ABI 0x%08X, %d Hz transport). ".format(
+                NativeVsmCallbackBridge.abiVersion,
+                NativeVsmCallbackBridge.defaultSampleRate
+            )
+        } else {
+            "VSM callback bridge is not loaded. "
+        }
+
         val bridgeMessage = if (NativeG2pBridge.isLoaded) {
             "Android ARM64 JNI bridge loaded (ABI 0x%08X). Korean input canonicalization is available, " +
                 "but Yamaha G2PA phoneme conversion and the VOCALOID7 singing renderer are not ported yet."
@@ -44,7 +53,7 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
                 "are not ported yet."
         }
 
-        val message = if (NativeG2pBridge.isLoaded) {
+        val message = vsmMessage + if (NativeG2pBridge.isLoaded) {
             bridgeMessage.format(NativeG2pBridge.abiVersion)
         } else {
             bridgeMessage

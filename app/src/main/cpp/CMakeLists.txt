@@ -21,6 +21,7 @@ target_compile_options(veavsm PRIVATE -Wall -Wextra)
 
 if(ANDROID)
     target_sources(veag2p PRIVATE veag2p_jni.cpp)
+    target_sources(veavsm PRIVATE vea_vsm_callback_jni.cpp)
     find_library(android_log_lib log)
     if(android_log_lib)
         target_link_libraries(veag2p PRIVATE ${android_log_lib})
