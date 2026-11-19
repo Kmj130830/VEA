@@ -146,7 +146,7 @@ object NativeS5TensorBridge {
         check(loaded) { "Native S5 tensor library is not loaded." }
         require(inputFeatures > 0 && outputFeatures > 0 && positions > 0 && banks > 0)
         require(weightRowStride >= inputFeatures)
-        require(weightBankStride >= (outputFeatures - 1L) * weightRowStride + inputFeatures)
+        require(weightBankStride.toLong() >= (outputFeatures - 1L) * weightRowStride + inputFeatures)
         val weightsRequired = (banks - 1L) * weightBankStride +
             (outputFeatures - 1L) * weightRowStride + inputFeatures
         require(weightsRequired <= weights.size.toLong())

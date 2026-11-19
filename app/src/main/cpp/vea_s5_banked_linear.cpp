@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <limits>
 #include <new>
+#include <stdexcept>
 #include <vector>
 
 namespace {
@@ -80,8 +81,8 @@ extern "C" VeaS5TensorStatus vea_s5_banked_linear_projection_f32(
         }
     } catch (const std::bad_alloc&) {
         return VEA_S5_TENSOR_STATUS_OUT_OF_MEMORY;
-    } catch (...) {
-        return VEA_S5_TENSOR_STATUS_INTERNAL_ERROR;
+    } catch (const std::length_error&) {
+        return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
     }
     return VEA_S5_TENSOR_STATUS_OK;
 }
