@@ -52,7 +52,8 @@ public class ExportS5ModelObjectTree extends GhidraScript {
         "18013a850", // backend object factory
         "1800c7ad0", // candidate recurrent hot path
         "1800c1a30", // candidate recurrent hot path
-        "1800c3740"  // backend/operator registry path
+        "1800c3740", // backend/operator registry path
+        "180081e20"  // ostream numeric-base manipulator used by the digest formatter
     };
 
     @Override
