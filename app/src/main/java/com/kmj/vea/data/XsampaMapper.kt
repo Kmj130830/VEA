@@ -403,31 +403,38 @@ object XsampaMapper {
     }
 
     private fun korean(input: String): String {
-        val composed = composeKoreanJamo(input)
-        val result = mutableListOf<String>()
-        composed.forEach { char ->
-            if (char in '가'..'힣') {
-                val code = char.code - 0xAC00
-                val onset = code / 588
-                val vowel = (code % 588) / 28
-                val coda = code % 28
-                val phones = listOf(koOnset[onset], koVowel[vowel], koCoda[coda])
-                    .filter { it.isNotBlank() }
-                result += phones
-            } else if (char.isWhitespace()) {
-                result += "|"
-            } else {
-                val jamo = char.toString()
-                val onsetIndex = koreanInitials.indexOf(jamo)
-                val vowelIndex = koreanVowels.indexOf(jamo)
-                when {
-                    onsetIndex >= 0 -> koOnset[onsetIndex].takeIf { it.isNotBlank() }?.let { result += it }
-                    vowelIndex >= 0 -> result += koVowel[vowelIndex]
-                    else -> result += jamo
+        // Keep word boundaries explicit and normalize repeated spaces. Within a
+        // word, use "." as the syllable boundary so adjacent Hangul syllables
+        // are not displayed as one unsegmented phone stream.
+        val words = input.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+        return words.joinToString(" | ") { rawWord ->
+            val composed = composeKoreanJamo(rawWord)
+            val syllableGroups = mutableListOf<String>()
+
+            composed.forEach { char ->
+                val group = if (char in '가'..'힣') {
+                    val code = char.code - 0xAC00
+                    val onset = code / 588
+                    val vowel = (code % 588) / 28
+                    val coda = code % 28
+                    listOf(koOnset[onset], koVowel[vowel], koCoda[coda])
+                        .filter { it.isNotBlank() }
+                        .joinToString(" ")
+                } else {
+                    val jamo = char.toString()
+                    val onsetIndex = koreanInitials.indexOf(jamo)
+                    val vowelIndex = koreanVowels.indexOf(jamo)
+                    when {
+                        onsetIndex >= 0 -> koOnset[onsetIndex].takeIf { it.isNotBlank() }.orEmpty()
+                        vowelIndex >= 0 -> koVowel[vowelIndex]
+                        else -> jamo
+                    }
                 }
+                if (group.isNotBlank()) syllableGroups += group
             }
+
+            syllableGroups.joinToString(" . ")
         }
-        return result.joinToString(" ")
     }
 
     private fun englishWordSuggestions(wordInput: String): List<String> {
