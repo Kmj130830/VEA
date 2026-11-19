@@ -37,15 +37,17 @@ G2P decompilation is being automated through the G2P static decompilation GitHub
 The G2P work is not itself a singing synthesizer. WaveOfflineRenderer.dll exposes audio normalization, resampling, and time-stretch functions; it is not evidence of an AI vocal renderer. VOCALOID7.dll had no named exports in the initial PE scan, so its real entry point remains unknown. See:
 - docs/G2P_REVERSE_ENGINEERING.md
 - docs/G2P_STATIC_FINDINGS.md
+- docs/NATIVE_G2P_BRIDGE.md
 - docs/SUPPLIED_V7_ASSETS.md
 - docs/ENGINE_AND_COMPATIBILITY.md
 
-No Android-native G2P .so or VOCALOID singing renderer is claimed yet. The app must continue to report synthesis as unavailable until a native library is built and a real local render is verified.
+An Android ARM64 shared library (libveag2p.so) and JNI bridge are now included. The first native implementation covers only a recovered Korean input-normalization primitive; its language-ready mask is zero, so this is not yet Yamaha G2P phoneme conversion. No VOCALOID singing renderer is implemented. The app must continue to report synthesis as unavailable until language phonemizers and a real local singing render are verified.
 
 ## Build
 
 Requirements:
 - Android Studio with Android SDK Platform 36 and Build Tools 36.x.
+- Android NDK 27.2.12479018 and CMake 3.22.1.
 - JDK 17.
 - Gradle 8.13.
 - Internet access for Gradle dependency resolution.
