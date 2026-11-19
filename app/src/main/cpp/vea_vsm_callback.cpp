@@ -156,7 +156,6 @@ extern "C" VeaVsmStatus vea_vsm_capture_write_wav_f32(
 
     bool ok = true;
     ok = ok && WriteBytes(file, "RIFF", 4);
-    ok = ok && (std::fwrite(&((uint32_t&)(*(new uint32_t(36u + data_bytes)))), 0, 0, file) == 0);
     WriteU32(file, 36u + data_bytes);
     ok = ok && WriteBytes(file, "WAVE", 4);
     ok = ok && WriteBytes(file, "fmt ", 4);
