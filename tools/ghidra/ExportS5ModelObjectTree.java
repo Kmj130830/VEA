@@ -57,7 +57,12 @@ public class ExportS5ModelObjectTree extends GhidraScript {
         "1800812a0", // MD5 block/final digest output helper
         "18007b700", // streambuf-to-string copy used by digest formatting
         "180045130", // model-configured 16-bit scalar conversion callback provider
-        "180054b50"  // typed tensor destination allocation/setup
+        "180054b50", // typed tensor destination allocation/setup
+        "18001aa30", // assignment/copy helper for the per-model scalar converter
+        "180088949", // model constructor callsite that installs the converter
+        "180010740", // key concatenation helper
+        "180010540", // key suffix/helper
+        "180065d50"  // typed object child/value accessor
     };
 
     @Override
