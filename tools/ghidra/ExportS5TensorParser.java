@@ -18,7 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class ExportS5TensorParser extends GhidraScript {
-    private static final int MAX_FUNCTIONS = 150;
+    private static final int MAX_FUNCTIONS = 240;
     private static final int MAX_CALLERS_PER_SEED = 16;
     private static final int MAX_DEPTH = 2;
 
@@ -39,7 +39,13 @@ public class ExportS5TensorParser extends GhidraScript {
         "18005df50", "180065510", "1800656e0",
         "180060270", "180064cc0",
         "18012d350", "18012e0d0", "180130b70", "1800c13a0",
-        "18012d780", "18012f280"
+        "18012d780", "18012f280",
+        "18000f5f0", "180054b50", "180008a60",
+        "180010890", "180081940", "18000fe00",
+        "180047990", "180047820", "180027e70",
+        "1800279f0", "180073cb0", "180073c20",
+        "18001e360", "18012d460", "18012e220",
+        "180130110", "180130d90", "180130ce0"
     };
 
     @Override
@@ -88,6 +94,26 @@ public class ExportS5TensorParser extends GhidraScript {
                 out.printf("| %s | %s | %s %s(%s) | %d |%n",
                     hex, f.getName(), f.getReturnType().getDisplayName(),
                     f.getName(), parameters(f), f.getBody().getNumAddresses());
+            }
+            out.println();
+
+            out.println("## Typed numeric string markers");
+            out.println();
+            out.println("| Address | Bytes | ASCII |");
+            out.println("|---:|---|---|");
+            String[] markerAddresses = { "18019b770", "18019b778", "18019b780" };
+            for (String hex : markerAddresses) {
+                Address marker = toAddr(hex);
+                byte[] bytes = new byte[8];
+                int count = currentProgram.getMemory().getBytes(marker, bytes);
+                StringBuilder hexText = new StringBuilder();
+                StringBuilder asciiText = new StringBuilder();
+                for (int i = 0; i < count; i++) {
+                    if (i > 0) hexText.append(' ');
+                    hexText.append(String.format("%02x", bytes[i] & 0xff));
+                    asciiText.append(bytes[i] >= 0x20 && bytes[i] <= 0x7e ? (char)bytes[i] : '.');
+                }
+                out.println("| 0x" + hex + " | " + hexText + " | " + asciiText + " |");
             }
             out.println();
 
