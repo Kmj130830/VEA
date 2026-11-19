@@ -164,10 +164,17 @@ public class ExportS5ModelObjectTree extends GhidraScript {
             dumpBytes(out, "18019b770", 4);
             dumpBytes(out, "18019b778", 4);
             out.println();
-            out.println("## Object-field +0x208 accesses");
+            out.println("## F16 callback candidate field accesses");
             out.println();
-            dumpFieldOffsetAccesses(out, "0x208");
-            out.println();
+            for (String fieldOffset : new String[] {
+                    "0x208", "0x240", "0x5f0",
+                    "0x4c8", "0x878", "0xaa0", "0xcc8", "0xef0"
+            }) {
+                out.println("### Accesses to " + fieldOffset);
+                out.println();
+                dumpFieldOffsetAccesses(out, fieldOffset);
+                out.println();
+            }
             out.println("## Exact x64 call-site windows");
             out.println();
             for (Map.Entry<Address, Function> item : selected.entrySet()) {
