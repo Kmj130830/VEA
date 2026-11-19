@@ -74,4 +74,10 @@ class XsampaMapperTest {
         )
     }
 
+    @Test
+    fun doesNotTreatChineseCharactersAsXsampa() {
+        assertEquals("", XsampaMapper.convert("你好", "zho"))
+        assertTrue(XsampaMapper.pronunciationSuggestions("你好", "zho").isEmpty())
+    }
+
 }
