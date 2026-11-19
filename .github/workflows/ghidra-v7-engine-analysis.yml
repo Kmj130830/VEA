@@ -45,6 +45,46 @@ jobs:
           test -x "$analyze_headless"
           echo "GHIDRA_DIR=$ghidra_dir" >> "$GITHUB_ENV"
 
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Install ILSpy command-line decompiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet tool install --global ilspycmd
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      - name: Inspect CLR headers and decompile managed metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/inspect_v7_clr_metadata.py \
+            build/v7-engine-targets/VOCALOID7.dll \
+            build/v7-engine-targets/WaveOfflineRenderer.dll
+
+          mkdir -p build/v7-engine-analysis/ilspy/VOCALOID7 build/v7-engine-analysis/ilspy/WaveOfflineRenderer
+          for name in VOCALOID7 WaveOfflineRenderer; do
+            dll="build/v7-engine-targets/$name.dll"
+            output="build/v7-engine-analysis/ilspy/$name"
+            echo "=== ILSpy $name ==="
+            if ilspycmd -l c "$dll" > "$output/types.txt" 2> "$output/list-errors.txt"; then
+              echo "type listing succeeded" > "$output/status.txt"
+            else
+              echo "type listing unavailable; see list-errors.txt" > "$output/status.txt"
+            fi
+            if ilspycmd --project -o "$output/project" "$dll" > "$output/decompile.log" 2>&1; then
+              echo "project decompilation succeeded" >> "$output/status.txt"
+            else
+              echo "project decompilation unavailable; see decompile.log" >> "$output/status.txt"
+            fi
+            if ilspycmd --ilcode "$dll" > "$output/assembly.il" 2> "$output/il-errors.txt"; then
+              echo "IL dump succeeded" >> "$output/status.txt"
+            else
+              echo "IL dump unavailable; see il-errors.txt" >> "$output/status.txt"
+            fi
+          done
       - name: Analyze V7 engine modules
         shell: bash
         run: |
