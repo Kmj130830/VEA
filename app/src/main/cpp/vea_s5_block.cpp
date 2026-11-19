@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <limits>
 #include <new>
+#include <stdexcept>
 #include <vector>
 
 namespace {
@@ -29,7 +30,7 @@ extern "C" VeaS5TensorStatus vea_s5_run_residual_dw_mlp_block_f32(
     if (history_rows == nullptr || depthwise_weights == nullptr || expand_weights == nullptr ||
         expanded_bias_a == nullptr || expanded_bias_b == nullptr || project_weights == nullptr ||
         residual_input == nullptr || residual_scale == nullptr || output == nullptr ||
-        channels == 0u || positions < 7u || expanded_features == 0u ||
+        channels == 0u || positions < 7u || positions > std::numeric_limits<uint32_t>::max() || expanded_features == 0u ||
         !std::isfinite(epsilon) || epsilon < 0.0f) {
         return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
     }
@@ -49,7 +50,8 @@ extern "C" VeaS5TensorStatus vea_s5_run_residual_dw_mlp_block_f32(
     (void)expand_weight_count;
     (void)project_weight_count;
 
-    if (!FiniteVector(depthwise_weights, depth_weight_count) ||
+    if (!FiniteVector(history_rows, history_count) ||
+        !FiniteVector(depthwise_weights, depth_weight_count) ||
         !FiniteVector(expand_weights, expand_weight_count) ||
         !FiniteVector(expanded_bias_a, expanded_features) ||
         !FiniteVector(expanded_bias_b, expanded_features) ||
@@ -63,9 +65,8 @@ extern "C" VeaS5TensorStatus vea_s5_run_residual_dw_mlp_block_f32(
     try {
         std::vector<float> depthwise(input_count, 0.0f);
         std::vector<float> expanded(expanded_count, 0.0f);
-        const size_t row_ptrs_bytes = 7u * sizeof(const float*);
-        if (row_ptrs_bytes < 7u * sizeof(const float*)) return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
-
+        // Preserve the residual source even when caller buffers alias or partially overlap.
+        std::vector<float> residual_copy(residual_input, residual_input + input_count);
         for (size_t channel = 0; channel < channels; ++channel) {
             const float* rows[7];
             for (size_t row = 0; row < 7u; ++row) {
@@ -107,15 +108,15 @@ extern "C" VeaS5TensorStatus vea_s5_run_residual_dw_mlp_block_f32(
 
         for (size_t channel = 0; channel < channels; ++channel) {
             status = vea_s5_residual_affine_add_f32(
-                output + channel * positions, residual_input + channel * positions,
+                output + channel * positions, residual_copy.data() + channel * positions,
                 positions, residual_scale[channel],
                 residual_bias == nullptr ? 0.0f : residual_bias[channel]);
             if (status != VEA_S5_TENSOR_STATUS_OK) return status;
         }
     } catch (const std::bad_alloc&) {
         return VEA_S5_TENSOR_STATUS_OUT_OF_MEMORY;
-    } catch (...) {
-        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    } catch (const std::length_error&) {
+        return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
     }
     return VEA_S5_TENSOR_STATUS_OK;
 }
