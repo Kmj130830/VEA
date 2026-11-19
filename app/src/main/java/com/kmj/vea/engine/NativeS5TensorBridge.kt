@@ -106,6 +106,27 @@ object NativeS5TensorBridge {
     }
 
 
+
+    /**
+     * Builds an S5API recurrent parameter key such as rnn.weight_ih_l0_reverse.
+     * The member suffix must include its leading dot.
+     */
+    fun buildRecurrentParameterName(
+        base: String,
+        memberSuffix: String,
+        layerIndex: Int,
+        reverseDirection: Boolean = false
+    ): String {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(base.all { it.code in 0x20..0x7e }) { "Base must be printable ASCII." }
+        require(memberSuffix.all { it.code in 0x20..0x7e }) { "Member suffix must be printable ASCII." }
+        require(memberSuffix.startsWith(".")) { "Member suffix must start with a dot." }
+        require(layerIndex >= 0) { "Layer index must not be negative." }
+        return nativeBuildRecurrentParameterName(base, memberSuffix, layerIndex, reverseDirection)
+            ?: throw IllegalArgumentException("Could not build S5 recurrent parameter name.")
+    }
+
+
     /**
      * Applies the recovered 7x7 depthwise-convolution scalar kernel.
      * inputRows contains seven consecutive row-major rows, each exactly width samples.
@@ -150,6 +171,7 @@ object NativeS5TensorBridge {
         return result[0] to result[1]
     }
 
+    private external fun nativeBuildRecurrentParameterName(base: String, memberSuffix: String, layerIndex: Int, reverseDirection: Boolean): String?
     private external fun nativeDepthwiseConv7x7Reflect(inputRows: FloatArray, weights: FloatArray, width: Int): FloatArray?
     private external fun nativeReduceSumAndSquares(values: FloatArray): FloatArray?
     private external fun nativeApplyGatedActivation(planes: FloatArray, count: Int, mode: Int): FloatArray?

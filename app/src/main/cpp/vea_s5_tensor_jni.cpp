@@ -25,6 +25,47 @@ bool Align32(size_t value, size_t* out) {
 
 }  // namespace
 
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeBuildRecurrentParameterName(
+    JNIEnv* env, jobject, jstring base_string, jstring suffix_string,
+    jint layer_index, jboolean reverse_direction) {
+    if (base_string == nullptr || suffix_string == nullptr) return nullptr;
+    const char* base = env->GetStringUTFChars(base_string, nullptr);
+    if (base == nullptr) return nullptr;
+    const char* suffix = env->GetStringUTFChars(suffix_string, nullptr);
+    if (suffix == nullptr) {
+        env->ReleaseStringUTFChars(base_string, base);
+        return nullptr;
+    }
+    const jsize base_length = env->GetStringUTFLength(base_string);
+    const jsize suffix_length = env->GetStringUTFLength(suffix_string);
+    if (base_length < 0 || suffix_length < 0 ||
+        static_cast<size_t>(base_length) + static_cast<size_t>(suffix_length) > 4096u) {
+        env->ReleaseStringUTFChars(suffix_string, suffix);
+        env->ReleaseStringUTFChars(base_string, base);
+        return nullptr;
+    }
+    try {
+        const size_t capacity = static_cast<size_t>(base_length) +
+            static_cast<size_t>(suffix_length) + 32u;
+        std::vector<char> output(capacity, '\0');
+        size_t required = 0;
+        const VeaS5TensorStatus status = vea_s5_build_recurrent_parameter_name(
+            base, suffix, static_cast<int32_t>(layer_index),
+            reverse_direction == JNI_TRUE ? 1 : 0,
+            output.data(), output.size(), &required);
+        env->ReleaseStringUTFChars(suffix_string, suffix);
+        env->ReleaseStringUTFChars(base_string, base);
+        if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+        return env->NewStringUTF(output.data());
+    } catch (...) {
+        env->ReleaseStringUTFChars(suffix_string, suffix);
+        env->ReleaseStringUTFChars(base_string, base);
+        return nullptr;
+    }
+}
+
 extern "C" JNIEXPORT jint JNICALL
 Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeAbiVersion(
     JNIEnv*, jobject) {
