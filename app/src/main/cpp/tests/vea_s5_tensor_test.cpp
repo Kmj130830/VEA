@@ -20,6 +20,26 @@ bool IsAligned(const void* pointer, uintptr_t alignment) {
 int main() {
     assert(vea_s5_tensor_abi_version() == VEA_S5_TENSOR_ABI_VERSION);
 
+    // S5API digest key: salted MD5 words formatted as 4 x 8 lowercase hex digits.
+    static constexpr uint8_t key_abc[] = {'a', 'b', 'c'};
+    char hashed_key[33] = {};
+    size_t hashed_key_required = 0;
+    assert(vea_s5_hash_parameter_key(
+        key_abc, sizeof(key_abc), hashed_key, sizeof(hashed_key),
+        &hashed_key_required) == VEA_S5_TENSOR_STATUS_OK);
+    assert(hashed_key_required == 33);
+    assert(std::strcmp(hashed_key, "7d736cde130f0bb75f2cdbe49c5e01d5") == 0);
+
+    char small_hashed_key[8] = "stable";
+    assert(vea_s5_hash_parameter_key(
+        key_abc, sizeof(key_abc), small_hashed_key, sizeof(small_hashed_key),
+        &hashed_key_required) == VEA_S5_TENSOR_STATUS_BUFFER_TOO_SMALL);
+    assert(hashed_key_required == 33);
+    assert(std::strcmp(small_hashed_key, "stable") == 0);
+    assert(vea_s5_hash_parameter_key(
+        nullptr, 1, hashed_key, sizeof(hashed_key), &hashed_key_required) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
     VeaS5Arena* arena = nullptr;
     assert(vea_s5_arena_create(8192, &arena) == VEA_S5_TENSOR_STATUS_OK);
     assert(arena != nullptr);
