@@ -1,0 +1,162 @@
+import ghidra.app.decompiler.DecompInterface;
+import ghidra.app.decompiler.DecompileOptions;
+import ghidra.app.decompiler.DecompileResults;
+import ghidra.app.script.GhidraScript;
+import ghidra.program.model.address.Address;
+import ghidra.program.model.address.AddressSet;
+import ghidra.program.model.listing.Function;
+import ghidra.program.model.listing.Instruction;
+import ghidra.program.model.listing.InstructionIterator;
+import ghidra.program.model.symbol.Reference;
+import ghidra.program.model.symbol.ReferenceIterator;
+import java.io.File;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/** Static-only S5API typed-object, key lookup and tensor decode trace. */
+public class ExportS5ModelObjectTree extends GhidraScript {
+    private static final int WINDOW_BEFORE = 0x100;
+    private static final int WINDOW_AFTER = 0x30;
+    private static final int MAX_CALLERS = 80;
+    private static final String[] SEEDS = {
+        "180068190", // model layer configuration entry
+        "18005ebe0", // recurrent parameter reader
+        "180064670", // matrix tensor loader
+        "180006c80", // typed numeric-array conversion
+        "1800656e0", // tagged F32/F16 tensor string parser
+        "18000fec0", // typed-object property lookup
+        "18000b100", // object insertion/access path
+        "180010260", // MD5 key hash
+        "1800103e0", // key/string conversion helper
+        "18001b1f0", // key serialization helper
+        "180024a90", // recurrent parameter name builder
+        "180026f60", // object/key lookup predicate
+        "18000f5f0"  // Base64/numeric text parser
+    };
+
+    @Override
+    public void run() throws Exception {
+        String[] args = getScriptArgs();
+        if (args.length < 1) throw new IllegalArgumentException("Usage: ExportS5ModelObjectTree.java <output.md>");
+        File output = new File(args[0]);
+        if (output.getParentFile() != null) output.getParentFile().mkdirs();
+        LinkedHashMap<Address, Function> selected = new LinkedHashMap<>();
+        try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(output.toPath(), StandardCharsets.UTF_8))) {
+            out.println("# S5API typed model-object and tensor lookup trace");
+            out.println();
+            out.println("> Ghidra static analysis only. The supplied Windows DLL is not executed.");
+            out.println("- Program: " + currentProgram.getName());
+            out.println("- Architecture: " + currentProgram.getLanguage().getLanguageID().getIdAsString());
+            out.println("- Image base: " + currentProgram.getImageBase());
+            out.println();
+
+            out.println("## Seed functions and callers");
+            out.println();
+            for (String hex : SEEDS) {
+                monitor.checkCancelled();
+                Address address = toAddr(hex);
+                Function f = currentProgram.getFunctionManager().getFunctionAt(address);
+                if (f == null) f = currentProgram.getFunctionManager().getFunctionContaining(address);
+                out.println("### 0x" + hex + (f == null ? " (not recovered)" : " " + f.getName()));
+                if (f == null) { out.println(); continue; }
+                selected.put(f.getEntryPoint(), f);
+                out.println("- Entry: " + f.getEntryPoint());
+                out.println("- Prototype: " + prototype(f));
+                out.println("- Body bytes: " + f.getBody().getNumAddresses());
+                ReferenceIterator refs = currentProgram.getReferenceManager().getReferencesTo(f.getEntryPoint());
+                int count = 0;
+                while (refs.hasNext() && count < MAX_CALLERS) {
+                    Reference ref = refs.next();
+                    Function caller = currentProgram.getFunctionManager().getFunctionContaining(ref.getFromAddress());
+                    out.println("- Caller: " + (caller == null ? "<unknown>" : caller.getName()) +
+                        " at " + ref.getFromAddress() + " [" + ref.getReferenceType() + "]");
+                    count++;
+                }
+                if (count == 0) out.println("- No direct callers recovered; indirect/data references may remain.");
+                out.println();
+            }
+
+            out.println("## Decompiled seed functions");
+            out.println();
+            DecompInterface decompiler = new DecompInterface();
+            decompiler.setOptions(new DecompileOptions());
+            decompiler.openProgram(currentProgram);
+            try {
+                int index = 0;
+                for (Map.Entry<Address, Function> item : selected.entrySet()) {
+                    monitor.checkCancelled();
+                    Function f = item.getValue();
+                    index++;
+                    out.println("### " + index + ". " + f.getName() + " at " + f.getEntryPoint());
+                    out.println("- RVA: 0x" + Long.toHexString(f.getEntryPoint().subtract(currentProgram.getImageBase())));
+                    out.println("- Prototype: " + prototype(f));
+                    out.println("- Body bytes: " + f.getBody().getNumAddresses());
+                    DecompileResults result = decompiler.decompileFunction(f, 60, monitor);
+                    if (result != null && result.decompileCompleted() && result.getDecompiledFunction() != null) {
+                        out.println();
+                        out.println("~~~c");
+                        out.println(result.getDecompiledFunction().getC());
+                        out.println("~~~");
+                    } else {
+                        out.println("- Decompilation unavailable: " + (result == null ? "no result" : result.getErrorMessage()));
+                    }
+                    out.println();
+                }
+            } finally {
+                decompiler.dispose();
+            }
+
+            out.println("## Exact x64 call-site windows");
+            out.println();
+            for (Map.Entry<Address, Function> item : selected.entrySet()) {
+                monitor.checkCancelled();
+                Function target = item.getValue();
+                out.println("### Callers of " + target.getName() + " at " + target.getEntryPoint());
+                ReferenceIterator refs = currentProgram.getReferenceManager().getReferencesTo(target.getEntryPoint());
+                int count = 0;
+                while (refs.hasNext() && count < MAX_CALLERS) {
+                    Reference ref = refs.next();
+                    dumpWindow(out, ref.getFromAddress(), WINDOW_BEFORE, WINDOW_AFTER);
+                    count++;
+                }
+                if (count == 0) out.println("- No direct call references.");
+                out.println();
+            }
+        }
+        println("S5API model-object tree report written: " + output.getAbsolutePath());
+    }
+
+    private String prototype(Function f) {
+        StringBuilder b = new StringBuilder(f.getReturnType().getDisplayName()).append(" ").append(f.getName()).append("(");
+        ghidra.program.model.listing.Parameter[] params = f.getParameters();
+        for (int i = 0; i < params.length; i++) {
+            if (i > 0) b.append(", ");
+            b.append(params[i].getDataType().getDisplayName()).append(" ").append(params[i].getName());
+        }
+        if (f.hasVarArgs()) { if (params.length > 0) b.append(", "); b.append("..."); }
+        return b.append(")").toString();
+    }
+
+    private void dumpWindow(PrintWriter out, Address center, int before, int after) {
+        Address start;
+        Address end;
+        try { start = center.subtract(before); end = center.add(after); }
+        catch (Exception e) { out.println("- Window unavailable: " + e.getMessage()); return; }
+        InstructionIterator it = currentProgram.getListing().getInstructions(new AddressSet(start, end), true);
+        out.println("#### Call-site near " + center);
+        int count = 0;
+        while (it.hasNext()) {
+            Instruction ins = it.next();
+            StringBuilder line = new StringBuilder("- ").append(ins.getAddress()).append("  ").append(ins.getMnemonicString());
+            for (int i = 0; i < ins.getNumOperands(); i++) {
+                line.append(i == 0 ? "  " : ", ").append(ins.getDefaultOperandRepresentation(i));
+            }
+            out.println(line.toString());
+            count++;
+        }
+        if (count == 0) out.println("- No decoded instructions in this window.");
+    }
+}
