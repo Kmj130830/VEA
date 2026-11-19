@@ -201,6 +201,17 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_compute_mean_invstd_f32(
     float sum, float sum_squares, size_t count, float epsilon,
     float* out_mean, float* out_inv_std);
 
+/*
+ * Scalar row-major SGEMM equivalent of S5API v0_naive:
+ * M,N,K,alpha,A,lda,B,ldb,beta,C,ldc.
+ * A=[M][K], B=[K][N], C=[M][N]; strides count float elements.
+ * lda>=K, ldb>=N, ldc>=N; M,N are non-zero; K may be zero.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_gemm_row_major_f32(
+    const float* a, const float* b, float* c,
+    size_t m, size_t n, size_t k,
+    float alpha, size_t lda, size_t ldb, float beta, size_t ldc);
+
 /* Ports the MRW_LNSTATS reduction output: sum(input) and sum(input * input). */
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_reduce_sum_sumsq_f32(
     const float* input, size_t count, float* out_sum, float* out_sum_squares);

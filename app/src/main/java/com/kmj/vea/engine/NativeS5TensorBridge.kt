@@ -128,6 +128,35 @@ object NativeS5TensorBridge {
 
 
     /**
+     * Executes the recovered S5API v0_naive row-major matrix primitive:
+     * C = alpha * A * B + beta * C. Strides count float elements.
+     */
+    fun gemmRowMajor(
+        a: FloatArray,
+        b: FloatArray,
+        c: FloatArray,
+        m: Int,
+        n: Int,
+        k: Int,
+        alpha: Float = 1.0f,
+        lda: Int = k,
+        ldb: Int = n,
+        beta: Float = 0.0f,
+        ldc: Int = n
+    ): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(m > 0 && n > 0 && k >= 0)
+        require(lda >= k && ldb >= n && ldc >= n)
+        val aRequired = if (k == 0) 0L else (m - 1L) * lda + k
+        val bRequired = if (k == 0) 0L else (k - 1L) * ldb + n
+        val cRequired = (m - 1L) * ldc + n
+        require(aRequired <= a.size.toLong() && bRequired <= b.size.toLong() &&
+            cRequired <= c.size.toLong()) { "Input or output buffers are too small for the requested GEMM." }
+        return nativeGemmRowMajor(a, b, c, m, n, k, alpha, lda, ldb, beta, ldc)
+            ?: throw IllegalArgumentException("S5 row-major GEMM failed.")
+    }
+
+    /**
      * Applies the recovered 7x7 depthwise-convolution scalar kernel.
      * inputRows contains seven consecutive row-major rows, each exactly width samples.
      * weights contains 49 row-major coefficients. The result contains width samples.
@@ -201,6 +230,10 @@ object NativeS5TensorBridge {
         return result[0] to result[1]
     }
 
+    private external fun nativeGemmRowMajor(
+        a: FloatArray, b: FloatArray, c: FloatArray,
+        m: Int, n: Int, k: Int, alpha: Float, lda: Int, ldb: Int, beta: Float, ldc: Int
+    ): FloatArray?
     private external fun nativeBuildRecurrentParameterName(base: String, memberSuffix: String, layerIndex: Int, reverseDirection: Boolean): String?
     private external fun nativeResidualAffineAdd(dst: FloatArray, residual: FloatArray, scale: Float, bias: Float): FloatArray?
     private external fun nativeDepthwiseConv7x7Reflect(inputRows: FloatArray, weights: FloatArray, width: Int): FloatArray?

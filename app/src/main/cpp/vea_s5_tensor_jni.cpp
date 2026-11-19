@@ -554,3 +554,61 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeComputeMeanInvStd(
     return env->ExceptionCheck() ? nullptr : result;
 }
 
+
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeGemmRowMajor(
+    JNIEnv* env, jobject, jfloatArray a_array, jfloatArray b_array, jfloatArray c_array,
+    jint m, jint n, jint k, jfloat alpha, jint lda, jint ldb, jfloat beta, jint ldc) {
+    if (a_array == nullptr || b_array == nullptr || c_array == nullptr ||
+        m <= 0 || n <= 0 || k < 0 || lda < k || ldb < n || ldc < n) return nullptr;
+
+    size_t a_required = 0, b_required = 0, c_required = 0, row_offset = 0;
+    if (k > 0) {
+        if (MultiplyOverflow(static_cast<size_t>(m - 1), static_cast<size_t>(lda), &row_offset) ||
+            row_offset > std::numeric_limits<size_t>::max() - static_cast<size_t>(k)) return nullptr;
+        a_required = row_offset + static_cast<size_t>(k);
+        if (MultiplyOverflow(static_cast<size_t>(k - 1), static_cast<size_t>(ldb), &row_offset) ||
+            row_offset > std::numeric_limits<size_t>::max() - static_cast<size_t>(n)) return nullptr;
+        b_required = row_offset + static_cast<size_t>(n);
+    }
+    if (MultiplyOverflow(static_cast<size_t>(m - 1), static_cast<size_t>(ldc), &row_offset) ||
+        row_offset > std::numeric_limits<size_t>::max() - static_cast<size_t>(n)) return nullptr;
+    c_required = row_offset + static_cast<size_t>(n);
+
+    const jsize a_length = env->GetArrayLength(a_array);
+    const jsize b_length = env->GetArrayLength(b_array);
+    const jsize c_length = env->GetArrayLength(c_array);
+    if (static_cast<size_t>(a_length) < a_required ||
+        static_cast<size_t>(b_length) < b_required ||
+        static_cast<size_t>(c_length) < c_required) return nullptr;
+
+    try {
+        std::vector<jfloat> a(static_cast<size_t>(a_length));
+        std::vector<jfloat> b(static_cast<size_t>(b_length));
+        std::vector<jfloat> c(static_cast<size_t>(c_length));
+        if (a_length > 0) env->GetFloatArrayRegion(a_array, 0, a_length, a.data());
+        if (env->ExceptionCheck()) return nullptr;
+        if (b_length > 0) env->GetFloatArrayRegion(b_array, 0, b_length, b.data());
+        if (env->ExceptionCheck()) return nullptr;
+        env->GetFloatArrayRegion(c_array, 0, c_length, c.data());
+        if (env->ExceptionCheck()) return nullptr;
+
+        const VeaS5TensorStatus status = vea_s5_gemm_row_major_f32(
+            a.empty() ? nullptr : a.data(), b.empty() ? nullptr : b.data(), c.data(),
+            static_cast<size_t>(m), static_cast<size_t>(n), static_cast<size_t>(k),
+            alpha, static_cast<size_t>(lda), static_cast<size_t>(ldb), beta,
+            static_cast<size_t>(ldc));
+        if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+
+        jfloatArray result = env->NewFloatArray(c_length);
+        if (result != nullptr && c_length > 0) {
+            env->SetFloatArrayRegion(result, 0, c_length, c.data());
+        }
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}

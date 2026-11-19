@@ -399,6 +399,63 @@ int main() {
         1.0f, 1.0f, 1, 0.01f, nullptr, &norm_inv_std) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
+    // S5API named-kernel table v0_naive -> FUN_18013aa50.
+    // Confirmed SGEMM order: M,N,K,alpha,A,lda,B,ldb,beta,C,ldc.
+    const float gemm_a[] = {
+        1.0f, 2.0f, 3.0f, 99.0f,
+        4.0f, 5.0f, 6.0f, 99.0f
+    };
+    const float gemm_b[] = {
+        7.0f, 8.0f, 99.0f,
+        9.0f, 10.0f, 99.0f,
+        11.0f, 12.0f, 99.0f
+    };
+    float gemm_c[] = {
+        100.0f, 200.0f, 77.0f,
+        300.0f, 400.0f, 88.0f
+    };
+    assert(vea_s5_gemm_row_major_f32(
+        gemm_a, gemm_b, gemm_c, 2, 2, 3, 2.0f, 4, 3, 0.5f, 3) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    const float gemm_expected[] = {166.0f, 228.0f, 77.0f, 428.0f, 508.0f, 88.0f};
+    for (size_t i = 0; i < 6; ++i) assert(gemm_c[i] == gemm_expected[i]);
+
+    // Exercise scalar K tails around the vendor's four-wide unrolled body.
+    for (size_t gemm_k = 1; gemm_k <= 9; ++gemm_k) {
+        float a_values[9] = {};
+        float b_values[9] = {};
+        for (size_t i = 0; i < gemm_k; ++i) {
+            a_values[i] = static_cast<float>(i + 1u);
+            b_values[i] = 2.0f;
+        }
+        float c_value = 0.0f;
+        const float expected = static_cast<float>(gemm_k * (gemm_k + 1u));
+        assert(vea_s5_gemm_row_major_f32(
+            a_values, b_values, &c_value, 1, 1, gemm_k,
+            1.0f, gemm_k, 1, 0.0f, 1) == VEA_S5_TENSOR_STATUS_OK);
+        assert(c_value == expected);
+    }
+
+    // K==0 scales C by beta and does not dereference A or B.
+    float gemm_zero_k[] = {2.0f, -4.0f};
+    assert(vea_s5_gemm_row_major_f32(
+        nullptr, nullptr, gemm_zero_k, 1, 2, 0, 1.0f, 0, 2, 0.25f, 2) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(gemm_zero_k[0] == 0.5f && gemm_zero_k[1] == -1.0f);
+
+    assert(vea_s5_gemm_row_major_f32(
+        gemm_a, gemm_b, gemm_c, 2, 2, 3, 1.0f, 2, 3, 0.0f, 3) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_gemm_row_major_f32(
+        gemm_a, gemm_b, gemm_c, 2, 2, 3, 1.0f, 4, 1, 0.0f, 3) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_gemm_row_major_f32(
+        nullptr, gemm_b, gemm_c, 1, 2, 3, 1.0f, 3, 2, 0.0f, 2) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_gemm_row_major_f32(
+        gemm_a, gemm_b, nullptr, 1, 2, 3, 1.0f, 3, 2, 0.0f, 2) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
     // Fixed 136-byte outer header observed in all five supplied V7 model files.
     uint8_t raw_header[VEA_S5_CONTAINER_HEADER_SIZE] = {};
     raw_header[4] = 100u;
