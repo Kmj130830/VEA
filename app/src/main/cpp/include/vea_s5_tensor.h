@@ -48,7 +48,8 @@ typedef enum VeaS5TensorStatus {
     VEA_S5_TENSOR_STATUS_ARENA_EXHAUSTED = 3,
     VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW = 4,
     VEA_S5_TENSOR_STATUS_MALFORMED_DATA = 5,
-    VEA_S5_TENSOR_STATUS_TYPE_MISMATCH = 6
+    VEA_S5_TENSOR_STATUS_TYPE_MISMATCH = 6,
+    VEA_S5_TENSOR_STATUS_BUFFER_TOO_SMALL = 7
 } VeaS5TensorStatus;
 
 VEA_S5_TENSOR_API uint32_t vea_s5_tensor_abi_version(void);
@@ -157,6 +158,23 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_depthwise_conv7x7_reflect_f32(
     const float* weights_7x7,
     uint32_t width,
     float* output);
+
+
+/*
+ * Builds the recurrent parameter name used by FUN_180024a90:
+ * base + member_suffix + decimal layer index + optional "_reverse".
+ * member_suffix is normally ".weight_ih_l", ".weight_hh_l",
+ * ".bias_ih_l", or ".bias_hh_l".
+ * out_required receives required byte count including the NUL terminator.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_build_recurrent_parameter_name(
+    const char* base,
+    const char* member_suffix,
+    int32_t layer_index,
+    int reverse_direction,
+    char* out,
+    size_t out_capacity,
+    size_t* out_required);
 
 /* Ports the MRW_LNSTATS reduction output: sum(input) and sum(input * input). */
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_reduce_sum_sumsq_f32(

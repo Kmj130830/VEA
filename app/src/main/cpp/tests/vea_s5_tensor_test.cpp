@@ -223,6 +223,32 @@ int main() {
     assert(vea_s5_depthwise_conv7x7_reflect_f32(
         nullptr, dw_weights, 7, dw_output) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
+    // FUN_180024a90: form RNN parameter keys with layer index and direction suffix.
+    char recurrent_name[128] = {};
+    size_t recurrent_required = 0;
+    assert(vea_s5_build_recurrent_parameter_name(
+        "rnn", ".weight_ih_l", 0, 0, recurrent_name, sizeof(recurrent_name),
+        &recurrent_required) == VEA_S5_TENSOR_STATUS_OK);
+    assert(std::strcmp(recurrent_name, "rnn.weight_ih_l0") == 0);
+    assert(recurrent_required == std::strlen("rnn.weight_ih_l0") + 1u);
+    assert(vea_s5_build_recurrent_parameter_name(
+        "rnn", ".weight_hh_l", 2, 1, recurrent_name, sizeof(recurrent_name),
+        &recurrent_required) == VEA_S5_TENSOR_STATUS_OK);
+    assert(std::strcmp(recurrent_name, "rnn.weight_hh_l2_reverse") == 0);
+    assert(vea_s5_build_recurrent_parameter_name(
+        "rnn", ".bias_ih_l", 12, 0, recurrent_name, sizeof(recurrent_name),
+        &recurrent_required) == VEA_S5_TENSOR_STATUS_OK);
+    assert(std::strcmp(recurrent_name, "rnn.bias_ih_l12") == 0);
+    char too_small[8] = "stable";
+    assert(vea_s5_build_recurrent_parameter_name(
+        "rnn", ".weight_ih_l", 0, 1, too_small, sizeof(too_small),
+        &recurrent_required) == VEA_S5_TENSOR_STATUS_BUFFER_TOO_SMALL);
+    assert(recurrent_required > sizeof(too_small));
+    assert(std::strcmp(too_small, "stable") == 0);
+    assert(vea_s5_build_recurrent_parameter_name(
+        nullptr, ".weight_ih_l", 0, 0, recurrent_name, sizeof(recurrent_name),
+        &recurrent_required) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
     // MRW_LNSTATS: raw sum and sum-of-squares reduction.
     const float stats_input[] = {1.0f, -2.0f, 3.0f, -4.0f};
     float stats_sum = 0.0f;
