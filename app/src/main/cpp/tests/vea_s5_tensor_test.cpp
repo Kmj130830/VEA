@@ -1,4 +1,5 @@
 #include "vea_s5_tensor.h"
+#include "vea_s5_container.h"
 
 #include <cassert>
 #include <cstdint>
@@ -92,6 +93,40 @@ int main() {
     assert(vea_s5_pack_matrix_bank_f32(
         arena, nullptr, 3, 2, 2, &descriptors) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
     assert(vea_s5_arena_used(arena) == checkpoint);
+
+
+    // Fixed 136-byte outer header observed in all five supplied V7 model files.
+    uint8_t raw_header[VEA_S5_CONTAINER_HEADER_SIZE] = {};
+    raw_header[4] = 100u;
+    raw_header[8] = 16u;
+    for (size_t i = 12; i < sizeof(raw_header); ++i) {
+        raw_header[i] = static_cast<uint8_t>(i ^ 0x5au);
+    }
+    const char* magics[] = {"VTBR", "VPIT", "VHNV", "VTMG"};
+    const uint32_t kinds[] = {
+        VEA_S5_CONTAINER_KIND_VTBR, VEA_S5_CONTAINER_KIND_VPIT,
+        VEA_S5_CONTAINER_KIND_VHNV, VEA_S5_CONTAINER_KIND_VTMG
+    };
+    assert(vea_s5_container_header_size() == 136u);
+    for (size_t i = 0; i < 4; ++i) {
+        VeaS5ContainerHeader parsed{};
+        for (size_t b = 0; b < 4; ++b) raw_header[b] = static_cast<uint8_t>(magics[i][b]);
+        assert(vea_s5_parse_container_header(
+            raw_header, sizeof(raw_header) + 100u, &parsed) == VEA_S5_CONTAINER_STATUS_OK);
+        assert(parsed.kind == kinds[i]);
+        assert(parsed.payload_size == 100u);
+        assert(parsed.format_word == 16u);
+        assert(parsed.opaque_metadata[0] == raw_header[12]);
+        assert(parsed.opaque_metadata[123] == raw_header[135]);
+    }
+    VeaS5ContainerHeader invalid_header{};
+    assert(vea_s5_parse_container_header(raw_header, sizeof(raw_header) + 99u, &invalid_header)
+        == VEA_S5_CONTAINER_STATUS_INVALID_LENGTH);
+    const uint8_t invalid_magic[VEA_S5_CONTAINER_HEADER_SIZE] = {};
+    assert(vea_s5_parse_container_header(invalid_magic, sizeof(invalid_magic), &invalid_header)
+        == VEA_S5_CONTAINER_STATUS_INVALID_MAGIC);
+    assert(vea_s5_parse_container_header(raw_header, 135u, &invalid_header)
+        == VEA_S5_CONTAINER_STATUS_INVALID_LENGTH);
 
     vea_s5_arena_reset(arena);
     assert(vea_s5_arena_used(arena) == 0);
