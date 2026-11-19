@@ -36,6 +36,7 @@ G2P decompilation is being automated through the G2P static decompilation GitHub
 
 The G2P work is not itself a singing synthesizer. WaveOfflineRenderer.dll exposes audio normalization, resampling, and time-stretch functions; it is not evidence of an AI vocal renderer. VOCALOID7.dll had no named exports in the initial PE scan, so its real entry point remains unknown. See:
 - docs/G2P_REVERSE_ENGINEERING.md
+- docs/G2P_STATIC_FINDINGS.md
 - docs/SUPPLIED_V7_ASSETS.md
 - docs/ENGINE_AND_COMPATIBILITY.md
 
