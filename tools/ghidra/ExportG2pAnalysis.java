@@ -63,8 +63,8 @@ public class ExportG2pAnalysis extends GhidraScript {
             writeSymbols(out, interestingSymbols);
             writeFunctionIndex(out);
 
-            LinkedHashMap<Address, Function> selected = selectCallClosure(interestingSymbols);
-            writeFactoryVtableEvidence(out, interestingSymbols, selected);
+            LinkedHashMap<Address, Function> selected = selectCallClosure(interestingSymbols, scriptArgs);
+            writeReferencedVtableEvidence(out, selected);
             writeDecompilation(out, selected);
         }
 
@@ -178,7 +178,8 @@ public class ExportG2pAnalysis extends GhidraScript {
         return text.toString();
     }
 
-    private LinkedHashMap<Address, Function> selectCallClosure(List<Symbol> symbols) throws CancelledException {
+    private LinkedHashMap<Address, Function> selectCallClosure(List<Symbol> symbols, String[] scriptArgs)
+            throws CancelledException {
         LinkedHashMap<Address, Function> selected = new LinkedHashMap<>();
         ArrayDeque<WorkItem> queue = new ArrayDeque<>();
         FunctionIterator allFunctions = currentProgram.getFunctionManager().getFunctions(true);
@@ -192,6 +193,31 @@ public class ExportG2pAnalysis extends GhidraScript {
             if (function != null && !selected.containsKey(function.getEntryPoint())) {
                 selected.put(function.getEntryPoint(), function);
                 queue.add(new WorkItem(function, 0));
+            }
+        }
+
+        // Optional additional seeds are absolute PE virtual addresses supplied by the
+        // workflow for internal language-parser functions that are not in the export call graph.
+        for (int i = 1; i < scriptArgs.length; i++) {
+            String raw = scriptArgs[i].trim();
+            if (raw.isEmpty()) continue;
+            String value = raw.startsWith("0x") || raw.startsWith("0X") ? raw.substring(2) : raw;
+            Address address;
+            try {
+                long offset = Long.parseUnsignedLong(value, 16);
+                address = currentProgram.getAddressFactory().getDefaultAddressSpace().getAddress(offset);
+            } catch (Exception ex) {
+                printerr("Ignoring invalid supplemental address: " + raw);
+                continue;
+            }
+            Function function = currentProgram.getFunctionManager().getFunctionAt(address);
+            if (function == null) function = currentProgram.getFunctionManager().getFunctionContaining(address);
+            if (function != null && !selected.containsKey(function.getEntryPoint())) {
+                selected.put(function.getEntryPoint(), function);
+                queue.addLast(new WorkItem(function, 0));
+                println("Added supplemental function seed: " + function.getName() + " at " + function.getEntryPoint());
+            } else if (function == null) {
+                printerr("No function found at supplemental address: " + raw);
             }
         }
 
@@ -233,33 +259,26 @@ public class ExportG2pAnalysis extends GhidraScript {
     }
 
     /**
-     * Recover vtable pointer runs referenced by concrete G2PACreateManager factories.
-     * This avoids guessing from unrelated read-only data or arbitrary pointer arrays.
+     * Recover virtual-table-like pointer runs referenced from already selected
+     * language-factory, manager, and supplemental parser functions. This captures
+     * internal G2PA objects that are instantiated below G2PACreateManager.
      */
-    private void writeFactoryVtableEvidence(
+    private void writeReferencedVtableEvidence(
             PrintWriter out,
-            List<Symbol> symbols,
             LinkedHashMap<Address, Function> selected) throws Exception {
-        out.println("## Factory-referenced virtual table candidates");
+        out.println("## Referenced virtual-table candidates");
         out.println();
-        out.println("Pointer slots are read from read-only data only when a G2PACreateManager instruction "
-                + "references that address. A slot is listed only when its value resolves to a function "
-                + "in an executable memory block.");
+        out.println("Candidate pointer runs are read from read-only data referenced by selected code. "
+                + "A slot is listed only when its value resolves to a function in an executable memory block. "
+                + "Candidates still require RTTI and call-site corroboration.");
         out.println();
 
         Set<Address> emittedTables = new HashSet<>();
         int tableCount = 0;
         int addedMethods = 0;
+        List<Function> scanFunctions = new ArrayList<>(selected.values());
 
-        for (Symbol symbol : symbols) {
-            if (symbol.getSymbolType() != SymbolType.FUNCTION
-                    || !"G2PACreateManager".equalsIgnoreCase(symbol.getName())) {
-                continue;
-            }
-
-            Function factory = currentProgram.getFunctionManager().getFunctionAt(symbol.getAddress());
-            if (factory == null) continue;
-
+        for (Function factory : scanFunctions) {
             InstructionIterator instructions =
                     currentProgram.getListing().getInstructions(factory.getBody(), true);
             while (instructions.hasNext()) {
@@ -275,7 +294,7 @@ public class ExportG2pAnalysis extends GhidraScript {
                     }
 
                     tableCount++;
-                    out.println("### Table " + tableCount + " referenced by "
+                    out.println("### Candidate " + tableCount + " referenced by "
                             + factory.getName() + " at " + factory.getEntryPoint()
                             + ", data address " + tableAddress);
                     out.println();
@@ -312,7 +331,7 @@ public class ExportG2pAnalysis extends GhidraScript {
                         slotCount++;
 
                         if (!selected.containsKey(targetFunction.getEntryPoint())
-                                && selected.size() < 160) {
+                                && selected.size() < 260) {
                             selected.put(targetFunction.getEntryPoint(), targetFunction);
                             addedMethods++;
                         }
@@ -326,10 +345,10 @@ public class ExportG2pAnalysis extends GhidraScript {
         }
 
         if (tableCount == 0) {
-            out.println("No direct read-only-data references from a G2PACreateManager factory were recovered.");
+            out.println("No executable pointer runs referenced from the selected functions were recovered.");
             out.println();
         }
-        out.println("Factory-referenced table count: " + tableCount);
+        out.println("Referenced pointer-run candidate count: " + tableCount);
         out.println("Additional virtual methods added to decompilation: " + addedMethods);
         out.println();
     }
