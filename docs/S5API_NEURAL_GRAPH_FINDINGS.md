@@ -48,7 +48,13 @@ Three dispatch functions were identified:
 
 Their dispatch logic checks x86 CPUID/XCR0 and selects scalar, AVX-family or AVX2-capable implementations. These machine-code kernels cannot be reused as Android ARM64 code. A native port must implement functionally equivalent scalar and/or NEON kernels and verify numeric agreement.
 
-## 5. What is now a suitable porting target
+## 5. External runtime dependencies
+
+The PE import table for S5API.dll imports Windows synchronization, Kernel32 file/thread APIs, the Microsoft C/C++ runtime, and the CRT math/heap/string/filesystem libraries. The import list contains no ONNX Runtime, TensorFlow, PyTorch, DirectML, CUDA, or other third-party neural inference runtime.
+
+This is a bounded observation about the static PE import table, not proof that no runtime component is dynamically loaded elsewhere. However, it indicates that the model parsing and inference kernels visible in S5API are implemented inside the module rather than delegated through a normal imported inference SDK. Android therefore needs a portable replacement for these internal routines, not merely an Android build of a missing vendor inference library.
+
+## 6. What is now a suitable porting target
 
 The analysis has separated the engine into these recoverable boundaries:
 
@@ -60,7 +66,7 @@ The analysis has separated the engine into these recoverable boundaries:
 
 The next implementation dependency is the low-level tensor reader called from the layer loader. Do not hard-code tensor shapes or invent GRU gate order before those functions and the model data are reconciled.
 
-## 6. Port status
+## 7. Port status
 
 - `libveavsm.so` currently implements the Android-side render callback transport/capture boundary and float32 WAV export adapter.
 - It does **not** yet implement these neural layers, the spectral decoder, or Megpoid V7 voice generation.
