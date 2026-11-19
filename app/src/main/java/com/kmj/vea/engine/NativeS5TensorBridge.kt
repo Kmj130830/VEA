@@ -105,7 +105,18 @@ object NativeS5TensorBridge {
             ?: throw IllegalStateException("S5 ACT activation failed.")
     }
 
-    private external fun nativeApplyGatedActivation(planes: FloatArray, count: Int, mode: Int): FloatArray?\n    private external fun nativeDecodeTypedFloatArray(encoded: ByteArray): FloatArray?
+
+    /** Returns [sum, sumSquares] for the input vector (MRW_LNSTATS primitive). */
+    fun reduceSumAndSquares(values: FloatArray): Pair<Float, Float> {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(values.isNotEmpty())
+        val result = nativeReduceSumAndSquares(values)
+            ?: throw IllegalStateException("S5 stats reduction failed.")
+        check(result.size == 2)
+        return result[0] to result[1]
+    }
+
+    private external fun nativeReduceSumAndSquares(values: FloatArray): FloatArray?\n    private external fun nativeApplyGatedActivation(planes: FloatArray, count: Int, mode: Int): FloatArray?\n    private external fun nativeDecodeTypedFloatArray(encoded: ByteArray): FloatArray?
     private external fun nativeDecodeTypedInt32Array(encoded: ByteArray): IntArray?
     private external fun nativeAbiVersion(): Int
     private external fun nativePackMatrixBank(

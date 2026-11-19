@@ -146,6 +146,10 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_decode_typed_int32_array(
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_apply_gated_activation_f32(
     float* planes, size_t count, int mode);
 
+/* Ports the MRW_LNSTATS reduction output: sum(input) and sum(input * input). */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_reduce_sum_sumsq_f32(
+    const float* input, size_t count, float* out_sum, float* out_sum_squares);
+
 #ifdef __cplusplus
 }
 #endif

@@ -193,6 +193,23 @@ int main() {
     assert(vea_s5_apply_gated_activation_f32(act_invalid, 0, 0) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
+
+    // MRW_LNSTATS: raw sum and sum-of-squares reduction.
+    const float stats_input[] = {1.0f, -2.0f, 3.0f, -4.0f};
+    float stats_sum = 0.0f;
+    float stats_square_sum = 0.0f;
+    assert(vea_s5_reduce_sum_sumsq_f32(
+        stats_input, 4, &stats_sum, &stats_square_sum) == VEA_S5_TENSOR_STATUS_OK);
+    assert(stats_sum == -2.0f);
+    assert(stats_square_sum == 30.0f);
+
+    const float stats_single[] = {-3.0f};
+    assert(vea_s5_reduce_sum_sumsq_f32(
+        stats_single, 1, &stats_sum, &stats_square_sum) == VEA_S5_TENSOR_STATUS_OK);
+    assert(stats_sum == -3.0f && stats_square_sum == 9.0f);
+    assert(vea_s5_reduce_sum_sumsq_f32(
+        nullptr, 1, &stats_sum, &stats_square_sum) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
     // S5API tagged binary numeric arrays: *F32, *F16, and *S32 + Base64.
     const char f32_encoded[] = "*F32AACAPwAAAEA=";  // [1.0f, 2.0f]
     float* decoded_f32 = nullptr;

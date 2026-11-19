@@ -391,3 +391,29 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeApplyGatedActivation(
         return nullptr;
     }
 }
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeReduceSumAndSquares(
+    JNIEnv* env, jobject, jfloatArray input_array) {
+    if (input_array == nullptr) return nullptr;
+    const jsize length = env->GetArrayLength(input_array);
+    if (length <= 0) return nullptr;
+    try {
+        std::vector<jfloat> input(static_cast<size_t>(length));
+        env->GetFloatArrayRegion(input_array, 0, length, input.data());
+        if (env->ExceptionCheck()) return nullptr;
+        float sum = 0.0f;
+        float sum_squares = 0.0f;
+        const VeaS5TensorStatus status = vea_s5_reduce_sum_sumsq_f32(
+            input.data(), input.size(), &sum, &sum_squares);
+        if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+        const jfloat values[2] = {sum, sum_squares};
+        jfloatArray result = env->NewFloatArray(2);
+        if (result != nullptr) env->SetFloatArrayRegion(result, 0, 2, values);
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
