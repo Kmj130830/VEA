@@ -204,6 +204,8 @@ object XsampaMapper {
             "jpn", "ja", "jp" -> japanese(normalized)
             "kor", "ko", "kr" -> korean(normalized)
             "eng", "en" -> english(normalized)
+            // Keep Chinese lyrics intact; Han characters are not X-SAMPA.
+            "zho", "zh", "cn" -> ""
             else -> normalized
         }
     }
