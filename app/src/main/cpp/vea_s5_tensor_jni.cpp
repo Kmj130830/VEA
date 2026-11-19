@@ -68,6 +68,42 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeBuildRecurrentParameterName(
     }
 }
 
+extern "C" JNIEXPORT jlongArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeRnnDirectionLayout(
+    JNIEnv* env, jobject,
+    jint input_size, jint hidden_size, jint num_layers,
+    jboolean has_bias, jboolean bidirectional,
+    jint layer_index, jint direction_index) {
+    if (input_size <= 0 || hidden_size <= 0 || num_layers <= 0 ||
+        layer_index < 0 || direction_index < 0) return nullptr;
+
+    VeaS5RnnDirectionLayout layout{};
+    const VeaS5TensorStatus status = vea_s5_rnn_direction_layout(
+        static_cast<uint32_t>(input_size), static_cast<uint32_t>(hidden_size),
+        static_cast<uint32_t>(num_layers),
+        has_bias == JNI_TRUE ? 1 : 0,
+        bidirectional == JNI_TRUE ? 1 : 0,
+        static_cast<uint32_t>(layer_index),
+        static_cast<uint32_t>(direction_index), &layout);
+    if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+
+    const jlong values[] = {
+        static_cast<jlong>(layout.layer_index),
+        static_cast<jlong>(layout.direction_index),
+        static_cast<jlong>(layout.input_features),
+        static_cast<jlong>(layout.hidden_features),
+        static_cast<jlong>(layout.gate_features),
+        static_cast<jlong>(layout.direction_count),
+        static_cast<jlong>(layout.weight_ih_elements),
+        static_cast<jlong>(layout.weight_hh_elements),
+        static_cast<jlong>(layout.bias_ih_elements),
+        static_cast<jlong>(layout.bias_hh_elements)
+    };
+    jlongArray result = env->NewLongArray(10);
+    if (result != nullptr) env->SetLongArrayRegion(result, 0, 10, values);
+    return env->ExceptionCheck() ? nullptr : result;
+}
+
 extern "C" JNIEXPORT jint JNICALL
 Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeAbiVersion(
     JNIEnv*, jobject) {
