@@ -10,6 +10,7 @@ on:
       - "tools/ghidra/ExportS5ApiAnalysis.java"
       - "tools/ghidra/ExportS5RendererPath.java"
       - "tools/ghidra/ExportS5ModelOperatorXrefs.java"
+      - "tools/ghidra/ExportS5ModelRuntime.java"
       - ".github/workflows/renderer-core-analysis.yml"
 
 permissions:
@@ -80,6 +81,17 @@ jobs:
             -postScript ExportS5ModelOperatorXrefs.java "$PWD/build/renderer-core-analysis/ghidra/S5API_MODEL_OPERATOR_XREFS.md" \
             -analysisTimeoutPerFile 600 -deleteProject
           test -s build/renderer-core-analysis/ghidra/S5API_MODEL_OPERATOR_XREFS.md
+
+      - name: Trace tensor loaders and ARM64 DSP operator candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GHIDRA_HEADLESS" "$PWD/build/ghidra-renderer-projects" VEA_S5API_MODEL_RUNTIME \
+            -import "$PWD/build/editor-package/modules/S5API.dll" \
+            -scriptPath "$PWD/tools/ghidra" \
+            -postScript ExportS5ModelRuntime.java "$PWD/build/renderer-core-analysis/ghidra/S5API_MODEL_RUNTIME.md" \
+            -analysisTimeoutPerFile 600 -deleteProject
+          test -s build/renderer-core-analysis/ghidra/S5API_MODEL_RUNTIME.md
 
       - name: Preserve exact renderer binaries and PE metadata
         shell: bash
