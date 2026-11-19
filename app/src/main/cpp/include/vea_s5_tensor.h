@@ -194,6 +194,13 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_build_recurrent_parameter_name(
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_residual_affine_add_f32(
     float* dst, const float* residual, size_t count, float scale, float bias);
 
+/* Computes the recovered S5API normalization statistics from sum and sumsq.
+ * variance = max(sum_squares/count - mean*mean, 0) + epsilon.
+ * Returns mean and reciprocal standard deviation. */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_compute_mean_invstd_f32(
+    float sum, float sum_squares, size_t count, float epsilon,
+    float* out_mean, float* out_inv_std);
+
 /* Ports the MRW_LNSTATS reduction output: sum(input) and sum(input * input). */
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_reduce_sum_sumsq_f32(
     const float* input, size_t count, float* out_sum, float* out_sum_squares);

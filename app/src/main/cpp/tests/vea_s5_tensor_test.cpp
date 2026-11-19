@@ -366,6 +366,39 @@ int main() {
         &decoded_unpadded, &decoded_unpadded_count) ==
         VEA_S5_TENSOR_STATUS_MALFORMED_DATA);
 
+    // FUN_1800c5d50: mean, variance clamp, epsilon, sqrt and reciprocal std.
+    float norm_mean = 0.0f;
+    float norm_inv_std = 0.0f;
+    assert(vea_s5_compute_mean_invstd_f32(
+        10.0f, 30.0f, 4, 0.001f, &norm_mean, &norm_inv_std) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(std::fabs(norm_mean - 2.5f) < 1.0e-7f);
+    assert(std::fabs(norm_inv_std - (1.0f / std::sqrt(1.251f))) < 1.0e-6f);
+
+    // A negative round-off variance is clamped to zero before epsilon.
+    assert(vea_s5_compute_mean_invstd_f32(
+        4.0f, 3.0f, 4, 0.25f, &norm_mean, &norm_inv_std) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(norm_mean == 1.0f);
+    assert(std::fabs(norm_inv_std - 2.0f) < 1.0e-6f);
+
+    // Constant signal uses epsilon as the variance floor.
+    assert(vea_s5_compute_mean_invstd_f32(
+        4.0f, 4.0f, 4, 0.01f, &norm_mean, &norm_inv_std) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(norm_mean == 1.0f);
+    assert(std::fabs(norm_inv_std - 10.0f) < 1.0e-5f);
+
+    assert(vea_s5_compute_mean_invstd_f32(
+        1.0f, 1.0f, 0, 0.01f, &norm_mean, &norm_inv_std) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_compute_mean_invstd_f32(
+        1.0f, 1.0f, 1, -0.01f, &norm_mean, &norm_inv_std) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_compute_mean_invstd_f32(
+        1.0f, 1.0f, 1, 0.01f, nullptr, &norm_inv_std) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
     // Fixed 136-byte outer header observed in all five supplied V7 model files.
     uint8_t raw_header[VEA_S5_CONTAINER_HEADER_SIZE] = {};
     raw_header[4] = 100u;

@@ -538,3 +538,19 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeReduceSumAndSquares(
         return nullptr;
     }
 }
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeComputeMeanInvStd(
+    JNIEnv* env, jobject, jfloat sum, jfloat sum_squares, jint count, jfloat epsilon) {
+    if (count <= 0) return nullptr;
+    float mean = 0.0f;
+    float inverse_std = 0.0f;
+    const VeaS5TensorStatus status = vea_s5_compute_mean_invstd_f32(
+        sum, sum_squares, static_cast<size_t>(count), epsilon, &mean, &inverse_std);
+    if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+    const jfloat output[2] = {mean, inverse_std};
+    jfloatArray result = env->NewFloatArray(2);
+    if (result != nullptr) env->SetFloatArrayRegion(result, 0, 2, output);
+    return env->ExceptionCheck() ? nullptr : result;
+}
+

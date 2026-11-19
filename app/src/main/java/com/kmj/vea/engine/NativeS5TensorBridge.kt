@@ -173,6 +173,24 @@ object NativeS5TensorBridge {
     }
 
 
+    /**
+     * Completes the scalar normalization statistics stage recovered in FUN_1800c5d50.
+     * Returns mean and 1/sqrt(max(sumSquares/count - mean^2, 0) + epsilon).
+     */
+    fun computeMeanAndInverseStd(
+        sum: Float,
+        sumSquares: Float,
+        count: Int,
+        epsilon: Float
+    ): Pair<Float, Float> {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(count > 0 && epsilon >= 0.0f)
+        val result = nativeComputeMeanInvStd(sum, sumSquares, count, epsilon)
+            ?: throw IllegalArgumentException("Invalid normalization statistics.")
+        check(result.size == 2)
+        return result[0] to result[1]
+    }
+
     /** Returns [sum, sumSquares] for the input vector (MRW_LNSTATS primitive). */
     fun reduceSumAndSquares(values: FloatArray): Pair<Float, Float> {
         check(loaded) { "Native S5 tensor library is not loaded." }
