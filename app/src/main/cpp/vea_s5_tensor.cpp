@@ -352,3 +352,58 @@ extern "C" VeaS5TensorStatus vea_s5_pack_row_major_f32(
     *out_descriptor = descriptor;
     return VEA_S5_TENSOR_STATUS_OK;
 }
+
+extern "C" VeaS5TensorStatus vea_s5_pack_transposed_f32(
+    VeaS5Arena* arena,
+    const float* source,
+    uint32_t axis0_count,
+    uint32_t axis1_count,
+    VeaS5MatrixDescriptor** out_descriptor) {
+    if (arena == nullptr || source == nullptr || out_descriptor == nullptr ||
+        axis0_count == 0 || axis1_count == 0) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    *out_descriptor = nullptr;
+    const size_t checkpoint = arena->used;
+    const uint64_t padded64 =
+        (static_cast<uint64_t>(axis0_count) + 7u) & ~static_cast<uint64_t>(7u);
+    if (padded64 > std::numeric_limits<uint32_t>::max()) {
+        return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
+    }
+    const uint32_t padded_axis0 = static_cast<uint32_t>(padded64);
+    size_t source_count = 0, output_count = 0, output_bytes = 0;
+    if (MultiplyOverflow(static_cast<size_t>(axis0_count), axis1_count, &source_count) ||
+        MultiplyOverflow(static_cast<size_t>(padded_axis0), axis1_count, &output_count) ||
+        MultiplyOverflow(output_count, sizeof(float), &output_bytes)) {
+        return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
+    }
+    (void)source_count;
+    (void)output_bytes;
+
+    VeaS5MatrixDescriptor* descriptor = nullptr;
+    VeaS5TensorStatus status =
+        vea_s5_arena_alloc_matrix_descriptors(arena, 1, &descriptor);
+    if (status != VEA_S5_TENSOR_STATUS_OK) return status;
+    float* values = nullptr;
+    status = vea_s5_arena_alloc_f32(arena, output_count, &values);
+    if (status != VEA_S5_TENSOR_STATUS_OK) {
+        arena->used = checkpoint;
+        return status;
+    }
+    descriptor->axis0 = axis0_count;
+    descriptor->axis1 = axis1_count;
+    descriptor->padded_axis0 = padded_axis0;
+    descriptor->reserved = 0;
+    descriptor->values = values;
+
+    // FUN_18005df50 consumes source [axis0][axis1] and writes [axis1][padded_axis0].
+    for (uint32_t axis0 = 0; axis0 < axis0_count; ++axis0) {
+        const size_t source_row = static_cast<size_t>(axis0) * axis1_count;
+        for (uint32_t axis1 = 0; axis1 < axis1_count; ++axis1) {
+            const size_t target = static_cast<size_t>(axis1) * padded_axis0 + axis0;
+            values[target] = source[source_row + axis1];
+        }
+    }
+    *out_descriptor = descriptor;
+    return VEA_S5_TENSOR_STATUS_OK;
+}

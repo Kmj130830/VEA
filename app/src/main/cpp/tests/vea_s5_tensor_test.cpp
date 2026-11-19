@@ -146,7 +146,27 @@ int main() {
     vea_s5_arena_destroy(row_tiny);
 
 
-    // S5API tagged binary numeric arrays: *F32, *F16, and *S32 + Base64.
+
+    // FUN_18005df50: transpose [axis0][axis1] to [axis1][padded_axis0].
+    const float transposed_input[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
+    VeaS5MatrixDescriptor* transposed_descriptor = nullptr;
+    assert(vea_s5_pack_transposed_f32(
+        arena, transposed_input, 3, 2, &transposed_descriptor) == VEA_S5_TENSOR_STATUS_OK);
+    assert(transposed_descriptor->axis0 == 3);
+    assert(transposed_descriptor->axis1 == 2);
+    assert(transposed_descriptor->padded_axis0 == 8);
+    assert(transposed_descriptor->values[0] == 1.0f);
+    assert(transposed_descriptor->values[1] == 3.0f);
+    assert(transposed_descriptor->values[2] == 5.0f);
+    assert(transposed_descriptor->values[8] == 2.0f);
+    assert(transposed_descriptor->values[9] == 4.0f);
+    assert(transposed_descriptor->values[10] == 6.0f);
+    for (uint32_t row = 0; row < 2; ++row) {
+        for (uint32_t col = 3; col < 8; ++col) {
+            assert(transposed_descriptor->values[row * 8u + col] == 0.0f);
+        }
+    }
+\n    // S5API tagged binary numeric arrays: *F32, *F16, and *S32 + Base64.
     const char f32_encoded[] = "*F32AACAPwAAAEA=";  // [1.0f, 2.0f]
     float* decoded_f32 = nullptr;
     size_t decoded_f32_count = 0;

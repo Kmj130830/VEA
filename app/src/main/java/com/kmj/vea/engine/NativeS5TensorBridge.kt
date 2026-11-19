@@ -114,6 +114,24 @@ object NativeS5TensorBridge {
             ?: throw IllegalStateException("S5 row-major packing failed.")
     }
 
+
+    /** Packs one contiguous [axis0][axis1] matrix as [axis1][alignUp(axis0, 8)]. */
+    fun packTransposed(values: FloatArray, axis0Count: Int, axis1Count: Int): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(axis0Count > 0 && axis1Count > 0)
+        val expected = axis0Count.toLong() * axis1Count.toLong()
+        require(expected == values.size.toLong()) {
+            "Expected $expected values, received ${values.size}."
+        }
+        return nativePackTransposed(values, axis0Count, axis1Count)
+            ?: throw IllegalStateException("S5 transposed packing failed.")
+    }
+
+    private external fun nativePackTransposed(
+        source: FloatArray,
+        axis0Count: Int,
+        axis1Count: Int
+    ): FloatArray?
     private external fun nativePackRowMajor(
         source: FloatArray,
         axis0Count: Int,
