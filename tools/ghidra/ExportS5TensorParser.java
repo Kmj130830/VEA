@@ -18,7 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class ExportS5TensorParser extends GhidraScript {
-    private static final int MAX_FUNCTIONS = 110;
+    private static final int MAX_FUNCTIONS = 150;
     private static final int MAX_CALLERS_PER_SEED = 16;
     private static final int MAX_DEPTH = 2;
 
@@ -35,7 +35,11 @@ public class ExportS5TensorParser extends GhidraScript {
         "180020190", "1800214c0", "180024a90",
         "180026f60", "180047900", "180056f40",
         "180064670", "180068190", "18005ebe0",
-        "18006fdb0", "180083610"
+        "18006fdb0", "180083610",
+        "18005df50", "180065510", "1800656e0",
+        "180060270", "180064cc0",
+        "18012d350", "18012e0d0", "180130b70", "1800c13a0",
+        "18012d780", "18012f280"
     };
 
     @Override

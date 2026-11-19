@@ -47,7 +47,7 @@ jobs:
           test -n "$tool"
           echo "GHIDRA_HEADLESS=$tool" >> "$GITHUB_ENV"
 
-      - name: Decompile tensor readers, shape converters, and GRU parameter accessors
+      - name: Decompile tensor readers, model-layer setup, GRU parameters, and DSP operator paths
         shell: bash
         run: |
           set -euo pipefail
