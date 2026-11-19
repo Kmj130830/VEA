@@ -2,30 +2,24 @@
 
 ## Target
 
-VEA targets offline Android editing and, eventually, local VOCALOID AI rendering. The first integration target is VOCALOID7 AI Megpoid; VOCALOID6 compatibility remains a later design target. The project model retains note timing, lyric, phoneme text, and per-note pitch points.
-
-**Product requirement:** synthesis must run on the Android device. A PC connection, Wine/Box64 runtime, remote render server, or cloud synthesis service is not an acceptable final workflow.
+VEA targets offline Android editing and eventual local VOCALOID AI rendering. The first engine target is VOCALOID7 AI Megpoid. The final product must run without a PC connection, Wine/Box64, remote renderer, or cloud service.
 
 ## PE-to-ELF boundary
 
-Android native libraries are ELF objects compiled for an Android ABI such as arm64-v8a. The supplied DLLs are Windows AMD64 PE images and depend on Windows loader/runtime conventions. Renaming a PE DLL to a .so does not change the file format, instruction ABI, imported APIs, C++ runtime, or object ABI.
+The supplied Windows AMD64 DLLs are PE images, while Android loads ELF libraries built for Android ABIs such as arm64-v8a. Renaming a PE DLL to .so does not convert the loader format, ABI, runtime imports, or C++ object model.
 
-The chosen route is therefore static reverse engineering followed by a native ARM64 reimplementation/port:
-- use Ghidra to inspect entry points, control flow, call sites, inferred prototypes, and data structures;
-- validate recovered behavior with the authorized desktop reference;
-- implement the confirmed contract in Android-compatible C/C++;
-- expose a narrow stable C ABI and call it from Kotlin using JNI;
-- build only for Android ABIs that are actually supported and tested, initially arm64-v8a.
+The current strategy is static reverse engineering followed by a new ARM64 implementation:
+- analyze the Windows modules statically;
+- recover their externally observable contracts and relevant algorithms;
+- validate those contracts with the authorized reference implementation;
+- implement portable C/C++ and expose stable interfaces via JNI;
+- mark a backend ready only after on-device differential tests.
 
-An inferred decompiler signature is not an authoritative header. Do not write JNI wrappers based only on guessed pointer types or calling conventions.
+Decompiled prototypes and object layouts are hypotheses, not vendor headers. The host-facing G2P manager interface is distinct from the per-language G2P manager classes.
 
-Android NDK references:
-- https://developer.android.com/ndk/guides/abis
-- https://developer.android.com/ndk/guides/jni-tips
+## G2P status
 
-## First target: G2P
-
-The first static-analysis batch covers:
+The G2P investigation covers the common host wrapper and language modules:
 - G2PAManager.dll
 - G2PAManager_ENG.dll
 - G2PAManager_JPN.dll
@@ -33,57 +27,43 @@ The first static-analysis batch covers:
 - G2PAManager_CHS.dll
 - G2PA_ESP.dll
 
-The G2PA-related named exports provide entry-point seeds. The Ghidra post-script records PE memory blocks, symbols, the function index, inferred prototypes, and decompiler output for the entry points and their direct call closure (bounded to avoid expanding into unrelated runtime code).
+Three Ghidra 12.2 static-analysis passes completed. They recover the common manager loader, language-key mapping, distinct object construction patterns, host-facing interface dispatches, and several per-language parser/converter helpers. The evidence and limitations are documented in:
+- docs/G2P_REVERSE_ENGINEERING.md
+- docs/G2P_STATIC_FINDINGS.md
 
-Analysis workflow:
-- Workflow: .github/workflows/ghidra-g2p-analysis.yml
-- Extractor: tools/extract_g2p_targets.py
-- Ghidra script: tools/ghidra/ExportG2pAnalysis.java
-- Ghidra release: 12.2, pinned by release archive SHA-256
-- Artifact: VEA-G2P-decompilation-reports
+The repository now builds and packages `libveag2p.so` for `arm64-v8a`. The initial native implementation includes:
+- C ABI version `0x00010000`;
+- a JNI bridge using explicit standard UTF-8 conversion;
+- strict UTF-8 validation and buffer ownership;
+- one observed Korean preprocessing transformation: U+30FC and U+2212 to U+002D;
+- host CMake tests and Android NDK build integration.
 
-After decompilation, the smallest native implementation should be based on the recovered public boundary and checked by differential tests:
-1. capture known input/output pairs from the authorized reference for Japanese, English, Chinese, and Korean;
-2. determine exact string encoding, buffer ownership, object lifetime, error behavior, and thread-safety requirements;
-3. implement only the confirmed G2P interface in C++;
-4. expose UTF-8-based JNI calls with explicit ownership and error handling;
-5. compare phoneme sequences, syllable boundaries, normalization, and edge cases against the reference.
+This is **not yet Yamaha G2P phoneme conversion**. The supported language mask is zero; every language readiness query returns false. No language is declared compatible until its phoneme strings, syllable boundaries, note updates and edge cases pass differential tests against the authorized reference.
 
-The existing Kotlin X-SAMPA mapper remains a fallback until those checks pass. A native G2P .so is not yet built.
+See docs/NATIVE_G2P_BRIDGE.md for the implemented bridge and test scope.
 
-## Renderer boundary
+## VOCALOID7 renderer status
 
-The G2P DLLs do not constitute the VOCALOID singing engine.
+The initial archive scan found no named exports in VOCALOID7.dll. Ghidra's first report recovered many semantic labels (including phoneme-service and renderer-observer names) but marked several function bodies as ".NET CLR Managed Code" and produced invalid native-looking decompilation for them. Those fragments must not be interpreted as real x64 renderer code.
 
-The initial archive scan observed:
-- WaveOfflineRenderer.dll exports normalization, resampling, time-stretch, and observer functions. These are post-processing features, not proof of singing synthesis.
-- VOCALOID7.dll is a Windows AMD64 PE image with no named exports recovered by the initial scan. This does not prove it has no synthesis code; the entry point may be internal, host-driven, or in another component.
-- The model assets use proprietary VPIT, VHNV, VTMG, and VTBR formats rather than ONNX. Matching manifest hashes establish package consistency, not a public inference contract.
+A second static-analysis path has been added to inspect the PE CLR descriptor and run ILSpy against VOCALOID7.dll and WaveOfflineRenderer.dll. Its goal is to determine whether the file contains managed IL, mixed-mode code, or native-only regions and then recover managed method metadata where supported.
 
-The next renderer investigation must establish the actual host-to-engine call path, all required DLLs, model loading sequence, tensor/runtime dependencies, audio callback or offline render boundary, and parameter mapping for notes and pitch/expression. The native renderer must not be approximated by a piano tone, generic neural vocoder, or WaveOfflineRenderer.
+WaveOfflineRenderer.dll exposes normalization, resampling, and time-stretch helpers. It is an audio utility module, not proof of a VOCALOID AI singing renderer.
 
-## Evidence status
+The V7 model assets use proprietary VPIT, VHNV, VTMG and VTBR formats. Manifest hashes prove file consistency, not a documented inference contract. The renderer work must identify:
+- the host-to-engine call path;
+- model loading and required runtime resources;
+- how note, phoneme, pitch and expression parameters enter the renderer;
+- the audio-block/offline-render output boundary;
+- required external dependencies and their Android ARM64 replacements.
 
-Known:
-- The supplied DLL archive members are Windows AMD64 PE files.
-- G2P-related DLLs expose named entry points suitable for static analysis.
-- WaveOfflineRenderer exports audio utility functions.
-- VOCALOID7.dll had no named exports in the initial export scan.
-- The AI Megpoid manifest references the supplied model files by matching hashes.
+No V7 Android singing renderer exists yet.
 
-Unknown until the Ghidra reports and additional authorized evidence are examined:
-- exact G2P function prototypes and calling conventions;
-- G2P object layout, ownership, and initialization/cleanup;
-- the G2P language resources and runtime dependency closure;
-- the VOCALOID7 rendering entry point and its host contract;
-- whether the required V7 model runtime can be implemented efficiently on Android ARM64;
-- whether the current supplied files are the complete runtime set required for a real offline render.
+## Verification rules
 
-## Non-goals and verification
+- The latest APK is built in CI and contains `lib/arm64-v8a/libveag2p.so`, confirmed as ELF64 AArch64.
+- The native G2P core tests and Android NDK build passed in CI.
+- These checks validate bridge packaging and the implemented preprocessing primitive only.
+- The app must keep synthesis unavailable until a complete language G2P backend and actual V7 singing renderer produce verified output on Android.
 
-- No PC tethering or remote render service in the final workflow.
-- No Wine/Box64 runtime as the implementation route.
-- No PE-to-.so renaming.
-- No bypass of activation, encryption, licensing, or access controls.
-- No WAV fabricated or presented as VOCALOID singing.
-- No synthesis-available status until a real Megpoid V7 WAV render has been produced and verified on the Android device.
+No Wine/Box64 route, PE renaming, licensing bypass, or fabricated VOCALOID audio is part of the implementation.
