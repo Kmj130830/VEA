@@ -39,9 +39,14 @@ jobs:
           echo "2c2cd776db3c1f6a097ba418922378ac3649cadd5e844a6f5f088ae628a7be67  $archive" | sha256sum --check
           mkdir -p /tmp/ghidra-dist
           unzip -q "$archive" -d /tmp/ghidra-dist
-          ghidra_dir="$(find /tmp/ghidra-dist -mindepth 1 -maxdepth 1 -type d -name 'ghidra_*_PUBLIC_*' -print -quit)"
-          test -n "$ghidra_dir"
-          test -x "$ghidra_dir/support/analyzeHeadless"
+          analyze_headless="$(find /tmp/ghidra-dist -type f -path '*/support/analyzeHeadless' -print -quit)"
+          if [[ -z "$analyze_headless" ]]; then
+            echo "Could not find support/analyzeHeadless after extracting Ghidra."
+            find /tmp/ghidra-dist -maxdepth 4 -type d -print | sort
+            exit 1
+          fi
+          ghidra_dir="$(dirname "$(dirname "$analyze_headless")")"
+          test -x "$analyze_headless"
           echo "GHIDRA_DIR=$ghidra_dir" >> "$GITHUB_ENV"
 
       - name: Run headless decompilation on G2P entry points
