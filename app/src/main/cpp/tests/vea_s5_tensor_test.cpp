@@ -30,6 +30,16 @@ int main() {
     assert(hashed_key_required == 33);
     assert(std::strcmp(hashed_key, "7d736cde130f0bb75f2cdbe49c5e01d5") == 0);
 
+    // A 48-byte key forces MD5 to process two 64-byte blocks after the salt.
+    static constexpr char long_key[] =
+        "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKL";
+    static_assert(sizeof(long_key) - 1u == 48u);
+    assert(vea_s5_hash_parameter_key(
+        reinterpret_cast<const uint8_t*>(long_key), sizeof(long_key) - 1u,
+        hashed_key, sizeof(hashed_key), &hashed_key_required) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(std::strcmp(hashed_key, "ec980bc709d9902a7f97a0a548d98c6d") == 0);
+
     char small_hashed_key[8] = "stable";
     assert(vea_s5_hash_parameter_key(
         key_abc, sizeof(key_abc), small_hashed_key, sizeof(small_hashed_key),
