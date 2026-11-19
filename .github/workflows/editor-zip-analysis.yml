@@ -8,6 +8,7 @@ on:
       - "tools/inspect_editor_zip.py"
       - "tools/ghidra/ExportVsmAnalysis.java"
       - "tools/ghidra/ExportS5ApiAnalysis.java"
+      - "tools/ghidra/ExportVdmAnalysis.java"
       - ".github/workflows/editor-zip-analysis.yml"
 
 permissions:
@@ -87,6 +88,18 @@ jobs:
             -postScript ExportS5ApiAnalysis.java "$PWD/build/editor-analysis/ghidra/S5API_EXPORT_ANALYSIS.md" \
             -analysisTimeoutPerFile 600 -deleteProject
           test -s build/editor-analysis/ghidra/S5API_EXPORT_ANALYSIS.md
+
+      - name: Decompile VDM voicebank and model metadata exports
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s build/editor-package/modules/VDM.dll
+          "$GHIDRA_HEADLESS" "$PWD/build/editor-ghidra-projects" VEA_VDM \
+            -import "$PWD/build/editor-package/modules/VDM.dll" \
+            -scriptPath "$PWD/tools/ghidra" \
+            -postScript ExportVdmAnalysis.java "$PWD/build/editor-analysis/ghidra/VDM_VOICEBANK_ANALYSIS.md" \
+            -analysisTimeoutPerFile 600 -deleteProject
+          test -s build/editor-analysis/ghidra/VDM_VOICEBANK_ANALYSIS.md
 
       - name: Preserve extracted PE inputs beside analysis reports
         shell: bash
