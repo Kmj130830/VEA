@@ -28,7 +28,7 @@ int main() {
            "Hangul: \xEA\xB0\x80\xEB\x82\x98");
     assert(Normalize("\xE3\x82\xAB\xE3\x83\xBC") == "\xE3\x82\xAB-");
     assert(Normalize("minus\xE2\x88\x92sign") == "minus-sign");
-    assert(Normalize("keep\xE2\x80\x94dash") == "keep\xE2\x80\x94dash");
+    assert(Normalize("keep\xE2\x80\x94" "dash") == "keep\xE2\x80\x94" "dash");
 
     const char invalid_utf8[] = {static_cast<char>(0xC0), static_cast<char>(0xAF)};
     size_t out_size = 0;
