@@ -183,7 +183,7 @@ int main() {
     float act_clamp[] = {100.0f, -100.0f, 100.0f, -100.0f};
     assert(vea_s5_apply_gated_activation_f32(act_clamp, 2, 0) == VEA_S5_TENSOR_STATUS_OK);
     assert(act_clamp[2] == 8.0f && act_clamp[3] == -8.0f);
-    assert(act_clamp[0] > 0.99f && act_clamp[1] < -0.99f);
+    assert(act_clamp[0] > 0.99f);\n    assert(act_clamp[1] < 0.0f && act_clamp[1] > -0.001f);
 
     float act_invalid[] = {0.0f, 0.0f};
     assert(vea_s5_apply_gated_activation_f32(nullptr, 1, 0) ==
