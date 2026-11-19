@@ -60,6 +60,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p build/v7-engine-analysis
           python3 tools/inspect_v7_clr_metadata.py \
             build/v7-engine-targets/VOCALOID7.dll \
             build/v7-engine-targets/WaveOfflineRenderer.dll
