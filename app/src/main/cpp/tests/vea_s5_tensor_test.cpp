@@ -2,6 +2,7 @@
 #include "vea_s5_container.h"
 
 #include <cassert>
+#include <cstring>
 #include <bit>
 #include <cstdint>
 #include <limits>
