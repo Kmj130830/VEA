@@ -60,13 +60,16 @@ jobs:
             extra_seeds=()
             case "$name" in
               G2PAManager_KOR)
-                extra_seeds=(0x180001ad0 0x1800024a0)
+                extra_seeds=(0x180001ad0 0x1800024a0 0x180001350 0x1800063c0 0x180007390 0x180007f80 0x180008730)
                 ;;
               G2PAManager_CHS)
-                extra_seeds=(0x180001af0 0x1800024c0)
+                extra_seeds=(0x180001af0 0x1800024c0 0x180001370 0x180005190 0x1800098d0 0x1800079f0 0x180007ec0)
                 ;;
               G2PAManager_JPN)
-                extra_seeds=(0x180001ac0 0x180001d50 0x180001eb0)
+                extra_seeds=(0x180001ac0 0x180001d50 0x180001eb0 0x180003b90 0x180005090 0x180008c30 0x18000b420)
+                ;;
+              G2PAManager_ENG)
+                extra_seeds=(0x180001060 0x1800020c0 0x180003b80 0x180005e90 0x180021f40 0x18001e350)
                 ;;
             esac
             "$GHIDRA_DIR/support/analyzeHeadless" \
