@@ -84,7 +84,21 @@ public class ExportS5ModelObjectTree extends GhidraScript {
         "180012240", // initializes the exact +0x288 model subobject passed to FUN_180056d60
         "180011900", // nested context/member initializer
         "180011680", // nested context/member initializer
-        "180011a30"  // nested context/member initializer
+        "180011a30", // nested context/member initializer
+        "180013410", // writes parent field +0xef0
+        "180013830", // writes parent field +0x878
+        "1800181e0", // writes parent field +0x4c8
+        "18009acc0", // writes parent field +0x4c8
+        "180131fa0", // writes parent field +0x4c8
+        "180019630", // writes parent field +0x878
+        "180050aa0", // writes parent field +0xaa0
+        "180018f00", // reads and updates parent field +0xef0
+        "1800290f0", // reads parent field +0xef0
+        "180031010", // reads parent field +0xef0
+        "1800591d0", // takes address of parent field +0xef0
+        "180016dc0", // writes field +0x240
+        "180012030", // clears fields +0x208 and +0x240
+        "1800114b0"  // initializes a nested buffer object at +0x208
     };
 
     @Override
