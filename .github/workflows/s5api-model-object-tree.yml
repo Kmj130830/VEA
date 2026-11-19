@@ -7,6 +7,11 @@ on:
       - "Editor.zip"
       - "tools/ghidra/ExportS5ModelObjectTree.java"
       - ".github/workflows/s5api-model-object-tree.yml"
+  pull_request:
+    paths:
+      - "Editor.zip"
+      - "tools/ghidra/ExportS5ModelObjectTree.java"
+      - ".github/workflows/s5api-model-object-tree.yml"
 
 permissions:
   contents: read
