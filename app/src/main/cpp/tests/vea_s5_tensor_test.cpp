@@ -10,6 +10,24 @@
 
 namespace {
 
+struct F16CallbackContext {
+    size_t calls = 0;
+    size_t fail_on_call = 0;
+    float bias = 0.0f;
+};
+
+VeaS5TensorStatus TestF16Callback(
+    uint16_t encoded_value, void* user_context, float* out_value) {
+    if (user_context == nullptr || out_value == nullptr)
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    auto* context = static_cast<F16CallbackContext*>(user_context);
+    ++context->calls;
+    if (context->fail_on_call != 0 && context->calls == context->fail_on_call)
+        return VEA_S5_TENSOR_STATUS_TYPE_MISMATCH;
+    *out_value = static_cast<float>(encoded_value) + context->bias;
+    return VEA_S5_TENSOR_STATUS_OK;
+}
+
 bool IsAligned(const void* pointer, uintptr_t alignment) {
     return pointer != nullptr &&
         (reinterpret_cast<uintptr_t>(pointer) & (alignment - 1u)) == 0;
@@ -370,6 +388,33 @@ int main() {
         &decoded_f16, &decoded_f16_count) == VEA_S5_TENSOR_STATUS_OK);
     assert(decoded_f16_count == 2);
     assert(decoded_f16[0] == 1.0f && decoded_f16[1] == -2.0f);
+
+    // The model-specific callback receives raw little-endian binary16 words.
+    F16CallbackContext custom_f16_context{};
+    custom_f16_context.bias = 0.5f;
+    float* decoded_f16_custom = nullptr;
+    size_t decoded_f16_custom_count = 0;
+    assert(vea_s5_decode_typed_float_array_with_f16_callback(
+        arena, f16_encoded, sizeof(f16_encoded) - 1,
+        TestF16Callback, &custom_f16_context,
+        &decoded_f16_custom, &decoded_f16_custom_count) == VEA_S5_TENSOR_STATUS_OK);
+    assert(decoded_f16_custom_count == 2 && custom_f16_context.calls == 2);
+    assert(decoded_f16_custom[0] == 0x3c00 + 0.5f);
+    assert(decoded_f16_custom[1] == 0xc000 + 0.5f);
+
+    // A converter failure is propagated without consuming arena space.
+    F16CallbackContext failing_f16_context{};
+    failing_f16_context.fail_on_call = 2;
+    const size_t arena_used_before_callback_failure = vea_s5_arena_used(arena);
+    float* failed_f16_output = nullptr;
+    size_t failed_f16_count = 99;
+    assert(vea_s5_decode_typed_float_array_with_f16_callback(
+        arena, f16_encoded, sizeof(f16_encoded) - 1,
+        TestF16Callback, &failing_f16_context,
+        &failed_f16_output, &failed_f16_count) == VEA_S5_TENSOR_STATUS_TYPE_MISMATCH);
+    assert(failed_f16_output == nullptr && failed_f16_count == 0);
+    assert(failing_f16_context.calls == 2);
+    assert(vea_s5_arena_used(arena) == arena_used_before_callback_failure);
 
     const char f16_subnormal[] = "*F16AQA=";
     float* decoded_subnormal = nullptr;
