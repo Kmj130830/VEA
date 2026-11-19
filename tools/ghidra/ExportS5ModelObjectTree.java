@@ -62,7 +62,13 @@ public class ExportS5ModelObjectTree extends GhidraScript {
         "180088949", // model constructor callsite that installs the converter
         "180010740", // key concatenation helper
         "180010540", // key suffix/helper
-        "180065d50"  // typed object child/value accessor
+        "180065d50", // typed object child/value accessor
+        "18001e360", // alternate typed tensor reader caller
+        "18005e120", // recurrent matrix/tensor reader caller
+        "180041590", // tensor input preparation
+        "180047990", // typed tensor dimension/context setup
+        "18004f2d0", // tensor context/member initializer
+        "180056d60"  // model decoder context setup
     };
 
     @Override
@@ -142,6 +148,10 @@ public class ExportS5ModelObjectTree extends GhidraScript {
             dumpBytes(out, "18019b770", 4);
             dumpBytes(out, "18019b778", 4);
             out.println();
+            out.println("## Object-field +0x208 accesses");
+            out.println();
+            dumpFieldOffsetAccesses(out, "0x208");
+            out.println();
             out.println("## Exact x64 call-site windows");
             out.println();
             for (Map.Entry<Address, Function> item : selected.entrySet()) {
@@ -197,6 +207,25 @@ public class ExportS5ModelObjectTree extends GhidraScript {
         }
         if (f.hasVarArgs()) { if (params.length > 0) b.append(", "); b.append("..."); }
         return b.append(")").toString();
+    }
+
+    private void dumpFieldOffsetAccesses(PrintWriter out, String offset) {
+        InstructionIterator it = currentProgram.getListing().getInstructions(true);
+        int count = 0;
+        while (it.hasNext()) {
+            monitor.checkCancelled();
+            Instruction ins = it.next();
+            String rendered = ins.toString().toLowerCase();
+            if (!rendered.contains("+ " + offset + "]") &&
+                !rendered.contains("+ " + offset + ",")) continue;
+            if (rendered.contains("[rbp +") || rendered.contains("[rsp +")) continue;
+            Function owner = currentProgram.getFunctionManager().getFunctionContaining(ins.getAddress());
+            out.println("- " + (owner == null ? "<unknown>" : owner.getName()) +
+                " @ " + ins.getAddress() + ": " + rendered);
+            count++;
+        }
+        if (count == 0) out.println("- No non-stack references to +" + offset + " were recovered.");
+        out.println("- Total matching instructions: " + count);
     }
 
     private void dumpWindow(PrintWriter out, Address center, int before, int after) {
