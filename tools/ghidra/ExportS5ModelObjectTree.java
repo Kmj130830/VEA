@@ -80,7 +80,11 @@ public class ExportS5ModelObjectTree extends GhidraScript {
         "18017b860", // reads object offset +0x208
         "1800bca40", // writes object offset +0x208
         "180029b80", // reads two object +0x208 fields
-        "18002b080"  // uses object +0x208 as a subobject base
+        "18002b080", // uses object +0x208 as a subobject base
+        "180012240", // initializes the exact +0x288 model subobject passed to FUN_180056d60
+        "180011900", // nested context/member initializer
+        "180011680", // nested context/member initializer
+        "180011a30"  // nested context/member initializer
     };
 
     @Override
