@@ -65,4 +65,13 @@ class XsampaMapperTest {
         assertEquals("h a n . k M l", XsampaMapper.convert("ㅎㅏㄴㄱㅡㄹ", "kor"))
     }
 
+    @Test
+    fun showsPhonemeSuggestionsForJapaneseAndKorean() {
+        assertEquals(listOf("S i"), XsampaMapper.pronunciationSuggestions("shi", "jpn"))
+        assertEquals(
+            listOf("h a n . k M l"),
+            XsampaMapper.pronunciationSuggestions("한글", "kor")
+        )
+    }
+
 }
