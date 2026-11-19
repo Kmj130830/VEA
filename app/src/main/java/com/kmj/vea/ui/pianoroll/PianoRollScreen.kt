@@ -564,7 +564,7 @@ private fun LyricEditorPopup(
                                             when (code) {
                                                 "jpn" -> "JAPANESE"
                                                 "eng" -> "ENGLISH"
-                                                "zho" -> "CHINESE"
+                                                "zho" -> "CHINESE · NOT READY"
                                                 else -> "KOREAN · PREVIEW ONLY"
                                             }
                                         )
@@ -623,6 +623,13 @@ private fun LyricEditorPopup(
                 val canSuggestPhonemes = suggestionLanguage in setOf(
                     "eng", "en", "jpn", "ja", "jp", "kor", "ko", "kr"
                 )
+                if (suggestionLanguage in setOf("zho", "zh", "cn")) {
+                    Text(
+                        "Chinese phoneme conversion is not implemented yet. The lyric is preserved.",
+                        color = Color(0xFF8A4A32),
+                        fontSize = 10.sp
+                    )
+                }
                 if (canSuggestPhonemes && suggestions.isNotEmpty()) {
                     Row(
                         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
