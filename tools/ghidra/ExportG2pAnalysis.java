@@ -175,7 +175,7 @@ public class ExportG2pAnalysis extends GhidraScript {
         return text.toString();
     }
 
-    private LinkedHashMap<Address, Function> selectCallClosure(List<Symbol> symbols) {
+    private LinkedHashMap<Address, Function> selectCallClosure(List<Symbol> symbols) throws CancelledException {
         LinkedHashMap<Address, Function> selected = new LinkedHashMap<>();
         ArrayDeque<WorkItem> queue = new ArrayDeque<>();
         FunctionIterator allFunctions = currentProgram.getFunctionManager().getFunctions(true);
