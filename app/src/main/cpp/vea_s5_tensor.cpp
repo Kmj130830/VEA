@@ -84,13 +84,6 @@ VeaS5TensorStatus AllocateBytes(
     return VEA_S5_TENSOR_STATUS_OK;
 }
 
-VeaS5TensorStatus AllocateBytesAt(
-    VeaS5Arena* arena,
-    size_t logical_bytes,
-    size_t* out_offset) {
-    return AllocateBytes(arena, logical_bytes, out_offset);
-}
-
 }  // namespace
 
 static_assert(sizeof(VeaS5MatrixDescriptor) == kDescriptorBytes,
@@ -210,7 +203,6 @@ extern "C" VeaS5TensorStatus vea_s5_convert_f64_array_to_f32(
     }
     *out_values = nullptr;
 
-    const size_t checkpoint = arena->used;
     float* values = nullptr;
     VeaS5TensorStatus status = vea_s5_arena_alloc_f32(arena, count, &values);
     if (status != VEA_S5_TENSOR_STATUS_OK) return status;
@@ -219,7 +211,6 @@ extern "C" VeaS5TensorStatus vea_s5_convert_f64_array_to_f32(
         values[i] = static_cast<float>(source[i]);
     }
     *out_values = values;
-    (void)checkpoint;
     return VEA_S5_TENSOR_STATUS_OK;
 }
 

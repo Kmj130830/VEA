@@ -52,3 +52,10 @@ The Android model loader should be split into three independently testable compo
 3. Float32 matrix packing using the 32-byte arena and 8-column padded descriptor representation.
 
 Only the tensor extraction and packing boundary has been partially recovered here. The complete V7 container parser, neural execution graph, and Megpoid V7 synthesis are still not implemented.
+
+
+## 2026-11-19 compression-candidate validation correction
+
+The follow-up byte scanner tested candidate zlib/gzip signatures by attempting decompression from each candidate offset and requiring the decompressor to reach a valid end-of-stream marker. The inspected `.vtb2`, `.vpit`, `.vhnv`, and `.vtmg` files produced **zero** candidates that passed this full-stream check.
+
+Therefore, the byte signatures in the high-entropy payloads are not evidence of embedded standard zlib/gzip streams; they are likely coincidental byte sequences or use a different framing/codec. The scanner records both the candidate offsets and the successful-stream list so this distinction is explicit. This result does not rule out proprietary compression or encrypted/obfuscated sections.

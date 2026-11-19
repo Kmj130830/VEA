@@ -19,7 +19,6 @@ int main() {
     VeaS5Arena* arena = nullptr;
     assert(vea_s5_arena_create(8192, &arena) == VEA_S5_TENSOR_STATUS_OK);
     assert(arena != nullptr);
-    assert(IsAligned(reinterpret_cast<const void*>(uintptr_t(vea_s5_arena_capacity(arena))), 1u));
 
     // Typed-array conversion: the S5API node reader reads doubles then casts to float32.
     const double input_doubles[] = {1.25, -2.5, 3.125, 0.0};
@@ -56,14 +55,18 @@ int main() {
 
     // Matrix 0 (rows are axis1, columns are axis0).
     assert(descriptors[0].values[0] == 10.0f);
-    assert(descriptors[0].values[1] == 11.0f);
-    assert(descriptors[0].values[2] == 20.0f);
-    assert(descriptors[0].values[8] == 30.0f);
+    assert(descriptors[0].values[1] == 20.0f);
+    assert(descriptors[0].values[2] == 30.0f);
+    assert(descriptors[0].values[8] == 11.0f);
+    assert(descriptors[0].values[9] == 21.0f);
+    assert(descriptors[0].values[10] == 31.0f);
     // Matrix 1.
     assert(descriptors[1].values[0] == 100.0f);
-    assert(descriptors[1].values[1] == 101.0f);
-    assert(descriptors[1].values[2] == 200.0f);
-    assert(descriptors[1].values[8] == 300.0f);
+    assert(descriptors[1].values[1] == 200.0f);
+    assert(descriptors[1].values[2] == 300.0f);
+    assert(descriptors[1].values[8] == 101.0f);
+    assert(descriptors[1].values[9] == 201.0f);
+    assert(descriptors[1].values[10] == 301.0f);
 
     // Padding is deterministic and safe for wide SIMD loads.
     for (uint32_t row = 0; row < 2; ++row) {
