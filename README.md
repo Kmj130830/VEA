@@ -39,6 +39,7 @@ The G2P work is not itself a singing synthesizer. WaveOfflineRenderer.dll expose
 - docs/G2P_STATIC_FINDINGS.md
 - docs/NATIVE_G2P_BRIDGE.md
 - docs/SUPPLIED_V7_ASSETS.md
+- docs/VOCALOID7_NATIVE_DEPENDENCIES.md
 - docs/ENGINE_AND_COMPATIBILITY.md
 
 An Android ARM64 shared library (libveag2p.so) and JNI bridge are now included. The first native implementation covers only a recovered Korean input-normalization primitive; its language-ready mask is zero, so this is not yet Yamaha G2P phoneme conversion. No VOCALOID singing renderer is implemented. The app must continue to report synthesis as unavailable until language phonemizers and a real local singing render are verified.
