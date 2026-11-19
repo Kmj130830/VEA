@@ -1,0 +1,133 @@
+import ghidra.app.decompiler.DecompInterface;
+import ghidra.app.decompiler.DecompileOptions;
+import ghidra.app.decompiler.DecompileResults;
+import ghidra.app.script.GhidraScript;
+import ghidra.program.model.address.Address;
+import ghidra.program.model.listing.Function;
+import ghidra.program.model.listing.Instruction;
+import ghidra.program.model.listing.InstructionIterator;
+import ghidra.program.model.symbol.Reference;
+import ghidra.program.model.symbol.ReferenceIterator;
+import java.io.File;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+public class ExportS5BlockRuntime extends GhidraScript {
+    private static final int MAX_FUNCTIONS = 130;
+    private static final String[] TARGETS = {
+        "1800c5d50", "1800c67e0", "1800c6390", "1800c72d0",
+        "18012cb50", "18012cbb2", "18012ca50",
+        "1800df720", "1800d84e0", "1800d8720",
+        "18012d460", "18012e0d0", "18012f280",
+        "180130b70", "180130ce0", "180130d90"
+    };
+
+    @Override
+    public void run() throws Exception {
+        String[] args = getScriptArgs();
+        if (args.length < 1) throw new IllegalArgumentException("Usage: ExportS5BlockRuntime.java <output.md>");
+        File output = new File(args[0]);
+        if (output.getParentFile() != null) output.getParentFile().mkdirs();
+
+        LinkedHashMap<Address, Function> selected = new LinkedHashMap<>();
+        try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(output.toPath(), StandardCharsets.UTF_8))) {
+            out.println("# S5API depthwise-normalization-residual runtime block");
+            out.println();
+            out.println("> Static analysis only. Vendor PE code is never executed.");
+            out.println();
+            out.println("- Program: " + currentProgram.getName());
+            out.println("- Image base: " + currentProgram.getImageBase());
+            out.println();
+
+            out.println("## Primary targets and all recovered direct callers");
+            out.println();
+            for (String hex : TARGETS) {
+                monitor.checkCancelled();
+                Address address = toAddr(hex);
+                Function f = currentProgram.getFunctionManager().getFunctionAt(address);
+                if (f == null) f = currentProgram.getFunctionManager().getFunctionContaining(address);
+                out.println("### 0x" + hex + (f == null ? " (not recovered)" : " " + f.getName()));
+                if (f == null) { out.println(); continue; }
+                selected.put(f.getEntryPoint(), f);
+                out.println("- Prototype: " + prototype(f));
+                out.println("- Body bytes: " + f.getBody().getNumAddresses());
+                ReferenceIterator refs = currentProgram.getReferenceManager().getReferencesTo(f.getEntryPoint());
+                int n = 0;
+                while (refs.hasNext() && n < 160) {
+                    Reference ref = refs.next();
+                    Function caller = currentProgram.getFunctionManager().getFunctionContaining(ref.getFromAddress());
+                    out.println("- Xref: " + (caller == null ? "<unknown>" : caller.getName()) +
+                        " at " + ref.getFromAddress() + " [" + ref.getReferenceType() + "]");
+                    n++;
+                }
+                if (n == 0) out.println("- No direct references recovered.");
+                out.println();
+            }
+
+            int initial = selected.size();
+            for (int i = 0; i < initial && selected.size() < MAX_FUNCTIONS; i++) {
+                Function f = (Function)selected.values().toArray()[i];
+                monitor.checkCancelled();
+                InstructionIterator it = currentProgram.getListing().getInstructions(f.getBody(), true);
+                while (it.hasNext() && selected.size() < MAX_FUNCTIONS) {
+                    Instruction ins = it.next();
+                    for (Reference ref : ins.getReferencesFrom()) {
+                        if (!ref.getReferenceType().isCall()) continue;
+                        Function callee = currentProgram.getFunctionManager().getFunctionAt(ref.getToAddress());
+                        if (callee == null) callee = currentProgram.getFunctionManager().getFunctionContaining(ref.getToAddress());
+                        if (callee != null && !selected.containsKey(callee.getEntryPoint())) {
+                            selected.put(callee.getEntryPoint(), callee);
+                        }
+                    }
+                }
+            }
+
+            out.println("## Decompilation");
+            out.println();
+            out.println("- Functions selected (primary targets plus one direct callee level): " + selected.size());
+            out.println();
+            DecompInterface decompiler = new DecompInterface();
+            decompiler.setOptions(new DecompileOptions());
+            decompiler.openProgram(currentProgram);
+            try {
+                int index = 0;
+                for (Map.Entry<Address, Function> item : selected.entrySet()) {
+                    monitor.checkCancelled();
+                    Function f = item.getValue();
+                    index++;
+                    out.println("### " + index + ". " + f.getName() + " at " + f.getEntryPoint());
+                    out.println();
+                    out.println("- RVA: 0x" + Long.toHexString(f.getEntryPoint().subtract(currentProgram.getImageBase())));
+                    out.println("- Prototype: " + prototype(f));
+                    out.println("- Body bytes: " + f.getBody().getNumAddresses());
+                    DecompileResults result = decompiler.decompileFunction(f, 60, monitor);
+                    if (result != null && result.decompileCompleted() && result.getDecompiledFunction() != null) {
+                        out.println();
+                        out.println("~~~c");
+                        out.println(result.getDecompiledFunction().getC());
+                        out.println("~~~");
+                    } else {
+                        out.println("- Decompilation unavailable: " +
+                            (result == null ? "no result" : result.getErrorMessage()));
+                    }
+                    out.println();
+                }
+            } finally { decompiler.dispose(); }
+        }
+        println("S5 block runtime report written: " + output.getAbsolutePath());
+    }
+
+    private String prototype(Function f) {
+        StringBuilder b = new StringBuilder(f.getReturnType().getDisplayName()).append(" ").append(f.getName()).append("(");
+        ghidra.program.model.listing.Parameter[] ps = f.getParameters();
+        for (int i = 0; i < ps.length; i++) {
+            if (i > 0) b.append(", ");
+            b.append(ps[i].getDataType().getDisplayName()).append(" ").append(ps[i].getName());
+        }
+        if (f.hasVarArgs()) { if (ps.length > 0) b.append(", "); b.append("..."); }
+        return b.append(")").toString();
+    }
+}

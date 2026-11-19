@@ -1,0 +1,50 @@
+name: VEA S5API block runtime analysis
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "Editor.zip"
+      - "tools/ghidra/ExportS5BlockRuntime.java"
+      - ".github/workflows/s5api-block-runtime.yml"
+
+permissions:
+  contents: read
+jobs:
+  block-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+      - name: Extract S5API.dll
+        run: python3 tools/inspect_editor_zip.py
+      - name: Download and verify Ghidra 12.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive=/tmp/ghidra_12.2_PUBLIC_20261016.zip
+          curl --fail --location --retry 3 "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_12.2_build/ghidra_12.2_PUBLIC_20261016.zip" -o "$archive"
+          echo "2c2cd776db3c1f6a097ba418922378ac3649cadd5e844a6f5f088ae628a7be67  $archive" | sha256sum --check
+          mkdir -p /tmp/ghidra
+          unzip -q "$archive" -d /tmp/ghidra
+          tool="$(find /tmp/ghidra -path '*/support/analyzeHeadless' -type f -print -quit)"
+          test -n "$tool"
+          echo "GHIDRA_HEADLESS=$tool" >> "$GITHUB_ENV"
+      - name: Trace block-level normalization and activation functions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/block-runtime/ghidra build/ghidra-block-runtime
+          "$GHIDRA_HEADLESS" "$PWD/build/ghidra-block-runtime" VEA_S5API_BLOCK             -import "$PWD/build/editor-package/modules/S5API.dll"             -scriptPath "$PWD/tools/ghidra"             -postScript ExportS5BlockRuntime.java "$PWD/build/block-runtime/ghidra/S5API_BLOCK_RUNTIME.md"             -analysisTimeoutPerFile 600 -deleteProject
+          test -s build/block-runtime/ghidra/S5API_BLOCK_RUNTIME.md
+      - name: Upload block runtime report
+        uses: actions/upload-artifact@v4
+        with:
+          name: VEA-S5API-block-runtime
+          path: build/block-runtime/
+          if-no-files-found: error
+          retention-days: 30
