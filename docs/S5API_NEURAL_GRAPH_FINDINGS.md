@@ -84,3 +84,11 @@ A focused follow-up analysis connected the 7x7 depthwise convolution to its actu
 The same trace recovered the scalar target behind `FUN_180130b70`: `MRW_LNSTATS_SIMD` selects the label at `0x180130ce0` when forced to scalar, or `FUN_180130d90` for the AVX2 path. The scalar routine accumulates both `sum(input)` and `sum(input * input)`; its register arguments and output order match `vea_s5_reduce_sum_sumsq_f32`.
 
 See `docs/S5API_CORE_OPERATOR_TRACE.md` and `docs/S5API_DWCONV_PORT.md` for details. This proves two DSP primitives, not the full neural inference graph.
+
+## 9. GELU, statistics and residual merge in the convolution block
+
+The complete decompiler trace of `FUN_1800c5d50` clarifies the block order: depthwise convolution → sum/sum-square statistics → mean/variance and epsilon/std calculation → GELU → residual affine merge. The variance calculation is `max(sumSquares / N - mean * mean, 0)`, followed by model epsilon addition and square root.
+
+The GELU dispatcher `FUN_18012cb50` selects AVX `FUN_18012cff0`, vector `FUN_18012cbc0`, or scalar `FUN_18012ca50`. The scalar body performs `x = scale * input + bias`, then `x / (1 + exp(-((x*x*x*0.044715 + x)*1.5957692)))`. This is a GELU approximation, not the two-plane ACT gate.
+
+VEA has added the scalar GELU implementation `vea_s5_apply_gelu_f32` and Kotlin/JNI entrypoint `NativeS5TensorBridge.applyGelu`. The residual affine merge remains a separate kernel with `dst = (dst + bias) * scale + residual`. See `docs/S5API_NORMALIZATION_PORT.md`.
