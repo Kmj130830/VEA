@@ -127,6 +127,11 @@ public class ExportS5ModelObjectTree extends GhidraScript {
                 decompiler.dispose();
             }
 
+            out.println("## Raw marker constants");
+            out.println();
+            dumpBytes(out, "18019b770", 4);
+            dumpBytes(out, "18019b778", 4);
+            out.println();
             out.println("## Exact x64 call-site windows");
             out.println();
             for (Map.Entry<Address, Function> item : selected.entrySet()) {
@@ -145,6 +150,32 @@ public class ExportS5ModelObjectTree extends GhidraScript {
             }
         }
         println("S5API model-object tree report written: " + output.getAbsolutePath());
+    }
+
+    private void dumpBytes(PrintWriter out, String hexAddress, int length) {
+        Address address = toAddr(hexAddress);
+        byte[] bytes = new byte[length];
+        out.println("- " + address + ":");
+        try {
+            currentProgram.getMemory().getBytes(address, bytes);
+            StringBuilder hex = new StringBuilder();
+            StringBuilder ascii = new StringBuilder();
+            for (byte value : bytes) {
+                int b = value & 0xff;
+                if (hex.length() > 0) hex.append(' ');
+                hex.append(String.format("%02x", b));
+                ascii.append(b >= 0x20 && b <= 0x7e ? (char)b : '.');
+            }
+            out.println("  - bytes: " + hex);
+            out.println("  - ASCII: " + ascii);
+            ghidra.program.model.listing.Data data = currentProgram.getListing().getDataAt(address);
+            if (data != null) {
+                out.println("  - data type: " + data.getDataType().getDisplayName());
+                out.println("  - defined value: " + data.getDefaultValueRepresentation());
+            }
+        } catch (Exception e) {
+            out.println("  - read failed: " + e.getMessage());
+        }
     }
 
     private String prototype(Function f) {
