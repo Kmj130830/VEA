@@ -57,6 +57,7 @@ private const val MIN_PITCH = 48
 private const val MAX_PITCH = 72
 private const val TICKS_PER_BEAT = 480
 private const val TICKS_PER_BAR = 1920
+private const val MAX_NOTE_LENGTH_TICKS = TICKS_PER_BAR * 64
 private val NoteGreen = Color(0xFFA8DA55)
 private val PitchCurveColor = Color(0xFFE76B22)
 private val EditorBackground = Color(0xFFE8E9EA)
@@ -326,9 +327,10 @@ fun PianoRollScreen(
                     onResizeNote = { noteId, length ->
                         val current = clip.notes.firstOrNull { it.id == noteId }
                         if (current != null) {
+                            val safeLength = length.coerceIn(gridTicks, MAX_NOTE_LENGTH_TICKS)
                             val resized = current.copy(
-                                lengthTick = length,
-                                pitchPoints = rescalePitchPoints(current.pitchPoints, current.lengthTick, length)
+                                lengthTick = safeLength,
+                                pitchPoints = rescalePitchPoints(current.pitchPoints, current.lengthTick, safeLength)
                             )
                             val others = clip.notes.filterNot { it.id == noteId }
                             if (canPlaceNote(others, resized)) {
@@ -373,14 +375,15 @@ fun PianoRollScreen(
             TextButton(
                 onClick = {
                     selectedNote?.let { note ->
-                        val longer = note.lengthTick + gridTicks
+                        val longer = (note.lengthTick.toLong() + gridTicks.toLong())
+                            .coerceAtMost(MAX_NOTE_LENGTH_TICKS.toLong()).toInt()
                         val others = clip.notes.filterNot { it.id == note.id }
                         if (canPlaceNote(others, note.copy(lengthTick = longer))) {
                             updateNote(note.copy(lengthTick = longer))
                         }
                     }
                 },
-                enabled = selectedNote != null,
+                enabled = selectedNote != null && selectedNote.lengthTick < MAX_NOTE_LENGTH_TICKS,
                 contentPadding = PaddingValues(horizontal = 3.dp)
             ) { Text("+LEN", fontSize = 9.sp) }
             TextButton(
@@ -423,7 +426,7 @@ fun PianoRollScreen(
             ToolbarIcon(VeaIcon.NEXT, "NEXT", modifier = Modifier.weight(1f))
             ToolbarIcon(VeaIcon.STOP, "STOP", modifier = Modifier.weight(1f), onClick = PianoPreview::stop)
             ToolbarIcon(
-                VeaIcon.PLAY, "PLAY", modifier = Modifier.weight(1f),
+                VeaIcon.PLAY, "PREVIEW", modifier = Modifier.weight(1f),
                 onClick = { PianoPreview.playNotes(clip.notes, bpm) }
             )
             ToolbarIcon(VeaIcon.RECORD, "REC", modifier = Modifier.weight(1f))
@@ -758,7 +761,8 @@ private fun NoteGrid(
     var previewValid by remember { mutableStateOf(true) }
 
     val density = androidx.compose.ui.platform.LocalDensity.current
-    val edgeThresholdPx = with(density) { 18.dp.toPx() }
+    // A touch-friendly resize zone extends slightly beyond the visible right handle.
+    val resizeHitSlopPx = with(density) { 24.dp.toPx() }
 
     Canvas(
         modifier = Modifier.width(width).height(height).background(EditorBackground)
@@ -806,7 +810,7 @@ private fun NoteGrid(
                     }
                 )
             }
-            .pointerInput(gridTicks, beatWidthPx, rowHeightPx, edgeThresholdPx, tool) {
+            .pointerInput(gridTicks, beatWidthPx, rowHeightPx, resizeHitSlopPx, tool) {
                 var initialStart = 0
                 var initialPitch = 60
                 var initialLength = 0
@@ -815,26 +819,49 @@ private fun NoteGrid(
 
                 detectDragGestures(
                     onDragStart = { position ->
-                        val hit = latestNotes.value.firstOrNull { note ->
+                        // Resolve the resize handle before the note body. The old
+                        // hit-test required the touch to land inside the note, so
+                        // grabbing just past the right edge could never resize it.
+                        val resizeHit = latestNotes.value.mapNotNull { note ->
                             val left = note.startTick.toFloat() / TICKS_PER_BEAT * beatWidthPx
-                            val right = left + note.lengthTick.toFloat() / TICKS_PER_BEAT * beatWidthPx
+                            val right = (note.startTick + note.lengthTick).toFloat() /
+                                TICKS_PER_BEAT * beatWidthPx
                             val top = (MAX_PITCH - note.pitch) * rowHeightPx
-                            position.x >= left && position.x <= right &&
-                                position.y >= top && position.y <= top + rowHeightPx
+                            val inPitchRow = position.y >= top && position.y <= top + rowHeightPx
+                            val noteWidth = (right - left).coerceAtLeast(1f)
+                            val handleWidth = minOf(resizeHitSlopPx, noteWidth * 0.35f).coerceAtLeast(7f)
+                            if (inPitchRow &&
+                                position.x >= right - handleWidth &&
+                                position.x <= right + resizeHitSlopPx
+                            ) {
+                                note to abs(position.x - right)
+                            } else {
+                                null
+                            }
+                        }.minByOrNull { it.second }?.first
+
+                        val bodyHit = if (resizeHit == null) {
+                            latestNotes.value.firstOrNull { note ->
+                                val left = note.startTick.toFloat() / TICKS_PER_BEAT * beatWidthPx
+                                val right = left + note.lengthTick.toFloat() / TICKS_PER_BEAT * beatWidthPx
+                                val top = (MAX_PITCH - note.pitch) * rowHeightPx
+                                position.x >= left && position.x <= right &&
+                                    position.y >= top && position.y <= top + rowHeightPx
+                            }
+                        } else {
+                            null
                         }
+                        val hit = resizeHit ?: bodyHit
+
                         activeNoteId = if (tool == PianoTool.PITCH) null else hit?.id
                         initialStart = hit?.startTick ?: 0
                         initialPitch = hit?.pitch ?: 60
                         initialLength = hit?.lengthTick ?: 0
                         accumulatedX = 0f
                         accumulatedY = 0f
-                        val hitRight = hit?.let {
-                            (it.startTick + it.lengthTick).toFloat() / TICKS_PER_BEAT * beatWidthPx
-                        } ?: 0f
-                        val resizeThreshold = with(density) { 20.dp.toPx() }
                         activeGesture = when {
                             tool == PianoTool.PITCH || hit == null -> "NONE"
-                            position.x >= hitRight - resizeThreshold && position.x <= hitRight + with(density) { 7.dp.toPx() } -> "RESIZE"
+                            resizeHit != null -> "RESIZE"
                             else -> "MOVE"
                         }
                         previewStartTick = initialStart
@@ -848,11 +875,13 @@ private fun NoteGrid(
                         accumulatedY += amount.y
                         if (activeGesture == "RESIZE") {
                             val deltaTicks = (accumulatedX / beatWidthPx * TICKS_PER_BEAT).roundToInt()
-                            val requested = max(gridTicks, initialLength + deltaTicks)
-                            previewLengthTick = max(
-                                gridTicks,
-                                ((requested + gridTicks / 2) / gridTicks) * gridTicks
-                            )
+                            val requested = (initialLength.toLong() + deltaTicks.toLong())
+                                .coerceIn(gridTicks.toLong(), MAX_NOTE_LENGTH_TICKS.toLong())
+                            val snapped = ((requested + gridTicks / 2L) / gridTicks.toLong()) *
+                                gridTicks.toLong()
+                            previewLengthTick = snapped
+                                .coerceAtMost(MAX_NOTE_LENGTH_TICKS.toLong())
+                                .toInt()
                             val current = latestNotes.value.firstOrNull { it.id == activeNoteId }
                             if (current != null) {
                                 val candidate = current.copy(lengthTick = previewLengthTick)
