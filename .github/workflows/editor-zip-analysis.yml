@@ -7,6 +7,7 @@ on:
       - "Editor.zip"
       - "tools/inspect_editor_zip.py"
       - "tools/ghidra/ExportVsmAnalysis.java"
+      - "tools/ghidra/ExportS5ApiAnalysis.java"
       - ".github/workflows/editor-zip-analysis.yml"
 
 permissions:
@@ -74,6 +75,18 @@ jobs:
           test -s build/editor-package/modules/VSM.dll
           "$GHIDRA_HEADLESS" "$PWD/build/editor-ghidra-projects" VEA_VSM             -import "$PWD/build/editor-package/modules/VSM.dll"             -scriptPath "$PWD/tools/ghidra"             -postScript ExportVsmAnalysis.java "$PWD/build/editor-analysis/ghidra/VSM_RENDER_BOUNDARY.md"             -analysisTimeoutPerFile 600 -deleteProject
           test -s build/editor-analysis/ghidra/VSM_RENDER_BOUNDARY.md
+
+      - name: Decompile S5API opaque exports and bounded callers
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s build/editor-package/modules/S5API.dll
+          "$GHIDRA_HEADLESS" "$PWD/build/editor-ghidra-projects" VEA_S5API \
+            -import "$PWD/build/editor-package/modules/S5API.dll" \
+            -scriptPath "$PWD/tools/ghidra" \
+            -postScript ExportS5ApiAnalysis.java "$PWD/build/editor-analysis/ghidra/S5API_EXPORT_ANALYSIS.md" \
+            -analysisTimeoutPerFile 600 -deleteProject
+          test -s build/editor-analysis/ghidra/S5API_EXPORT_ANALYSIS.md
 
       - name: Record Android ARM64 porting boundary
         run: |
