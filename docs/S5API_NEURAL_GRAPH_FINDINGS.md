@@ -71,3 +71,16 @@ The next implementation dependency is the low-level tensor reader called from th
 - `libveavsm.so` currently implements the Android-side render callback transport/capture boundary and float32 WAV export adapter.
 - It does **not** yet implement these neural layers, the spectral decoder, or Megpoid V7 voice generation.
 - The original modules remain Windows PE/AMD64. The ARM64 renderer must be rebuilt from portable C++/NEON source; no PE-to-ELF conversion is claimed.
+
+## 8. Verified scalar convolution and statistics kernels
+
+A focused follow-up analysis connected the 7x7 depthwise convolution to its actual caller:
+
+- `FUN_1800c67e0` selects `FUN_18012e0d0` only when both convolution dimensions are 7.
+- `FUN_18012e0d0` can choose `FUN_18012f280` as the scalar fallback, `FUN_18012e220` as the vector path, or `FUN_180130110` as the AVX2 path.
+- The scalar kernel accepts an output pointer, seven input-row pointers, 49 float weights, and an integer width. It writes the same number of output samples as the input width and uses reflect-without-edge-repeat horizontal borders.
+- VEA now contains a portable ARM64-compatible scalar implementation, `vea_s5_depthwise_conv7x7_reflect_f32`, with edge-index tests. It is not yet a NEON optimization.
+
+The same trace recovered the scalar target behind `FUN_180130b70`: `MRW_LNSTATS_SIMD` selects the label at `0x180130ce0` when forced to scalar, or `FUN_180130d90` for the AVX2 path. The scalar routine accumulates both `sum(input)` and `sum(input * input)`; its register arguments and output order match `vea_s5_reduce_sum_sumsq_f32`.
+
+See `docs/S5API_CORE_OPERATOR_TRACE.md` and `docs/S5API_DWCONV_PORT.md` for details. This proves two DSP primitives, not the full neural inference graph.
