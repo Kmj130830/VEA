@@ -72,6 +72,15 @@ typedef enum VeaS5TensorStatus {
     VEA_S5_TENSOR_STATUS_BUFFER_TOO_SMALL = 7
 } VeaS5TensorStatus;
 
+/*
+ * Optional model-specific decoder for raw *F16 scalar values.
+ * encoded_value is the little-endian binary16 bit pattern. The callback must
+ * write one float32 value and return VEA_S5_TENSOR_STATUS_OK on success.
+ * It must not throw across the C ABI boundary.
+ */
+typedef VeaS5TensorStatus (*VeaS5F16ToFloatCallback)(
+    uint16_t encoded_value, void* user_context, float* out_value);
+
 VEA_S5_TENSOR_API uint32_t vea_s5_tensor_abi_version(void);
 
 /*
@@ -161,7 +170,18 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_pack_row_major_f32(
     uint32_t axis1_count,
     VeaS5MatrixDescriptor** out_descriptor);
 
-/* Decode S5API tagged Base64 arrays: float32, float16 and signed int32 types. */
+/*
+ * Decode S5API *F32 / *F16 tagged Base64 arrays. When f16_callback is non-null,
+ * it converts each raw binary16 value using model-specific rules. When null,
+ * the decoder uses the standard IEEE-754 binary16 conversion as a fallback.
+ * Callback failures are propagated and do not consume arena capacity.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_decode_typed_float_array_with_f16_callback(
+    VeaS5Arena* arena, const char* encoded, size_t encoded_size,
+    VeaS5F16ToFloatCallback f16_callback, void* callback_context,
+    float** out_values, size_t* out_count);
+
+/* Backward-compatible API; uses the standard IEEE-754 binary16 fallback. */
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_decode_typed_float_array(
     VeaS5Arena* arena, const char* encoded, size_t encoded_size,
     float** out_values, size_t* out_count);
