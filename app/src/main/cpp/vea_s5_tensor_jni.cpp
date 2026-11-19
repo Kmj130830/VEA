@@ -168,3 +168,64 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeParseContainerHeader(
     if (result != nullptr) env->SetLongArrayRegion(result, 0, 3, values);
     return env->ExceptionCheck() ? nullptr : result;
 }
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativePackRowMajor(
+    JNIEnv* env,
+    jobject,
+    jfloatArray source_array,
+    jint axis0_count,
+    jint axis1_count) {
+    if (source_array == nullptr || axis0_count <= 0 || axis1_count <= 0) return nullptr;
+
+    size_t source_count = 0;
+    size_t output_count = 0;
+    size_t descriptor_reserved = 0;
+    size_t values_bytes = 0;
+    size_t values_reserved = 0;
+    if (MultiplyOverflow(static_cast<size_t>(axis0_count), static_cast<size_t>(axis1_count),
+                         &source_count)) return nullptr;
+    const jsize input_length = env->GetArrayLength(source_array);
+    if (input_length < 0 || static_cast<size_t>(input_length) != source_count) return nullptr;
+
+    const uint64_t padded64 = (static_cast<uint64_t>(axis0_count) + 7u) & ~static_cast<uint64_t>(7u);
+    if (padded64 > std::numeric_limits<uint32_t>::max() ||
+        MultiplyOverflow(static_cast<size_t>(padded64), static_cast<size_t>(axis1_count),
+                         &output_count) ||
+        MultiplyOverflow(output_count, sizeof(float), &values_bytes) ||
+        !Align32(VEA_S5_MATRIX_DESCRIPTOR_SIZE, &descriptor_reserved) ||
+        !Align32(values_bytes, &values_reserved) ||
+        descriptor_reserved > std::numeric_limits<size_t>::max() - values_reserved) {
+        return nullptr;
+    }
+    const size_t capacity = descriptor_reserved + values_reserved;
+
+    try {
+        std::vector<jfloat> input(source_count);
+        env->GetFloatArrayRegion(source_array, 0, input_length, input.data());
+        if (env->ExceptionCheck()) return nullptr;
+        VeaS5Arena* arena = nullptr;
+        if (vea_s5_arena_create(capacity, &arena) != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+
+        VeaS5MatrixDescriptor* descriptor = nullptr;
+        const VeaS5TensorStatus status = vea_s5_pack_row_major_f32(
+            arena, input.data(), static_cast<uint32_t>(axis0_count),
+            static_cast<uint32_t>(axis1_count), &descriptor);
+        if (status != VEA_S5_TENSOR_STATUS_OK || descriptor == nullptr ||
+            output_count > static_cast<size_t>(std::numeric_limits<jsize>::max())) {
+            vea_s5_arena_destroy(arena);
+            return nullptr;
+        }
+
+        jfloatArray result = env->NewFloatArray(static_cast<jsize>(output_count));
+        if (result != nullptr && output_count != 0) {
+            env->SetFloatArrayRegion(result, 0, static_cast<jsize>(output_count), descriptor->values);
+        }
+        vea_s5_arena_destroy(arena);
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}

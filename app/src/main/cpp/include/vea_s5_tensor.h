@@ -104,6 +104,18 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_pack_matrix_bank_f32(
     uint32_t matrix_count,
     VeaS5MatrixDescriptor** out_descriptors);
 
+/*
+ * Reconstructs FUN_180065510: a single contiguous [axis1][axis0] matrix
+ * is copied to [axis1][align_up(axis0, 8)]. Unlike pack_matrix_bank_f32,
+ * this path does not distribute an interleaved matrix-bank dimension.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_pack_row_major_f32(
+    VeaS5Arena* arena,
+    const float* source,
+    uint32_t axis0_count,
+    uint32_t axis1_count,
+    VeaS5MatrixDescriptor** out_descriptor);
+
 #ifdef __cplusplus
 }
 #endif

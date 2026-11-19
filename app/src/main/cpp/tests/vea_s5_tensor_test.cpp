@@ -95,6 +95,56 @@ int main() {
     assert(vea_s5_arena_used(arena) == checkpoint);
 
 
+
+    // FUN_180065510: contiguous [axis1][axis0] copy into an 8-column padded matrix.
+    const float row_major_input[] = {
+        1.0f, 2.0f, 3.0f,
+        4.0f, 5.0f, 6.0f
+    };
+    VeaS5MatrixDescriptor* row_major_descriptor = nullptr;
+    assert(vea_s5_pack_row_major_f32(
+        arena, row_major_input, 3, 2, &row_major_descriptor) == VEA_S5_TENSOR_STATUS_OK);
+    assert(row_major_descriptor != nullptr);
+    assert(IsAligned(row_major_descriptor, VEA_S5_ARENA_ALIGNMENT));
+    assert(IsAligned(row_major_descriptor->values, VEA_S5_ARENA_ALIGNMENT));
+    assert(row_major_descriptor->axis0 == 3);
+    assert(row_major_descriptor->axis1 == 2);
+    assert(row_major_descriptor->padded_axis0 == 8);
+    assert(row_major_descriptor->values[0] == 1.0f);
+    assert(row_major_descriptor->values[1] == 2.0f);
+    assert(row_major_descriptor->values[2] == 3.0f);
+    assert(row_major_descriptor->values[8] == 4.0f);
+    assert(row_major_descriptor->values[9] == 5.0f);
+    assert(row_major_descriptor->values[10] == 6.0f);
+    for (uint32_t row = 0; row < 2; ++row) {
+        for (uint32_t col = 3; col < 8; ++col) {
+            assert(row_major_descriptor->values[row * 8u + col] == 0.0f);
+        }
+    }
+
+    // When axis0 is already a multiple of eight, the copy contains no padding.
+    const float aligned_input[] = {
+        1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f,
+        9.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.0f, 15.0f, 16.0f
+    };
+    VeaS5MatrixDescriptor* aligned_descriptor = nullptr;
+    assert(vea_s5_pack_row_major_f32(
+        arena, aligned_input, 8, 2, &aligned_descriptor) == VEA_S5_TENSOR_STATUS_OK);
+    assert(aligned_descriptor->padded_axis0 == 8);
+    for (size_t i = 0; i < 16; ++i) {
+        assert(aligned_descriptor->values[i] == aligned_input[i]);
+    }
+
+    VeaS5Arena* row_tiny = nullptr;
+    assert(vea_s5_arena_create(32, &row_tiny) == VEA_S5_TENSOR_STATUS_OK);
+    const size_t row_before = vea_s5_arena_used(row_tiny);
+    VeaS5MatrixDescriptor* row_failed = nullptr;
+    assert(vea_s5_pack_row_major_f32(
+        row_tiny, row_major_input, 3, 2, &row_failed) == VEA_S5_TENSOR_STATUS_ARENA_EXHAUSTED);
+    assert(row_failed == nullptr);
+    assert(vea_s5_arena_used(row_tiny) == row_before);
+    vea_s5_arena_destroy(row_tiny);
+
     // Fixed 136-byte outer header observed in all five supplied V7 model files.
     uint8_t raw_header[VEA_S5_CONTAINER_HEADER_SIZE] = {};
     raw_header[4] = 100u;
