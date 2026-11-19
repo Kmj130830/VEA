@@ -55,7 +55,9 @@ public class ExportS5ModelObjectTree extends GhidraScript {
         "1800c3740", // backend/operator registry path
         "180081e20", // ostream numeric-base manipulator used by the digest formatter
         "1800812a0", // MD5 block/final digest output helper
-        "18007b700"  // streambuf-to-string copy used by digest formatting
+        "18007b700", // streambuf-to-string copy used by digest formatting
+        "180045130", // model-configured 16-bit scalar conversion callback provider
+        "180054b50"  // typed tensor destination allocation/setup
     };
 
     @Override
