@@ -126,6 +126,15 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_decode_typed_int32_array(
     VeaS5Arena* arena, const char* encoded, size_t encoded_size,
     int32_t** out_values, size_t* out_count);
 
+/*
+ * Ports the S5API ACT operator body in FUN_18012d460.
+ * planes contains count floats followed by count gate floats; both halves
+ * are clamped to [-8, 8], and the first half is replaced in place.
+ * mode == 0: sigmoid(second) * tanh(first); mode != 0: tanh(second) * sigmoid(first).
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_apply_gated_activation_f32(
+    float* planes, size_t count, int mode);
+
 #ifdef __cplusplus
 }
 #endif

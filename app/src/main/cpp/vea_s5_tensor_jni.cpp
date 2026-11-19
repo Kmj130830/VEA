@@ -365,3 +365,29 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativePackTransposed(
         return nullptr;
     }
 }
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeApplyGatedActivation(
+    JNIEnv* env, jobject, jfloatArray planes_array, jint count, jint mode) {
+    if (planes_array == nullptr || count <= 0 ||
+        count > std::numeric_limits<jsize>::max() / 2) return nullptr;
+    const jsize length = env->GetArrayLength(planes_array);
+    if (length != count * 2) return nullptr;
+    try {
+        std::vector<jfloat> planes(static_cast<size_t>(length));
+        env->GetFloatArrayRegion(planes_array, 0, length, planes.data());
+        if (env->ExceptionCheck()) return nullptr;
+        const VeaS5TensorStatus status =
+            vea_s5_apply_gated_activation_f32(planes.data(), static_cast<size_t>(count), mode);
+        if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+        jfloatArray result = env->NewFloatArray(length);
+        if (result != nullptr) {
+            env->SetFloatArrayRegion(result, 0, length, planes.data());
+        }
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}

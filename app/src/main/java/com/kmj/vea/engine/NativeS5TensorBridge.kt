@@ -92,7 +92,20 @@ object NativeS5TensorBridge {
             ?: throw IllegalArgumentException("Malformed or unsupported S5 int32 tensor.")
     }
 
-    private external fun nativeDecodeTypedFloatArray(encoded: ByteArray): FloatArray?
+
+    /**
+     * Applies the recovered S5API two-plane ACT operator.
+     * Input is [valuePlane(count), gatePlane(count)]; both are clamped to [-8, 8].
+     * The returned first plane contains the activation result; the second is clamped input.
+     */
+    fun applyGatedActivation(planes: FloatArray, count: Int, mode: Int = 0): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(count > 0 && count.toLong() * 2L == planes.size.toLong())
+        return nativeApplyGatedActivation(planes, count, mode)
+            ?: throw IllegalStateException("S5 ACT activation failed.")
+    }
+
+    private external fun nativeApplyGatedActivation(planes: FloatArray, count: Int, mode: Int): FloatArray?\n    private external fun nativeDecodeTypedFloatArray(encoded: ByteArray): FloatArray?
     private external fun nativeDecodeTypedInt32Array(encoded: ByteArray): IntArray?
     private external fun nativeAbiVersion(): Int
     private external fun nativePackMatrixBank(
