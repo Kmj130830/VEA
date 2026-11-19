@@ -18,7 +18,8 @@ public class ExportS5NormalizationTrace extends GhidraScript {
     private static final String[] TARGETS = {
         "1800c5d50", "1800c67e0", "1800c3740", "18012cb50",
         "1800df720", "1800d8720", "1800d84e0",
-        "180130b70", "180130ce0", "180130d90"
+        "180130b70", "180130ce0", "180130d90",
+        "18012cff0", "18012ca50", "18012cbc0"
     };
 
     @Override
