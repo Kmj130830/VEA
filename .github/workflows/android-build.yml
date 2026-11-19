@@ -24,8 +24,13 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           packages: "platform-tools"
-      - name: Install Android 16 SDK
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Install Android 16 SDK and NDK
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+      - name: Run native G2P core tests
+        run: |
+          cmake -S app/src/main/cpp -B build/g2p-core-host -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/g2p-core-host --parallel 2
+          ctest --test-dir build/g2p-core-host --output-on-failure
       - name: Prepare AI Megpoid artwork assets
         run: python3 tools/prepare_voicebank_assets.py
       - name: Run editor unit tests and assemble debug APK
