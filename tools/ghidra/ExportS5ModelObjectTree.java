@@ -213,7 +213,6 @@ public class ExportS5ModelObjectTree extends GhidraScript {
         InstructionIterator it = currentProgram.getListing().getInstructions(true);
         int count = 0;
         while (it.hasNext()) {
-            monitor.checkCancelled();
             Instruction ins = it.next();
             String rendered = ins.toString().toLowerCase();
             if (!rendered.contains("+ " + offset + "]") &&
