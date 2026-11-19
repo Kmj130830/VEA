@@ -1,5 +1,18 @@
 package com.kmj.vea.engine
 
+data class S5RnnDirectionLayout(
+    val layerIndex: Int,
+    val directionIndex: Int,
+    val inputFeatures: Int,
+    val hiddenFeatures: Int,
+    val gateFeatures: Int,
+    val directionCount: Int,
+    val weightIhElements: Long,
+    val weightHhElements: Long,
+    val biasIhElements: Long,
+    val biasHhElements: Long
+)
+
 data class S5ContainerHeaderInfo(
     val kind: String,
     val payloadSize: Long,
@@ -106,6 +119,34 @@ object NativeS5TensorBridge {
     }
 
 
+
+    /**
+     * Computes the recovered flattened parameter sizes for one recurrent layer/direction.
+     * This describes model storage only; it does not execute the recurrent network.
+     */
+    fun rnnDirectionLayout(
+        inputSize: Int,
+        hiddenSize: Int,
+        numLayers: Int,
+        hasBias: Boolean,
+        bidirectional: Boolean,
+        layerIndex: Int,
+        directionIndex: Int
+    ): S5RnnDirectionLayout {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(inputSize > 0 && hiddenSize > 0 && numLayers > 0)
+        require(layerIndex in 0 until numLayers)
+        val directions = if (bidirectional) 2 else 1
+        require(directionIndex in 0 until directions)
+        val values = nativeRnnDirectionLayout(
+            inputSize, hiddenSize, numLayers, hasBias, bidirectional, layerIndex, directionIndex
+        ) ?: throw IllegalArgumentException("Invalid or overflowing S5 RNN parameter layout.")
+        require(values.size == 10)
+        return S5RnnDirectionLayout(
+            values[0].toInt(), values[1].toInt(), values[2].toInt(), values[3].toInt(),
+            values[4].toInt(), values[5].toInt(), values[6], values[7], values[8], values[9]
+        )
+    }
 
     /**
      * Builds an S5API recurrent parameter key such as rnn.weight_ih_l0_reverse.
@@ -315,6 +356,10 @@ object NativeS5TensorBridge {
         a: FloatArray, b: FloatArray, c: FloatArray,
         m: Int, n: Int, k: Int, alpha: Float, lda: Int, ldb: Int, beta: Float, ldc: Int
     ): FloatArray?
+    private external fun nativeRnnDirectionLayout(
+        inputSize: Int, hiddenSize: Int, numLayers: Int, hasBias: Boolean,
+        bidirectional: Boolean, layerIndex: Int, directionIndex: Int
+    ): LongArray?
     private external fun nativeBuildRecurrentParameterName(base: String, memberSuffix: String, layerIndex: Int, reverseDirection: Boolean): String?
     private external fun nativeResidualAffineAdd(dst: FloatArray, residual: FloatArray, scale: Float, bias: Float): FloatArray?
     private external fun nativeDepthwiseConv7x7Reflect(inputRows: FloatArray, weights: FloatArray, width: Int): FloatArray?
