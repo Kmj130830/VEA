@@ -6,6 +6,7 @@ on:
     paths:
       - "Editor.zip"
       - "tools/inspect_editor_zip.py"
+      - "tools/ghidra/ExportVsmAnalysis.java"
       - ".github/workflows/editor-zip-analysis.yml"
 
 permissions:
@@ -14,27 +15,49 @@ permissions:
 jobs:
   inventory-and-decompile:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+
+      - name: Set up Java 25 for Ghidra 12.2
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "25"
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "8.0.x"
+
       - name: Inventory Editor.zip and extract every PE module
         run: python3 tools/inspect_editor_zip.py
-      - name: Install ILSpy
-        run: |
-          dotnet tool install --global ilspycmd
-          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
-      - name: Download Ghidra 12.2
+
+      - name: Record PE import/export tables for every module
         shell: bash
         run: |
           set -euo pipefail
-          archive=/tmp/ghidra.zip
+          mkdir -p build/editor-analysis/pe
+          for file in build/editor-package/modules/*; do
+            [[ -f "$file" ]] || continue
+            name="$(basename "$file")"
+            objdump -p "$file" > "build/editor-analysis/pe/$name.txt" 2>&1 || true
+          done
+
+      - name: Install ILSpy and decompile managed candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet tool install --global ilspycmd
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+          mkdir -p build/editor-analysis/ilspy
+          file="build/editor-package/modules/UriTemplate.Core.dll"
+          if [[ -f "$file" ]]; then
+            ilspycmd -l c "$file" > build/editor-analysis/ilspy/UriTemplate.Core.types.txt 2>&1 || true
+            ilspycmd --project -o build/editor-analysis/ilspy/UriTemplate.Core "$file" > build/editor-analysis/ilspy/UriTemplate.Core.log 2>&1 || true
+            ilspycmd --ilcode "$file" > build/editor-analysis/ilspy/UriTemplate.Core.il 2>&1 || true
+          fi
+
+      - name: Download and verify official Ghidra 12.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive=/tmp/ghidra_12.2_PUBLIC_20261016.zip
           curl --fail --location --retry 3 "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_12.2_build/ghidra_12.2_PUBLIC_20261016.zip" -o "$archive"
           echo "2c2cd776db3c1f6a097ba418922378ac3649cadd5e844a6f5f088ae628a7be67  $archive" | sha256sum --check
           mkdir -p /tmp/ghidra
@@ -42,47 +65,30 @@ jobs:
           tool="$(find /tmp/ghidra -path '*/support/analyzeHeadless' -type f -print -quit)"
           test -n "$tool"
           echo "GHIDRA_HEADLESS=$tool" >> "$GITHUB_ENV"
-      - name: Decompile managed assemblies with ILSpy
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p build/editor-analysis/ilspy
-          find build/editor-package/modules -type f -iname '*.dll' -o -iname '*.exe' | while IFS= read -r file; do
-            rel="${file#build/editor-package/modules/}"
-            out="build/editor-analysis/ilspy/$rel"
-            mkdir -p "$out"
-            if grep -q '"managed_candidate": true' build/editor-package/inventory.json; then :; fi
-            ilspycmd -l c "$file" > "$out/types.txt" 2> "$out/types.err" || true
-            ilspycmd --project -o "$out/project" "$file" > "$out/project.log" 2>&1 || true
-            ilspycmd --ilcode "$file" > "$out/assembly.il" 2> "$out/il.err" || true
-          done
-      - name: Decompile native modules with Ghidra
+
+      - name: Decompile VSM render and audio-buffer entry points
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p build/editor-analysis/ghidra build/editor-ghidra-projects
-          find build/editor-package/modules -type f -iname '*.dll' -o -iname '*.exe' | while IFS= read -r file; do
-            if grep -a -q 'BSJB' "$file"; then
-              echo "Managed metadata marker found; ILSpy output retained for $file"
-              continue
-            fi
-            rel="${file#build/editor-package/modules/}"
-            safe="$(printf '%s' "$rel" | tr '/ ' '__')"
-            "$GHIDRA_HEADLESS" "$PWD/build/editor-ghidra-projects" "$safe" -import "$PWD/$file" -analysisTimeoutPerFile 180 -deleteProject > "build/editor-analysis/ghidra/$safe.log" 2>&1 || true
-          done
-      - name: Record Android porting boundary
+          test -s build/editor-package/modules/VSM.dll
+          "$GHIDRA_HEADLESS" "$PWD/build/editor-ghidra-projects" VEA_VSM             -import "$PWD/build/editor-package/modules/VSM.dll"             -scriptPath "$PWD/tools/ghidra"             -postScript ExportVsmAnalysis.java "$PWD/build/editor-analysis/ghidra/VSM_RENDER_BOUNDARY.md"             -analysisTimeoutPerFile 600 -deleteProject
+          test -s build/editor-analysis/ghidra/VSM_RENDER_BOUNDARY.md
+
+      - name: Record Android ARM64 porting boundary
         run: |
-          mkdir -p build/editor-analysis
           cat > build/editor-analysis/PORTING_STATUS.md <<'EOF'
           # Android ARM64 port status
-          Windows PE/AMD64 DLLs are not converted into ELF/ARM64 by renaming or byte patching.
-          Managed IL must be ported/reimplemented against Android APIs; native Windows code must be rebuilt from source or reimplemented.
-          This workflow inventories and decompiles; it does not falsely label Windows binaries as Android .so files.
-          Actual .so targets will be added after ABI, dependency, model I/O, and runtime behavior are recovered.
+          The new Editor.zip contains native Windows AMD64 PE modules, including VSM.dll.
+          Static decompilation is used to recover public contracts and call paths. No Windows module is copied or renamed to .so.
+          A real Android implementation must be built as ELF/ARM64 with Android NDK, replacing Windows APIs and validating the model-loading and audio callback contracts.
+          The current VEA libveag2p.so remains a text-normalization prototype and does not synthesize singing.
           EOF
           cp build/editor-package/INVENTORY.md build/editor-analysis/
           cp build/editor-package/inventory.json build/editor-analysis/
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload full static analysis artifact
+        uses: actions/upload-artifact@v4
         with:
           name: VEA-Editor-zip-decompilation
           path: build/editor-analysis/
