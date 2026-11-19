@@ -113,7 +113,7 @@ public class ExportS5RnnCallSites extends GhidraScript {
         println("S5API RNN call-site report written: " + output.getAbsolutePath());
     }
 
-    private void dumpDirectCalls(PrintWriter out, Function function) {
+    private void dumpDirectCalls(PrintWriter out, Function function) throws ghidra.util.exception.CancelledException {
         out.println("- Direct calls from this function:");
         InstructionIterator it = currentProgram.getListing().getInstructions(function.getBody(), true);
         int count = 0;
