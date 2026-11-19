@@ -40,6 +40,22 @@ against the requested key using byte comparison plus a length tie-break.
 The key string is stored in the node's string-like field beginning at
 `+0x20`. `FUN_180026f60` is the associated lexicographic comparison helper.
 
+## Recovered digest text layout
+
+The output stream setup in `FUN_18001b1f0` selects hexadecimal formatting,
+and `FUN_18001acc0` iterates over four 32-bit values, applying zero fill and
+width 8 to each. The resulting lookup key is 32 lowercase hexadecimal
+characters. This is a word-wise representation of the four MD5 state words;
+it is not the usual canonical MD5 digest string, which serializes each word
+as four little-endian bytes.
+
+VEA adds `vea_s5_hash_parameter_key` as an isolated helper that accepts an
+explicit byte length, appends the recovered 24-byte suffix, computes the
+standard MD5 state, and emits each state word as eight lowercase hex digits.
+It is unit-tested with a fixed salted test vector. It is not yet wired into
+the full model parser; a binary-model cross-check remains advisable before
+using it to resolve production voicebank parameters.
+
 ## Typed object node
 
 The observed typed-value access convention is:
