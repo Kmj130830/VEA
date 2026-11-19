@@ -19,6 +19,13 @@ target_include_directories(veavsm PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_definitions(veavsm PRIVATE VEA_VSM_BUILD)
 target_compile_options(veavsm PRIVATE -Wall -Wextra)
 
+add_library(veas5tensor SHARED
+    vea_s5_tensor.cpp
+)
+target_include_directories(veas5tensor PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_compile_definitions(veas5tensor PRIVATE VEA_S5_TENSOR_BUILD)
+target_compile_options(veas5tensor PRIVATE -Wall -Wextra)
+
 if(ANDROID)
     target_sources(veag2p PRIVATE veag2p_jni.cpp)
     target_sources(veavsm PRIVATE vea_vsm_callback_jni.cpp)
@@ -38,4 +45,9 @@ else()
     target_link_libraries(veavsm_callback_test PRIVATE veavsm)
     target_include_directories(veavsm_callback_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
     add_test(NAME veavsm_callback_test COMMAND veavsm_callback_test)
+
+    add_executable(vea_s5_tensor_test tests/vea_s5_tensor_test.cpp)
+    target_link_libraries(vea_s5_tensor_test PRIVATE veas5tensor)
+    target_include_directories(vea_s5_tensor_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    add_test(NAME vea_s5_tensor_test COMMAND vea_s5_tensor_test)
 endif()

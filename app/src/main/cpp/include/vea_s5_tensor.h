@@ -1,0 +1,109 @@
+#pragma once
+
+#include <stddef.h>
+#include <stdint.h>
+
+#if defined(_WIN32)
+  #if defined(VEA_S5_TENSOR_BUILD)
+    #define VEA_S5_TENSOR_API __declspec(dllexport)
+  #else
+    #define VEA_S5_TENSOR_API __declspec(dllimport)
+  #endif
+#else
+  #define VEA_S5_TENSOR_API __attribute__((visibility("default")))
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define VEA_S5_TENSOR_ABI_VERSION 0x00010000u
+#define VEA_S5_ARENA_ALIGNMENT 32u
+#define VEA_S5_MATRIX_AXIS0_ALIGNMENT 8u
+#define VEA_S5_MATRIX_DESCRIPTOR_SIZE 24u
+
+typedef struct VeaS5Arena VeaS5Arena;
+
+/*
+ * Recovered 0x18-byte S5API matrix descriptor.
+ * axis0 is stored at +0, axis1 at +4, padded_axis0 at +8,
+ * and the float32 data pointer at +0x10.
+ *
+ * Axis names are intentionally neutral until the surrounding model graph
+ * establishes whether they represent input channels, output channels,
+ * time, or another semantic dimension.
+ */
+typedef struct VeaS5MatrixDescriptor {
+    uint32_t axis0;
+    uint32_t axis1;
+    uint32_t padded_axis0;
+    uint32_t reserved;
+    float* values;
+} VeaS5MatrixDescriptor;
+
+typedef enum VeaS5TensorStatus {
+    VEA_S5_TENSOR_STATUS_OK = 0,
+    VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT = 1,
+    VEA_S5_TENSOR_STATUS_OUT_OF_MEMORY = 2,
+    VEA_S5_TENSOR_STATUS_ARENA_EXHAUSTED = 3,
+    VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW = 4
+} VeaS5TensorStatus;
+
+VEA_S5_TENSOR_API uint32_t vea_s5_tensor_abi_version(void);
+
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_arena_create(
+    size_t capacity_bytes,
+    VeaS5Arena** out_arena);
+
+VEA_S5_TENSOR_API void vea_s5_arena_destroy(VeaS5Arena* arena);
+VEA_S5_TENSOR_API size_t vea_s5_arena_capacity(const VeaS5Arena* arena);
+VEA_S5_TENSOR_API size_t vea_s5_arena_used(const VeaS5Arena* arena);
+VEA_S5_TENSOR_API void vea_s5_arena_reset(VeaS5Arena* arena);
+
+/* Allocates count float32 values. The returned address is 32-byte aligned. */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_arena_alloc_f32(
+    VeaS5Arena* arena,
+    size_t count,
+    float** out_values);
+
+/* Allocates count 0x18-byte matrix descriptor records. */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_arena_alloc_matrix_descriptors(
+    VeaS5Arena* arena,
+    size_t count,
+    VeaS5MatrixDescriptor** out_descriptors);
+
+/*
+ * Converts a typed double-array payload into contiguous float32 values.
+ * This corresponds to the recovered node-tag-4 conversion path. The parser
+ * that validates the source node/type is deliberately outside this function.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_convert_f64_array_to_f32(
+    VeaS5Arena* arena,
+    const double* source,
+    size_t count,
+    float** out_values);
+
+/*
+ * Reconstructs the recovered matrix-bank layout from FUN_180064670.
+ *
+ * Input layout:
+ *   source[((axis0_index * axis1_count + axis1_index) * matrix_count) + matrix]
+ *
+ * Output per matrix:
+ *   descriptor[matrix].values[axis1_index * padded_axis0 + axis0_index]
+ *
+ * padded_axis0 = align_up(axis0_count, 8). Padding is initialized to zero.
+ * The descriptor table and every float region are 32-byte aligned allocations.
+ * All arena allocations roll back atomically if this function fails.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_pack_matrix_bank_f32(
+    VeaS5Arena* arena,
+    const float* source,
+    uint32_t axis0_count,
+    uint32_t axis1_count,
+    uint32_t matrix_count,
+    VeaS5MatrixDescriptor** out_descriptors);
+
+#ifdef __cplusplus
+}
+#endif
