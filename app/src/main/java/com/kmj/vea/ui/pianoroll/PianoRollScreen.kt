@@ -619,13 +619,22 @@ private fun LyricEditorPopup(
                     }
                 }
 
-                if (language.lowercase() in setOf("eng", "en") && suggestions.isNotEmpty()) {
+                val suggestionLanguage = language.lowercase()
+                val canSuggestPhonemes = suggestionLanguage in setOf(
+                    "eng", "en", "jpn", "ja", "jp", "kor", "ko", "kr"
+                )
+                if (canSuggestPhonemes && suggestions.isNotEmpty()) {
                     Row(
                         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
-                        Text("G2P", color = Color(0xFF666666), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (suggestionLanguage in setOf("eng", "en")) "G2P" else "PHONEME",
+                            color = Color(0xFF666666),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                         suggestions.forEach { suggestion ->
                             OutlinedButton(
                                 onClick = { onSuggestionSelected(suggestion) },
