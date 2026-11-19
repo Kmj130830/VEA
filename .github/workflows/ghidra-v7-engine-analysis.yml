@@ -86,14 +86,14 @@ jobs:
               echo "IL dump unavailable; see il-errors.txt" >> "$output/status.txt"
             fi
           done
-      - name: Analyze V7 engine modules
+      - name: Analyze native WaveOfflineRenderer module (VOCALOID7 CLR is handled by ILSpy)
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p build/v7-engine-analysis build/ghidra-v7-projects
           while IFS= read -r dll; do
             name="$(basename "${dll%.dll}")"
-            echo "=== Ghidra V7 target: $name ==="
+            echo "=== Ghidra native target: $name ==="
             "$GHIDRA_DIR/support/analyzeHeadless" \
               "$PWD/build/ghidra-v7-projects" "VEA_$name" \
               -import "$PWD/$dll" \
@@ -101,7 +101,7 @@ jobs:
               -postScript ExportV7EngineAnalysis.java "$PWD/build/v7-engine-analysis/$name.md" \
               -deleteProject
             test -s "build/v7-engine-analysis/$name.md"
-          done < <(find build/v7-engine-targets -maxdepth 1 -type f -name '*.dll' -print | sort)
+          done < <(find build/v7-engine-targets -maxdepth 1 -type f -name 'WaveOfflineRenderer.dll' -print | sort)
 
           cp build/v7-engine-targets/SHA256SUMS.txt build/v7-engine-analysis/
           printf '\nAnalysis tool: Ghidra 12.2 (official release)\nTarget architecture: Windows AMD64 PE\nMode: static analysis only; no target execution\n' \
