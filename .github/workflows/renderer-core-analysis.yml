@@ -57,6 +57,17 @@ jobs:
           "$GHIDRA_HEADLESS" "$PWD/build/ghidra-renderer-projects" VEA_S5API             -import "$PWD/build/editor-package/modules/S5API.dll"             -scriptPath "$PWD/tools/ghidra"             -postScript ExportS5ApiAnalysis.java "$PWD/build/renderer-core-analysis/ghidra/S5API_EXPORT_ANALYSIS.md"             -analysisTimeoutPerFile 600 -deleteProject
           test -s build/renderer-core-analysis/ghidra/S5API_EXPORT_ANALYSIS.md
 
+      - name: Deep-decompile S5API model and inference call path
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GHIDRA_HEADLESS" "$PWD/build/ghidra-renderer-projects" VEA_S5API_DEEP \
+            -import "$PWD/build/editor-package/modules/S5API.dll" \
+            -scriptPath "$PWD/tools/ghidra" \
+            -postScript ExportS5RendererPath.java "$PWD/build/renderer-core-analysis/ghidra/S5API_RENDER_HOT_PATH.md" \
+            -analysisTimeoutPerFile 600 -deleteProject
+          test -s build/renderer-core-analysis/ghidra/S5API_RENDER_HOT_PATH.md
+
       - name: Preserve exact renderer binaries and PE metadata
         shell: bash
         run: |
