@@ -5,6 +5,7 @@
 #include <cstring>
 #include <bit>
 #include <cstdint>
+#include <cmath>
 #include <limits>
 
 namespace {
@@ -265,6 +266,28 @@ int main() {
         nullptr, residual_src, 7, 1.0f, 0.0f) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
     assert(vea_s5_residual_affine_add_f32(
         residual_dst, residual_src, 0, 1.0f, 0.0f) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
+    // FUN_18012ca50: S5API scalar tanh-approximation GELU kernel.
+    float gelu_values[] = {-3.0f, -1.0f, 0.0f, 0.5f, 1.0f, 2.0f, 3.0f};
+    const float gelu_original[] = {-3.0f, -1.0f, 0.0f, 0.5f, 1.0f, 2.0f, 3.0f};
+    assert(vea_s5_apply_gelu_f32(gelu_values, 7, 1.0f, 0.0f) == VEA_S5_TENSOR_STATUS_OK);
+    for (size_t i = 0; i < 7; ++i) {
+        const float x = gelu_original[i];
+        const float reference = x / (1.0f + std::exp(-((x * x * x * 0.044715f + x) * 1.5957692f)));
+        assert(std::fabs(gelu_values[i] - reference) <= 1.0e-6f);
+    }
+    assert(gelu_values[2] == 0.0f);
+    float gelu_affine[] = {-1.0f, 0.0f, 1.0f};
+    assert(vea_s5_apply_gelu_f32(gelu_affine, 3, 2.0f, -0.5f) == VEA_S5_TENSOR_STATUS_OK);
+    for (size_t i = 0; i < 3; ++i) {
+        const float x = 2.0f * (static_cast<float>(i) - 1.0f) - 0.5f;
+        const float reference = x / (1.0f + std::exp(-((x * x * x * 0.044715f + x) * 1.5957692f)));
+        assert(std::fabs(gelu_affine[i] - reference) <= 1.0e-6f);
+    }
+    assert(vea_s5_apply_gelu_f32(nullptr, 1, 1.0f, 0.0f) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_apply_gelu_f32(gelu_affine, 0, 1.0f, 0.0f) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
     // MRW_LNSTATS: raw sum and sum-of-squares reduction.
     const float stats_input[] = {1.0f, -2.0f, 3.0f, -4.0f};

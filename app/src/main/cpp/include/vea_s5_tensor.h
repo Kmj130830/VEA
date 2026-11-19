@@ -147,6 +147,15 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_decode_typed_int32_array(
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_apply_gated_activation_f32(
     float* planes, size_t count, int mode);
 
+
+/*
+ * Ports the S5API scalar GELU kernel FUN_18012ca50.
+ * x = scale * input[i] + bias
+ * input[i] = x / (1 + exp(-((x^3 * 0.044715 + x) * 1.5957692)))
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_apply_gelu_f32(
+    float* input, size_t count, float scale, float bias);
+
 /*
  * Portable scalar equivalent of S5API FUN_18012f280 (MRW_DWCONV_SIMD fallback).
  * Seven input rows are convolved with a row-major 7x7 kernel; output width

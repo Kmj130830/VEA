@@ -148,6 +148,18 @@ object NativeS5TensorBridge {
      * Applies S5API FUN_1800d8720: dst = (dst + bias) * scale + residual.
      * Both arrays must have the same non-zero length.
      */
+
+    /**
+     * Applies the recovered S5API scalar GELU operator.
+     * x = scale * input + bias; output = x * sigmoid(1.5957692 * (x + 0.044715*x^3)).
+     */
+    fun applyGelu(values: FloatArray, scale: Float = 1.0f, bias: Float = 0.0f): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(values.isNotEmpty())
+        return nativeApplyGelu(values, scale, bias)
+            ?: throw IllegalStateException("S5 GELU activation failed.")
+    }
+
     fun residualAffineAdd(
         dst: FloatArray,
         residual: FloatArray,
@@ -172,7 +184,9 @@ object NativeS5TensorBridge {
     }
 
     private external fun nativeBuildRecurrentParameterName(base: String, memberSuffix: String, layerIndex: Int, reverseDirection: Boolean): String?
+    private external fun nativeResidualAffineAdd(dst: FloatArray, residual: FloatArray, scale: Float, bias: Float): FloatArray?
     private external fun nativeDepthwiseConv7x7Reflect(inputRows: FloatArray, weights: FloatArray, width: Int): FloatArray?
+    private external fun nativeApplyGelu(values: FloatArray, scale: Float, bias: Float): FloatArray?
     private external fun nativeReduceSumAndSquares(values: FloatArray): FloatArray?
     private external fun nativeApplyGatedActivation(planes: FloatArray, count: Int, mode: Int): FloatArray?
     private external fun nativeDecodeTypedFloatArray(encoded: ByteArray): FloatArray?
