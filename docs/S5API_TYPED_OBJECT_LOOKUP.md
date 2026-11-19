@@ -28,9 +28,12 @@ The visible operations in `FUN_18001b1f0` are:
 4. Pass the result to `FUN_180083610` through a stream helper to construct the
    string used by the lookup path.
 
-The exact textual representation emitted by `FUN_180083610` is not yet
-established. VEA must not assume lowercase hex, uppercase hex, Base64, or raw
-binary key storage until that formatter is inspected.
+`FUN_18001acc0` formats the four 32-bit digest words as four groups of
+eight hexadecimal digits, zero-padded with `setw(8)`. It sets the stream's
+hexadecimal basefield and does not enable uppercase, so the emitted key is
+32 lowercase hexadecimal characters. The four-word textual order is known;
+whether those words are serialized in the same byte order as the canonical
+RFC MD5 digest string is not yet established.
 
 `FUN_18000b100` traverses an ordered tree and compares the stored key string
 against the requested key using byte comparison plus a length tie-break.
@@ -70,9 +73,9 @@ should not be treated as a complete schema for every S5API object.
 `FUN_1800656e0` writes a two-dimensional float32 tensor buffer. For tag 4 it
 reads the tagged-double sequence row by row. Its destination row stride is
 rounded up to a multiple of eight elements. For tag 3 it checks for one of two
-four-byte marker values before decoding the payload; the marker bytes and
-their semantics remain unresolved. One accepted path also calls a conversion
-callback through the model context at offset `+0x208`.
+four-byte marker values before decoding the payload. One accepted path
+calls an indirect scalar-conversion target through the processing context
+passed as `FUN_1800656e0`'s first argument, at that context's offset `+0x208`.
 
 `FUN_180064670` is a higher-level matrix/tensor loader. Its allocations and
 loops use the requested row/feature dimensions and construct float buffers
@@ -85,18 +88,29 @@ The raw constants consumed by `FUN_1800656e0` are:
 | Address | Bytes | ASCII | Observed branch |
 |---|---|---|---|
 | `DAT_18019b770` | `2a 46 33 32` | `*F32` | decode following Base64 text into float32 values |
-| `DAT_18019b778` | `2a 46 31 36` | `*F16` | decode following Base64 text into 16-bit values, then call the model-context converter at offset `+0x208` for each scalar |
+| `DAT_18019b778` | `2a 46 31 36` | `*F16` | decode following Base64 text into 16-bit values, then call the processing-context converter at offset `+0x208` for each scalar |
 
 For either marker, the four-byte prefix is removed before calling
 `FUN_18000f5f0`; that function decodes the remaining Base64 text.
-The `*F16` branch does not inline a fixed IEEE-754 conversion. It invokes a
-per-model callback loaded from the model context at `+0x208`. VEA's existing
-half-float conversion therefore remains a candidate fallback, not yet a
-verified match for every S5API backend.
+The `*F16` branch does not inline a fixed IEEE-754 conversion. It invokes an
+indirect conversion target stored at offset `+0x208` relative to the first
+argument of `FUN_1800656e0`. The call site in `FUN_180060270` passes its
+tensor-processing context as that first argument. The target's initializer,
+calling convention beyond the observed 16-bit scalar input, and exact numeric
+mapping remain unresolved.
 
-The C++ typed-array parser already recognizes `*F32` and `*F16` payload
-prefixes, but it currently decodes the values directly. Integrating the
-per-model `+0x208` callback semantics is a separate follow-up.
+A separate function, `FUN_180045130`, builds 0x50-byte records from a
+different hashed object-tree entry and moves that array to offset `+0x208`
+of the outer object in `Func_47a12a73`. That destination is a different base
+address from the `FUN_1800656e0` processing context (the latter is passed as
+an embedded context at outer-object offset `+0x898`). Current evidence does
+not connect those records to the F16 scalar conversion; the two uses of
+offset `+0x208` must not be conflated.
+
+The C++ typed-array parser already recognizes the confirmed `*F32` and
+`*F16` prefixes. PR #4 adds an injectable F16 conversion callback to that
+parser while preserving standard IEEE-754 binary16 as the fallback. This
+provides the extension point without claiming to match the vendor mapping.
 
 ## Implementation implications
 
@@ -112,9 +126,10 @@ per-model `+0x208` callback semantics is a separate follow-up.
 
 ## Outstanding static questions
 
-1. What exact text encoding does `FUN_180083610` use for the 16-byte digest?
-2. What are the two four-byte tag-3 marker values at `DAT_18019b770` and
-   `DAT_18019b778`?
+1. Are the four MD5 state words rendered in canonical digest byte order or
+   word-wise numeric hexadecimal order?
+2. Which constructor installs the F16 conversion target at processing-context
+   offset `+0x208`, and what numeric mapping does it implement?
 3. What is the full grammar and dimensional metadata format accepted by
    `FUN_18000f5f0` / `FUN_18000f6d0`?
 4. How is the root object tree populated from the outer model container?
