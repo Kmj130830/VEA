@@ -22,7 +22,7 @@ import java.util.Map;
  * callee prototype.
  */
 public class ExportS5RnnCallSites extends GhidraScript {
-    private static final int WINDOW_BEFORE = 0x50;
+    private static final int WINDOW_BEFORE = 0x180;
     private static final int WINDOW_AFTER = 0x28;
     private static final int MAX_XREFS = 64;
     private static final int MAX_CALLS_PER_FUNCTION = 160;
