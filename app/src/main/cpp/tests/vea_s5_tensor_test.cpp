@@ -501,6 +501,49 @@ int main() {
         banked_weights, 1, 4, banked_input, nullptr, banked_output, 2, 2, 3, 2) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
+    // Integrated scalar block: 7x7 depthwise -> global stats -> expand/GELU/project -> residual.
+    constexpr size_t block_channels = 1;
+    constexpr size_t block_positions = 7;
+    constexpr size_t block_expanded = 2;
+    float block_history[block_channels * 7 * block_positions] = {};
+    for (size_t row = 0; row < 7; ++row) {
+        for (size_t pos = 0; pos < block_positions; ++pos) {
+            block_history[row * block_positions + pos] = static_cast<float>(pos + 1u);
+        }
+    }
+    float block_dw_weights[49] = {};
+    block_dw_weights[3u * 7u + 3u] = 1.0f;
+    const float block_expand_weights[] = {1.0f, 2.0f};
+    const float block_bias_a[] = {0.0f, 0.0f};
+    const float block_bias_b[] = {0.0f, 0.0f};
+    const float block_project_weights[] = {1.0f, 0.5f};
+    const float block_residual[] = {0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f};
+    const float block_residual_scale[] = {2.0f};
+    const float block_residual_bias[] = {0.25f};
+    float block_output[7] = {};
+    assert(vea_s5_run_residual_dw_mlp_block_f32(
+        block_history, block_dw_weights, block_expand_weights,
+        block_bias_a, block_bias_b, block_project_weights,
+        block_residual, block_residual_scale, block_residual_bias, block_output,
+        block_channels, block_positions, block_expanded, 0.25f) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    // Depthwise center impulse leaves 1..7. Global mean=4, var=4, invStd=1/sqrt(4.25).
+    const float block_inv_std = 1.0f / std::sqrt(4.25f);
+    for (size_t pos = 0; pos < block_positions; ++pos) {
+        const float x = static_cast<float>(pos + 1u) * block_inv_std;
+        const float gelu1 = x / (1.0f + std::exp(-((x*x*x*0.044715f + x)*1.5957692f)));
+        const float x2 = 2.0f * static_cast<float>(pos + 1u) * block_inv_std;
+        const float gelu2 = x2 / (1.0f + std::exp(-((x2*x2*x2*0.044715f + x2)*1.5957692f)));
+        const float projected = gelu1 + 0.5f * gelu2;
+        const float expected = (projected + 0.25f) * 2.0f + 0.5f;
+        assert(std::fabs(block_output[pos] - expected) < 1.0e-5f);
+    }
+    assert(vea_s5_run_residual_dw_mlp_block_f32(
+        nullptr, block_dw_weights, block_expand_weights, block_bias_a, block_bias_b,
+        block_project_weights, block_residual, block_residual_scale, block_residual_bias,
+        block_output, block_channels, block_positions, block_expanded, 0.25f) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
     // Fixed 136-byte outer header observed in all five supplied V7 model files.
     uint8_t raw_header[VEA_S5_CONTAINER_HEADER_SIZE] = {};
     raw_header[4] = 100u;

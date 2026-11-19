@@ -128,6 +128,44 @@ object NativeS5TensorBridge {
 
 
     /**
+     * Runs the recovered residual depthwise/MLP block from FUN_1800c5d50.
+     * historyRows: [channel][7][position], depthwise weights: [channel][49].
+     * expand weights: [expandedFeature][channel], project weights: [channel][expandedFeature].
+     * Input and output/residual tensors are [channel][position].
+     */
+    fun runResidualDepthwiseMlpBlock(
+        historyRows: FloatArray,
+        depthwiseWeights: FloatArray,
+        expandWeights: FloatArray,
+        expandedBiasA: FloatArray,
+        expandedBiasB: FloatArray,
+        projectWeights: FloatArray,
+        residualInput: FloatArray,
+        residualScale: FloatArray,
+        residualBias: FloatArray?,
+        channels: Int,
+        positions: Int,
+        expandedFeatures: Int,
+        epsilon: Float
+    ): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(channels > 0 && positions >= 7 && expandedFeatures > 0)
+        require(historyRows.size == channels * 7 * positions)
+        require(depthwiseWeights.size == channels * 49)
+        require(expandWeights.size == expandedFeatures * channels)
+        require(expandedBiasA.size >= expandedFeatures && expandedBiasB.size >= expandedFeatures)
+        require(projectWeights.size == channels * expandedFeatures)
+        require(residualInput.size == channels * positions && residualScale.size >= channels)
+        require(residualBias == null || residualBias.size >= channels)
+        require(epsilon.isFinite() && epsilon >= 0.0f)
+        return nativeRunResidualDwMlpBlock(
+            historyRows, depthwiseWeights, expandWeights, expandedBiasA, expandedBiasB,
+            projectWeights, residualInput, residualScale, residualBias,
+            channels, positions, expandedFeatures, epsilon
+        ) ?: throw IllegalArgumentException("S5 residual depthwise/MLP block failed.")
+    }
+
+    /**
      * Runs the banked linear projection recovered in FUN_1800c6390.
      * Weights are [bank][outputFeature][inputFeature]; input is [inputFeature][position].
      * Output is [outputFeature][position][bank]. Bias may be null.
@@ -261,6 +299,13 @@ object NativeS5TensorBridge {
         return result[0] to result[1]
     }
 
+    private external fun nativeRunResidualDwMlpBlock(
+        historyRows: FloatArray, depthwiseWeights: FloatArray,
+        expandWeights: FloatArray, expandedBiasA: FloatArray, expandedBiasB: FloatArray,
+        projectWeights: FloatArray, residualInput: FloatArray,
+        residualScale: FloatArray, residualBias: FloatArray?,
+        channels: Int, positions: Int, expandedFeatures: Int, epsilon: Float
+    ): FloatArray?
     private external fun nativeApplyBankedLinear(
         weights: FloatArray, weightRowStride: Int, weightBankStride: Int,
         input: FloatArray, bias: FloatArray?,

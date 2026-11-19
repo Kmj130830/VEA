@@ -224,6 +224,31 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_banked_linear_projection_f32(
     const float* input, const float* bias, float* output,
     size_t input_features, size_t output_features, size_t positions, size_t banks);
 
+/*
+ * Scalar S5API residual depthwise/MLP block from FUN_1800c5d50.
+ *
+ * history_rows: [channels][7][positions]
+ * depthwise_weights: [channels][7][7]
+ * expand_weights: [expanded_features][channels]
+ * expanded_bias_a/b: [expanded_features]
+ * project_weights: [channels][expanded_features]
+ * residual_input: [channels][positions]
+ * residual_scale/bias: [channels]; residual_bias may be null.
+ * output: [channels][positions]
+ *
+ * Statistics are global across the depthwise [channels][positions] tensor.
+ * The GELU affine stage is invStd*x + biasA[f] - invStd*mean*biasB[f].
+ * The final residual update is (projected + residualBias[c])*scale[c] + residualInput.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_run_residual_dw_mlp_block_f32(
+    const float* history_rows, const float* depthwise_weights,
+    const float* expand_weights, const float* expanded_bias_a,
+    const float* expanded_bias_b, const float* project_weights,
+    const float* residual_input, const float* residual_scale,
+    const float* residual_bias, float* output,
+    size_t channels, size_t positions, size_t expanded_features,
+    float epsilon);
+
 /* Ports the MRW_LNSTATS reduction output: sum(input) and sum(input * input). */
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_reduce_sum_sumsq_f32(
     const float* input, size_t count, float* out_sum, float* out_sum_squares);
