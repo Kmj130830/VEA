@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Inventory and extract PE modules from the newly supplied Editor.zip."""
+"""Inventory and extract PE modules from the newly supplied Editor.zip.
+
+The archive is inspected as data only; no Windows executable is launched.
+"""
 from __future__ import annotations
 import hashlib, json, zipfile
 from pathlib import Path
