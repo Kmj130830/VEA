@@ -115,7 +115,7 @@ jobs:
               name="$(basename "$file")"
               echo "## $name"
               echo
-              awk '/The Export Tables/{flag=1} /The Import Tables/{flag=0} flag' "$file" | head -n 160
+              awk '/The Export Tables/{flag=1} /The Import Tables|The Function Table/{flag=0} flag' "$file"
               echo
             done
           } > build/editor-analysis/PE_EXPORTS.md
