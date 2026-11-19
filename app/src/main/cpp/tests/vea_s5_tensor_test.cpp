@@ -249,6 +249,22 @@ int main() {
         nullptr, ".weight_ih_l", 0, 0, recurrent_name, sizeof(recurrent_name),
         &recurrent_required) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
+    // FUN_1800d8720: residual affine merge dst = (dst + bias) * scale + residual.
+    float residual_dst[7] = {1.0f, 2.0f, -1.0f, 0.0f, 4.0f, -3.0f, 0.5f};
+    const float residual_src[7] = {10.0f, 20.0f, 30.0f, 40.0f, -2.0f, 3.0f, 0.5f};
+    assert(vea_s5_residual_affine_add_f32(
+        residual_dst, residual_src, 7, 2.0f, 0.5f) == VEA_S5_TENSOR_STATUS_OK);
+    const float residual_expected[7] = {13.0f, 25.0f, 29.0f, 41.0f, 7.0f, -2.0f, 2.5f};
+    for (size_t i = 0; i < 7; ++i) assert(residual_dst[i] == residual_expected[i]);
+    float residual_alias[3] = {1.0f, 2.0f, 3.0f};
+    assert(vea_s5_residual_affine_add_f32(
+        residual_alias, residual_alias, 3, 0.5f, 1.0f) == VEA_S5_TENSOR_STATUS_OK);
+    assert(residual_alias[0] == 2.0f && residual_alias[1] == 3.5f && residual_alias[2] == 5.0f);
+    assert(vea_s5_residual_affine_add_f32(
+        nullptr, residual_src, 7, 1.0f, 0.0f) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_residual_affine_add_f32(
+        residual_dst, residual_src, 0, 1.0f, 0.0f) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
     // MRW_LNSTATS: raw sum and sum-of-squares reduction.
     const float stats_input[] = {1.0f, -2.0f, 3.0f, -4.0f};
     float stats_sum = 0.0f;

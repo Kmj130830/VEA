@@ -420,6 +420,34 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeDepthwiseConv7x7Reflect(
     } catch (const std::bad_alloc&) { return nullptr; }
       catch (...) { return nullptr; }
 }
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeResidualAffineAdd(
+    JNIEnv* env, jobject, jfloatArray dst_array, jfloatArray residual_array,
+    jfloat scale, jfloat bias) {
+    if (dst_array == nullptr || residual_array == nullptr) return nullptr;
+    const jsize count = env->GetArrayLength(dst_array);
+    if (count <= 0 || env->GetArrayLength(residual_array) != count) return nullptr;
+    try {
+        std::vector<jfloat> dst(static_cast<size_t>(count));
+        std::vector<jfloat> residual(static_cast<size_t>(count));
+        env->GetFloatArrayRegion(dst_array, 0, count, dst.data());
+        if (env->ExceptionCheck()) return nullptr;
+        env->GetFloatArrayRegion(residual_array, 0, count, residual.data());
+        if (env->ExceptionCheck()) return nullptr;
+        const VeaS5TensorStatus status = vea_s5_residual_affine_add_f32(
+            dst.data(), residual.data(), static_cast<size_t>(count), scale, bias);
+        if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+        jfloatArray result = env->NewFloatArray(count);
+        if (result != nullptr) env->SetFloatArrayRegion(result, 0, count, dst.data());
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
 extern "C" JNIEXPORT jfloatArray JNICALL
 Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeReduceSumAndSquares(
     JNIEnv* env, jobject, jfloatArray input_array) {

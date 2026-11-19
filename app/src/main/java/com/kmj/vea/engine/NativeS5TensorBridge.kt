@@ -122,6 +122,24 @@ object NativeS5TensorBridge {
             ?: throw IllegalStateException("S5 7x7 depthwise convolution failed.")
     }
 
+
+    /**
+     * Applies S5API FUN_1800d8720: dst = (dst + bias) * scale + residual.
+     * Both arrays must have the same non-zero length.
+     */
+    fun residualAffineAdd(
+        dst: FloatArray,
+        residual: FloatArray,
+        scale: Float,
+        bias: Float
+    ): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(dst.isNotEmpty() && dst.size == residual.size)
+        return nativeResidualAffineAdd(dst, residual, scale, bias)
+            ?: throw IllegalStateException("S5 residual affine operation failed.")
+    }
+
+
     /** Returns [sum, sumSquares] for the input vector (MRW_LNSTATS primitive). */
     fun reduceSumAndSquares(values: FloatArray): Pair<Float, Float> {
         check(loaded) { "Native S5 tensor library is not loaded." }

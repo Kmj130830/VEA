@@ -176,6 +176,15 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_build_recurrent_parameter_name(
     size_t out_capacity,
     size_t* out_required);
 
+
+/*
+ * Ports the scalar residual affine operator FUN_1800d8720.
+ * In-place result: dst[i] = (dst[i] + bias) * scale + residual[i].
+ * dst and residual may be identical; partial overlap is unsupported.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_residual_affine_add_f32(
+    float* dst, const float* residual, size_t count, float scale, float bias);
+
 /* Ports the MRW_LNSTATS reduction output: sum(input) and sum(input * input). */
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_reduce_sum_sumsq_f32(
     const float* input, size_t count, float* out_sum, float* out_sum_squares);
