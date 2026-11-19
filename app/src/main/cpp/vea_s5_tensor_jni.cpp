@@ -393,6 +393,34 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeApplyGatedActivation(
 }
 
 extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeDepthwiseConv7x7Reflect(
+    JNIEnv* env, jobject, jfloatArray input_rows_array, jfloatArray weights_array, jint width) {
+    if (input_rows_array == nullptr || weights_array == nullptr || width < 7) return nullptr;
+    size_t input_count = 0;
+    if (MultiplyOverflow(static_cast<size_t>(width), 7u, &input_count) ||
+        input_count > static_cast<size_t>(std::numeric_limits<jsize>::max()) ||
+        env->GetArrayLength(input_rows_array) != static_cast<jsize>(input_count) ||
+        env->GetArrayLength(weights_array) != 49) return nullptr;
+    try {
+        std::vector<jfloat> input(input_count);
+        std::vector<jfloat> weights(49u);
+        std::vector<jfloat> output(static_cast<size_t>(width));
+        env->GetFloatArrayRegion(input_rows_array, 0, static_cast<jsize>(input_count), input.data());
+        if (env->ExceptionCheck()) return nullptr;
+        env->GetFloatArrayRegion(weights_array, 0, 49, weights.data());
+        if (env->ExceptionCheck()) return nullptr;
+        const float* rows[7] = {};
+        for (size_t row = 0; row < 7u; ++row) rows[row] = input.data() + row * static_cast<size_t>(width);
+        const VeaS5TensorStatus status = vea_s5_depthwise_conv7x7_reflect_f32(
+            rows, weights.data(), static_cast<uint32_t>(width), output.data());
+        if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+        jfloatArray result = env->NewFloatArray(width);
+        if (result != nullptr) env->SetFloatArrayRegion(result, 0, width, output.data());
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) { return nullptr; }
+      catch (...) { return nullptr; }
+}
+extern "C" JNIEXPORT jfloatArray JNICALL
 Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeReduceSumAndSquares(
     JNIEnv* env, jobject, jfloatArray input_array) {
     if (input_array == nullptr) return nullptr;

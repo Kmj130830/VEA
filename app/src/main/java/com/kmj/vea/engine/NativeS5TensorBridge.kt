@@ -106,6 +106,22 @@ object NativeS5TensorBridge {
     }
 
 
+    /**
+     * Applies the recovered 7x7 depthwise-convolution scalar kernel.
+     * inputRows contains seven consecutive row-major rows, each exactly width samples.
+     * weights contains 49 row-major coefficients. The result contains width samples.
+     */
+    fun depthwiseConv7x7Reflect(inputRows: FloatArray, weights: FloatArray, width: Int): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(width >= 7)
+        require(width.toLong() * 7L == inputRows.size.toLong()) {
+            "Expected " + (width.toLong() * 7L) + " input samples, received " + inputRows.size + "."
+        }
+        require(weights.size == 49) { "A 7x7 depthwise kernel requires 49 weights." }
+        return nativeDepthwiseConv7x7Reflect(inputRows, weights, width)
+            ?: throw IllegalStateException("S5 7x7 depthwise convolution failed.")
+    }
+
     /** Returns [sum, sumSquares] for the input vector (MRW_LNSTATS primitive). */
     fun reduceSumAndSquares(values: FloatArray): Pair<Float, Float> {
         check(loaded) { "Native S5 tensor library is not loaded." }
@@ -116,6 +132,7 @@ object NativeS5TensorBridge {
         return result[0] to result[1]
     }
 
+    private external fun nativeDepthwiseConv7x7Reflect(inputRows: FloatArray, weights: FloatArray, width: Int): FloatArray?
     private external fun nativeReduceSumAndSquares(values: FloatArray): FloatArray?
     private external fun nativeApplyGatedActivation(planes: FloatArray, count: Int, mode: Int): FloatArray?
     private external fun nativeDecodeTypedFloatArray(encoded: ByteArray): FloatArray?
