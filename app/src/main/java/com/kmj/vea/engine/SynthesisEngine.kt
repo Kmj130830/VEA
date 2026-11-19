@@ -28,17 +28,17 @@ interface SynthesisEngine {
 }
 
 /**
- * Integration boundary for local, on-device VOCALOID AI rendering.
+ * Integration boundary for native, on-device VOCALOID AI rendering.
  *
- * The supplied Windows PE DLLs are not loaded by Android. A Wine/Box64
- * compatibility backend is under investigation; no renderer is advertised
- * as available until an actual on-device V7 render is verified.
+ * The supplied Windows PE DLLs are not Android-loadable libraries. The current
+ * path is authorized static analysis followed by an Android ARM64 native port.
+ * G2P is being analyzed first; no native G2P or singing renderer is integrated yet.
  */
 class VocaloidAiEngineAdapter : SynthesisEngine {
     override fun status(): EngineStatus = EngineStatus(
         engineName = "VOCALOID AI (V6 / V7 target)",
         isAvailable = false,
-        message = "On-device VOCALOID rendering is not integrated yet. Local Windows-runtime compatibility and the V7 render entry point are under investigation."
+        message = "Native Android backend is not integrated yet. G2P DLL analysis is in progress; VOCALOID singing-render entry point and ARM64 implementation remain unverified."
     )
 
     override suspend fun render(
@@ -47,7 +47,7 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
         output: OutputStream
     ) {
         throw UnsupportedOperationException(
-            "On-device VOCALOID AI synthesis is not available until a local backend is verified."
+            "On-device VOCALOID AI synthesis is unavailable until a native backend produces a verified render."
         )
     }
 }
