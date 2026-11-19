@@ -22,6 +22,7 @@ target_compile_options(veavsm PRIVATE -Wall -Wextra)
 add_library(veas5tensor SHARED
     vea_s5_tensor.cpp
     vea_s5_container.cpp
+    vea_s5_typed_array.cpp
 )
 target_include_directories(veas5tensor PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_definitions(veas5tensor PRIVATE VEA_S5_TENSOR_BUILD)

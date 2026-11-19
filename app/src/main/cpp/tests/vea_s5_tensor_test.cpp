@@ -145,6 +145,68 @@ int main() {
     assert(vea_s5_arena_used(row_tiny) == row_before);
     vea_s5_arena_destroy(row_tiny);
 
+
+    // S5API tagged binary numeric arrays: *F32, *F16, and *S32 + Base64.
+    const char f32_encoded[] = "*F32AACAPwAAAEA=";  // [1.0f, 2.0f]
+    float* decoded_f32 = nullptr;
+    size_t decoded_f32_count = 0;
+    assert(vea_s5_decode_typed_float_array(
+        arena, f32_encoded, sizeof(f32_encoded) - 1,
+        &decoded_f32, &decoded_f32_count) == VEA_S5_TENSOR_STATUS_OK);
+    assert(decoded_f32_count == 2);
+    assert(decoded_f32[0] == 1.0f && decoded_f32[1] == 2.0f);
+
+    const char f16_encoded[] = "*F16ADwAwA==";  // binary16 [1.0f, -2.0f]
+    float* decoded_f16 = nullptr;
+    size_t decoded_f16_count = 0;
+    assert(vea_s5_decode_typed_float_array(
+        arena, f16_encoded, sizeof(f16_encoded) - 1,
+        &decoded_f16, &decoded_f16_count) == VEA_S5_TENSOR_STATUS_OK);
+    assert(decoded_f16_count == 2);
+    assert(decoded_f16[0] == 1.0f && decoded_f16[1] == -2.0f);
+
+    const char f16_subnormal[] = "*F16AQA=";
+    float* decoded_subnormal = nullptr;
+    size_t decoded_subnormal_count = 0;
+    assert(vea_s5_decode_typed_float_array(
+        arena, f16_subnormal, sizeof(f16_subnormal) - 1,
+        &decoded_subnormal, &decoded_subnormal_count) == VEA_S5_TENSOR_STATUS_OK);
+    assert(decoded_subnormal_count == 1);
+    assert(decoded_subnormal[0] > 0.0f && decoded_subnormal[0] < 1.0e-6f);
+
+    const char s32_encoded[] = "*S32wB3+/yoAAAA="; // [-123456, 42]
+    int32_t* decoded_s32 = nullptr;
+    size_t decoded_s32_count = 0;
+    assert(vea_s5_decode_typed_int32_array(
+        arena, s32_encoded, sizeof(s32_encoded) - 1,
+        &decoded_s32, &decoded_s32_count) == VEA_S5_TENSOR_STATUS_OK);
+    assert(decoded_s32_count == 2);
+    assert(decoded_s32[0] == -123456 && decoded_s32[1] == 42);
+
+    const char unpadded_f32[] = "*F32AACAPwAAAEA";
+    float* decoded_unpadded = nullptr;
+    size_t decoded_unpadded_count = 0;
+    assert(vea_s5_decode_typed_float_array(
+        arena, unpadded_f32, sizeof(unpadded_f32) - 1,
+        &decoded_unpadded, &decoded_unpadded_count) == VEA_S5_TENSOR_STATUS_OK);
+    assert(decoded_unpadded_count == 2 && decoded_unpadded[1] == 2.0f);
+
+    const char malformed_f32[] = "*F32AQI=";
+    assert(vea_s5_decode_typed_float_array(
+        arena, malformed_f32, sizeof(malformed_f32) - 1,
+        &decoded_unpadded, &decoded_unpadded_count) ==
+        VEA_S5_TENSOR_STATUS_MALFORMED_DATA);
+    const char wrong_type[] = "*S32AAAA";
+    assert(vea_s5_decode_typed_float_array(
+        arena, wrong_type, sizeof(wrong_type) - 1,
+        &decoded_unpadded, &decoded_unpadded_count) ==
+        VEA_S5_TENSOR_STATUS_TYPE_MISMATCH);
+    const char invalid_base64[] = "*F32****";
+    assert(vea_s5_decode_typed_float_array(
+        arena, invalid_base64, sizeof(invalid_base64) - 1,
+        &decoded_unpadded, &decoded_unpadded_count) ==
+        VEA_S5_TENSOR_STATUS_MALFORMED_DATA);
+
     // Fixed 136-byte outer header observed in all five supplied V7 model files.
     uint8_t raw_header[VEA_S5_CONTAINER_HEADER_SIZE] = {};
     raw_header[4] = 100u;

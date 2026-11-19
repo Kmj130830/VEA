@@ -46,7 +46,9 @@ typedef enum VeaS5TensorStatus {
     VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT = 1,
     VEA_S5_TENSOR_STATUS_OUT_OF_MEMORY = 2,
     VEA_S5_TENSOR_STATUS_ARENA_EXHAUSTED = 3,
-    VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW = 4
+    VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW = 4,
+    VEA_S5_TENSOR_STATUS_MALFORMED_DATA = 5,
+    VEA_S5_TENSOR_STATUS_TYPE_MISMATCH = 6
 } VeaS5TensorStatus;
 
 VEA_S5_TENSOR_API uint32_t vea_s5_tensor_abi_version(void);
@@ -115,6 +117,14 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_pack_row_major_f32(
     uint32_t axis0_count,
     uint32_t axis1_count,
     VeaS5MatrixDescriptor** out_descriptor);
+
+/* Decode S5API tagged Base64 arrays: *F32/*F16 to float32, *S32 to int32. */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_decode_typed_float_array(
+    VeaS5Arena* arena, const char* encoded, size_t encoded_size,
+    float** out_values, size_t* out_count);
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_decode_typed_int32_array(
+    VeaS5Arena* arena, const char* encoded, size_t encoded_size,
+    int32_t** out_values, size_t* out_count);
 
 #ifdef __cplusplus
 }
