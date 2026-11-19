@@ -16,11 +16,13 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class ExportS5RnnTensorOps extends GhidraScript {
-    private static final int MAX_FUNCTIONS = 120;
+    private static final int MAX_FUNCTIONS = 180;
     private static final String[] SEEDS = {
-        "18013aa00", "1800c3740", "180056f40", "18005ebe0",
+        "18013aa00", "1800c3740", "180056d60", "180056f40", "18005ebe0",
         "180024a90", "180064670", "180068190", "18005df50",
-        "180065510", "1800656e0", "1800c5d50", "1800c67e0"
+        "180065510", "1800656e0", "180057880", "1800873a0",
+        "18008e350", "18008d470", "1800aec40", "1800c1a30",
+        "1800c7ad0", "1800c5d50", "1800c67e0"
     };
     @Override
     public void run() throws Exception {
