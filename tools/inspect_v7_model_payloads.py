@@ -8,6 +8,7 @@ import math
 import re
 import struct
 import zipfile
+import zlib
 from collections import Counter
 from pathlib import Path
 
@@ -46,6 +47,55 @@ def printable_utf16le(data: bytes, limit: int = 80) -> list[dict]:
         if len(out) >= limit:
             break
     return out
+
+
+def compressed_streams(data: bytes, max_candidates: int = 256) -> list[dict]:
+    """Return only embedded zlib/gzip streams that successfully reach EOF."""
+    candidates = []
+    markers = [
+        ("gzip", bytes((0x1f, 0x8b)), 31),
+        ("zlib", bytes((0x78, 0x01)), 15),
+        ("zlib", bytes((0x78, 0x5e)), 15),
+        ("zlib", bytes((0x78, 0x9c)), 15),
+        ("zlib", bytes((0x78, 0xda)), 15),
+    ]
+    for label, marker, wbits in markers:
+        pos = 0
+        while len(candidates) < max_candidates:
+            pos = data.find(marker, pos)
+            if pos < 0:
+                break
+            candidates.append((pos, label, wbits))
+            pos += 1
+    results = []
+    seen = set()
+    for offset, label, wbits in sorted(candidates):
+        if (offset, wbits) in seen:
+            continue
+        seen.add((offset, wbits))
+        try:
+            decoder = zlib.decompressobj(wbits)
+            raw = data[offset:]
+            decoded = decoder.decompress(raw, 32 * 1024 * 1024)
+            if not decoder.eof:
+                continue
+            decoded += decoder.flush()
+            consumed = len(raw) - len(decoder.unused_data)
+            results.append({
+                "offset": offset,
+                "kind": label,
+                "compressed_bytes": consumed,
+                "decompressed_bytes": len(decoded),
+                "sha256": hashlib.sha256(decoded).hexdigest(),
+                "entropy": round(shannon(decoded), 5),
+                "prefix_hex_64": decoded[:64].hex(" "),
+                "ascii_strings": printable_ascii(decoded, limit=8),
+                "utf8_preview": decoded[:256].decode("utf-8", "replace")
+                    if decoded[:1] in (bytes((0x7b,)), bytes((0x5b,)), bytes((0x3c,))) else None,
+            })
+        except (zlib.error, ValueError, MemoryError):
+            continue
+    return results
 
 def float_summary(data: bytes) -> dict:
     usable = data[: min(len(data) - len(data) % 4, 1_000_000)]
@@ -98,6 +148,7 @@ def inspect_member(archive_name: str, member: str, data: bytes) -> dict:
         "entropy_4k_median": sorted(entropies)[len(entropies)//2] if entropies else None,
         "entropy_4k_max": max(entropies) if entropies else None,
         "magic_marker_offsets": marker_hits,
+        "valid_compressed_streams": compressed_streams(data),
         "first_u32le": head_ints,
         "float32_sample": float_summary(data),
         "ascii_strings": printable_ascii(data),
@@ -153,6 +204,15 @@ def main() -> None:
             lines.append(f"- offset 0x{string['offset']:x}: `{string['text']}`")
         for string in item["utf16le_strings"]:
             lines.append(f"- UTF16LE offset 0x{string['offset']:x}: `{string['text']}`")
+        for stream in item["valid_compressed_streams"]:
+            lines.append(
+                "Valid " + stream["kind"] + " stream at 0x" + format(stream["offset"], "x") +
+                ": " + str(stream["compressed_bytes"]) + " bytes -> " +
+                str(stream["decompressed_bytes"]) + " bytes; sha256=" + stream["sha256"] +
+                "; entropy=" + str(stream["entropy"])
+            )
+            for string in stream["ascii_strings"]:
+                lines.append("  decompressed +0x" + format(string["offset"], "x") + ": " + string["text"])
         lines.append("")
         if item.get("manifest_text"):
             lines.extend(["### Manifest", "", "~~~json", item["manifest_text"], "~~~", ""])
