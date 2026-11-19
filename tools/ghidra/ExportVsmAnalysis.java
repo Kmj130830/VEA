@@ -5,14 +5,13 @@ import ghidra.app.decompiler.DecompileResults;
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.listing.Function;
-import ghidra.program.model.listing.FunctionIterator;
 import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.listing.InstructionIterator;
 import ghidra.program.model.symbol.Reference;
+import ghidra.program.model.symbol.ReferenceIterator;
 import ghidra.program.model.symbol.Symbol;
 import ghidra.program.model.symbol.SymbolIterator;
 import ghidra.program.model.symbol.SymbolType;
-import ghidra.util.exception.CancelledException;
 import java.io.File;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
@@ -22,18 +21,18 @@ import java.util.LinkedHashMap;
 import java.util.regex.Pattern;
 
 public class ExportVsmAnalysis extends GhidraScript {
-    private static final int MAX_FUNCTIONS = 120;
-    private static final int MAX_DEPTH = 2;
+    private static final int MAX_FUNCTIONS = 180;
+    private static final int MAX_DEPTH = 3;
     private static final Pattern TARGET = Pattern.compile(
         "VIS_VSM_(WVSMModuleIF_createManager|" +
         "WIVSMSequenceManager_(createSequence|setDatabaseManager|setDSEManager|setYvs|phonemeService)|" +
         "WIVSMSequence_(startAsyncRendering|stopAsyncRendering|createPartialRenderer|destroyPartialRenderer|" +
         "addRendererObserver|removeRendererObserver|isFinishedRendering|setSamplingRate|samplingRate)|" +
         "WIVSMMidiPart_(render|renderPartiallyAsync|hasValidRenderedWave|hasValidRenderedScore)|" +
-        "WIVSMAudioBuffer(samples|numSamples)|" +
-        "WIVSMAudioBufferList_(audioBuffer|numAudioBuffers|numSamples)|" +
+        "WIVSMAudioBuffer_(create|samples|numSamples|addRef|release)|" +
+        "WIVSMAudioBufferList_(audioBuffer|numAudioBuffers|numSamples|addRef|release|thumbWithRange)|" +
         "RendererObserver_(create|destroy|setContext)|" +
-        "PhonemeService_(setLyricsAndPhonemesByLangID|setPhonemesByLangID|setG2PAManager|setG2PAManagerIF))"
+        "PhonemeService_(setLyricsAndPhonemesByLangID|setPhonemesByLangID|setG2PAManager))"
     );
 
     private static final class Work {
@@ -47,8 +46,7 @@ public class ExportVsmAnalysis extends GhidraScript {
         String[] args = getScriptArgs();
         if (args.length < 1) throw new IllegalArgumentException("Usage: ExportVsmAnalysis.java <output.md>");
         File outFile = new File(args[0]);
-        File parent = outFile.getParentFile();
-        if (parent != null) parent.mkdirs();
+        if (outFile.getParentFile() != null) outFile.getParentFile().mkdirs();
 
         LinkedHashMap<Address, Function> selected = new LinkedHashMap<>();
         ArrayDeque<Work> queue = new ArrayDeque<>();
@@ -65,25 +63,58 @@ public class ExportVsmAnalysis extends GhidraScript {
             out.println();
             out.println("## Renderer/G2P entry points");
             out.println();
-            out.println("| Export | Address | Prototype |");
-            out.println("|---|---:|---|");
+            out.println("| Export | Address | Symbol type | Prototype |");
+            out.println("|---|---:|---|---|");
 
             SymbolIterator symbols = currentProgram.getSymbolTable().getAllSymbols(true);
             while (symbols.hasNext()) {
                 monitor.checkCancelled();
                 Symbol symbol = symbols.next();
-                if (symbol.getSymbolType() != SymbolType.FUNCTION || !TARGET.matcher(symbol.getName()).matches()) continue;
+                if (!TARGET.matcher(symbol.getName()).matches()) continue;
                 Function f = currentProgram.getFunctionManager().getFunctionAt(symbol.getAddress());
                 if (f == null) f = currentProgram.getFunctionManager().getFunctionContaining(symbol.getAddress());
-                if (f == null) continue;
+                if (f == null) {
+                    out.printf("| `%s` | `%s` | %s | function not recovered |%n",
+                        symbol.getName(), symbol.getAddress(), symbol.getSymbolType());
+                    continue;
+                }
                 selected.put(f.getEntryPoint(), f);
                 queue.add(new Work(f, 0));
-                out.printf("| `%s` | `%s` | `%s %s(%s)` |%n",
-                    symbol.getName(), symbol.getAddress(), f.getReturnType().getDisplayName(),
-                    f.getName(), parameters(f));
+                out.printf("| `%s` | `%s` | %s | `%s %s(%s)` |%n",
+                    symbol.getName(), symbol.getAddress(), symbol.getSymbolType(),
+                    f.getReturnType().getDisplayName(), f.getName(), parameters(f));
             }
             out.println();
             out.println("Seed count: " + selected.size());
+            out.println();
+
+            out.println("## Dynamic module-loading references");
+            out.println();
+            out.println("References to LoadLibrary / GetProcAddress imports are traced to their containing caller functions. Their decompilation can reveal module names, symbol names, and late-bound API boundaries.");
+            out.println();
+            out.println("| Imported API | Import address | Caller | Caller address |");
+            out.println("|---|---:|---|---:|");
+            String[] imports = {"LoadLibraryExW", "LoadLibraryW", "LoadLibraryA", "GetProcAddress"};
+            for (String importName : imports) {
+                SymbolIterator imported = currentProgram.getSymbolTable().getAllSymbols(true);
+                while (imported.hasNext()) {
+                    Symbol symbol = imported.next();
+                    if (!symbol.getName().equalsIgnoreCase(importName)) continue;
+                    ReferenceIterator refs = currentProgram.getReferenceManager().getReferencesTo(symbol.getAddress());
+                    while (refs.hasNext()) {
+                        monitor.checkCancelled();
+                        Reference ref = refs.next();
+                        Function caller = currentProgram.getFunctionManager().getFunctionContaining(ref.getFromAddress());
+                        if (caller == null) continue;
+                        if (!selected.containsKey(caller.getEntryPoint()) && selected.size() < MAX_FUNCTIONS) {
+                            selected.put(caller.getEntryPoint(), caller);
+                            queue.add(new Work(caller, 0));
+                        }
+                        out.printf("| `%s` | `%s` | `%s` | `%s` |%n",
+                            importName, symbol.getAddress(), caller.getName(), caller.getEntryPoint());
+                    }
+                }
+            }
             out.println();
 
             while (!queue.isEmpty() && selected.size() < MAX_FUNCTIONS) {
@@ -122,7 +153,7 @@ public class ExportVsmAnalysis extends GhidraScript {
                     out.println();
                     out.println("- Prototype: `" + f.getReturnType().getDisplayName() + " " + f.getName() + "(" + parameters(f) + ")`");
                     out.println("- Body bytes: " + f.getBody().getNumAddresses());
-                    DecompileResults result = decompiler.decompileFunction(f, 20, monitor);
+                    DecompileResults result = decompiler.decompileFunction(f, 25, monitor);
                     if (result != null && result.decompileCompleted() && result.getDecompiledFunction() != null) {
                         out.println();
                         out.println("```c");
