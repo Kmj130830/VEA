@@ -88,6 +88,25 @@ jobs:
             -analysisTimeoutPerFile 600 -deleteProject
           test -s build/editor-analysis/ghidra/S5API_EXPORT_ANALYSIS.md
 
+      - name: Preserve extracted PE inputs beside analysis reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/editor-analysis/extracted-modules
+          cp -a build/editor-package/modules/. build/editor-analysis/extracted-modules/
+          {
+            echo "# Native module export/import summary"
+            echo
+            for file in build/editor-analysis/pe/*; do
+              [[ -f "$file" ]] || continue
+              name="$(basename "$file")"
+              echo "## $name"
+              echo
+              awk '/The Export Tables/{flag=1} /The Import Tables/{flag=0} flag' "$file" | head -n 160
+              echo
+            done
+          } > build/editor-analysis/PE_EXPORTS.md
+
       - name: Record Android ARM64 porting boundary
         run: |
           cat > build/editor-analysis/PORTING_STATUS.md <<'EOF'
