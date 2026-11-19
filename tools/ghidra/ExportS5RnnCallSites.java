@@ -36,6 +36,11 @@ public class ExportS5RnnCallSites extends GhidraScript {
         "180065510", // matrix row-major pack
         "180068190", // layer/config loader
         "180060270", // generic parameter/config helper
+        "180057880", // adjacent model component constructor
+        "1800873a0", // Func_47a12a73: caller/model factory for the RNN component
+        "18008e350", // Func_5fd62874: second caller of the RNN component constructor
+        "18008d470", // Func_4cd84bb7: model/layer loader entry
+        "1800aec40", // parent of the primary S5 streaming/block processing path
         "1800c1a30", // stream/block processing path
         "1800c7ad0", // primary S5 processing path
         "18013a850", // backend context factory
