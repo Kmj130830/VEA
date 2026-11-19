@@ -128,6 +128,37 @@ object NativeS5TensorBridge {
 
 
     /**
+     * Runs the banked linear projection recovered in FUN_1800c6390.
+     * Weights are [bank][outputFeature][inputFeature]; input is [inputFeature][position].
+     * Output is [outputFeature][position][bank]. Bias may be null.
+     */
+    fun applyBankedLinearProjection(
+        weights: FloatArray,
+        weightRowStride: Int,
+        weightBankStride: Int,
+        input: FloatArray,
+        bias: FloatArray?,
+        inputFeatures: Int,
+        outputFeatures: Int,
+        positions: Int,
+        banks: Int
+    ): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(inputFeatures > 0 && outputFeatures > 0 && positions > 0 && banks > 0)
+        require(weightRowStride >= inputFeatures)
+        require(weightBankStride >= (outputFeatures - 1L) * weightRowStride + inputFeatures)
+        val weightsRequired = (banks - 1L) * weightBankStride +
+            (outputFeatures - 1L) * weightRowStride + inputFeatures
+        require(weightsRequired <= weights.size.toLong())
+        require(inputFeatures.toLong() * positions <= input.size.toLong())
+        require(bias == null || bias.size >= outputFeatures)
+        return nativeApplyBankedLinear(
+            weights, weightRowStride, weightBankStride, input, bias,
+            inputFeatures, outputFeatures, positions, banks
+        ) ?: throw IllegalArgumentException("S5 banked linear projection failed.")
+    }
+
+    /**
      * Executes the recovered S5API v0_naive row-major matrix primitive:
      * C = alpha * A * B + beta * C. Strides count float elements.
      */
@@ -230,6 +261,11 @@ object NativeS5TensorBridge {
         return result[0] to result[1]
     }
 
+    private external fun nativeApplyBankedLinear(
+        weights: FloatArray, weightRowStride: Int, weightBankStride: Int,
+        input: FloatArray, bias: FloatArray?,
+        inputFeatures: Int, outputFeatures: Int, positions: Int, banks: Int
+    ): FloatArray?
     private external fun nativeGemmRowMajor(
         a: FloatArray, b: FloatArray, c: FloatArray,
         m: Int, n: Int, k: Int, alpha: Float, lda: Int, ldb: Int, beta: Float, ldc: Int

@@ -456,6 +456,51 @@ int main() {
         gemm_a, gemm_b, nullptr, 1, 2, 3, 1.0f, 3, 2, 0.0f, 2) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
+    // FUN_1800c6390: run one GEMM per bank, scatter to [feature][position][bank],
+    // then add the shared per-output-feature bias.
+    const float banked_weights[] = {
+        1.0f, 0.0f, 0.0f, 1.0f,   // bank 0: identity
+        2.0f, 0.0f, 0.0f, 3.0f    // bank 1: diagonal scale
+    };
+    const float banked_input[] = {
+        1.0f, 2.0f, 3.0f,         // input feature 0 over 3 positions
+        4.0f, 5.0f, 6.0f          // input feature 1 over 3 positions
+    };
+    const float banked_bias[] = {0.5f, -1.0f};
+    float banked_output[12] = {};
+    assert(vea_s5_banked_linear_projection_f32(
+        banked_weights, 2, 4, banked_input, banked_bias, banked_output,
+        2, 2, 3, 2) == VEA_S5_TENSOR_STATUS_OK);
+    const float banked_expected[] = {
+        1.5f, 2.5f, 2.5f, 4.5f, 3.5f, 6.5f,
+        3.0f, 11.0f, 4.0f, 14.0f, 5.0f, 17.0f
+    };
+    for (size_t i = 0; i < 12; ++i) assert(banked_output[i] == banked_expected[i]);
+
+    // Padded weight rows/banks are accepted and padding remains outside the logical product.
+    const float banked_weights_padded[] = {
+        1.0f, 0.0f, 91.0f, 92.0f,
+        0.0f, 1.0f, 93.0f, 94.0f,
+        2.0f, 0.0f, 95.0f, 96.0f,
+        0.0f, 3.0f, 97.0f, 98.0f
+    };
+    float banked_padded_output[12] = {};
+    assert(vea_s5_banked_linear_projection_f32(
+        banked_weights_padded, 4, 8, banked_input, nullptr, banked_padded_output,
+        2, 2, 3, 2) == VEA_S5_TENSOR_STATUS_OK);
+    const float banked_no_bias_expected[] = {
+        1.0f, 2.0f, 2.0f, 4.0f, 3.0f, 6.0f,
+        4.0f, 12.0f, 5.0f, 15.0f, 6.0f, 18.0f
+    };
+    for (size_t i = 0; i < 12; ++i) assert(banked_padded_output[i] == banked_no_bias_expected[i]);
+
+    assert(vea_s5_banked_linear_projection_f32(
+        nullptr, 2, 4, banked_input, nullptr, banked_output, 2, 2, 3, 2) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_banked_linear_projection_f32(
+        banked_weights, 1, 4, banked_input, nullptr, banked_output, 2, 2, 3, 2) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
     // Fixed 136-byte outer header observed in all five supplied V7 model files.
     uint8_t raw_header[VEA_S5_CONTAINER_HEADER_SIZE] = {};
     raw_header[4] = 100u;

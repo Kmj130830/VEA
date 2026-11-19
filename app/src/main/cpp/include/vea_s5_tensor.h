@@ -212,6 +212,18 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_gemm_row_major_f32(
     size_t m, size_t n, size_t k,
     float alpha, size_t lda, size_t ldb, float beta, size_t ldc);
 
+/*
+ * Banked linear projection matching the observable dataflow of FUN_1800c6390.
+ * weights are [bank][out_feature][input_feature] with explicit row/bank strides.
+ * input is [input_feature][position].
+ * output is [out_feature][position][bank] (bank-interleaved positions).
+ * bias is optional and contains one value per output feature.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_banked_linear_projection_f32(
+    const float* weights, size_t weight_row_stride, size_t weight_bank_stride,
+    const float* input, const float* bias, float* output,
+    size_t input_features, size_t output_features, size_t positions, size_t banks);
+
 /* Ports the MRW_LNSTATS reduction output: sum(input) and sum(input * input). */
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_reduce_sum_sumsq_f32(
     const float* input, size_t count, float* out_sum, float* out_sum_squares);

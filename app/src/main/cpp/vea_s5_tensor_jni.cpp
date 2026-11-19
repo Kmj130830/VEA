@@ -612,3 +612,79 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeGemmRowMajor(
         return nullptr;
     }
 }
+
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeApplyBankedLinear(
+    JNIEnv* env, jobject, jfloatArray weights_array,
+    jint weight_row_stride, jint weight_bank_stride,
+    jfloatArray input_array, jfloatArray bias_array,
+    jint input_features, jint output_features, jint positions, jint banks) {
+    if (weights_array == nullptr || input_array == nullptr ||
+        weight_row_stride <= 0 || weight_bank_stride <= 0 ||
+        input_features <= 0 || output_features <= 0 || positions <= 0 || banks <= 0) {
+        return nullptr;
+    }
+
+    size_t weight_rows = 0, weight_extent = 0, weight_offset = 0;
+    size_t input_required = 0, output_required = 0;
+    if (MultiplyOverflow(static_cast<size_t>(output_features - 1),
+                         static_cast<size_t>(weight_row_stride), &weight_rows) ||
+        weight_rows > std::numeric_limits<size_t>::max() - static_cast<size_t>(input_features)) {
+        return nullptr;
+    }
+    weight_extent = weight_rows + static_cast<size_t>(input_features);
+    if (weight_bank_stride < static_cast<jint>(weight_extent)) return nullptr;
+    if (MultiplyOverflow(static_cast<size_t>(banks - 1),
+                         static_cast<size_t>(weight_bank_stride), &weight_offset) ||
+        weight_offset > std::numeric_limits<size_t>::max() - weight_extent) return nullptr;
+    const size_t weights_required = weight_offset + weight_extent;
+    if (MultiplyOverflow(static_cast<size_t>(input_features),
+                         static_cast<size_t>(positions), &input_required) ||
+        MultiplyOverflow(static_cast<size_t>(output_features),
+                         static_cast<size_t>(positions), &output_required) ||
+        MultiplyOverflow(output_required, static_cast<size_t>(banks), &output_required) ||
+        output_required > static_cast<size_t>(std::numeric_limits<jsize>::max())) return nullptr;
+
+    const jsize weights_length = env->GetArrayLength(weights_array);
+    const jsize input_length = env->GetArrayLength(input_array);
+    if (static_cast<size_t>(weights_length) < weights_required ||
+        static_cast<size_t>(input_length) < input_required) return nullptr;
+    if (bias_array != nullptr && env->GetArrayLength(bias_array) < output_features) return nullptr;
+
+    try {
+        std::vector<jfloat> weights(static_cast<size_t>(weights_length));
+        std::vector<jfloat> input(static_cast<size_t>(input_length));
+        std::vector<jfloat> bias;
+        std::vector<jfloat> output(output_required, 0.0f);
+        env->GetFloatArrayRegion(weights_array, 0, weights_length, weights.data());
+        if (env->ExceptionCheck()) return nullptr;
+        env->GetFloatArrayRegion(input_array, 0, input_length, input.data());
+        if (env->ExceptionCheck()) return nullptr;
+        const float* bias_data = nullptr;
+        if (bias_array != nullptr) {
+            const jsize bias_length = env->GetArrayLength(bias_array);
+            bias.resize(static_cast<size_t>(bias_length));
+            env->GetFloatArrayRegion(bias_array, 0, bias_length, bias.data());
+            if (env->ExceptionCheck()) return nullptr;
+            bias_data = bias.data();
+        }
+
+        const VeaS5TensorStatus status = vea_s5_banked_linear_projection_f32(
+            weights.data(), static_cast<size_t>(weight_row_stride),
+            static_cast<size_t>(weight_bank_stride), input.data(), bias_data, output.data(),
+            static_cast<size_t>(input_features), static_cast<size_t>(output_features),
+            static_cast<size_t>(positions), static_cast<size_t>(banks));
+        if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+
+        jfloatArray result = env->NewFloatArray(static_cast<jsize>(output.size()));
+        if (result != nullptr && !output.empty()) {
+            env->SetFloatArrayRegion(result, 0, static_cast<jsize>(output.size()), output.data());
+        }
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
