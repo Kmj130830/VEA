@@ -57,11 +57,23 @@ jobs:
           while IFS= read -r dll; do
             name="$(basename "${dll%.dll}")"
             echo "=== Ghidra: $name ==="
+            extra_seeds=()
+            case "$name" in
+              G2PAManager_KOR)
+                extra_seeds=(0x180001ad0 0x1800024a0)
+                ;;
+              G2PAManager_CHS)
+                extra_seeds=(0x180001af0 0x1800024c0)
+                ;;
+              G2PAManager_JPN)
+                extra_seeds=(0x180001ac0 0x180001d50 0x180001eb0)
+                ;;
+            esac
             "$GHIDRA_DIR/support/analyzeHeadless" \
               "$PWD/build/ghidra-projects" "VEA_$name" \
               -import "$PWD/$dll" \
               -scriptPath "$PWD/tools/ghidra" \
-              -postScript ExportG2pAnalysis.java "$PWD/build/g2p-analysis/$name.md" \
+              -postScript ExportG2pAnalysis.java "$PWD/build/g2p-analysis/$name.md" "${extra_seeds[@]}" \
               -deleteProject
             test -s "build/g2p-analysis/$name.md"
           done < <(find build/g2p-targets -maxdepth 1 -type f -name '*.dll' -print | sort)
