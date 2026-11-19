@@ -1,0 +1,68 @@
+name: VEA VDM voicebank and model-loader analysis
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "Editor.zip"
+      - "tools/inspect_editor_zip.py"
+      - "tools/ghidra/ExportVdmAnalysis.java"
+      - ".github/workflows/s5api-vdm-voicebank.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  vdm-analysis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+      - name: Extract Editor PE modules
+        run: |
+          python3 tools/inspect_editor_zip.py
+          test -s build/editor-package/modules/VDM.dll
+      - name: Download and verify Ghidra 12.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive=/tmp/ghidra_12.2_PUBLIC_20261016.zip
+          curl --fail --location --retry 3 "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_12.2_build/ghidra_12.2_PUBLIC_20261016.zip" -o "$archive"
+          echo "2c2cd776db3c1f6a097ba418922378ac3649cadd5e844a6f5f088ae628a7be67  $archive" | sha256sum --check
+          mkdir -p /tmp/ghidra
+          unzip -q "$archive" -d /tmp/ghidra
+          tool="$(find /tmp/ghidra -path '*/support/analyzeHeadless' -type f -print -quit)"
+          test -n "$tool"
+          echo "GHIDRA_HEADLESS=$tool" >> "$GITHUB_ENV"
+      - name: Decompile VDM database manager and voicebank exports
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/vdm-analysis build/ghidra-vdm-project
+          "$GHIDRA_HEADLESS" "$PWD/build/ghidra-vdm-project" VEA_VDM             -import "$PWD/build/editor-package/modules/VDM.dll"             -scriptPath "$PWD/tools/ghidra"             -postScript ExportVdmAnalysis.java "$PWD/build/vdm-analysis/VDM_VOICEBANK.md"             -analysisTimeoutPerFile 600 -deleteProject
+          test -s build/vdm-analysis/VDM_VOICEBANK.md
+      - name: Preserve source module hash and analysis scope
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+          p=Path("build/editor-package/modules/VDM.dll")
+          (Path("build/vdm-analysis/VDM_SHA256.txt")).write_text(
+              f"{hashlib.sha256(p.read_bytes()).hexdigest()}  VDM.dll  {p.stat().st_size} bytes\n",
+              encoding="utf-8")
+          (Path("build/vdm-analysis/SCOPE.txt")).write_text(
+              "Static Ghidra analysis only. No supplied DLL was executed.\n"
+              "License/activation methods are inventoried only; no checks are bypassed.\n",
+              encoding="utf-8")
+          PY
+      - name: Upload VDM analysis
+        uses: actions/upload-artifact@v4
+        with:
+          name: VEA-VDM-voicebank-analysis
+          path: build/vdm-analysis/
+          if-no-files-found: error
+          retention-days: 30
