@@ -25,6 +25,35 @@ Within the loader:
 
 The 0x60-byte per-direction layout follows the decompiled addressing: layer_index * 0xC0 plus direction_index * 0x60. The four field offsets correspond to the four separately managed C++ vector triples.
 
+## Model-constructor call-site confirmation
+
+The call-site instruction window around `FUN_18005ebe0` at RVA `0x5ebe0` now confirms the configuration field mapping:
+
+- `R9D = [RBX + 0x68]` becomes parameter 4, the first-layer input width.
+- `ECX = [RBX + 0x6c]` is copied to stack argument 5, the hidden width.
+- Stack argument 6 is the constant `1`: one recurrent layer.
+- Stack argument 7 is the constant `1`: bias arrays enabled.
+- Stack argument 8 is the constant `1`: bidirectional mode enabled.
+
+The same constructor, `FUN_180056f40`, reads a third scalar at `[RBX + 0x70]`, but it passes that value to the separate `FUN_18005df50` and `FUN_180065510` matrix-preparation calls. It is not the hidden width for this RNN call.
+
+The relevant x64 sequence immediately before the call is:
+
+```asm
+mov ecx, dword ptr [rbx + 0x6c]
+mov dword ptr [rsp + 0x20], ecx
+mov dword ptr [rsp + 0x28], 1
+mov dword ptr [rsp + 0x30], 1
+mov byte ptr  [rsp + 0x38], 1
+mov r9d, dword ptr [rbx + 0x68]
+lea r8, [rbp + 0x50]
+mov rdx, r14
+lea rcx, [rbx + 0x10]
+call FUN_18005ebe0
+```
+
+This establishes the parameter ordering and the single-layer / bias-enabled / bidirectional settings in this constructor. It does not reveal the literal runtime values stored in the two dimension fields, nor the recurrent forward equations.
+
 ## Android implementation
 
 VEA adds vea_s5_rnn_direction_layout and Kotlin NativeS5TensorBridge.rnnDirectionLayout. They compute and validate the flattened element counts for one requested layer/direction, with overflow checks.
