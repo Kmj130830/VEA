@@ -28,16 +28,17 @@ interface SynthesisEngine {
 }
 
 /**
- * Integration boundary for a future, legally authorized VOCALOID AI backend.
+ * Integration boundary for local, on-device VOCALOID AI rendering.
  *
- * This class deliberately does not inspect proprietary voicebank internals,
- * invoke desktop binaries, bypass activation, or fabricate audio output.
+ * The supplied Windows PE DLLs are not loaded by Android. A Wine/Box64
+ * compatibility backend is under investigation; no renderer is advertised
+ * as available until an actual on-device V7 render is verified.
  */
 class VocaloidAiEngineAdapter : SynthesisEngine {
     override fun status(): EngineStatus = EngineStatus(
         engineName = "VOCALOID AI (V6 / V7 target)",
         isAvailable = false,
-        message = "No Android VOCALOID runtime is available. Export V7 MIDI and render with the authorized desktop VOCALOID7 AI engine."
+        message = "On-device VOCALOID rendering is not integrated yet. Local Windows-runtime compatibility and the V7 render entry point are under investigation."
     )
 
     override suspend fun render(
@@ -46,7 +47,7 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
         output: OutputStream
     ) {
         throw UnsupportedOperationException(
-            "VOCALOID AI synthesis is not available until an authorized Android backend is integrated."
+            "On-device VOCALOID AI synthesis is not available until a local backend is verified."
         )
     }
 }

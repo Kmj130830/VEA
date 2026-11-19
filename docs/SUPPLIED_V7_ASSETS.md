@@ -98,3 +98,18 @@ The static PE export/import scan found the following named exports:
 - `G2PA_ESP.dll` exports `g2paCreate`, `g2paDelete`, `g2paGet`, `g2paGetDefaultLyric`, `g2paGetDefaultPhoneme`, `g2paGetSyllable`, and `g2paPut`.
 
 The English G2P manager imports Windows system/runtime DLLs (including KERNEL32, MSVCP140, and VCRUNTIME140 variants). The scan did not recover function signatures, object layouts, calling conventions beyond the PE platform, or any Android ABI. Therefore these symbols identify a likely desktop G2P manager interface but are not enough to call it safely or port it. The current app does not invoke the DLLs. Their named exports are not a usable Android API, and the inspection did not recover the signatures/ABI needed for a safe integration. The Android app uses its own fallback G2P; for genuine VOCALOID7 G2P and singing, use the new MIDI hand-off to the official editor.
+
+
+## Renderer boundary correction from the full PE export scan
+
+The exported functions of `WaveOfflineRenderer.dll` are:
+- `VIS_WOR_Normalize_*`
+- `VIS_WOR_Resample_*`
+- `VIS_WOR_TimeStretch_*`
+- observer/progress helpers
+
+These functions indicate post-processing utilities (normalization, resampling, and time-stretch). They are not evidence of the AI singing synthesis engine.
+
+The current scan of `VOCALOID7.dll` identifies a PE AMD64 image but no named exports. The file may still contain internal code or be loaded through a host/plugin mechanism, but the supplied archive does not yet reveal a stable callable vocal-render API. This is the main blocker for an on-device Wine/Box64 proof of concept.
+
+The four language G2P DLLs do expose `G2PACreateManager`, which makes them the most reasonable small first target for a local Windows-compatibility experiment. However, export names alone do not establish C/C++ function signatures or object lifetime rules. A supported header/API contract or deeper authorized static analysis is required before invocation.
