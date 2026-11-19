@@ -204,7 +204,7 @@ fun ArrangementScreen(
                 VeaIcon.PREVIOUS to "PREVIOUS",
                 VeaIcon.NEXT to "NEXT",
                 VeaIcon.STOP to "STOP",
-                VeaIcon.PLAY to "PLAY",
+                VeaIcon.PLAY to "PREVIEW",
                 VeaIcon.RECORD to "REC",
                 VeaIcon.SUB_TOOL to "SUB TOOL",
                 VeaIcon.GRID to "SNAP"
@@ -214,7 +214,7 @@ fun ArrangementScreen(
             canRedo = canRedo,
             onAction = { label ->
                 when (label) {
-                    "PLAY" -> onPlay()
+                    "PREVIEW" -> onPlay()
                     "STOP" -> onStop()
                 }
             }
