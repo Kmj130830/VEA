@@ -116,7 +116,9 @@ object NativeS5TensorBridge {
         return result[0] to result[1]
     }
 
-    private external fun nativeReduceSumAndSquares(values: FloatArray): FloatArray?\n    private external fun nativeApplyGatedActivation(planes: FloatArray, count: Int, mode: Int): FloatArray?\n    private external fun nativeDecodeTypedFloatArray(encoded: ByteArray): FloatArray?
+    private external fun nativeReduceSumAndSquares(values: FloatArray): FloatArray?
+    private external fun nativeApplyGatedActivation(planes: FloatArray, count: Int, mode: Int): FloatArray?
+    private external fun nativeDecodeTypedFloatArray(encoded: ByteArray): FloatArray?
     private external fun nativeDecodeTypedInt32Array(encoded: ByteArray): IntArray?
     private external fun nativeAbiVersion(): Int
     private external fun nativePackMatrixBank(
