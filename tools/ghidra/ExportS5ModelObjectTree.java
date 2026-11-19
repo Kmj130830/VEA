@@ -34,7 +34,25 @@ public class ExportS5ModelObjectTree extends GhidraScript {
         "18001b1f0", // key serialization helper
         "180024a90", // recurrent parameter name builder
         "180026f60", // object/key lookup predicate
-        "18000f5f0"  // Base64/numeric text parser
+        "18000f5f0", // Base64/numeric text parser
+        "180083610", // digest/string stream formatter
+        "18001acc0", // digest/string stream initializer
+        "180010890", // stream/object construction helper
+        "1800279f0", // stream finalization helper
+        "180081940", // typed-object tree lookup
+        "18000fe00", // tensor/object iterator accessor
+        "180082d20", // numeric output buffer setup
+        "18000f6d0", // text-to-number decode loop
+        "18002aa90", // model root-object setup
+        "180056f40", // enclosing model constructor
+        "180060270", // tensor/module consumer
+        "18005df50", // adjacent matrix preparation path
+        "180065510", // adjacent matrix preparation path
+        "18013aa00", // backend dispatch thunk
+        "18013a850", // backend object factory
+        "1800c7ad0", // candidate recurrent hot path
+        "1800c1a30", // candidate recurrent hot path
+        "1800c3740"  // backend/operator registry path
     };
 
     @Override
