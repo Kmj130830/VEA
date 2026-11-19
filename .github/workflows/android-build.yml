@@ -26,7 +26,7 @@ jobs:
           packages: "platform-tools"
       - name: Install Android 16 SDK and NDK
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
-      - name: Run native G2P core tests
+      - name: Run native G2P and VSM callback tests
         run: |
           cmake -S app/src/main/cpp -B build/g2p-core-host -DCMAKE_BUILD_TYPE=Release
           cmake --build build/g2p-core-host --parallel 2
@@ -35,6 +35,21 @@ jobs:
         run: python3 tools/prepare_voicebank_assets.py
       - name: Run editor unit tests and assemble debug APK
         run: gradle --no-daemon testDebugUnitTest assembleDebug
+      - name: Verify and extract Android ARM64 native libraries
+        run: |
+          set -euo pipefail
+          mkdir -p build/android-arm64-libs
+          unzip -p app/build/outputs/apk/debug/app-debug.apk lib/arm64-v8a/libveavsm.so > build/android-arm64-libs/libveavsm.so
+          unzip -p app/build/outputs/apk/debug/app-debug.apk lib/arm64-v8a/libveag2p.so > build/android-arm64-libs/libveag2p.so
+          readelf -h build/android-arm64-libs/libveavsm.so | grep -E 'Class:|Machine:'
+          readelf -h build/android-arm64-libs/libveag2p.so | grep -E 'Class:|Machine:'
+      - name: Upload VSM callback bridge (ARM64 ELF)
+        uses: actions/upload-artifact@v4
+        with:
+          name: VEA-VSM-callback-bridge-arm64
+          path: build/android-arm64-libs/libveavsm.so
+          if-no-files-found: error
+          retention-days: 30
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
