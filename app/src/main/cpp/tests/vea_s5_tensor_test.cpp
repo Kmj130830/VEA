@@ -194,6 +194,35 @@ int main() {
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
 
+    // FUN_18012f280: 7-row, 7x7 depthwise convolution with reflect-without-edge-repeat borders.
+    float dw_rows_storage[7][7] = {};
+    const float* dw_rows[7] = {};
+    for (uint32_t row = 0; row < 7; ++row) {
+        dw_rows[row] = dw_rows_storage[row];
+        for (uint32_t col = 0; col < 7; ++col) {
+            dw_rows_storage[row][col] = static_cast<float>(row * 10u + col);
+        }
+    }
+    float dw_weights[49];
+    for (float& weight : dw_weights) weight = 1.0f;
+    float dw_output[7] = {};
+    assert(vea_s5_depthwise_conv7x7_reflect_f32(
+        dw_rows, dw_weights, 7, dw_output) == VEA_S5_TENSOR_STATUS_OK);
+    const float dw_expected[7] = {1554.0f, 1561.0f, 1582.0f, 1617.0f, 1652.0f, 1673.0f, 1680.0f};
+    for (size_t i = 0; i < 7; ++i) assert(dw_output[i] == dw_expected[i]);
+
+    // An impulse at the first kernel element exercises the left/right reflection indices.
+    for (float& weight : dw_weights) weight = 0.0f;
+    dw_weights[0] = 1.0f;
+    assert(vea_s5_depthwise_conv7x7_reflect_f32(
+        dw_rows, dw_weights, 7, dw_output) == VEA_S5_TENSOR_STATUS_OK);
+    const float dw_impulse_expected[7] = {3.0f, 2.0f, 1.0f, 0.0f, 1.0f, 2.0f, 3.0f};
+    for (size_t i = 0; i < 7; ++i) assert(dw_output[i] == dw_impulse_expected[i]);
+    assert(vea_s5_depthwise_conv7x7_reflect_f32(
+        dw_rows, dw_weights, 6, dw_output) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_depthwise_conv7x7_reflect_f32(
+        nullptr, dw_weights, 7, dw_output) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
     // MRW_LNSTATS: raw sum and sum-of-squares reduction.
     const float stats_input[] = {1.0f, -2.0f, 3.0f, -4.0f};
     float stats_sum = 0.0f;

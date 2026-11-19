@@ -146,6 +146,18 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_decode_typed_int32_array(
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_apply_gated_activation_f32(
     float* planes, size_t count, int mode);
 
+/*
+ * Portable scalar equivalent of S5API FUN_18012f280 (MRW_DWCONV_SIMD fallback).
+ * Seven input rows are convolved with a row-major 7x7 kernel; output width
+ * equals input width. Horizontal borders use reflect-without-edge-repeat
+ * indexing: -1 -> 1 and width -> width - 2.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_depthwise_conv7x7_reflect_f32(
+    const float* const input_rows[7],
+    const float* weights_7x7,
+    uint32_t width,
+    float* output);
+
 /* Ports the MRW_LNSTATS reduction output: sum(input) and sum(input * input). */
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_reduce_sum_sumsq_f32(
     const float* input, size_t count, float* out_sum, float* out_sum_squares);
