@@ -45,6 +45,14 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
             "VSM callback bridge is not loaded. "
         }
 
+        val tensorMessage = if (NativeS5TensorBridge.isLoaded) {
+            "S5 tensor layout bridge loaded (ABI 0x%08X). ".format(
+                NativeS5TensorBridge.abiVersion
+            )
+        } else {
+            "S5 tensor layout bridge is not loaded. "
+        }
+
         val bridgeMessage = if (NativeG2pBridge.isLoaded) {
             "Android ARM64 JNI bridge loaded (ABI 0x%08X). Korean input canonicalization is available, " +
                 "but Yamaha G2PA phoneme conversion and the VOCALOID7 singing renderer are not ported yet."
@@ -53,7 +61,7 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
                 "are not ported yet."
         }
 
-        val message = vsmMessage + if (NativeG2pBridge.isLoaded) {
+        val message = vsmMessage + tensorMessage + if (NativeG2pBridge.isLoaded) {
             bridgeMessage.format(NativeG2pBridge.abiVersion)
         } else {
             bridgeMessage
