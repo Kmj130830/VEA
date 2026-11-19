@@ -25,9 +25,9 @@ The call sites pass output pointers and dimension/count arguments. The names are
 
 The presence of `_reverse` in the same family of model-member names indicates a reverse-direction parameter path. Together these are strong evidence for a bidirectional GRU-style block, but the graph order, reset/update/new gate ordering, activation functions, bias handling, and sequence packing are not yet verified. Treat "bidirectional GRU" as the current best structural hypothesis, not a fully recovered graph.
 
-## 3. Streaming/spectral synthesis state
+## 3. Streaming/spectral state diagnostics
 
-`FUN_1800c7ad0` and `FUN_1800c1a30` consume state values keyed by names including:
+`FUN_1800c7ad0` and `FUN_1800c1a30` call `FUN_1800ccdb0` with names including:
 
 - `prior1`, `prior2`, `excitation`
 - `reset_real`, `reset_imag`, `theta_ctr`, `vuv_gate`
@@ -36,7 +36,7 @@ The presence of `_reverse` in the same family of model-member names indicates a 
 - `free_real`, `free_imag`, `ana_cosP`, `ana_sinP`, `waveform`
 - `delta`, `Xh_real`, `Xh_imag`, `Xn_real`, `Xn_imag`
 
-These names and their references show that the runtime maintains complex-valued spectral, phase/rotation, prior, excitation, and voiced/unvoiced gate state. They are consistent with a stateful spectral decoder/vocoder stage. The exact equations and tensor axes are not yet recovered.
+The names are diagnostic dump labels, not model-file keys. The helper at RVA `0xccdb0` uses the label to construct a `.bin` file name and writes a float buffer when the runtime dump flag at context offset `+0x36c9` is enabled. The labeled buffers belong to the internal spectral/phase-processing path; their values, equations and tensor axes still need to be recovered. Do not use these labels as evidence of the .vtb2 model tensor schema.
 
 ## 4. CPU-specific operator dispatch
 
@@ -55,7 +55,7 @@ The analysis has separated the engine into these recoverable boundaries:
 1. Model object and tensor parsing: `FUN_180068190`, `FUN_180020190`, `FUN_1800214c0`, `FUN_180064670`.
 2. Recurrent parameter loading: `FUN_18005ebe0`, `FUN_180024a90`.
 3. Convolution/conditioning layer setup: `pre1/pre2`, `conv1/cond1`, `conv2/cond2`, `conv3/cond3`, `linear`.
-4. Stateful spectral decoder: `FUN_1800c7ad0`, `FUN_1800c1a30`.
+4. Stateful spectral processing and diagnostics: `FUN_1800c7ad0`, `FUN_1800c1a30`, `FUN_1800ccdb0` (diagnostic dump helper).
 5. Numeric kernels and dispatch: activation, depthwise convolution, layer-normalization statistics, plus the associated non-dispatch worker bodies.
 
 The next implementation dependency is the low-level tensor reader called from the layer loader. Do not hard-code tensor shapes or invent GRU gate order before those functions and the model data are reconciled.
