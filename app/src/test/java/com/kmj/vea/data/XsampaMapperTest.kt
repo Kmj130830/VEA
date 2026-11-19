@@ -57,4 +57,27 @@ class XsampaMapperTest {
         assertTrue(hello.contains("oU"))
         assertTrue(XsampaMapper.pronunciationSuggestions("computer", "eng").isNotEmpty())
     }
+    @Test
+    fun keepsKoreanSyllableAndWordBoundaries() {
+        assertEquals("h a n . k M l", XsampaMapper.convert("한글", "kor"))
+        assertEquals("h a n . k M l | k a", XsampaMapper.convert("한글 가", "kor"))
+        assertEquals("h a n . k M l | k a", XsampaMapper.convert("한글   가", "kor"))
+        assertEquals("h a n . k M l", XsampaMapper.convert("ㅎㅏㄴㄱㅡㄹ", "kor"))
+    }
+
+    @Test
+    fun showsPhonemeSuggestionsForJapaneseAndKorean() {
+        assertEquals(listOf("S i"), XsampaMapper.pronunciationSuggestions("shi", "jpn"))
+        assertEquals(
+            listOf("h a n . k M l"),
+            XsampaMapper.pronunciationSuggestions("한글", "kor")
+        )
+    }
+
+    @Test
+    fun doesNotTreatChineseCharactersAsXsampa() {
+        assertEquals("", XsampaMapper.convert("你好", "zho"))
+        assertTrue(XsampaMapper.pronunciationSuggestions("你好", "zho").isEmpty())
+    }
+
 }
