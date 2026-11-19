@@ -68,7 +68,19 @@ public class ExportS5ModelObjectTree extends GhidraScript {
         "180041590", // tensor input preparation
         "180047990", // typed tensor dimension/context setup
         "18004f2d0", // tensor context/member initializer
-        "180056d60"  // model decoder context setup
+        "180056d60", // model decoder context setup
+        "1800537e0", // writes a pointer at object offset +0x208
+        "18005c340", // reads object offset +0x208
+        "1800114b0", // writes object offset +0x208
+        "180012030", // writes object offset +0x208
+        "180012530", // writes object offset +0x208
+        "180013c00", // writes object offset +0x208
+        "180015d10", // reads and writes object offset +0x208
+        "18017a760", // writes and reads object offset +0x208
+        "18017b860", // reads object offset +0x208
+        "1800bca40", // writes object offset +0x208
+        "180029b80", // reads two object +0x208 fields
+        "18002b080"  // uses object +0x208 as a subobject base
     };
 
     @Override
