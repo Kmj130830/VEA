@@ -18,6 +18,21 @@ The layer path in `FUN_1800c5d50` performs these stages in order:
 
 This is a recovered portion of a model layer. It does not establish the complete model graph or every memory-layout/stride requirement around the enclosing block.
 
+## Mean and inverse-standard-deviation helper
+
+The scalar post-statistics expression from `FUN_1800c5d50` is now ported separately as `vea_s5_compute_mean_invstd_f32`:
+
+```text
+mean = sum / N
+variance = sumSquares / N - mean * mean
+variance = max(variance, 0)
+inverseStd = 1 / sqrt(variance + epsilon)
+```
+
+The function preserves this float32 operation order and rejects zero count, negative/non-finite epsilon, non-finite input statistics, and null outputs. It is exposed as `NativeS5TensorBridge.computeMeanAndInverseStd`. Tests cover ordinary variance, a negative pre-clamp variance, constant input with epsilon, and invalid arguments.
+
+This helper returns only mean and reciprocal standard deviation. The enclosing per-channel gamma/beta indexing and complete block memory layout are not yet wrapped into a single normalization kernel.
+
 ## GELU selector and formula
 
 `FUN_18012cb50` caches and selects the implementation:
