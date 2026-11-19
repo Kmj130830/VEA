@@ -276,7 +276,7 @@ fun ArrangementScreen(
                         selectedVoiceStyleId
                     )
                     voicePickerTrack = null
-                }) { Text("LOAD VOICE") }
+                }) { Text("ASSIGN VOICE") }
             },
             dismissButton = {
                 TextButton(onClick = { voicePickerTrack = null }) { Text("CANCEL") }
