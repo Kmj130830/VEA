@@ -61,7 +61,7 @@ public class ExportS5BackendDispatch extends GhidraScript {
                 try { target = toAddr(value); }
                 catch (Exception e) { target = null; }
                 String label = target == null ? "<invalid address>" : readAscii(target, 160);
-                Function f = target == null ? null : currentProgram.getFunctionAt(target);
+                Function f = target == null ? null : currentProgram.getFunctionManager().getFunctionAt(target);
                 if (f == null && target != null) f = currentProgram.getFunctionManager().getFunctionContaining(target);
                 if (f != null) label += " -> " + f.getName() + " (" + prototype(f) + ")";
                 out.println("| " + i + " | 0x" + Long.toHexString(value) + " | " + escape(label) + " |");
