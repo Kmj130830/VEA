@@ -27,6 +27,7 @@ add_library(veas5tensor SHARED
     vea_s5_stats.cpp
     vea_s5_dwconv.cpp
     vea_s5_gru_names.cpp
+    vea_s5_parameter_key.cpp
     vea_s5_residual.cpp
     vea_s5_gelu.cpp
     vea_s5_normalization.cpp
