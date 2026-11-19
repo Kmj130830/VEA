@@ -68,6 +68,7 @@ public class ExportG2pAnalysis extends GhidraScript {
             writeDecompilation(out, selected);
         }
 
+        dumpReadOnlyData(output.getParentFile());
         println("G2P analysis report written: " + output.getAbsolutePath());
     }
 
@@ -392,6 +393,44 @@ public class ExportG2pAnalysis extends GhidraScript {
             }
         } finally {
             decompiler.dispose();
+        }
+    }
+
+    /**
+     * Export read-only data sections alongside the decompilation reports.
+     * G2P implementations rely on static character and phoneme tables that
+     * cannot be reconstructed from decompiler pseudocode alone.
+     */
+    private void dumpReadOnlyData(File outputDir) throws Exception {
+        if (outputDir == null) {
+            return;
+        }
+        outputDir.mkdirs();
+        for (MemoryBlock block : currentProgram.getMemory().getBlocks()) {
+            monitor.checkCancelled();
+            String blockName = block.getName().toLowerCase();
+            if (!blockName.contains("rdata") || !block.isRead() || block.isWrite() || block.isExecute()) {
+                continue;
+            }
+            long blockSize = block.getSize();
+            if (blockSize <= 0 || blockSize > 32L * 1024L * 1024L) {
+                throw new IllegalStateException("Unexpected read-only data block size: "
+                        + block.getName() + " = " + blockSize);
+            }
+
+            byte[] bytes = new byte[(int) blockSize];
+            int read = currentProgram.getMemory().getBytes(block.getStart(), bytes);
+            if (read != bytes.length) {
+                throw new IllegalStateException("Short read from " + block.getName()
+                        + ": expected " + bytes.length + ", got " + read);
+            }
+
+            String programName = currentProgram.getName().replaceAll("[^A-Za-z0-9._-]", "_");
+            String safeBlockName = block.getName().replaceAll("[^A-Za-z0-9._-]", "_");
+            File destination = new File(outputDir, programName + safeBlockName + ".bin");
+            Files.write(destination.toPath(), bytes);
+            println("Read-only block exported: " + destination.getAbsolutePath()
+                    + " (" + bytes.length + " bytes, base " + block.getStart() + ")");
         }
     }
 
