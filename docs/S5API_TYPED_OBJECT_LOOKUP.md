@@ -78,6 +78,26 @@ callback through the model context at offset `+0x208`.
 loops use the requested row/feature dimensions and construct float buffers
 from the typed object values.
 
+## Confirmed inline tensor payload markers
+
+The raw constants consumed by `FUN_1800656e0` are:
+
+| Address | Bytes | ASCII | Observed branch |
+|---|---|---|---|
+| `DAT_18019b770` | `2a 46 33 32` | `*F32` | decode following Base64 text into float32 values |
+| `DAT_18019b778` | `2a 46 31 36` | `*F16` | decode following Base64 text into 16-bit values, then call the model-context converter at offset `+0x208` for each scalar |
+
+For either marker, the four-byte prefix is removed before calling
+`FUN_18000f5f0`; that function decodes the remaining Base64 text.
+The `*F16` branch does not inline a fixed IEEE-754 conversion. It invokes a
+per-model callback loaded from the model context at `+0x208`. VEA's existing
+half-float conversion therefore remains a candidate fallback, not yet a
+verified match for every S5API backend.
+
+The C++ typed-array parser already recognizes `*F32` and `*F16` payload
+prefixes, but it currently decodes the values directly. Integrating the
+per-model `+0x208` callback semantics is a separate follow-up.
+
 ## Implementation implications
 
 - Implement field-name construction, salted digest calculation, digest text
