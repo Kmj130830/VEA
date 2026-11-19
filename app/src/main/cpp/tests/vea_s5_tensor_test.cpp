@@ -167,7 +167,8 @@ int main() {
             assert(transposed_descriptor->values[row * 8u + col] == 0.0f);
         }
     }
-\n
+
+
     // FUN_18012d460 gated activation with the FUN_18003be50 approximate exp.
     float act_mode0[] = {1.0f, 0.0f, 0.0f, 0.0f};
     assert(vea_s5_apply_gated_activation_f32(act_mode0, 2, 0) == VEA_S5_TENSOR_STATUS_OK);
@@ -183,14 +184,16 @@ int main() {
     float act_clamp[] = {100.0f, -100.0f, 100.0f, -100.0f};
     assert(vea_s5_apply_gated_activation_f32(act_clamp, 2, 0) == VEA_S5_TENSOR_STATUS_OK);
     assert(act_clamp[2] == 8.0f && act_clamp[3] == -8.0f);
-    assert(act_clamp[0] > 0.99f);\n    assert(act_clamp[1] < 0.0f && act_clamp[1] > -0.001f);
+    assert(act_clamp[0] > 0.99f);
+    assert(act_clamp[1] < 0.0f && act_clamp[1] > -0.001f);
 
     float act_invalid[] = {0.0f, 0.0f};
     assert(vea_s5_apply_gated_activation_f32(nullptr, 1, 0) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
     assert(vea_s5_apply_gated_activation_f32(act_invalid, 0, 0) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
-\n    // S5API tagged binary numeric arrays: *F32, *F16, and *S32 + Base64.
+
+    // S5API tagged binary numeric arrays: *F32, *F16, and *S32 + Base64.
     const char f32_encoded[] = "*F32AACAPwAAAEA=";  // [1.0f, 2.0f]
     float* decoded_f32 = nullptr;
     size_t decoded_f32_count = 0;
