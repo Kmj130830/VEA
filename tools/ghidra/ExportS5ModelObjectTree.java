@@ -98,7 +98,9 @@ public class ExportS5ModelObjectTree extends GhidraScript {
         "1800591d0", // takes address of parent field +0xef0
         "180016dc0", // writes field +0x240
         "180012030", // clears fields +0x208 and +0x240
-        "1800114b0"  // initializes a nested buffer object at +0x208
+        "1800114b0", // initializes a nested buffer object at +0x208
+        "1800cdbb0", // copies the model processing contexts containing +0x208/+0x240
+        "18004f2d0"  // selects CPU-specific tensor operator function pointers
     };
 
     @Override
