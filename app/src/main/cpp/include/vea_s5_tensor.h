@@ -41,6 +41,26 @@ typedef struct VeaS5MatrixDescriptor {
     float* values;
 } VeaS5MatrixDescriptor;
 
+
+/*
+ * Recovered per-direction parameter layout for the S5API recurrent module.
+ * A direction contains four flattened float arrays. Gate order and recurrence
+ * equations are not represented by this storage descriptor.
+ */
+typedef struct VeaS5RnnDirectionLayout {
+    uint32_t layer_index;
+    uint32_t direction_index;
+    uint32_t input_features;
+    uint32_t hidden_features;
+    uint32_t gate_features;
+    uint32_t direction_count;
+    uint64_t weight_ih_elements;
+    uint64_t weight_hh_elements;
+    uint64_t bias_ih_elements;
+    uint64_t bias_hh_elements;
+} VeaS5RnnDirectionLayout;
+
+
 typedef enum VeaS5TensorStatus {
     VEA_S5_TENSOR_STATUS_OK = 0,
     VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT = 1,
@@ -53,6 +73,17 @@ typedef enum VeaS5TensorStatus {
 } VeaS5TensorStatus;
 
 VEA_S5_TENSOR_API uint32_t vea_s5_tensor_abi_version(void);
+
+/*
+ * Computes one S5API recurrent layer/direction parameter layout.
+ * input_features is input_size for layer zero and hidden_size*direction_count
+ * for subsequent layers. The recovered gate width is 3*hidden_size.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_rnn_direction_layout(
+    uint32_t input_size, uint32_t hidden_size, uint32_t num_layers,
+    int has_bias, int bidirectional, uint32_t layer_index,
+    uint32_t direction_index, VeaS5RnnDirectionLayout* out_layout);
+
 
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_arena_create(
     size_t capacity_bytes,

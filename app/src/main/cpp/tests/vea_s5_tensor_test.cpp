@@ -35,6 +35,53 @@ int main() {
     assert(converted[2] == 3.125f);
     assert(converted[3] == 0.0f);
 
+    // Model-constructor mode confirmed at FUN_180057459: one layer, bias, bidirectional.
+    VeaS5RnnDirectionLayout rnn_model_forward{};
+    assert(vea_s5_rnn_direction_layout(80, 128, 1, 1, 1, 0, 0, &rnn_model_forward) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(rnn_model_forward.layer_index == 0 && rnn_model_forward.direction_index == 0);
+    assert(rnn_model_forward.input_features == 80);
+    assert(rnn_model_forward.gate_features == 384);
+    assert(rnn_model_forward.direction_count == 2);
+    assert(rnn_model_forward.weight_ih_elements == 30720);
+    assert(rnn_model_forward.weight_hh_elements == 49152);
+    assert(vea_s5_rnn_direction_layout(80, 128, 1, 1, 1, 0, 1, &rnn_model_forward) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(rnn_model_forward.direction_index == 1);
+    assert(rnn_model_forward.input_features == 80);
+
+    // Recovered recurrent parameter sizes: 3 gate blocks and stacked directions.
+    VeaS5RnnDirectionLayout rnn_layout{};
+    assert(vea_s5_rnn_direction_layout(80, 128, 3, 1, 1, 0, 0, &rnn_layout) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(rnn_layout.layer_index == 0 && rnn_layout.direction_index == 0);
+    assert(rnn_layout.input_features == 80 && rnn_layout.hidden_features == 128);
+    assert(rnn_layout.gate_features == 384 && rnn_layout.direction_count == 2);
+    assert(rnn_layout.weight_ih_elements == 30720);
+    assert(rnn_layout.weight_hh_elements == 49152);
+    assert(rnn_layout.bias_ih_elements == 384 && rnn_layout.bias_hh_elements == 384);
+
+    assert(vea_s5_rnn_direction_layout(80, 128, 3, 1, 1, 1, 1, &rnn_layout) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(rnn_layout.input_features == 256);
+    assert(rnn_layout.weight_ih_elements == 98304);
+    assert(rnn_layout.weight_hh_elements == 49152);
+
+    assert(vea_s5_rnn_direction_layout(80, 128, 3, 0, 0, 2, 0, &rnn_layout) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(rnn_layout.input_features == 128 && rnn_layout.direction_count == 1);
+    assert(rnn_layout.weight_ih_elements == 49152);
+    assert(rnn_layout.bias_ih_elements == 0 && rnn_layout.bias_hh_elements == 0);
+
+    assert(vea_s5_rnn_direction_layout(80, 128, 3, 1, 1, 0, 2, &rnn_layout) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_rnn_direction_layout(80, 128, 3, 2, 0, 0, 0, &rnn_layout) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_rnn_direction_layout(80, 128, 0, 1, 0, 0, 0, &rnn_layout) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_rnn_direction_layout(1, UINT32_MAX, 1, 1, 0, 0, 0, &rnn_layout) ==
+        VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW);
+
     // Two matrices, 3 x 2 logical dimensions; axis0 is padded to 8.
     // Source layout: [axis0][axis1][matrix].
     const float interleaved[] = {

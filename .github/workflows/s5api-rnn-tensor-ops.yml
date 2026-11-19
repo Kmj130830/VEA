@@ -6,6 +6,7 @@ on:
     paths:
       - "Editor.zip"
       - "tools/ghidra/ExportS5RnnTensorOps.java"
+      - "tools/ghidra/ExportS5RnnCallSites.java"
       - ".github/workflows/s5api-rnn-tensor-ops.yml"
 
 permissions:
@@ -41,6 +42,17 @@ jobs:
           mkdir -p build/rnn-tensor-trace/ghidra build/ghidra-rnn-projects
           "$GHIDRA_HEADLESS" "$PWD/build/ghidra-rnn-projects" VEA_S5API_RNN             -import "$PWD/build/editor-package/modules/S5API.dll"             -scriptPath "$PWD/tools/ghidra"             -postScript ExportS5RnnTensorOps.java "$PWD/build/rnn-tensor-trace/ghidra/S5API_RNN_TENSOR_OPS.md"             -analysisTimeoutPerFile 600 -deleteProject
           test -s build/rnn-tensor-trace/ghidra/S5API_RNN_TENSOR_OPS.md
+      - name: Preserve x64 register and stack argument setup around RNN model calls
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/rnn-tensor-trace/ghidra build/ghidra-rnn-callsite-projects
+          "$GHIDRA_HEADLESS" "$PWD/build/ghidra-rnn-callsite-projects" VEA_S5API_RNN_CALLS \
+            -import "$PWD/build/editor-package/modules/S5API.dll" \
+            -scriptPath "$PWD/tools/ghidra" \
+            -postScript ExportS5RnnCallSites.java "$PWD/build/rnn-tensor-trace/ghidra/S5API_RNN_CALLSITE_CONTRACT.md" \
+            -analysisTimeoutPerFile 600 -deleteProject
+          test -s build/rnn-tensor-trace/ghidra/S5API_RNN_CALLSITE_CONTRACT.md
       - name: Package report notes
         run: |
           cat > build/rnn-tensor-trace/PORTING_NOTES.md <<'EOF'
