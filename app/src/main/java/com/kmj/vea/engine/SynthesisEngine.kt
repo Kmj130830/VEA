@@ -30,16 +30,32 @@ interface SynthesisEngine {
 /**
  * Integration boundary for native, on-device VOCALOID AI rendering.
  *
- * The supplied Windows PE DLLs are not Android-loadable libraries. The current
- * path is authorized static analysis followed by an Android ARM64 native port.
- * G2P is being analyzed first; no native G2P or singing renderer is integrated yet.
+ * The ARM64 JNI bridge is now built into the app. It currently implements
+ * only a recovered Korean-input canonicalization primitive; no Yamaha G2P
+ * phoneme engine or VOCALOID singing renderer is available yet.
  */
 class VocaloidAiEngineAdapter : SynthesisEngine {
-    override fun status(): EngineStatus = EngineStatus(
-        engineName = "VOCALOID AI (V6 / V7 target)",
-        isAvailable = false,
-        message = "Native Android backend is not integrated yet. G2P DLL analysis is in progress; VOCALOID singing-render entry point and ARM64 implementation remain unverified."
-    )
+    override fun status(): EngineStatus {
+        val bridgeMessage = if (NativeG2pBridge.isLoaded) {
+            "Android ARM64 JNI bridge loaded (ABI 0x%08X). Korean input canonicalization is available, " +
+                "but Yamaha G2PA phoneme conversion and the VOCALOID7 singing renderer are not ported yet."
+        } else {
+            "Android ARM64 JNI bridge is not loaded. The G2P phoneme engine and VOCALOID7 singing renderer " +
+                "are not ported yet."
+        }
+
+        val message = if (NativeG2pBridge.isLoaded) {
+            bridgeMessage.format(NativeG2pBridge.abiVersion)
+        } else {
+            bridgeMessage
+        }
+
+        return EngineStatus(
+            engineName = "VOCALOID AI (V6 / V7 target)",
+            isAvailable = false,
+            message = message
+        )
+    }
 
     override suspend fun render(
         project: VeaProject,
@@ -47,7 +63,7 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
         output: OutputStream
     ) {
         throw UnsupportedOperationException(
-            "On-device VOCALOID AI synthesis is unavailable until a native backend produces a verified render."
+            "On-device VOCALOID AI synthesis is unavailable until the native G2P and singing renderer are implemented and verified."
         )
     }
 }
