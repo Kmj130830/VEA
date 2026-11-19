@@ -1,0 +1,27 @@
+name: Fast Editor.zip inventory
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "Editor.zip"
+      - "tools/inspect_editor_zip.py"
+      - ".github/workflows/editor-zip-inventory.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inventory and extract PE modules
+        run: python3 tools/inspect_editor_zip.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VEA-Editor-zip-inventory
+          path: build/editor-package/
+          if-no-files-found: error
+          retention-days: 30
