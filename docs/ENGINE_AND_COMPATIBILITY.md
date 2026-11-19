@@ -8,62 +8,74 @@ VEA targets offline Android editing and eventual local VOCALOID AI rendering. Th
 
 The supplied Windows AMD64 DLLs are PE images, while Android loads ELF libraries built for Android ABIs such as arm64-v8a. Renaming a PE DLL to .so does not convert the loader format, ABI, runtime imports, or C++ object model.
 
-The current strategy is static reverse engineering followed by a new ARM64 implementation:
+The implementation route is static analysis followed by a new ARM64 implementation:
 - analyze the Windows modules statically;
-- recover their externally observable contracts and relevant algorithms;
+- recover externally observable contracts and relevant algorithms;
 - validate those contracts with the authorized reference implementation;
 - implement portable C/C++ and expose stable interfaces via JNI;
 - mark a backend ready only after on-device differential tests.
 
-Decompiled prototypes and object layouts are hypotheses, not vendor headers. The host-facing G2P manager interface is distinct from the per-language G2P manager classes.
+Decompiled prototypes and object layouts are hypotheses, not vendor headers. The host-facing G2P manager interface is distinct from per-language G2P manager classes.
 
 ## G2P status
 
-The G2P investigation covers the common host wrapper and language modules:
-- G2PAManager.dll
-- G2PAManager_ENG.dll
-- G2PAManager_JPN.dll
-- G2PAManager_KOR.dll
-- G2PAManager_CHS.dll
-- G2PA_ESP.dll
+Three Ghidra 12.2 static-analysis passes completed on the supplied G2P DLLs. They recover the common manager loader, language-key mapping, distinct object construction patterns, host-facing interface dispatches, and several per-language parser/converter helpers.
 
-Three Ghidra 12.2 static-analysis passes completed. They recover the common manager loader, language-key mapping, distinct object construction patterns, host-facing interface dispatches, and several per-language parser/converter helpers. The evidence and limitations are documented in:
-- docs/G2P_REVERSE_ENGINEERING.md
-- docs/G2P_STATIC_FINDINGS.md
-
-The repository now builds and packages `libveag2p.so` for `arm64-v8a`. The initial native implementation includes:
+The repository builds and packages `libveag2p.so` for `arm64-v8a`. The initial native implementation includes:
 - C ABI version `0x00010000`;
-- a JNI bridge using explicit standard UTF-8 conversion;
+- JNI bridge using explicit standard UTF-8 conversion;
 - strict UTF-8 validation and buffer ownership;
 - one observed Korean preprocessing transformation: U+30FC and U+2212 to U+002D;
 - host CMake tests and Android NDK build integration.
 
-This is **not yet Yamaha G2P phoneme conversion**. The supported language mask is zero; every language readiness query returns false. No language is declared compatible until its phoneme strings, syllable boundaries, note updates and edge cases pass differential tests against the authorized reference.
+This is **not yet Yamaha G2P phoneme conversion**. Supported language mask is zero; every language readiness query returns false. No language is declared compatible until its phoneme strings, syllable boundaries, note updates and edge cases pass differential tests.
 
-See docs/NATIVE_G2P_BRIDGE.md for the implemented bridge and test scope.
+See:
+- docs/G2P_REVERSE_ENGINEERING.md
+- docs/G2P_STATIC_FINDINGS.md
+- docs/NATIVE_G2P_BRIDGE.md
 
-## VOCALOID7 renderer status
+## VOCALOID7 managed layer and missing native modules
 
-The initial archive scan found no named exports in VOCALOID7.dll. Ghidra's first report recovered many semantic labels (including phoneme-service and renderer-observer names) but marked several function bodies as ".NET CLR Managed Code" and produced invalid native-looking decompilation for them. Those fragments must not be interpreted as real x64 renderer code.
+ILSpy successfully reconstructed the managed C# surface of `VOCALOID7.dll`. Its P/Invoke declarations reveal that the selected `Editor dll.zip` is not the complete native runtime directory.
 
-A second static-analysis path has been added to inspect the PE CLR descriptor and run ILSpy against VOCALOID7.dll and WaveOfflineRenderer.dll. Its goal is to determine whether the file contains managed IL, mixed-mode code, or native-only regions and then recover managed method metadata where supported.
+The strongest renderer-facing boundary is in the missing `vsm.dll`:
+- `WVSMModuleIF.CreateManager` creates a VSM sequence manager;
+- `WIVSMSequenceManager` receives VDM, DSE and YVS services;
+- its phoneme service accepts G2P managers and applies lyrics/phonemes to notes;
+- `WIVSMSequence.StartAsyncRendering` and `CreatePartialRenderer` start native rendering;
+- its renderer observer's `BlockRendered` callback receives a `WIVSMAudioBufferList` and score data;
+- audio-buffer wrappers expose sample pointers and sample counts.
 
-WaveOfflineRenderer.dll exposes normalization, resampling, and time-stretch helpers. It is an audio utility module, not proof of a VOCALOID AI singing renderer.
+This is the best current lead to the actual render output, but the native buffer format and the acoustic model inference implementation have not yet been recovered. The application layer separately uses `VAE.dll` for audio device/playback/mixdown. Other managed P/Invoke modules include VDM database/voicebank support, VSStyle presets, EffectManager and DSE authorization queries.
 
-The V7 model assets use proprietary VPIT, VHNV, VTMG and VTBR formats. Manifest hashes prove file consistency, not a documented inference contract. The renderer work must identify:
-- the host-to-engine call path;
+The ILSpy inventory reports the following P/Invoke declaration counts: vsm 786, vsstyle 122, vdm 104, VAE 90, EffectManager 74, G2PAManager 25, WaveOfflineRenderer 19, dse 18 and AudioTranscoder 6. In the supplied editor bundle, G2PAManager, WaveOfflineRenderer and AudioTranscoder are present; the primary `vsm.dll` and the other listed modules are missing.
+
+See docs/VOCALOID7_NATIVE_DEPENDENCIES.md for the complete dependency-role inventory and the exact evidence for the renderer callback.
+
+The next necessary input is the complete native DLL/runtime directory from the authorized VOCALOID7 installation, especially `vsm.dll` and its transitive dependencies. Without this, the native renderer implementation boundary cannot be completed. The current V7 renderer is not implemented.
+
+## Audio and model boundary
+
+`WaveOfflineRenderer.dll` is a native AMD64 audio utility library exposing normalization, resampling and time-stretch. It is not the identified singing renderer.
+
+The V7 model package contains proprietary VPIT, VHNV, VTMG and VTBR files. Manifest hashes establish package consistency, not the inference API, model tensor layout or runtime dependency closure.
+
+The next renderer analysis must establish:
+- VSM's internal handoff to the actual acoustic engine, if delegated;
 - model loading and required runtime resources;
-- how note, phoneme, pitch and expression parameters enter the renderer;
-- the audio-block/offline-render output boundary;
-- required external dependencies and their Android ARM64 replacements.
+- how notes, phonemes, pitch and expression enter the acoustic renderer;
+- audio sample type, channel layout, sample rate, buffer ownership and callback lifetime;
+- required external dependencies and Android ARM64 replacements.
 
 No V7 Android singing renderer exists yet.
 
-## Verification rules
+## Verification
 
-- The latest APK is built in CI and contains `lib/arm64-v8a/libveag2p.so`, confirmed as ELF64 AArch64.
-- The native G2P core tests and Android NDK build passed in CI.
-- These checks validate bridge packaging and the implemented preprocessing primitive only.
-- The app must keep synthesis unavailable until a complete language G2P backend and actual V7 singing renderer produce verified output on Android.
+- CI-built APK includes `lib/arm64-v8a/libveag2p.so`, confirmed as ELF64 AArch64.
+- Native bridge core tests and Android NDK build passed.
+- Those checks validate packaging and the single Korean preprocessing primitive only.
+- G2P readiness remains false for all languages and singing synthesis remains unavailable.
+- No VOCALOID7 AI Megpoid singing render has been produced on Android.
 
 No Wine/Box64 route, PE renaming, licensing bypass, or fabricated VOCALOID audio is part of the implementation.
