@@ -125,7 +125,8 @@ public class ExportS5ModelRuntime extends GhidraScript {
                     index++;
                     out.println("### " + index + ". " + f.getName() + " at " + f.getEntryPoint());
                     out.println();
-                    out.println("- Entry RVA: 0x" + currentProgram.getImageBase().subtract(f.getEntryPoint()).negate().toString(16));
+                    long entryRva = f.getEntryPoint().subtract(currentProgram.getImageBase());
+                    out.println("- Entry RVA: 0x" + Long.toHexString(entryRva));
                     out.println("- Body bytes: " + f.getBody().getNumAddresses());
                     out.println("- Call depth: " + depths.get(item.getKey()));
                     DecompileResults result = decompiler.decompileFunction(f, 15, monitor);
