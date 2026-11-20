@@ -45,7 +45,7 @@ class S5ModelObjectTree private constructor(val root: S5ModelValue.ObjectValue) 
     fun findAllByLookupKeyRecursive(key: String): List<LookupMatch> {
         require(key.isNotEmpty()) { "Lookup key must not be empty." }
         val matches = mutableListOf<LookupMatch>()
-        val stack = mutableListOf(root to "$")
+        val stack = mutableListOf<Pair<S5ModelValue, String>>(root to "$")
         while (stack.isNotEmpty()) {
             val (current, path) = stack.removeAt(stack.lastIndex)
             when (current) {
