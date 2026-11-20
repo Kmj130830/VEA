@@ -11,7 +11,7 @@ enum class S5MegpoidRuntimeBlockFactory(
     val destinationOffset: Int,
     val description: String
 ) {
-    DEPTHWISE_FILTER("FUN_1800ea000", 0x20, "3-D depthwise-filter tensor; the last two axes are transposed"),
+    DEPTHWISE_FILTER("FUN_1800ea000", 0x20, "3-D filter tensor; native record permutation is [C,H,W] -> [W,C,H]"),
     SHARED_DESCRIPTOR_A("FUN_1800ff330", 0x38, "First shared descriptor vector"),
     SHARED_DESCRIPTOR_B("FUN_1800f8220", 0x48, "Second shared descriptor vector"),
     EXPANSION_WEIGHTS("FUN_18010d550", 0x68, "Expansion matrix attached to the C -> C*E descriptor at +0x58"),
