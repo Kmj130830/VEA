@@ -579,6 +579,47 @@ This makes named-property lookup compatible with the actual `VOCALOID7.vtmg`
 JSON keys. It does not by itself identify how these named matrices feed the
 runtime residual operator or establish an end-to-end inference schedule.
 
+### Optional GRU parameter-loading path
+
+A separate generic recurrent loader, `FUN_18005ebe0`, is called with a
+base name of `rnn`. Its recovered arguments define a GRU-style parameter
+layout:
+
+- `param_4`: input feature count for layer zero;
+- `param_5`: hidden feature count;
+- `param_6`: recurrent layer count;
+- `param_7`: whether bias vectors are enabled;
+- `param_8`: bidirectional flag; direction count is
+  `1 + (param_8 != 0)`;
+- gate feature count is `3 * hidden_size`, so this is a three-gate
+  GRU-style layout, not an LSTM's four-gate layout.
+
+For layer `l`, input feature count is `input_size` when `l == 0`,
+otherwise `hidden_size * direction_count`. Each direction loads the
+following hashed properties (with `_reverse` appended for reverse
+direction):
+
+| Property suffix | Element count |
+|---|---:|
+| `weight_ih_l{l}` | `3 * hidden_size * input_features` |
+| `weight_hh_l{l}` | `3 * hidden_size * hidden_size` |
+| `bias_ih_l{l}` | `3 * hidden_size` when bias enabled |
+| `bias_hh_l{l}` | `3 * hidden_size` when bias enabled |
+
+The existing Android `S5RnnDirectionLayout` / native
+`vea_s5_rnn_direction_layout` helpers represent these element counts.
+The loader also uses `FUN_18005df50` to transpose one of the matrix
+buffers into an axis0-padded descriptor representation. This is a
+separate parameter path from the nine named `pre/conv/cond/linear`
+layers indexed above.
+
+The provided Megpoid JSON audit previously found no `rnn.*_l0` lookup
+keys. The validator now scans layer indices 0 through 15 and both
+directions, rather than checking only layer zero. Until that expanded scan
+finishes, the current Megpoid package's use of this optional GRU path remains
+unconfirmed. The presence of a generic loader in S5API does not prove that
+this voicebank supplies or enables those recurrent weights.
+
 ### Named-layer descriptor-pair storage
 
 The decompiled factory `Func_4cd84bb7` allocates a 0x200-byte model object
