@@ -118,7 +118,14 @@ public class ExportS5ModelObjectTree extends GhidraScript {
         "18000f340", // parser error formatter
         "18001b020", // generic tree/node insertion helper
         "18007b520", // allocate ordered-tree node
-        "18007abf0"  // commit ordered-tree node insertion
+        "18007abf0", // commit ordered-tree node insertion
+        "18000e4e0", // JSON object parser
+        "18000e070", // JSON array parser
+        "18000eae0", // JSON string and escape parser
+        "18000e3d0", // JSON number token parser
+        "180083590", // typed double node writer
+        "180083500", // typed boolean node writer
+        "180083550"  // typed null node writer
     };
 
     @Override
