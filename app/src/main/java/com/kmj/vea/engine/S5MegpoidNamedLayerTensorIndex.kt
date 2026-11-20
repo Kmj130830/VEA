@@ -63,6 +63,13 @@ data class S5MegpoidPackedNamedLayerMatrixBank(
     val packedValues: FloatArray
 )
 
+data class S5MegpoidPackedNamedLayer(
+    val layer: S5MegpoidNamedLayer,
+    val shape: S5MegpoidNamedLayerShape,
+    val packedWeightValues: FloatArray,
+    val biasValues: FloatArray
+)
+
 data class S5MegpoidNamedLayerParameters(
     val layer: S5MegpoidNamedLayer,
     val weight: S5MegpoidNamedLayerTensorReference,
@@ -149,6 +156,29 @@ class S5MegpoidNamedLayerTensorIndex private constructor(
         layerMap[id] ?: throw IllegalArgumentException(
             "Named model layer '${id.modelName}' is missing from VOCALOID7.vtmg."
         )
+
+    /**
+     * Prepares every named layer for a native forward path: typed weight data
+     * is converted to the S5API BlockMatrix storage layout and each bias vector
+     * is decoded. This is parameter preparation only; it does not infer audio.
+     */
+    fun packAllLayers(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder,
+        matrixPacker: (FloatArray, Int, Int, Int) -> FloatArray =
+            NativeS5TensorBridge::packMatrixBank
+    ): List<S5MegpoidPackedNamedLayer> = layers.map { parameters ->
+        val packed = parameters.packWeightMatrixBank(tensorDecoder, matrixPacker)
+        val biasValues = parameters.decodeBiasArray(tensorDecoder)
+        check(biasValues.size == packed.shape.axis0Count) {
+            "Bias length does not match axis0 for '${parameters.layer.modelName}'."
+        }
+        S5MegpoidPackedNamedLayer(
+            layer = parameters.layer,
+            shape = packed.shape,
+            packedWeightValues = packed.packedValues,
+            biasValues = biasValues
+        )
+    }
 
     companion object {
         fun build(
