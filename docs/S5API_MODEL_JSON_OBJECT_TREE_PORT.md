@@ -31,6 +31,12 @@ Recurrent parameters are located using the salted MD5 lookup helper already port
 
 CI's native differential check compares complete decoded byte arrays for all five actual model files. It logs only member names, sizes, root-entry counts and short key samples, not tensor contents.
 
+## Decoded AI Megpoid tree inventory and unresolved parameter names
+
+The validated AI_Megpoid.vtb2 JSON object tree contains 258 objects, 108 arrays, 299 strings, 626 numbers, 87 booleans, one null, 859 32-character hex keys, 282 *F32 strings and one *S32 string. The inventory found no *F16 strings. These are structural counts only; tensor contents are not printed by CI.
+
+The static generic RNN constructor supplies base rnn and suffixes including .weight_ih_l, .weight_hh_l, .bias_ih_l and .bias_hh_l. Nevertheless, none of the direct layer-zero salted-key candidates, including reverse variants, matched a key in the supplied five decoded model trees. The current parser and hash helper therefore must not yet be described as having loaded Megpoid's RNN weights. The next analysis step is to inspect the exact index formatter and determine whether the AI Megpoid model uses a different name namespace or model graph.
+
 ## Deliberate limits
 
 - The payload transform is not a full voicebank/runtime loader; the final 128 bytes of the supplied members are outside the JSON range produced by the recovered function and their role remains unknown.
