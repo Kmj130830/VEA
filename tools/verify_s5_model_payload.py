@@ -136,6 +136,7 @@ def summarize_model_tree(
         "typed_s32": 0,
     }
     all_keys: set[str] = set()
+    key_values: dict[str, list[object]] = {}
     stack: list[object] = [root]
     while stack:
         value = stack.pop()
@@ -143,6 +144,7 @@ def summarize_model_tree(
             counts["objects"] += 1
             for key, child in value.items():
                 all_keys.add(key)
+                key_values.setdefault(key, []).append(child)
                 if len(key) == 32 and all(ch in "0123456789abcdef" for ch in key):
                     counts["hashed_keys_32hex"] += 1
                 stack.append(child)
@@ -177,7 +179,29 @@ def summarize_model_tree(
         "conv3", "cond3", "linear",
     ]
     matching_modules = [name for name in module_names if s5_lookup_key(name) in all_keys]
-    return counts, all_keys, matching_parameters, matching_modules
+    return counts, all_keys, matching_parameters, matching_modules, key_values
+
+
+def describe_value(value: object) -> str:
+    if isinstance(value, dict):
+        return f"object:{len(value)}"
+    if isinstance(value, list):
+        return f"array:{len(value)}"
+    if isinstance(value, str):
+        if value.startswith("*F32"):
+            return "typed_f32"
+        if value.startswith("*F16"):
+            return "typed_f16"
+        if value.startswith("*S32"):
+            return "typed_s32"
+        return f"string:{len(value)}"
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, (int, float)):
+        return "number"
+    if value is None:
+        return "null"
+    return type(value).__name__
 
 
 def value_shape(value: object) -> dict[str, int]:
@@ -305,7 +329,7 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
             if root is not None:
                 keys = list(root.keys())
                 sample = [str(key)[:32] for key in keys[:4]]
-                counts, all_keys, parameter_matches, module_matches = summarize_model_tree(root)
+                counts, all_keys, parameter_matches, module_matches, key_values = summarize_model_tree(root)
                 print(
                     "JSON_OK",
                     f"archive={path.name}!/{item.filename}",
@@ -353,6 +377,7 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                         f"member={item.filename}",
                         f"name={flag_name}",
                         f"present={lookup_key in all_keys}",
+                        f"values={[describe_value(value) for value in key_values.get(lookup_key, [])]}",
                         f"lookup_key={lookup_key}",
                     )
                 for function_key, lookup_key in MODEL_STATIC_LOOKUP_KEYS.items():
