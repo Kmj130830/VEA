@@ -47,11 +47,11 @@ the block records using the same field and stride later consumed by
 ## Partial field-construction trace: FUN_1800d4bf0
 
 The function at `0x1800d4bf0` receives a destination block record followed
-by one tensor-like float vector, three pairs of descriptor inputs, and one
-additional float-vector input. The Ghidra call-site instructions establish
-that `FUN_1800ced10` passes eight temporary values in addition to the
-destination record; the decompiler's high-level call expression omits the
-stack-passed arguments, so these are not renamed semantically yet.
+by eight model-property values. The Ghidra call-site instructions recover all
+eight Win64 argument positions, including stack-passed arguments omitted from
+the decompiler's high-level call expression. The associated property-key
+factory functions are mapped below; the source roles are described by the
+fields that consume them, rather than by guessed vendor parameter names.
 
 The following operations are direct observations from the decompilation:
 
@@ -82,11 +82,8 @@ MLP kernel: the expansion matrix storage has the expected
 This also corrects the earlier rough note that described the normalization
 arrays as length `C`; the builder's actual allocation loop uses `C * E`.
 
-The +0x20 source vector's axis order is also now explicit. It is a
-three-dimensional tensor transpose, not a plain flat copy. The descriptor
-inputs at +0x30, +0x58, +0x88, and the vector attached at +0xB8 still need
-their property names and exact consumer roles mapped before wiring Android
-code to these fields.
+The `+0x20` source vector's axis order is also now explicit. It is a
+three-dimensional tensor transpose, not a plain flat copy.
 
 ## Existing runtime field consumers
 
@@ -111,22 +108,41 @@ The `+0x88` companion record is a separate workspace/history structure.
 Its internal pointers and history substructure are not part of the model
 matrix bank.
 
-## Next required mapping
+## Recovered source-property routing
 
-The follow-up Ghidra export now includes:
+The follow-up Ghidra export established the eight input routes used by
+`FUN_1800ced10` when it calls the per-block builder. Each factory resolves
+one entry from a 16×16 table using the two loop indices `iVar14` and
+`iVar15`. The factory's table slot is
+`row * 16 + column`, with a `0x20`-byte entry stride.
 
-- `FUN_1800bc5e0`, which initializes the scalar dimensions before the
-  per-block builder;
-- `FUN_1800d4a90`, `FUN_1800d4610`, and `FUN_1800c0320`, which populate
-  the nested descriptor fields;
-- eight model-property key factories called by `FUN_1800ced10`:
-  `FUN_1800f1110`, `FUN_180114660`, `FUN_18011b770`,
-  `FUN_180106440`, `FUN_18010d550`, `FUN_1800f8220`,
-  `FUN_1800ff330`, and `FUN_1800ea000`.
+| Factory | Builder input | Destination in the 0x100-byte block | Current source role |
+|---|---:|---:|---|
+| `FUN_1800ea000` | param2 | `+0x20` | 3-D tensor, last two axes transposed |
+| `FUN_1800ff330` | param3 | `+0x38` | first shared descriptor vector |
+| `FUN_1800f8220` | param4 | `+0x48` | second shared descriptor vector |
+| `FUN_18010d550` | param5 | `+0x68` via descriptor at `+0x58` | nested matrix weights |
+| `FUN_180106440` | param6 | `+0x78` via descriptor at `+0x58` | optional nested bias/vector |
+| `FUN_18011b770` | param7 | `+0x98` via descriptor at `+0x88` | nested matrix weights |
+| `FUN_180114660` | param8 | `+0xA8` via descriptor at `+0x88` | optional nested bias/vector |
+| `FUN_1800f1110` | param9 | `+0xB8` | residual-scale shared vector |
 
-These functions are the next step for identifying the exact
-`AI_Megpoid.vtb2` keys and matching each source vector to the block fields.
-Until that key-to-field provenance is proven, the Android implementation
-must not substitute similarly sized tensors by arithmetic coincidence.
+Each factory contains 256 static initialization entries. Each entry's
+32-character key is formed by formatting four embedded 32-bit constants as
+8-digit hexadecimal words through `FUN_18001acc0`, then copying the
+resulting string into the table through `FUN_1800e63b0`. A raw memory dump of
+the table in the unexecuted DLL is all zero because these static tables are
+populated by runtime initialization; the key strings are instead recoverable
+from the initialization code itself.
 
-No end-to-end neural forward pass or synthesized PCM output is claimed.
+The verifier now accepts the Ghidra report via `--ghidra-report`, extracts
+all 2,048 candidate keys, and matches them recursively against the actual
+`AI_Megpoid.vtb2` JSON tree. The workflow records only matched key,
+factory/index, parent path, and value layout (typed scalar kind and element
+count); it does not print tensor contents. The next result will establish
+which table indices are actually present in the supplied bank and confirm
+whether optional properties are present for each block.
+
+The Android code has a checked residual-block input contract, but it still
+does not construct a complete singing forward pass. No synthesized PCM
+output is claimed.
