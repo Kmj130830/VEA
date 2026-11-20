@@ -47,6 +47,7 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
         "1800ccce0", // caller that constructs/copies model runtime state
         "1800ced10", // builds per-block runtime records from parsed model configuration
         "1800d4bf0", // per-block 0x100-byte runtime record builder
+        "1800bc5e0", // initializes dimension fields for the per-block constructor
         "1800d4a90", // populate the first nested descriptor within each runtime block
         "1800d4610", // populate additional nested descriptors within each runtime block
         "1800c0320", // attach a shared vector descriptor into the runtime block
@@ -219,7 +220,7 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
 
             out.println("## Raw instruction listing for tensor-loader ABI");
             out.println();
-            for (String hex : new String[] { "180010260", "1800812a0", "180081e20", "180010740", "180010540", "1800103e0", "18001acc0", "180083610", "180014f70", "180083c50", "180024a90", "18005ebe0", "18008d470", "18008d470", "180052f90", "1800537e0", "1800589d0", "18005e9b0", "180063ca0", "180064e90", "1800c4730", "1800ccce0", "1800ced10", "1800d4bf0", "1800d4a90", "1800d4610", "1800c0320", "1800f1110", "180114660", "18011b770", "180106440", "18010d550", "1800f8220", "1800ff330", "1800ea000", "1800b3130", "1800b28a0", "1800bc0c0", "1800b0b30", "1800b36d0", "1800d3f00", "1800d3f6d", "1800cdbb0", "1800d5a00", "1800bbcc0", "1800afab0", "1800aff50", "1800b0110", "1800d9580", "1800d9830", "1800d9700", "1800b4410", "1800c7ad0", "1800c72d0", "1800c5260", "1800c5440", "1800c5d50", "1800c67e0", "1800afc30", "1800af720", "1800b3bd0", "1800c3740", "1800aec40", "180126c20", "180126d40", "1800aed70", "1800aea60", "1800ae770", "1800ae950", "1800aeea0", "180126e30", "180127120", "1801271a0", "180127330" }) {
+            for (String hex : new String[] { "180010260", "1800812a0", "180081e20", "180010740", "180010540", "1800103e0", "18001acc0", "180083610", "180014f70", "180083c50", "180024a90", "18005ebe0", "18008d470", "18008d470", "180052f90", "1800537e0", "1800589d0", "18005e9b0", "180063ca0", "180064e90", "1800c4730", "1800ccce0", "1800ced10", "1800d4bf0", "1800bc5e0", "1800d4a90", "1800d4610", "1800c0320", "1800f1110", "180114660", "18011b770", "180106440", "18010d550", "1800f8220", "1800ff330", "1800ea000", "1800b3130", "1800b28a0", "1800bc0c0", "1800b0b30", "1800b36d0", "1800d3f00", "1800d3f6d", "1800cdbb0", "1800d5a00", "1800bbcc0", "1800afab0", "1800aff50", "1800b0110", "1800d9580", "1800d9830", "1800d9700", "1800b4410", "1800c7ad0", "1800c72d0", "1800c5260", "1800c5440", "1800c5d50", "1800c67e0", "1800afc30", "1800af720", "1800b3bd0", "1800c3740", "1800aec40", "180126c20", "180126d40", "1800aed70", "1800aea60", "1800ae770", "1800ae950", "1800aeea0", "180126e30", "180127120", "1801271a0", "180127330" }) {
                 monitor.checkCancelled();
                 Address address = toAddr(hex);
                 Function f = currentProgram.getFunctionManager().getFunctionAt(address);
