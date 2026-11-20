@@ -749,20 +749,20 @@ def extract_megpoid_factory_keys(report_path: Path) -> list[dict[str, object]]:
     """
     report = report_path.read_text(encoding="utf-8")
     pattern = re.compile(
-        r"local_28 = (0x[0-9a-fA-F]+);\\s*"
-        r"local_24 = (0x[0-9a-fA-F]+);\\s*"
-        r"local_20 = (0x[0-9a-fA-F]+);\\s*"
+        r"local_28 = (0x[0-9a-fA-F]+);\s*"
+        r"local_24 = (0x[0-9a-fA-F]+);\s*"
+        r"local_20 = (0x[0-9a-fA-F]+);\s*"
         r"local_1c = (0x[0-9a-fA-F]+);.*?"
-        r"FUN_1800e63b0\\(local_128,(&DAT_[0-9a-fA-F]+)\\);",
+        r"FUN_1800e63b0\(local_128,(&DAT_[0-9a-fA-F]+)\\);",
         re.S,
     )
     tables: list[dict[str, object]] = []
     for function_name, target_field, role in MEGPOID_BLOCK_FACTORY_FIELDS:
-        sections = list(re.finditer(rf"^### \\d+\\. {function_name} at ", report, re.M))
+        sections = list(re.finditer(rf"^### \d+\. {function_name} at ", report, re.M))
         if not sections:
             raise ValueError(f"Ghidra report is missing decompilation for {function_name}.")
         start = sections[-1].start()
-        end = report.find("\\n### ", start + 5)
+        end = report.find("\n### ", start + 5)
         section = report[start:end if end >= 0 else len(report)]
         matches = list(pattern.finditer(section))
         if len(matches) != 256:
