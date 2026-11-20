@@ -21,13 +21,13 @@ class S5MegpoidRuntimeBlockTensorIndexTest {
         }
 
         val json = keys.joinToString(prefix = "{", postfix = "}") { key ->
-            "\\"" + key.lookupKey + "\\":{\\"weight\\":\\"*F32AAAAAA==\\"}"
+            "\"" + key.lookupKey + "\":{\"weight\":\"*F32AAAAAA==\"}"
         }
         val tree = S5ModelObjectTree.parseUtf8(json)
         val index = S5MegpoidRuntimeBlockTensorIndex.build(tree, keys)
 
         assertEquals(64, index.totalTensorReferences)
-        assertEquals(8, index.tensors(S5MegpoidRuntimeBlockFactory.TRANSPOSED_TENSOR, 3, 1).size)
+        assertEquals(8, index.summary().getValue(S5MegpoidRuntimeBlockFactory.TRANSPOSED_TENSOR))
         assertEquals(1, index.tensors(
             S5MegpoidRuntimeBlockFactory.TRANSPOSED_TENSOR, 3, 1
         ).size)
