@@ -52,6 +52,17 @@ data class S5VoicebankModelPackage(
             NativeS5TensorBridge::packRowMajor
     ): List<S5MegpoidPackedNamedLayer> =
         namedLayerTensorIndex.packAllLayers(tensorDecoder, matrixPacker, biasPacker)
+
+
+    /**
+     * Creates a persistent native descriptor table for all nine named layers.
+     * The caller owns the returned handle and must close it when the voicebank
+     * is unloaded. This prepares BlockMatrix storage; it does not run inference.
+     */
+    fun prepareNativeNamedLayerParameterSet(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidNativeParameterSet =
+        namedLayerTensorIndex.prepareNativeParameterSet(tensorDecoder)
 }
 
 class S5VoicebankModelPackageAssembler(
