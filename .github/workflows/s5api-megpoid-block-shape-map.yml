@@ -5,11 +5,13 @@ on:
     paths:
       - "Editor.zip"
       - "tools/ghidra/ExportS5MegpoidBlockShapeMap.java"
+      - "tools/verify_s5_model_payload.py"
       - ".github/workflows/s5api-megpoid-block-shape-map.yml"
   pull_request:
     paths:
       - "Editor.zip"
       - "tools/ghidra/ExportS5MegpoidBlockShapeMap.java"
+      - "tools/verify_s5_model_payload.py"
       - ".github/workflows/s5api-megpoid-block-shape-map.yml"
 
 permissions:
