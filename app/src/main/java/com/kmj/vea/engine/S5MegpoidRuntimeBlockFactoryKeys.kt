@@ -9,6 +9,9 @@ package com.kmj.vea.engine
  * omitted rather than populated with guessed values.
  */
 object S5MegpoidRuntimeBlockFactoryKeys {
+    const val BLOCK_ROWS = 4
+    const val BLOCK_COLUMNS = 2
+
     val ALL: List<S5MegpoidRuntimeBlockFactoryKey> = listOf(
         // FUN_1800f1110 -> residual scale at +0xB8
         key(S5MegpoidRuntimeBlockFactory.RESIDUAL_SCALE, 0, 0, "64bd498ceb9692194e89336e38535fbb"),
