@@ -712,8 +712,8 @@ int main() {
         assert(parsed.kind == kinds[i]);
         assert(parsed.payload_size == 100u);
         assert(parsed.format_word == 16u);
-        assert(parsed.opaque_metadata[0] == raw_header[12]);
-        assert(parsed.opaque_metadata[123] == raw_header[135]);
+        assert(parsed.raw_bytes_after_format_word[0] == raw_header[12]);
+        assert(parsed.raw_bytes_after_format_word[123] == raw_header[135]);
     }
     VeaS5ContainerHeader invalid_header{};
     assert(vea_s5_parse_container_header(raw_header, sizeof(raw_header) + 99u, &invalid_header)
