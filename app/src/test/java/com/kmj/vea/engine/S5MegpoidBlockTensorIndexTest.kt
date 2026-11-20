@@ -35,6 +35,22 @@ class S5MegpoidBlockTensorIndexTest {
     }
 
     @Test
+    fun pairsTheTwoMatrixPropertiesOnlyWithinTheSameLayerObject() {
+        val firstKey = S5MegpoidBlockLookupSlot.KEY_1.lookupKey
+        val secondKey = S5MegpoidBlockLookupSlot.KEY_2.lookupKey
+        val tree = S5ModelObjectTree.parseUtf8(
+            """{"layers":[{"$firstKey":"*F32AAAAAA==","$secondKey":"*F32AQAAAA=="},{"$firstKey":"*F32AgAAAA=="}]}"""
+        )
+
+        val pairs = S5MegpoidBlockTensorIndex.build(tree).matrixPropertyPairs()
+
+        assertEquals(1, pairs.size)
+        assertEquals("$.layers[0]", pairs.single().containingObjectPath)
+        assertEquals(S5MegpoidBlockLookupSlot.KEY_1, pairs.single().first.slot)
+        assertEquals(S5MegpoidBlockLookupSlot.KEY_2, pairs.single().second.slot)
+    }
+
+    @Test
     fun rejectsMalformedBase64LengthsAndMisalignedTensorPayloads() {
         val key = S5MegpoidBlockLookupSlot.KEY_1.lookupKey
         val malformedLength = S5ModelObjectTree.parseUtf8(
@@ -56,6 +72,7 @@ class S5MegpoidBlockTensorIndexTest {
         override fun decodeFloatArray(encoded: String): FloatArray = when (encoded) {
             "*F32AAAAAA==" -> floatArrayOf(0.25f)
             "*F32AQAAAA==" -> floatArrayOf(0.75f)
+            "*F32AgAAAA==" -> floatArrayOf(1.25f)
             "*F16AAE=" -> floatArrayOf(-0.5f)
             else -> error("Unexpected test tensor.")
         }
