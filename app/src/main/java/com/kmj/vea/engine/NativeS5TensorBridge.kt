@@ -169,6 +169,18 @@ object NativeS5TensorBridge {
 
 
     /**
+     * Hashes a full S5API model-object property name into its salted MD5 lookup key.
+     * The result uses the recovered four-word, 32-character lowercase hex layout.
+     */
+    fun hashParameterLookupKey(parameterName: String): String {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        val nameBytes = parameterName.toByteArray(Charsets.UTF_8)
+        require(nameBytes.size <= 1 shl 20) { "Parameter name is unreasonably large." }
+        return nativeHashParameterKey(nameBytes)
+            ?: throw IllegalArgumentException("Could not hash S5 parameter lookup key.")
+    }
+
+    /**
      * Runs the recovered residual depthwise/MLP block from FUN_1800c5d50.
      * historyRows: [channel][7][position], depthwise weights: [channel][49].
      * expand weights: [expandedFeature][channel], project weights: [channel][expandedFeature].
@@ -361,6 +373,7 @@ object NativeS5TensorBridge {
         bidirectional: Boolean, layerIndex: Int, directionIndex: Int
     ): LongArray?
     private external fun nativeBuildRecurrentParameterName(base: String, memberSuffix: String, layerIndex: Int, reverseDirection: Boolean): String?
+    private external fun nativeHashParameterKey(nameBytes: ByteArray): String?
     private external fun nativeResidualAffineAdd(dst: FloatArray, residual: FloatArray, scale: Float, bias: Float): FloatArray?
     private external fun nativeDepthwiseConv7x7Reflect(inputRows: FloatArray, weights: FloatArray, width: Int): FloatArray?
     private external fun nativeApplyGelu(values: FloatArray, scale: Float, bias: Float): FloatArray?
