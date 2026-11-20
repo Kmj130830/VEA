@@ -57,6 +57,35 @@ int main() {
         VEA_S5_TENSOR_STATUS_OK);
     assert(std::strcmp(hashed_key, "bf1fb08e8ffbab205dbb90120465e856") == 0);
 
+    struct RealModelKeyVector { const char* name; const char* expected; };
+    static constexpr RealModelKeyVector real_model_keys[] = {
+        {"pre1.weight", "f8b15a70e9fe50b828e5803435580c63"},
+        {"pre1.bias", "e0b8e91e6062dd010960e012a5410dfc"},
+        {"pre2.weight", "5f070ac57c6e37c82ef5338f3325fdb0"},
+        {"pre2.bias", "a236e71e934a1ef9421a3aa58dc4a32d"},
+        {"conv1.weight", "220316df91912792cb42bc663a8df636"},
+        {"conv1.bias", "bf1fb08e8ffbab205dbb90120465e856"},
+        {"cond1.weight", "edf0ab9aee552c38c05ca173eee22ac1"},
+        {"cond1.bias", "696e7aab6b19e87bda4d64d30787f024"},
+        {"conv2.weight", "7352c2e9486a73ce344f167dfad31876"},
+        {"conv2.bias", "c968ce1719cfab911f40b224b5bb28df"},
+        {"cond2.weight", "d2513a339c1cd73dccef828453a4d23a"},
+        {"cond2.bias", "f6b8236c129bd838ccee88b5e54ab949"},
+        {"conv3.weight", "7646bc7c9e90a59c368ef2b779853dff"},
+        {"conv3.bias", "68b10aa33dc35fe0030cd4bcf63d69b1"},
+        {"cond3.weight", "aa0c15b96de654347f8cf7f3d318d537"},
+        {"cond3.bias", "84560ce6291c9ad58de7fcace89954cf"},
+        {"linear.weight", "ecf71a24e4595ed754ce7c2a519102f0"},
+        {"linear.bias", "e7e58da68e9b65d684a141ccf7071bca"}
+    };
+    for (const auto& vector : real_model_keys) {
+        assert(vea_s5_hash_parameter_key(
+            reinterpret_cast<const uint8_t*>(vector.name), std::strlen(vector.name),
+            hashed_key, sizeof(hashed_key), &hashed_key_required) ==
+            VEA_S5_TENSOR_STATUS_OK);
+        assert(std::strcmp(hashed_key, vector.expected) == 0);
+    }
+
     char small_hashed_key[8] = "stable";
     assert(vea_s5_hash_parameter_key(
         key_abc, sizeof(key_abc), small_hashed_key, sizeof(small_hashed_key),
@@ -70,11 +99,13 @@ int main() {
     // Build the persistent 9-layer descriptor-pair table at the same
     // object offsets used by FUN_180068190 (0x20 through 0xa0).
     constexpr size_t kLayerCount = VEA_S5_NAMED_LAYER_COUNT;
+    // These are the exact descriptor dimensions recovered from the
+    // supplied VOCALOID7.vtmg member, in FUN_180068190 layer order.
     const std::array<uint32_t, kLayerCount> layer_axis0 = {
-        2u, 2u, 4u, 4u, 4u, 4u, 4u, 4u, 1u
+        32u, 32u, 64u, 64u, 64u, 64u, 64u, 64u, 3u
     };
     const std::array<uint32_t, kLayerCount> layer_axis1 = {
-        3u, 2u, 2u, 3u, 2u, 3u, 2u, 3u, 2u
+        82u, 32u, 32u, 26u, 32u, 26u, 32u, 26u, 32u
     };
     const std::array<uint32_t, kLayerCount> layer_banks = {
         1u, 1u, 3u, 1u, 3u, 1u, 3u, 1u, 1u
