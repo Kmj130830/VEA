@@ -107,7 +107,7 @@ class S5MegpoidRuntimeBlockAssemblerTest {
         // The reference kernel retains [channel][height][width] source order.
         assertEquals(depthwise.toList(), compiled.depthwiseWeightsChannelMajor.toList())
 
-        // S5API's record builder permutes [C][H][W] into [W][C][H].
+        // S5API's record builder swaps the two spatial axes: [C][H][W] -> [C][W][H].
         assertEquals(depthwise[0], compiled.nativeRecordDepthwiseFilter[0])
         assertEquals(depthwise[7], compiled.nativeRecordDepthwiseFilter[1])
         assertEquals(depthwise[1], compiled.nativeRecordDepthwiseFilter[7])
