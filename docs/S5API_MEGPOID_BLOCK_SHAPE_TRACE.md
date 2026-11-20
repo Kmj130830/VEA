@@ -238,6 +238,22 @@ They remain structural property pairs but are not assigned this matrix shape.
 The model constructor contains other `FUN_18005e9b0` call sites with
 different dimension tuples, so those pairs require a separate call-site map.
 
+The same audit grouped those 88 pairs by the first-level object-tree
+section containing each pair. This is a structural grouping only; the opaque
+hashes are kept as labels rather than assigned semantic component names.
+
+| Top-level model key | Pairs | Repeated-block matches | Single-bank arithmetic candidates |
+|---|---:|---:|---:|
+| `3b4c84865651c9d431c9ee873790add3` | 8 | 6 | 7 |
+| `5be3f5d6495f68286523e230e2d0d9a4` | 68 | 53 | 68 |
+| `6dbe9f75292d82b3cc6c57bd65089b20` | 12 | 10 | 12 |
+
+The section-specific results reinforce why the single-bank arithmetic must not
+be treated as a callsite identity: 87 pairs pass its even-row test, including
+all 69 that also match the repeated-block constructor. The audit exposes these
+as overlapping candidates instead of selecting one constructor from element
+counts alone.
+
 The shape candidate API deliberately preserves this distinction:
 `repeatedBlockMatrixShapeOrNull()` represents the row/column/bank tuple
 recovered from the `FUN_180052f90` callsite, while
