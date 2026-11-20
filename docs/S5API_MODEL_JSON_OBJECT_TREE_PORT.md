@@ -35,7 +35,7 @@ CI's native differential check compares complete decoded byte arrays for all fiv
 
 The validated AI_Megpoid.vtb2 JSON object tree contains 258 objects, 108 arrays, 299 strings, 626 numbers, 87 booleans, one null, 859 32-character hex keys, 282 *F32 strings and one *S32 string. The inventory found no *F16 strings. These are structural counts only; tensor contents are not printed by CI.
 
-The static generic RNN constructor supplies base rnn and suffixes including .weight_ih_l, .weight_hh_l, .bias_ih_l and .bias_hh_l. Nevertheless, none of the direct layer-zero salted-key candidates, including reverse variants, matched a key in the supplied five decoded model trees. The current parser and hash helper therefore must not yet be described as having loaded Megpoid's RNN weights. The next analysis step is to inspect the exact index formatter and determine whether the AI Megpoid model uses a different name namespace or model graph.
+The static generic RNN constructor supplies base rnn and suffixes including .weight_ih_l, .weight_hh_l, .bias_ih_l and .bias_hh_l. Nevertheless, none of the direct layer-zero salted-key candidates, including reverse variants, matched a key in the supplied five decoded model trees. The current parser and hash helper therefore must not yet be described as having loaded Megpoid's RNN weights. The next analysis step is to recover the model-derived +0xf11 flag value through FUN_18004e1e0 and determine whether the conditional RNN constructor is enabled for AI Megpoid.
 
 ## Deliberate limits
 
