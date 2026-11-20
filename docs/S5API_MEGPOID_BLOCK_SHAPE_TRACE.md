@@ -374,6 +374,39 @@ Inside `FUN_1800c7ad0`, the residual stage is an explicit nested loop:
 - Each iteration calls `FUN_1800c5d50` with that block-data entry, the current input/output workspace descriptors, and its companion state entry. The two workspace descriptors are then swapped for the next block.
 - The dispatcher also calls `FUN_1800c5260`, `FUN_1800c5440`, and either `FUN_1800c6390` or `FUN_1800c72d0` around the residual loop. These are separate preprocessing/transition stages and should not be folded into the residual block's tensor bundle without a field-level data-flow trace.
 
+## Runtime record-array ownership and copy paths
+
+A whole-image instruction scan for the non-stack offsets used by
+`FUN_1800c7ad0` found two additional functions that operate on the same
+record-vector fields.
+
+- `FUN_1800cdbb0` copies the block-data vector from byte offset `0x2E0`.
+  In its `undefined4 *` parameters, this appears as `param + 0xB8`.
+  It obtains the begin pointer from `param_2 + 0xB8`, obtains the end pointer
+  from `param_2 + 0xBA`, and passes `(end - begin) >> 8` as the element
+  count to `FUN_1800afc30`. The right shift by eight is division by the
+  `0x100)-byte block-record stride.
+- `FUN_1800c47a0` copies the state-record vector at byte offset `0x2F8`.
+  It obtains begin/end pointers from offsets `0x2F8` and `0x300` and
+  passes `(end - begin) / 0x88` to `FUN_1800af720`.
+
+These are separate object-copy paths, but they use the same two field offsets
+and exactly the same element strides as the runtime dispatcher. This confirms
+that the fields at `0x2E0` and `0x2F8` are vector-like record arrays, not
+single tensor pointers. It also links the 0x100-byte and 0x88-byte record
+layouts to the object-copy lifecycle.
+
+The scan also found `FUN_180131fa0` reading/growing fields at the same
+offsets through `FUN_1800b3bd0`, with a requested capacity of `0x801`.
+That routine has not yet been proven to initialize the exact same object
+instance passed to `FUN_1800c7ad0`; it remains a candidate initialization
+path until the constructor/caller relation is established.
+
+This does not yet identify the assignments that populate each record's
+internal tensor pointers (for example the `0x20`, `0x98`, and `0xC8`
+fields of a block-data record). Those writes are the next required link
+before the model-tree tensors can be bound to the Android kernel inputs.
+
 ## Residual runtime record offsets
 
 The decompilation of `FUN_1800c7ad0` and `FUN_1800c5d50` exposes a
