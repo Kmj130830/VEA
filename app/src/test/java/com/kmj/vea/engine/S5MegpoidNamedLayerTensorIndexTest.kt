@@ -82,6 +82,22 @@ class S5MegpoidNamedLayerTensorIndexTest {
     }
 
     @Test
+    fun preparesAllNineNamedLayerWeightsAndBiasesForTheNativeBoundary() {
+        val index = S5MegpoidNamedLayerTensorIndex.build(modelTree(), ::lookupKey)
+        val prepared = index.packAllLayers(TestDecoder()) { _, axis0, axis1, matrices ->
+            FloatArray(axis1 * ((axis0 + 7) / 8 * 8) * matrices)
+        }
+
+        assertEquals(9, prepared.size)
+        assertEquals(S5MegpoidNamedLayer.PRE1, prepared.first().layer)
+        assertEquals(S5MegpoidNamedLayer.LINEAR, prepared.last().layer)
+        assertEquals(6144, prepared.firstOrNull { it.layer == S5MegpoidNamedLayer.CONV1 }
+            ?.packedWeightValues?.size)
+        assertEquals(64, prepared.first { it.layer == S5MegpoidNamedLayer.CONV1 }.biasValues.size)
+        assertEquals(3, prepared.first { it.layer == S5MegpoidNamedLayer.LINEAR }.biasValues.size)
+    }
+
+    @Test
     fun decodesNamedLayerTensorOnlyWhenRequested() {
         val index = S5MegpoidNamedLayerTensorIndex.build(modelTree(), ::lookupKey)
         val weight = index.requireLayer(S5MegpoidNamedLayer.CONV1).weight
