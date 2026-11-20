@@ -7,6 +7,7 @@ model payloads to disk, or prints parameter/tensor contents.
 from __future__ import annotations
 
 import argparse
+import base64
 import ctypes
 import hashlib
 import json
@@ -294,6 +295,102 @@ class NativeDecoder:
         return bytes(output)
 
 
+
+def json_value_kind(value: object) -> str:
+    if isinstance(value, dict):
+        return "object"
+    if isinstance(value, list):
+        return "array"
+    if isinstance(value, str):
+        if value.startswith("*F32"):
+            return "typed_f32"
+        if value.startswith("*F16"):
+            return "typed_f16"
+        if value.startswith("*S32"):
+            return "typed_s32"
+        return "string"
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, (int, float)):
+        return "number"
+    if value is None:
+        return "null"
+    return type(value).__name__
+
+
+def uniform_array_shape(value: object, depth: int = 0) -> list[object] | None:
+    """Return a JSON numeric/list shape when rectangular; never expose values."""
+    if not isinstance(value, list):
+        return [] if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+    if depth > 16:
+        return ["depth-limit"]
+    if not value:
+        return [0]
+    child_shapes = [uniform_array_shape(child, depth + 1) for child in value]
+    if any(shape is None for shape in child_shapes):
+        return [len(value), "mixed"]
+    first = child_shapes[0]
+    if any(shape != first for shape in child_shapes[1:]):
+        return [len(value), "ragged"]
+    return [len(value)] + (first or [])
+
+
+def decode_typed_payload_layout(value: str) -> dict[str, object]:
+    marker = value[:4]
+    encoded = value[4:]
+    padded = encoded + ("=" * ((-len(encoded)) % 4))
+    try:
+        raw = base64.b64decode(padded, validate=True)
+        scalar_bytes = 2 if marker == "*F16" else 4
+        return {
+            "marker": marker,
+            "payload_bytes": len(raw),
+            "elements": len(raw) // scalar_bytes,
+            "element_bytes": scalar_bytes,
+            "aligned": len(raw) % scalar_bytes == 0,
+        }
+    except (ValueError, base64.binascii.Error):
+        return {"marker": marker, "payload_bytes": None, "elements": None, "invalid_base64": True}
+
+
+def model_value_layout(value: object, max_tensors: int = 96) -> dict[str, object]:
+    """Summarize model config object structure and tensor lengths without data."""
+    shape = uniform_array_shape(value)
+    child_values = list(value.values()) if isinstance(value, dict) else value if isinstance(value, list) else []
+    child_kinds = {}
+    for child in child_values:
+        kind = json_value_kind(child)
+        child_kinds[kind] = child_kinds.get(kind, 0) + 1
+
+    tensors: list[dict[str, object]] = []
+    stack: list[tuple[object, str, int]] = [(value, "$", 0)]
+    visited = 0
+    while stack and len(tensors) < max_tensors and visited < 20000:
+        current, path, depth = stack.pop()
+        visited += 1
+        if depth > 24:
+            continue
+        if isinstance(current, str) and current[:4] in {"*F32", "*F16", "*S32"}:
+            tensors.append({"path": path, **decode_typed_payload_layout(current)})
+        elif isinstance(current, dict):
+            items = list(current.values())
+            for index in range(len(items) - 1, -1, -1):
+                stack.append((items[index], f"{path}/field{index}", depth + 1))
+        elif isinstance(current, list):
+            for index in range(len(current) - 1, -1, -1):
+                stack.append((current[index], f"{path}[{index}]", depth + 1))
+
+    return {
+        "node_kind": json_value_kind(value),
+        "direct_children": len(child_values),
+        "direct_child_kinds": child_kinds,
+        "rectangular_numeric_shape": shape,
+        "recursive_value_counts": value_shape(value),
+        "typed_payloads": tensors,
+        "typed_payloads_truncated": bool(stack) or len(tensors) >= max_tensors,
+    }
+
+
 def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
     if not path.is_file():
         print("MISSING_ARCHIVE", path)
@@ -381,14 +478,24 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                         f"lookup_key={lookup_key}",
                     )
                 for function_key, lookup_key in MODEL_STATIC_LOOKUP_KEYS.items():
+                    matches = key_values.get(lookup_key, [])
                     print(
                         "MODEL_STATIC_KEY",
                         f"member={item.filename}",
                         f"name={function_key}",
                         f"present={lookup_key in all_keys}",
-                        f"values={[describe_value(value) for value in key_values.get(lookup_key, [])]}",
+                        f"values={[describe_value(value) for value in matches]}",
                         f"lookup_key={lookup_key}",
                     )
+                    if function_key.startswith("fun_1800537e0"):
+                        for match_index, matched_value in enumerate(matches):
+                            print(
+                                "MODEL_STATIC_LAYOUT",
+                                f"member={item.filename}",
+                                f"name={function_key}",
+                                f"match_index={match_index}",
+                                "layout=" + json.dumps(model_value_layout(matched_value), sort_keys=True),
+                            )
                 recovered += 1
             else:
                 prefix = decoded[:24]
