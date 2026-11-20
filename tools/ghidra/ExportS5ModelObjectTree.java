@@ -100,6 +100,11 @@ public class ExportS5ModelObjectTree extends GhidraScript {
         "180012030", // clears fields +0x208 and +0x240
         "1800114b0", // initializes a nested buffer object at +0x208
         "1800cdbb0", // copies the model processing contexts containing +0x208/+0x240
+        "1800ccd23", // containing function creates a default context then copies from source
+        "1800c4730", // source-context getter used by the copy caller
+        "1800c0290", // field-copy helper used for the +0x208 member
+        "1800c03a0", // adjacent context member-copy helper
+        "18001a840", // shared field assignment helper
         "18004f2d0"  // selects CPU-specific tensor operator function pointers
     };
 
