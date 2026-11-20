@@ -64,6 +64,9 @@ object NativeS5TensorBridge {
      */
     fun decodeModelPayload(input: ByteArray): ByteArray {
         check(loaded) { "Native S5 tensor library is not loaded." }
+        require(input.size <= 128 * 1024 * 1024) {
+            "S5 model payload exceeds the 128 MiB safety limit."
+        }
         return nativeDecodeModelPayload(input)
             ?: throw IllegalArgumentException("S5 model payload decoding failed.")
     }
