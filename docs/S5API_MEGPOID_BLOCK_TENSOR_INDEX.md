@@ -65,3 +65,21 @@ operators. Only after that mapping is verified should tensors be passed to a
 specific native forward operation.
 
 No AI Megpoid PCM output is produced by this milestone.
+
+
+## Follow-up: nested matrix property pairs
+
+The later static trace of `FUN_180052f90` → `FUN_18005e9b0` →
+`FUN_180063ca0` refined the meaning of the first two hashes. KEY_1 and KEY_2
+are two property lookups performed inside a selected layer object and passed
+together to the matrix-object loader; they are not two independent top-level
+block sections. The index now offers `matrixPropertyPairs()`, pairing only
+unique typed leaves with the same immediate parent path. Incomplete or
+ambiguous groups are omitted.
+
+The pair members deliberately retain neutral names. Static evidence proves
+that both values are loaded as matrix properties, but does not yet establish
+which is a kernel, bias, projection, or another matrix role. Shape validation
+against the descriptor arguments and the residual runtime operator is the
+next step. This is a structural binding improvement only; it does not add
+neural inference or PCM rendering.
