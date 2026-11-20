@@ -1,4 +1,5 @@
 #pragma once
+#include <stddef.h>
 #include <stdint.h>
 #ifdef __cplusplus
 extern "C" {
@@ -15,7 +16,8 @@ typedef enum VeaS5ContainerStatus {
     VEA_S5_CONTAINER_STATUS_OK = 0,
     VEA_S5_CONTAINER_STATUS_INVALID_ARGUMENT = 1,
     VEA_S5_CONTAINER_STATUS_INVALID_MAGIC = 2,
-    VEA_S5_CONTAINER_STATUS_INVALID_LENGTH = 3
+    VEA_S5_CONTAINER_STATUS_INVALID_LENGTH = 3,
+    VEA_S5_CONTAINER_STATUS_BUFFER_TOO_SMALL = 4
 } VeaS5ContainerStatus;
 /*
  * Recovered common 136-byte prefix:
@@ -35,6 +37,21 @@ VeaS5ContainerStatus vea_s5_parse_container_header(
     const uint8_t* header_bytes,
     uint64_t total_file_size,
     VeaS5ContainerHeader* out_header);
+/*
+ * Reproduces S5API FUN_18002aa90 for model JSON payload preparation.
+ *
+ * The function returns the required output length in out_output_size. Pass
+ * output=nullptr/output_capacity=0 to query the required length; a non-empty
+ * result returns BUFFER_TOO_SMALL. Unknown 16-byte-or-longer inputs are copied
+ * unchanged, matching the native fallback path. Inputs shorter than 16 bytes
+ * produce an empty result.
+ */
+VeaS5ContainerStatus vea_s5_decode_model_payload(
+    const uint8_t* input,
+    size_t input_size,
+    uint8_t* output,
+    size_t output_capacity,
+    size_t* out_output_size);
 #ifdef __cplusplus
 }
 #endif
