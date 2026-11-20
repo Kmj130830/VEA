@@ -54,6 +54,10 @@ fun ArrangementScreen(
     onPlay: () -> Unit,
     onStop: () -> Unit,
     onAssignVoice: (String, String, String, String) -> Unit,
+    modelArchiveStatus: String,
+    modelLoaded: Boolean,
+    isImportingModelArchive: Boolean,
+    onImportModelArchive: () -> Unit,
     canUndo: Boolean,
     canRedo: Boolean
 ) {
@@ -79,6 +83,20 @@ fun ArrangementScreen(
                 Text(project.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF222222))
                 Text("${project.bpm} BPM    ${project.numerator}/${project.denominator}",
                     color = Color(0xFF555555), fontSize = 9.sp)
+                Text(
+                    modelArchiveStatus,
+                    color = if (modelLoaded) Color(0xFF527A35) else Color(0xFF555555),
+                    fontSize = 8.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            TextButton(
+                onClick = onImportModelArchive,
+                enabled = !isImportingModelArchive,
+                contentPadding = PaddingValues(horizontal = 4.dp)
+            ) {
+                Text(if (isImportingModelArchive) "LOADING" else "LOAD V7", fontSize = 9.sp)
             }
             TextButton(onClick = onExportMidi, contentPadding = PaddingValues(horizontal = 5.dp)) {
                 Text("V7 MIDI", fontSize = 10.sp)
@@ -261,7 +279,11 @@ fun ArrangementScreen(
                         }
                     }
                     Text(
-                        "Singer identity and styles are loaded from the supplied package. VOCALOID rendering still requires an authorized Android engine.",
+                        if (modelLoaded) {
+                            "V7 model data is loaded. Neural inference and waveform rendering are still being implemented."
+                        } else {
+                            "Load the AI Megpoid V7 model package to prepare local model data. Singing inference is not available yet."
+                        },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 10.sp
                     )
