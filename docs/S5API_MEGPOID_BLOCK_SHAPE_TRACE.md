@@ -431,8 +431,8 @@ recovered fields are:
 | `0xA8` | Optional pointer consumed by the residual affine merge | Residual bias |
 | `0xB8` | Pointer consumed by the residual affine merge | Residual scale |
 | `0xC8` | Pointer consumed by the first `FUN_1800c3740` call | Expansion matrix, mapping `C -> C * E` |
-| `0xD8` | Per-channel array consumed by the normalization/GELU affine step | Expansion normalization scale (`gamma`) |
-| `0xE8` | Per-channel array consumed by the normalization/GELU affine step | Expansion normalization bias (`beta`) |
+| `0xD8` | Expanded-feature array consumed by the normalization/GELU affine step | Expansion normalization scale (`gamma`); the block builder allocates `C * E` values |
+| `0xE8` | Expanded-feature array consumed by the normalization/GELU affine step | Expansion normalization bias (`beta`); the block builder allocates `C * E` values |
 | `0xF8` | `param_1[0x3e]` | Epsilon term |
 
 The depthwise descriptor begins at byte offset `0x10`. `FUN_1800c67e0`
@@ -463,7 +463,7 @@ The offset roles align with the Android kernel's argument shapes:
 - depthwise coefficients: `C * 49`;
 - expansion matrix: `(C * E) * C`;
 - projection matrix: `C * (C * E)`;
-- normalization arrays: `C) each;
+- normalization arrays: `C * E` each;
 - residual scale and optional bias: `C) each;
 - sequence workspaces: `C * N) and `C * E * N).
 
