@@ -114,7 +114,7 @@ MODEL_STATIC_LOOKUP_KEYS = {
 # The values become FUN_180052f90's dim0 (param_8) and dim1 (param_6) fields.
 MODEL_BLOCK_DESCRIPTOR_KEYS = {
     # Func_47a12a73 assigns these to original descriptor slots [0], [1], [5].
-    "descriptor_param0": "52e6fc7b15bd76513d7169444b901f84",
+    "descriptor_param0": "15bd765152e6fc7b4b901f843d716944",
     "descriptor_param1": "0322875158f9b1bff9162ba2fa7dd262",
     "descriptor_param5": "d7226a031351dcf206e02f41499ed9b6",
 }
