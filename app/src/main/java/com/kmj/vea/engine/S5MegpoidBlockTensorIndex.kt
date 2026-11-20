@@ -6,9 +6,9 @@ package com.kmj.vea.engine
  * the binary analysis has not established semantic parameter names.
  */
 enum class S5MegpoidBlockLookupSlot(val lookupKey: String) {
-    /** First of the two matrix-property keys passed to FUN_18005e9b0. */
+    /** Primary typed-matrix property consumed by FUN_180063ca0. */
     KEY_1("30c16498ff30815c43d58f610a91f938"),
-    /** Second of the two matrix-property keys passed to FUN_18005e9b0. */
+    /** Secondary property consumed by FUN_180064e90 when its descriptor enables it. */
     KEY_2("c169d8ef47cc23f097ff312d08a6f829"),
     KEY_3("9e4170a67e795e687b0df130d8086421"),
     KEY_4("6eaa6d5161e42effbaa006bb0cd3f587"),
@@ -25,11 +25,12 @@ enum class S5MegpoidBlockLookupSlot(val lookupKey: String) {
  * only when the renderer asks for it.
  */
 /**
- * Two matrix-property tensors found in the same containing object. The binary
- * proves that both properties are passed to the matrix loader; their semantic
- * roles (for example, kernel versus bias) are intentionally not guessed.
+ * Two layer-property tensors found in the same containing object. Static code
+ * shows that the first property becomes a BlockMatrix array and the second is
+ * handled by a separate consumer. Their semantic roles are intentionally not
+ * guessed.
  */
-data class S5MegpoidModelMatrixPair(
+data class S5MegpoidModelPropertyPair(
     val containingObjectPath: String,
     val first: S5MegpoidModelTensorReference,
     val second: S5MegpoidModelTensorReference
@@ -80,7 +81,7 @@ class S5MegpoidBlockTensorIndex private constructor(
      * share the same immediate containing object. Incomplete or ambiguous
      * groups are omitted rather than guessed.
      */
-    fun matrixPropertyPairs(): List<S5MegpoidModelMatrixPair> {
+    fun modelPropertyPairs(): List<S5MegpoidModelPropertyPair> {
         val firstByParent = tensors(S5MegpoidBlockLookupSlot.KEY_1)
             .groupBy { it.objectPath.substringBeforeLast('/', missingDelimiterValue = "") }
         val secondByParent = tensors(S5MegpoidBlockLookupSlot.KEY_2)
@@ -89,7 +90,7 @@ class S5MegpoidBlockTensorIndex private constructor(
             val first = firstByParent[parent].orEmpty()
             val second = secondByParent[parent].orEmpty()
             if (first.size == 1 && second.size == 1) {
-                S5MegpoidModelMatrixPair(parent, first.single(), second.single())
+                S5MegpoidModelPropertyPair(parent, first.single(), second.single())
             } else {
                 null
             }
