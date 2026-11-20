@@ -28,6 +28,8 @@ class S5MegpoidNamedLayerTensorReference internal constructor(
     val layer: S5MegpoidNamedLayer,
     val propertyName: String,
     val lookupKey: String,
+    /** Exact nested JSON path where the hashed property was found. */
+    val objectPath: String,
     val marker: String,
     val elementCount: Int,
     private val encodedValue: S5ModelValue.StringValue
@@ -251,6 +253,7 @@ class S5MegpoidNamedLayerTensorIndex private constructor(
                     layer = layer,
                     propertyName = propertyName,
                     lookupKey = lookupKey,
+                    objectPath = match.path,
                     marker = marker,
                     elementCount = elements,
                     encodedValue = value
