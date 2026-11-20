@@ -271,11 +271,12 @@ fun VeaApp() {
 
     fun updateTrackVoice(trackId: String, singerId: String, singerName: String, styleId: String) {
         if (loadedVoicebankPackage?.voicebankId != singerId ||
-            preparedNamedLayerParameters == null
+            preparedNamedLayerParameters == null ||
+            preparedRuntimeBlocks?.size != 8
         ) {
             Toast.makeText(
                 context,
-                "Verify the matching voicebank and finish native layer preparation before assigning this singer.",
+                "Verify the matching voicebank and finish named-layer plus residual-block preparation before assigning this singer.",
                 Toast.LENGTH_LONG
             ).show()
             return
