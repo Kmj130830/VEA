@@ -47,6 +47,9 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
         "1800c5440", // related linear/operator helper
         "1800c5d50", // residual depthwise-MLP runtime operator
         "1800c67e0", // depthwise history/ring-buffer producer
+        "1800afc30", // 0x100-stride block-data vector copy helper
+        "1800af720", // 0x88-stride block-state vector copy helper
+        "1800b3bd0", // runtime buffer-vector capacity/growth helper
         "1800c3740", // linear projection runtime operator
         "1800aec40", // owner/caller that dispatches the neural forward method
         "180126c20", // higher-level render/voice processing caller
@@ -181,7 +184,7 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
 
             out.println("## Raw instruction listing for tensor-loader ABI");
             out.println();
-            for (String hex : new String[] { "180010260", "180010740", "180010540", "1800103e0", "18001acc0", "180083610", "180014f70", "180083c50", "180024a90", "18005ebe0", "180052f90", "1800537e0", "1800589d0", "18005e9b0", "180063ca0", "180064e90", "1800c7ad0", "1800c72d0", "1800c5260", "1800c5440", "1800c5d50", "1800c67e0", "1800c3740", "1800aec40", "180126c20" }) {
+            for (String hex : new String[] { "180010260", "180010740", "180010540", "1800103e0", "18001acc0", "180083610", "180014f70", "180083c50", "180024a90", "18005ebe0", "180052f90", "1800537e0", "1800589d0", "18005e9b0", "180063ca0", "180064e90", "1800c7ad0", "1800c72d0", "1800c5260", "1800c5440", "1800c5d50", "1800c67e0", "1800afc30", "1800af720", "1800b3bd0", "1800c3740", "1800aec40", "180126c20" }) {
                 monitor.checkCancelled();
                 Address address = toAddr(hex);
                 Function f = currentProgram.getFunctionManager().getFunctionAt(address);
