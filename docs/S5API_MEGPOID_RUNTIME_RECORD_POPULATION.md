@@ -59,9 +59,9 @@ The following operations are direct observations from the decompilation:
   the record's `+0x20` shared-pointer field. The buffer has
   `param_1[4] * param_1[5] * param_1[6]` elements. Its traversal changes
   source order from `[C][H][W]`, index
-  `((c * H + y) * W + x)`, to `[W][C][H]`, index
-  `((x * C + c) * H + y)`. This is a three-axis permutation, not merely a
-  swap of the final two axes.
+  `((c * H + y) * W + x)`, to `[C][W][H]`, index
+  `((c * W + x) * H + y)`. The channel axis remains outermost; the two
+  spatial axes are exchanged.
 - `FUN_1800d4a90` populates a nested descriptor beginning at destination
   offset `+0x30` from the first descriptor pair.
 - `FUN_1800d4610` populates nested descriptors beginning at `+0x58` and
@@ -82,7 +82,7 @@ MLP kernel: the expansion matrix storage has the expected
 This also corrects the earlier rough note that described the normalization
 arrays as length `C`; the builder's actual allocation loop uses `C * E`.
 
-The `+0x20` source vector's three-axis permutation is explicit. Its actual
+The `+0x20` source vector's spatial-axis permutation is explicit. Its actual
 runtime dimensions are supplied by the per-block descriptor initialized by
 `FUN_1800bc5e0`; the static VTB2 metadata array is recorded separately and
 must not be confused with the destination pointer's axis order.
@@ -120,7 +120,7 @@ one entry from a 16×16 table using the two loop indices `iVar14` and
 
 | Factory | Builder input | Destination in the 0x100-byte block | Current source role |
 |---|---:|---:|---|
-| `FUN_1800ea000` | param2 | `+0x20` | depthwise tensor; builder permutes `[C,H,W]` to `[W,C,H]` |
+| `FUN_1800ea000` | param2 | `+0x20` | depthwise tensor; builder permutes `[C,H,W]` to `[C,W,H]` |
 | `FUN_1800ff330` | param3 | `+0x38` | first shared descriptor vector |
 | `FUN_1800f8220` | param4 | `+0x48` | second shared descriptor vector |
 | `FUN_18010d550` | param5 | `+0x68` via descriptor at `+0x58` | nested matrix weights |
