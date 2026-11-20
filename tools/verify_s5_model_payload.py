@@ -753,7 +753,7 @@ def extract_megpoid_factory_keys(report_path: Path) -> list[dict[str, object]]:
         r"local_24 = (0x[0-9a-fA-F]+);\s*"
         r"local_20 = (0x[0-9a-fA-F]+);\s*"
         r"local_1c = (0x[0-9a-fA-F]+);.*?"
-        r"FUN_1800e63b0\(local_128,(&DAT_[0-9a-fA-F]+)\\);",
+        r"FUN_1800e63b0\(local_128,(&DAT_[0-9a-fA-F]+)\);",
         re.S,
     )
     tables: list[dict[str, object]] = []
