@@ -34,6 +34,25 @@ data class S5MegpoidRepeatedBlockMatrixShape(
     val matrixCount: Int
 )
 
+/** Source traversal order used by FUN_180063ca0's typed tensor fill loop. */
+enum class S5MegpoidMatrixInputOrder {
+    /** Each row traverses columns before advancing to the next row. */
+    ROW_MAJOR,
+    /** Each column traverses rows before advancing to the next column. */
+    COLUMN_MAJOR
+}
+
+/**
+ * Decoded payload for the primary matrix-property pair.
+ * [matrices] follows the matrix-object bank order allocated by S5API;
+ * [secondaryProperty] intentionally has no assigned semantic role.
+ */
+data class S5MegpoidDecodedMatrixBank(
+    val shape: S5MegpoidRepeatedBlockMatrixShape,
+    val matrices: List<FloatArray>,
+    val secondaryProperty: FloatArray
+)
+
 data class S5MegpoidModelPropertyPair(
     val containingObjectPath: String,
     val first: S5MegpoidModelTensorReference,
@@ -76,6 +95,55 @@ data class S5MegpoidModelPropertyPair(
         val expectedElements = rows.toLong() * columns.toLong() * matrixCount.toLong()
         if (expectedElements != first.elementCount.toLong()) return null
         return S5MegpoidRepeatedBlockMatrixShape(rows, columns, matrixCount)
+    }
+
+    /**
+     * Decodes the primary tensor into the exact bank order used by
+     * FUN_180063ca0.
+     *
+     * The native fill loop interleaves matrix values for each coordinate and
+     * visits the allocated matrix-pointer array from its final element to its
+     * first. ROW_MAJOR/COLUMN_MAJOR selects the observed param_11 traversal
+     * branch; callers must supply the descriptor's real orientation.
+     */
+    fun decodeMatrixBankPayloadOrNull(
+        inputOrder: S5MegpoidMatrixInputOrder,
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidDecodedMatrixBank? {
+        val shape = repeatedBlockMatrixShapeOrNull() ?: return null
+        val expectedElements = shape.rows.toLong() *
+            shape.columns.toLong() * shape.matrixCount.toLong()
+        if (expectedElements > Int.MAX_VALUE || first.elementCount.toLong() != expectedElements) {
+            return null
+        }
+        if (second.elementCount != shape.rows) return null
+
+        val interleaved = first.decodeFloatArray(tensorDecoder)
+        val secondary = second.decodeFloatArray(tensorDecoder)
+        val matrixSize = shape.rows * shape.columns
+        val matrices = List(shape.matrixCount) { FloatArray(matrixSize) }
+
+        for (row in 0 until shape.rows) {
+            for (column in 0 until shape.columns) {
+                val coordinateIndex = when (inputOrder) {
+                    S5MegpoidMatrixInputOrder.ROW_MAJOR -> row * shape.columns + column
+                    S5MegpoidMatrixInputOrder.COLUMN_MAJOR -> column * shape.rows + row
+                }
+                val outputIndex = row * shape.columns + column
+                val sourceBase = coordinateIndex * shape.matrixCount
+                for (sourceBankIndex in 0 until shape.matrixCount) {
+                    val matrixObjectIndex = shape.matrixCount - 1 - sourceBankIndex
+                    matrices[matrixObjectIndex][outputIndex] =
+                        interleaved[sourceBase + sourceBankIndex]
+                }
+            }
+        }
+
+        return S5MegpoidDecodedMatrixBank(
+            shape = shape,
+            matrices = matrices,
+            secondaryProperty = secondary
+        )
     }
 }
 
