@@ -68,6 +68,35 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeBuildRecurrentParameterName(
     }
 }
 
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeHashParameterKey(
+    JNIEnv* env, jobject, jbyteArray name_array) {
+    if (name_array == nullptr) return nullptr;
+    const jsize length = env->GetArrayLength(name_array);
+    if (length < 0 || length > (1 << 20)) return nullptr;
+
+    try {
+        std::vector<uint8_t> name_bytes(static_cast<size_t>(length));
+        if (length != 0) {
+            env->GetByteArrayRegion(
+                name_array, 0, length, reinterpret_cast<jbyte*>(name_bytes.data()));
+            if (env->ExceptionCheck()) return nullptr;
+        }
+
+        char key[33] = {};
+        size_t required = 0;
+        const VeaS5TensorStatus status = vea_s5_hash_parameter_key(
+            name_bytes.empty() ? nullptr : name_bytes.data(),
+            name_bytes.size(), key, sizeof(key), &required);
+        if (status != VEA_S5_TENSOR_STATUS_OK || required != sizeof(key)) return nullptr;
+        return env->NewStringUTF(key);
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
 extern "C" JNIEXPORT jlongArray JNICALL
 Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeRnnDirectionLayout(
     JNIEnv* env, jobject,
