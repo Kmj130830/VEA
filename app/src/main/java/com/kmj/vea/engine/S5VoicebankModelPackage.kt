@@ -27,6 +27,18 @@ data class S5VoicebankModelPackage(
     val modelBlockTensorIndex: S5MegpoidBlockTensorIndex by lazy(LazyThreadSafetyMode.PUBLICATION) {
         S5MegpoidBlockTensorIndex.build(singerModel.tree)
     }
+
+    /**
+     * Lazily indexes the nine named neural layers in the shared VOCALOID7.vtmg.
+     * This resolves actual model tensors but does not yet execute their network.
+     */
+    val namedLayerTensorIndex: S5MegpoidNamedLayerTensorIndex by lazy(
+        LazyThreadSafetyMode.PUBLICATION
+    ) {
+        val sharedModel = models.members["VOCALOID7.vtmg"]
+            ?: throw IllegalStateException("Shared VOCALOID7.vtmg model member is missing.")
+        S5MegpoidNamedLayerTensorIndex.build(sharedModel.tree)
+    }
 }
 
 class S5VoicebankModelPackageAssembler(
