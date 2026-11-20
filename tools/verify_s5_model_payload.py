@@ -406,8 +406,8 @@ def typed_tensor_lengths(value: object) -> list[dict[str, object]]:
     return layouts
 
 
-def inspect_megpoid_matrix_property_pairs(root: dict, member: str) -> None:
-    """Find objects that contain both matrix-property keys and report only lengths."""
+def inspect_megpoid_layer_property_pairs(root: dict, member: str) -> None:
+    """Find objects that contain both layer-property keys and report only lengths."""
     first_key = MODEL_STATIC_LOOKUP_KEYS["fun_1800537e0_key_1"]
     second_key = MODEL_STATIC_LOOKUP_KEYS["fun_1800537e0_key_2"]
     stack: list[tuple[object, str]] = [(root, "$")]
@@ -428,7 +428,7 @@ def inspect_megpoid_matrix_property_pairs(root: dict, member: str) -> None:
                 else:
                     classification = "paired"
                 print(
-                    "MODEL_MATRIX_PROPERTY_PAIR",
+                    "MODEL_LAYER_PROPERTY_PAIR",
                     f"member={member}",
                     f"parent={path}",
                     f"first_count={len(first)}",
@@ -443,7 +443,7 @@ def inspect_megpoid_matrix_property_pairs(root: dict, member: str) -> None:
             for index, child in enumerate(current):
                 stack.append((child, f"{path}[{index}]"))
     print(
-        "MODEL_MATRIX_PROPERTY_PAIR_SUMMARY",
+        "MODEL_LAYER_PROPERTY_PAIR_SUMMARY",
         f"member={member}",
         f"pair_objects={pair_count}",
         f"ambiguous_objects={ambiguous_count}",
