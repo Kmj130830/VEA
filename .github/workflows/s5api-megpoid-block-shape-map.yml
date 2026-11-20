@@ -50,6 +50,14 @@ jobs:
             -postScript ExportS5MegpoidBlockShapeMap.java "$PWD/build/megpoid-block-shape/ghidra/S5API_MEGPOID_BLOCK_SHAPE.md" \
             -analysisTimeoutPerFile 600 -deleteProject
           test -s build/megpoid-block-shape/ghidra/S5API_MEGPOID_BLOCK_SHAPE.md
+      - name: Match recovered 16x16 property-key tables against AI Megpoid VTB2
+        run: |
+          set -euo pipefail
+          python3 tools/verify_s5_model_payload.py \
+            --ghidra-report build/megpoid-block-shape/ghidra/S5API_MEGPOID_BLOCK_SHAPE.md \
+            > build/megpoid-block-shape/MODEL_BLOCK_DYNAMIC_KEY_MATCHES.txt
+          grep -E "MODEL_BLOCK_DYNAMIC_KEY_(CANDIDATES|MATCH|SUMMARY)" \
+            build/megpoid-block-shape/MODEL_BLOCK_DYNAMIC_KEY_MATCHES.txt | head -n 80 || true
       - name: Add mapping scope notes
         run: |
           cat > build/megpoid-block-shape/PORTING_NOTES.md <<'EOF'
