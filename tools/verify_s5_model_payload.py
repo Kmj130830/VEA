@@ -430,6 +430,34 @@ NAMED_MODEL_LAYER_BANK_COUNTS = {
 }
 
 
+def inspect_vtmg_typed_root_objects(member: str, root: dict) -> None:
+    """List hashed names and sizes of immediate typed-tensor fields in VTMG."""
+    for root_key, value in sorted(root.items()):
+        if not isinstance(value, dict):
+            continue
+        typed_fields = []
+        for child_key, child_value in sorted(value.items()):
+            tensors = typed_tensor_lengths(child_value)
+            if tensors:
+                typed_fields.append(
+                    {
+                        "key": child_key,
+                        "value_kind": describe_value(child_value),
+                        "tensor_count": len(tensors),
+                        "elements": [item.get("elements") for item in tensors],
+                        "types": [item.get("type") for item in tensors],
+                    }
+                )
+        if typed_fields:
+            print(
+                "VTMG_TYPED_ROOT_OBJECT",
+                f"member={member}",
+                f"root_key={root_key}",
+                f"typed_field_count={len(typed_fields)}",
+                f"fields={typed_fields}",
+            )
+
+
 def inspect_named_layer_container_keys(
     member: str, key_values: dict[str, list[object]]
 ) -> None:
@@ -695,6 +723,7 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                 if item.filename == "AI_Megpoid.vtb2":
                     inspect_megpoid_layer_property_pairs(root, item.filename)
                 if item.filename.lower().endswith(".vtmg"):
+                    inspect_vtmg_typed_root_objects(item.filename, root)
                     inspect_named_layer_container_keys(item.filename, key_values)
                     inspect_megpoid_named_layer_parameters(item.filename, key_values)
                 for root_key, root_value in root.items():
