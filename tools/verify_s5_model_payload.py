@@ -126,9 +126,10 @@ S5_KEY_SUFFIX = bytes.fromhex(
 
 
 def s5_lookup_key(parameter_name: str) -> str:
-    digest = hashlib.md5(parameter_name.encode("utf-8") + S5_KEY_SUFFIX).digest()
-    words = struct.unpack("<4I", digest)
-    return "".join(f"{word:08x}" for word in words)
+    # JSON object property names store the MD5 digest bytes in canonical hex
+    # order. FUN_18001acc0 formats four uint32 words for static-key lookup
+    # constants, but the dynamic parameter-key strings retain digest.hex().
+    return hashlib.md5(parameter_name.encode("utf-8") + S5_KEY_SUFFIX).hexdigest()
 
 
 def summarize_model_tree(
