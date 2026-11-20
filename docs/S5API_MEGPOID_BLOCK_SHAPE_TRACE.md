@@ -357,6 +357,25 @@ matrix loader. The repeated-block row/column/bank decomposition is supported
 for 69 pairs as documented above; the remaining 19 are not shape-classified
 by that call path. Neither payload is assigned a semantic role.
 
+## Runtime forward dispatch and residual-block loop
+
+The active native execution path is now traced one call layer above the residual operator.
+
+- `FUN_1800aec40` is a thin forward-call wrapper. It validates the network object pointer, obtains a positive state/count field from the companion object returned by `FUN_1800c4730`, copies that value to the network object at byte offset `0x624`, and calls `FUN_1800c7ad0`.
+- The wrapper call at `0x1800aecba` passes three caller-supplied values alongside the network object. Their semantic types are not named by the current decompilation.
+- `FUN_180126c20` calls this wrapper at `0x180126cde`, making it the next higher-level owner to inspect for frame/input preparation.
+
+Inside `FUN_1800c7ad0`, the residual stage is an explicit nested loop:
+
+- The outer loop runs while the current sequence index is below `param_1[5] - 1`.
+- For each sequence position, the inner loop visits `param_1[6]` residual block entries.
+- The block-data entry address is computed with a `0x100`-byte stride from the pointer stored at `param_1 + 0xb8`.
+- The companion block-state entry uses a `0x88`-byte stride from the pointer stored at `param_1 + 0xbe`.
+- Each iteration calls `FUN_1800c5d50` with that block-data entry, the current input/output workspace descriptors, and its companion state entry. The two workspace descriptors are then swapped for the next block.
+- The dispatcher also calls `FUN_1800c5260`, `FUN_1800c5440`, and either `FUN_1800c6390` or `FUN_1800c72d0` around the residual loop. These are separate preprocessing/transition stages and should not be folded into the residual block's tensor bundle without a field-level data-flow trace.
+
+This establishes where the residual operator is scheduled and how its per-position/per-block records are addressed. It does **not** yet show which `AI_Megpoid.vtb2` tensor paths populate the `0x100`-byte block-data records, the `0x88`-byte state records, or the workspace descriptors. Therefore the current Android matrix decoder remains an isolated layout conversion layer; it is not yet wired to `vea_s5_run_residual_dw_mlp_block_f32`, and no PCM synthesis is claimed.
+
 ## What is still not connected
 
 - The nine fixed lookup keys in `AI_Megpoid.vtb2` have been found and indexed.
