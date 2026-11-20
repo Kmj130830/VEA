@@ -42,17 +42,25 @@ class S5MegpoidNamedLayerTensorReference internal constructor(
 }
 
 /**
- * Arithmetic shape evidence for a named banked matrix.
+ * Exact matrix descriptor dimensions recovered from FUN_180064670.
  *
- * These fields deliberately avoid row/column naming: element counts and the
- * constructor's matrix-bank count are known, but the semantic axis orientation
- * has not been established for every named layer call site.
+ * axis0 is the bias-vector element count (param_5); axis1 is
+ * weightElementsPerMatrix / axis0 (param_4). Each matrix stores axis1 rows
+ * with axis0 values per row, padded to a multiple of eight.
  */
-data class S5MegpoidNamedLayerShapeCandidate(
+data class S5MegpoidNamedLayerShape(
     val matrixCount: Int,
+    val axis0Count: Int,
+    val axis1Count: Int,
+    val paddedAxis0Count: Int,
     val weightElementsPerMatrix: Int,
-    val biasElementCount: Int,
-    val weightToBiasElementRatio: Int
+    val biasElementCount: Int
+)
+
+data class S5MegpoidPackedNamedLayerMatrixBank(
+    val shape: S5MegpoidNamedLayerShape,
+    /** Matrix-by-matrix concatenation; each matrix is axis1Count * paddedAxis0Count. */
+    val packedValues: FloatArray
 )
 
 data class S5MegpoidNamedLayerParameters(
@@ -60,25 +68,65 @@ data class S5MegpoidNamedLayerParameters(
     val weight: S5MegpoidNamedLayerTensorReference,
     val bias: S5MegpoidNamedLayerTensorReference
 ) {
-    fun shapeCandidateOrNull(): S5MegpoidNamedLayerShapeCandidate? {
+    fun shapeOrNull(): S5MegpoidNamedLayerShape? {
         val banks = layer.matrixCount
         val weights = weight.elementCount
         val biases = bias.elementCount
         if (banks <= 0 || weights <= 0 || biases <= 0) return null
-        val divisor = biases.toLong() * banks.toLong()
-        if (divisor <= 0L || weights.toLong() % divisor != 0L) return null
-        val perMatrix = weights.toLong() / banks.toLong()
+        val bankCount = banks.toLong()
+        val axis0 = biases.toLong()
+        val totalDivisor = axis0 * bankCount
+        if (totalDivisor <= 0L || weights.toLong() % totalDivisor != 0L) return null
+
+        val axis1 = weights.toLong() / totalDivisor
+        if (axis1 <= 0L || axis1 > Int.MAX_VALUE) return null
+        val paddedAxis0 = ((axis0 + 7L) / 8L) * 8L
+        if (paddedAxis0 > Int.MAX_VALUE) return null
+        val expectedElements = axis0 * axis1 * bankCount
+        if (expectedElements != weights.toLong()) return null
+        val perMatrix = axis0 * axis1
         if (perMatrix > Int.MAX_VALUE) return null
-        val ratio = perMatrix / biases.toLong()
-        if (perMatrix % biases.toLong() != 0L || ratio <= 0L || ratio > Int.MAX_VALUE) {
-            return null
-        }
-        return S5MegpoidNamedLayerShapeCandidate(
+
+        return S5MegpoidNamedLayerShape(
             matrixCount = banks,
+            axis0Count = axis0.toInt(),
+            axis1Count = axis1.toInt(),
+            paddedAxis0Count = paddedAxis0.toInt(),
             weightElementsPerMatrix = perMatrix.toInt(),
-            biasElementCount = biases,
-            weightToBiasElementRatio = ratio.toInt()
+            biasElementCount = biases
         )
+    }
+
+    fun decodeBiasArray(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): FloatArray = bias.decodeFloatArray(tensorDecoder)
+
+    /**
+     * Decodes source-order weights [axis0][axis1][matrix] and packs them with
+     * the same 8-element axis0 padding used by the S5API BlockMatrix objects.
+     */
+    fun packWeightMatrixBank(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder,
+        matrixPacker: (FloatArray, Int, Int, Int) -> FloatArray =
+            NativeS5TensorBridge::packMatrixBank
+    ): S5MegpoidPackedNamedLayerMatrixBank {
+        val shape = shapeOrNull()
+            ?: throw IllegalStateException(
+                "Named layer '${layer.modelName}' has inconsistent weight/bias element counts."
+            )
+        val decodedWeights = weight.decodeFloatArray(tensorDecoder)
+        val packed = matrixPacker(
+            decodedWeights,
+            shape.axis0Count,
+            shape.axis1Count,
+            shape.matrixCount
+        )
+        val expectedPackedElements = shape.axis1Count.toLong() *
+            shape.paddedAxis0Count.toLong() * shape.matrixCount.toLong()
+        check(expectedPackedElements == packed.size.toLong()) {
+            "Native matrix packing returned an unexpected element count for '${layer.modelName}'."
+        }
+        return S5MegpoidPackedNamedLayerMatrixBank(shape, packed)
     }
 }
 
