@@ -45,7 +45,7 @@ class S5MegpoidBlockTensorIndexTest {
         val pairs = S5MegpoidBlockTensorIndex.build(tree).matrixPropertyPairs()
 
         assertEquals(1, pairs.size)
-        assertEquals("$.layers[0]", pairs.single().containingObjectPath)
+        assertEquals("$/layers[0]", pairs.single().containingObjectPath)
         assertEquals(S5MegpoidBlockLookupSlot.KEY_1, pairs.single().first.slot)
         assertEquals(S5MegpoidBlockLookupSlot.KEY_2, pairs.single().second.slot)
     }
