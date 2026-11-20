@@ -98,6 +98,26 @@ data class S5MegpoidModelPropertyPair(
     }
 
     /**
+     * Returns an arithmetic shape candidate for FUN_1800537e0's separate
+     * single-bank entry call at 0x180053e13.
+     *
+     * That caller supplies EAX, R10D, 1 to FUN_18005e9b0; the wrapper forwards
+     * them as FUN_180063ca0 columns, rows, and matrixCount. R10D is computed
+     * as 2 * descriptor[+0x14] * descriptor[+0x08], so the row count must be
+     * even. The source descriptor has not been associated with each tensor
+     * pair, so this remains a compatibility candidate, not a callsite match.
+     */
+    fun singleBankEntryShapeCandidateOrNull(): S5MegpoidRepeatedBlockMatrixShape? {
+        val rows = second.elementCount
+        if (rows <= 0 || rows % 2 != 0) return null
+        val columns = primaryToSecondaryElementRatio ?: return null
+        if (columns <= 0) return null
+        val expectedElements = rows.toLong() * columns.toLong()
+        if (expectedElements != first.elementCount.toLong()) return null
+        return S5MegpoidRepeatedBlockMatrixShape(rows, columns, matrixCount = 1)
+    }
+
+    /**
      * Decodes the primary tensor into the exact bank order used by
      * FUN_180063ca0.
      *
