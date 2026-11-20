@@ -35,14 +35,14 @@ class S5MegpoidBlockTensorIndexTest {
     }
 
     @Test
-    fun pairsTheTwoMatrixPropertiesOnlyWithinTheSameLayerObject() {
+    fun pairsPrimaryAndSecondaryPropertiesOnlyWithinTheSameLayerObject() {
         val firstKey = S5MegpoidBlockLookupSlot.KEY_1.lookupKey
         val secondKey = S5MegpoidBlockLookupSlot.KEY_2.lookupKey
         val tree = S5ModelObjectTree.parseUtf8(
             """{"layers":[{"$firstKey":"*F32AAAAAA==","$secondKey":"*F32AQAAAA=="},{"$firstKey":"*F32AgAAAA=="}]}"""
         )
 
-        val pairs = S5MegpoidBlockTensorIndex.build(tree).matrixPropertyPairs()
+        val pairs = S5MegpoidBlockTensorIndex.build(tree).modelPropertyPairs()
 
         assertEquals(1, pairs.size)
         assertEquals("$/layers[0]", pairs.single().containingObjectPath)
