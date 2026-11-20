@@ -80,6 +80,14 @@ def decode_payload(data: bytes) -> bytes:
     return bytes(out)
 
 
+# Fixed model-tree keys queried by FUN_18004e3b0 and FUN_18004e1e0.
+# These are already-formatted four-word hex strings, not salted parameter names.
+MODEL_FLAG_LOOKUP_KEYS = {
+    "flag_18004e3b0": "69d61aca6f87b9618d4c65b9560cb5be",
+    "flag_18004e1e0": "9f174dc2b1ab89f96f4577e17d5e568a",
+}
+
+
 S5_KEY_SUFFIX = bytes.fromhex(
     "69 23 33 65 2e 63 5a 54 25 35 6b 39 6a 32 64 2c 32 5a 72 53 2f 2b 2f 32"
 )
@@ -268,6 +276,14 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                     f"matched={len(module_matches)}/9",
                     f"names={module_matches}",
                 )
+                for flag_name, lookup_key in MODEL_FLAG_LOOKUP_KEYS.items():
+                    print(
+                        "MODEL_FEATURE_FLAG",
+                        f"member={item.filename}",
+                        f"name={flag_name}",
+                        f"present={lookup_key in all_keys}",
+                        f"lookup_key={lookup_key}",
+                    )
                 recovered += 1
             else:
                 prefix = decoded[:24]
