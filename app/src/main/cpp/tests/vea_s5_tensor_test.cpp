@@ -621,6 +621,76 @@ int main() {
         block_output, block_channels, block_positions, block_expanded, 0.25f) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
+    // S5API FUN_18002aa90 payload transform: seeded multiword and tail vectors.
+    const uint8_t payload_tail_input[] = {
+        0x56, 0x54, 0x42, 0x52, 0x0f, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x78, 0x56, 0x34, 0x12,
+        0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77
+    };
+    const uint8_t payload_tail_expected[] = {
+        0x65, 0x20, 0x4d, 0xf1, 0x16, 0x3a, 0xfb
+    };
+    size_t decoded_payload_size = 0u;
+    assert(vea_s5_decode_model_payload(
+        payload_tail_input, sizeof(payload_tail_input), nullptr, 0u,
+        &decoded_payload_size) == VEA_S5_CONTAINER_STATUS_BUFFER_TOO_SMALL);
+    assert(decoded_payload_size == sizeof(payload_tail_expected));
+    uint8_t decoded_payload[sizeof(payload_tail_expected)] = {};
+    assert(vea_s5_decode_model_payload(
+        payload_tail_input, sizeof(payload_tail_input),
+        decoded_payload, sizeof(decoded_payload), &decoded_payload_size) ==
+        VEA_S5_CONTAINER_STATUS_OK);
+    assert(decoded_payload_size == sizeof(payload_tail_expected));
+    assert(std::memcmp(decoded_payload, payload_tail_expected, sizeof(decoded_payload)) == 0);
+
+    const uint8_t payload_multiword_input[] = {
+        0x56, 0x54, 0x4d, 0x47, 0x14, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0xef, 0xbe, 0xad, 0xde,
+        0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+        0x09, 0x0a, 0x0b, 0x0c
+    };
+    const uint8_t payload_multiword_expected[] = {
+        0xb2, 0x8d, 0xa3, 0xb2, 0xfa, 0xd7, 0x55, 0x79,
+        0xfa, 0x89, 0x11, 0x8f
+    };
+    uint8_t decoded_multiword[sizeof(payload_multiword_expected)] = {};
+    assert(vea_s5_decode_model_payload(
+        payload_multiword_input, sizeof(payload_multiword_input),
+        decoded_multiword, sizeof(decoded_multiword), &decoded_payload_size) ==
+        VEA_S5_CONTAINER_STATUS_OK);
+    assert(decoded_payload_size == sizeof(payload_multiword_expected));
+    assert(std::memcmp(decoded_multiword, payload_multiword_expected,
+        sizeof(decoded_multiword)) == 0);
+
+    // Insufficient capacity is atomic, and unrecognized data uses the copy path.
+    uint8_t too_small_output[sizeof(payload_tail_expected) - 1u];
+    std::memset(too_small_output, 0xa5, sizeof(too_small_output));
+    assert(vea_s5_decode_model_payload(
+        payload_tail_input, sizeof(payload_tail_input),
+        too_small_output, sizeof(too_small_output), &decoded_payload_size) ==
+        VEA_S5_CONTAINER_STATUS_BUFFER_TOO_SMALL);
+    for (uint8_t value : too_small_output) assert(value == 0xa5u);
+
+    uint8_t passthrough_input[20] = {
+        0x4a, 0x53, 0x4f, 0x4e, 0x10, 0x00, 0x00, 0x00
+    };
+    for (size_t index = 8; index < sizeof(passthrough_input); ++index) {
+        passthrough_input[index] = static_cast<uint8_t>(index * 3u);
+    }
+    uint8_t passthrough_output[sizeof(passthrough_input)] = {};
+    assert(vea_s5_decode_model_payload(
+        passthrough_input, sizeof(passthrough_input),
+        passthrough_output, sizeof(passthrough_output), &decoded_payload_size) ==
+        VEA_S5_CONTAINER_STATUS_OK);
+    assert(decoded_payload_size == sizeof(passthrough_input));
+    assert(std::memcmp(passthrough_input, passthrough_output, sizeof(passthrough_input)) == 0);
+
+    const uint8_t short_model_header[12] = {};
+    assert(vea_s5_decode_model_payload(
+        short_model_header, sizeof(short_model_header), nullptr, 0u,
+        &decoded_payload_size) == VEA_S5_CONTAINER_STATUS_OK);
+    assert(decoded_payload_size == 0u);
+
     // Fixed 136-byte outer header observed in all five supplied V7 model files.
     uint8_t raw_header[VEA_S5_CONTAINER_HEADER_SIZE] = {};
     raw_header[4] = 100u;
