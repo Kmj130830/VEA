@@ -77,6 +77,16 @@ data class S5MegpoidPackedNamedLayer(
     val packedBiasValues: FloatArray
 )
 
+/** Decoded source-order arrays and descriptor metadata passed to the native owner. */
+data class S5MegpoidNativeParameterInputs(
+    val weightArrays: Array<FloatArray>,
+    val biasArrays: Array<FloatArray>,
+    val axis0Counts: IntArray,
+    val axis1Counts: IntArray,
+    val matrixCounts: IntArray,
+    val descriptorPairOffsets: IntArray
+)
+
 data class S5MegpoidNamedLayerParameters(
     val layer: S5MegpoidNamedLayer,
     val weight: S5MegpoidNamedLayerTensorReference,
@@ -209,6 +219,59 @@ class S5MegpoidNamedLayerTensorIndex private constructor(
             packedWeightValues = packed.packedValues,
             biasValues = biasValues,
             packedBiasValues = packedBias
+        )
+    }
+
+
+    /**
+     * Decodes the nine real VTMG tensors into native source order and pairs
+     * them with the exact descriptor dimensions and vendor object offsets.
+     * This method only builds inputs; prepareNativeParameterSet() copies them
+     * into a persistent native arena.
+     */
+    fun buildNativeParameterInputs(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidNativeParameterInputs {
+        val parameters = layers
+        check(parameters.size == S5MegpoidNamedLayer.entries.size) {
+            "All nine named model layers are required."
+        }
+        val shapes = parameters.map { layer ->
+            layer.shapeOrNull()
+                ?: throw IllegalStateException(
+                    "Named layer '${layer.layer.modelName}' has inconsistent tensor dimensions."
+                )
+        }
+        val weights = Array(parameters.size) { index ->
+            parameters[index].weight.decodeFloatArray(tensorDecoder)
+        }
+        val biases = Array(parameters.size) { index ->
+            parameters[index].bias.decodeFloatArray(tensorDecoder)
+        }
+        return S5MegpoidNativeParameterInputs(
+            weightArrays = weights,
+            biasArrays = biases,
+            axis0Counts = IntArray(parameters.size) { shapes[it].axis0Count },
+            axis1Counts = IntArray(parameters.size) { shapes[it].axis1Count },
+            matrixCounts = IntArray(parameters.size) { shapes[it].matrixCount },
+            descriptorPairOffsets = IntArray(parameters.size) {
+                parameters[it].layer.descriptorPairOffsetBytes
+            }
+        )
+    }
+
+    /** Builds the persistent native descriptor table from the loaded VTMG data. */
+    fun prepareNativeParameterSet(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidNativeParameterSet {
+        val inputs = buildNativeParameterInputs(tensorDecoder)
+        return NativeS5TensorBridge.createNamedLayerParameterSet(
+            inputs.weightArrays,
+            inputs.biasArrays,
+            inputs.axis0Counts,
+            inputs.axis1Counts,
+            inputs.matrixCounts,
+            inputs.descriptorPairOffsets
         )
     }
 
