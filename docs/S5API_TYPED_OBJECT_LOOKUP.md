@@ -31,9 +31,8 @@ The visible operations in `FUN_18001b1f0` are:
 `FUN_18001acc0` formats the four 32-bit digest words as four groups of
 eight hexadecimal digits, zero-padded with `setw(8)`. It sets the stream's
 hexadecimal basefield and does not enable uppercase, so the emitted key is
-32 lowercase hexadecimal characters. The four-word textual order is known;
-whether those words are serialized in the same byte order as the canonical
-RFC MD5 digest string is not yet established.
+32 lowercase hexadecimal characters. The values are formatted word-wise;
+this is not the canonical RFC MD5 byte-string rendering.
 
 `FUN_18000b100` traverses an ordered tree and compares the stored key string
 against the requested key using byte comparison plus a length tie-break.
@@ -108,45 +107,80 @@ The raw constants consumed by `FUN_1800656e0` are:
 
 For either marker, the four-byte prefix is removed before calling
 `FUN_18000f5f0`; that function decodes the remaining Base64 text.
-The `*F16` branch does not inline a fixed IEEE-754 conversion. It invokes an
-indirect conversion target stored at offset `+0x208` relative to the first
-argument of `FUN_1800656e0`. The call site in `FUN_180060270` passes its
-tensor-processing context as that first argument. The target's initializer,
-calling convention beyond the observed 16-bit scalar input, and exact numeric
-mapping remain unresolved.
+
+### F16 callback registration
+
+The `+0x208` callback is installed by CPU dispatch, not by the separate
+model-configuration record loader:
+
+1. `FUN_180060270` receives its processing context as `int* param_1` and
+   calls `FUN_18004f2d0(param_1 + 0x46)`. Pointer arithmetic on `int*`
+   places the CPU function table at byte offset `0x46 * 4 = 0x118`.
+2. `FUN_18004f2d0` receives that table as `undefined8* param_1` and stores
+   its selected scalar-conversion callback in `param_1[0x1e]`, byte offset
+   `0x1e * 8 = 0xf0`.
+3. The combined address is `0x118 + 0xf0 = 0x208`, exactly the indirect-call
+   field used by the `*F16` readers in `FUN_1800656e0` and
+   `FUN_18005e120`.
+
+The CPU dispatch selects one of two observed implementations:
+
+| CPU path | Installed target | Observed conversion |
+|---|---|---|
+| AVX2 + FMA + F16C feature branch | `FUN_1800a58b0` | Broadcasts the input 16-bit word and executes `VCVTPH2PS YMM0, XMM0`; the scalar caller consumes the low float lane |
+| Baseline fallback | `LAB_18003cb70` | Software bit conversion using sign, exponent and mantissa fields |
+
+The accelerated branch is AVX2/FMA/F16C, not AVX-512: the dispatch checks CPUID leaf-7 EBX bit 5 (AVX2) and leaf-1 ECX bits 12 (FMA) and 29 (F16C); the conversion instruction writes a YMM register.
+
+### Scalar fallback semantics
+
+`LAB_18003cb70` implements the following mapping:
+
+- Sign: moves half bit 15 to float bit 31.
+- Zero exponent: converts the 10-bit mantissa to float and multiplies by
+  `2^-24`, yielding signed zero or the half subnormal value.
+- Nonzero exponent: applies the ordinary half-to-float exponent bias
+  adjustment and shifts the mantissa into float32 position.
+
+The scalar routine does not contain a special case for exponent bits
+`0x1f`. Consequently, half encodings for infinity and NaN are mapped through
+the ordinary exponent path (to finite float bit patterns), unlike the F16C
+instruction, which performs IEEE binary16-to-binary32 conversion. For all
+finite half values with exponent 0 through 30, the two observed paths agree.
+This is an observed backend difference; it is not evidence that production
+voicebank tensors contain infinity or NaN values.
+
+VEA's current `HalfToFloat` uses standard IEEE-754 handling. It matches the
+F16C path and agrees with the scalar fallback for finite values, but not for
+the scalar fallback's exponent-`0x1f` edge case. PR #4's injectable callback
+remains useful when a caller needs to select or test an exact backend policy.
 
 A separate function, `FUN_180045130`, builds 0x50-byte records from a
 different hashed object-tree entry and moves that array to offset `+0x208`
-of the outer object in `Func_47a12a73`. That destination is a different base
-address from the `FUN_1800656e0` processing context (the latter is passed as
-an embedded context at outer-object offset `+0x898`). Current evidence does
-not connect those records to the F16 scalar conversion; the two uses of
-offset `+0x208` must not be conflated.
-
-The C++ typed-array parser already recognizes the confirmed `*F32` and
-`*F16` prefixes. PR #4 adds an injectable F16 conversion callback to that
-parser while preserving standard IEEE-754 binary16 as the fallback. This
-provides the extension point without claiming to match the vendor mapping.
+of the outer object in `Func_47a12a73`. That is a distinct object base and
+is not the CPU callback slot described above; the two uses of `+0x208`
+must not be conflated.
 
 ## Implementation implications
 
 - Implement field-name construction, salted digest calculation, digest text
   formatting, ordered-tree lookup, typed-value decoding, and outer container
   parsing as separate modules.
-- Add exact tests for the 24-byte suffix and MD5 digest bytes before wiring
-  model key lookup.
-- Do not infer the two tag-3 marker strings from their purpose or appearance.
-  Export their raw bytes and inspect the callback path first.
+- Keep key hashing, ordered-tree lookup, typed-value decoding, and outer
+  container parsing as separate modules. The salted-key helper is unit-tested
+  for both single- and multi-block input, but still needs a known-key
+  cross-check against a real model file.
+- Keep the two F16 CPU paths explicit in tests: IEEE/F16C behavior and the
+  finite-only-equivalent scalar fallback. Do not silently assume they agree
+  for exponent-`0x1f` inputs.
 - Do not label this layer as a VTB2 parser. It is the typed model-object
   representation consumed after the outer payload is available.
 
 ## Outstanding static questions
 
-1. Are the four MD5 state words rendered in canonical digest byte order or
-   word-wise numeric hexadecimal order?
-2. Which constructor installs the F16 conversion target at processing-context
-   offset `+0x208`, and what numeric mapping does it implement?
-3. What is the full grammar and dimensional metadata format accepted by
+1. Can the salted key implementation be verified against at least one
+   known parameter key extracted from a real voicebank model?
+2. What is the full grammar and dimensional metadata format accepted by
    `FUN_18000f5f0` / `FUN_18000f6d0`?
-4. How is the root object tree populated from the outer model container?
-5. Which consumer invokes the recurrent module after these tensors are loaded?
+3. How is the root object tree populated from the outer model container?
+4. Which consumer invokes the recurrent module after these tensors are loaded?
