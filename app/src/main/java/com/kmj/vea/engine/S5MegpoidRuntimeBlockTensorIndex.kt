@@ -53,6 +53,7 @@ class S5MegpoidRuntimeBlockTensorReference internal constructor(
     val marker: String,
     val elementCount: Int,
     val encodedPayloadBytes: Int,
+    val descriptorMetadata: List<Int>,
     private val encodedValue: S5ModelValue.StringValue
 ) {
     init {
@@ -135,10 +136,32 @@ class S5MegpoidRuntimeBlockTensorIndex private constructor(
                 mutableMapOf<Pair<Int, Int>, MutableList<S5MegpoidRuntimeBlockTensorReference>>()
             }
 
+            fun integerMetadataFromObject(value: S5ModelValue.ObjectValue): List<Int>? {
+                val candidates = value.fields.values.mapNotNull { child ->
+                    val array = (child as? S5ModelValue.ArrayValue)?.values ?: return@mapNotNull null
+                    if (array.isEmpty() || array.size > 32) return@mapNotNull null
+                    val integers = array.map { item ->
+                        val number = (item as? S5ModelValue.NumberValue)?.value
+                            ?: return@mapNotNull null
+                        if (!number.isFinite() || number % 1.0 != 0.0 ||
+                            number < Int.MIN_VALUE.toDouble() || number > Int.MAX_VALUE.toDouble()) {
+                            return@mapNotNull null
+                        }
+                        number.toInt()
+                    }
+                    integers
+                }
+                require(candidates.size <= 1) {
+                    "Matched model property contains multiple integer metadata arrays."
+                }
+                return candidates.singleOrNull()
+            }
+
             fun collectTypedLeaves(
                 value: S5ModelValue,
                 path: String,
-                entry: S5MegpoidRuntimeBlockFactoryKey
+                entry: S5MegpoidRuntimeBlockFactoryKey,
+                inheritedMetadata: List<Int> = emptyList()
             ) {
                 when (value) {
                     is S5ModelValue.StringValue -> {
@@ -154,16 +177,20 @@ class S5MegpoidRuntimeBlockTensorIndex private constructor(
                                         marker = marker,
                                         elementCount = elements,
                                         encodedPayloadBytes = bytes,
+                                        descriptorMetadata = inheritedMetadata,
                                         encodedValue = value
                                     )
                                 )
                         }
                     }
-                    is S5ModelValue.ObjectValue -> value.fields.forEach { (key, child) ->
-                        collectTypedLeaves(child, "$path/$key", entry)
+                    is S5ModelValue.ObjectValue -> {
+                        val metadata = integerMetadataFromObject(value) ?: inheritedMetadata
+                        value.fields.forEach { (key, child) ->
+                            collectTypedLeaves(child, "$path/$key", entry, metadata)
+                        }
                     }
                     is S5ModelValue.ArrayValue -> value.values.forEachIndexed { index, child ->
-                        collectTypedLeaves(child, "$path[$index]", entry)
+                        collectTypedLeaves(child, "$path[$index]", entry, inheritedMetadata)
                     }
                     else -> Unit
                 }
