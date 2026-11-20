@@ -11,11 +11,11 @@ enum class S5MegpoidRuntimeBlockFactory(
     val destinationOffset: Int,
     val description: String
 ) {
-    TRANSPOSED_TENSOR("FUN_1800ea000", 0x20, "3-D input tensor; the last two axes are transposed"),
+    DEPTHWISE_FILTER("FUN_1800ea000", 0x20, "3-D depthwise-filter tensor; the last two axes are transposed"),
     SHARED_DESCRIPTOR_A("FUN_1800ff330", 0x38, "First shared descriptor vector"),
     SHARED_DESCRIPTOR_B("FUN_1800f8220", 0x48, "Second shared descriptor vector"),
-    DEPTHWISE_WEIGHTS("FUN_18010d550", 0x68, "Weights attached to the descriptor at +0x58"),
-    DEPTHWISE_OPTIONAL_BIAS("FUN_180106440", 0x78, "Optional vector attached to the descriptor at +0x58"),
+    EXPANSION_WEIGHTS("FUN_18010d550", 0x68, "Expansion matrix attached to the C -> C*E descriptor at +0x58"),
+    EXPANSION_OPTIONAL_BIAS("FUN_180106440", 0x78, "Expansion-layer bias attached to the C -> C*E descriptor at +0x58"),
     PROJECTION_WEIGHTS("FUN_18011b770", 0x98, "Weights attached to the descriptor at +0x88"),
     PROJECTION_OPTIONAL_BIAS("FUN_180114660", 0xA8, "Optional vector attached to the descriptor at +0x88"),
     RESIDUAL_SCALE("FUN_1800f1110", 0xB8, "Residual-scale shared vector")
