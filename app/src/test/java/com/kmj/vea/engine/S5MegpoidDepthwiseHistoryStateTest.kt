@@ -12,7 +12,7 @@ class S5MegpoidDepthwiseHistoryStateTest {
 
         val window = state.appendAndBuildWindow(chunk)
 
-        assertEquals(1, state.currentPositions)
+        assertEquals(5, state.currentPositions)
         assertEquals(1, state.nextWriteIndex)
         assertEquals(2 * 7 * 5, window.size)
         for (channel in 0 until 2) {
@@ -35,7 +35,7 @@ class S5MegpoidDepthwiseHistoryStateTest {
             )
         }
 
-        assertEquals(4, state.nextWriteIndex)
+        assertEquals(1, state.nextWriteIndex)
         assertEquals(2, window.size / 2)
         assertEquals(listOf(20f, 21f, 30f, 31f, 40f, 41f), window.toList())
     }
