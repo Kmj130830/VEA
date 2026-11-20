@@ -112,7 +112,13 @@ public class ExportS5ModelObjectTree extends GhidraScript {
         "1800a7e60", // AVX-512 table slot +0x14
         "1800a8e40", // AVX-512 table slot +0x1b
         "1800a5370", // alternate CPU path table slot +0x14
-        "180072b30"  // baseline CPU path table slot +0x00
+        "180072b30", // baseline CPU path table slot +0x00
+        "18000daa0", // underlying JSON/text parser called by FUN_18000fec0
+        "18000b290", // parser error-context string append helper
+        "18000f340", // parser error formatter
+        "18001b020", // generic tree/node insertion helper
+        "18007b520", // allocate ordered-tree node
+        "18007abf0"  // commit ordered-tree node insertion
     };
 
     @Override
