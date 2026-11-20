@@ -58,10 +58,10 @@ The following operations are direct observations from the decompilation:
 - The first input vector is copied into an owned float buffer stored through
   the record's `+0x20` shared-pointer field. The buffer has
   `param_1[4] * param_1[5] * param_1[6]` elements. Its traversal changes
-  source order from
-  `((axisA * dimB + axisB) * dimC + axisC)` to
-  `((axisA * dimC + axisC) * dimB + axisB)`; in other words, the final two
-  axes are transposed.
+  source order from `[C][H][W]`, index
+  `((c * H + y) * W + x)`, to `[W][C][H]`, index
+  `((x * C + c) * H + y)`. This is a three-axis permutation, not merely a
+  swap of the final two axes.
 - `FUN_1800d4a90` populates a nested descriptor beginning at destination
   offset `+0x30` from the first descriptor pair.
 - `FUN_1800d4610` populates nested descriptors beginning at `+0x58` and
@@ -82,8 +82,10 @@ MLP kernel: the expansion matrix storage has the expected
 This also corrects the earlier rough note that described the normalization
 arrays as length `C`; the builder's actual allocation loop uses `C * E`.
 
-The `+0x20` source vector's axis order is also now explicit. It is a
-three-dimensional tensor transpose, not a plain flat copy.
+The `+0x20` source vector's three-axis permutation is explicit. Its actual
+runtime dimensions are supplied by the per-block descriptor initialized by
+`FUN_1800bc5e0`; the static VTB2 metadata array is recorded separately and
+must not be confused with the destination pointer's axis order.
 
 ## Existing runtime field consumers
 
@@ -118,7 +120,7 @@ one entry from a 16×16 table using the two loop indices `iVar14` and
 
 | Factory | Builder input | Destination in the 0x100-byte block | Current source role |
 |---|---:|---:|---|
-| `FUN_1800ea000` | param2 | `+0x20` | 3-D tensor, last two axes transposed |
+| `FUN_1800ea000` | param2 | `+0x20` | depthwise tensor; builder permutes `[C,H,W]` to `[W,C,H]` |
 | `FUN_1800ff330` | param3 | `+0x38` | first shared descriptor vector |
 | `FUN_1800f8220` | param4 | `+0x48` | second shared descriptor vector |
 | `FUN_18010d550` | param5 | `+0x68` via descriptor at `+0x58` | nested matrix weights |
@@ -135,14 +137,81 @@ the table in the unexecuted DLL is all zero because these static tables are
 populated by runtime initialization; the key strings are instead recoverable
 from the initialization code itself.
 
-The verifier now accepts the Ghidra report via `--ghidra-report`, extracts
-all 2,048 candidate keys, and matches them recursively against the actual
-`AI_Megpoid.vtb2` JSON tree. The workflow records only matched key,
-factory/index, parent path, and value layout (typed scalar kind and element
-count); it does not print tensor contents. The next result will establish
-which table indices are actually present in the supplied bank and confirm
-whether optional properties are present for each block.
+The verifier extracts all 2,048 candidate keys (eight 16x16 tables) and
+matches them against the actual `AI_Megpoid.vtb2` tree. The supplied bank
+contains eight entries per factory, at rows 0..3 and columns 0..1, for 64
+matched properties total. The report records only the key, factory/grid
+position, parent path, scalar type, payload element count and small integer
+metadata; it does not print tensor contents.
 
-The Android code has a checked residual-block input contract, but it still
-does not construct a complete singing forward pass. No synthesized PCM
-output is claimed.
+### Observed VTB2 layouts
+
+All eight factory properties occur in the same per-block object. The
+following metadata and payload lengths were observed for each of the eight
+blocks in the supplied bank:
+
+| Factory | Metadata | Payload elements | Builder/runtime role |
+|---|---:|---:|---|
+| `FUN_1800ea000` | `[7,7,1,32]` | 1,568 F32 | depthwise filter input |
+| `FUN_1800ff330` | `[32]` | 32 F32 | descriptor vector A |
+| `FUN_1800f8220` | `[32]` | 32 F32 | descriptor vector B |
+| `FUN_18010d550` | `[1,1,32,64]` | 2,048 F32 | expansion-layer matrix source |
+| `FUN_180106440` | `[64]` | 64 F32 | expansion-layer source bias |
+| `FUN_18011b770` | `[1,1,64,32]` | 2,048 F32 | projection matrix source |
+| `FUN_180114660` | `[32]` | 32 F32 | optional projection bias |
+| `FUN_1800f1110` | `[1,1,32,1]` | 32 F32 | residual-scale vector |
+
+The channel and expanded-feature sizes are therefore `C=32` and
+`C*E=64` for these blocks (`E=2`). The generated expansion matrix has
+`C*E*C=2,048` values; both generated affine arrays have 64 values. The
+epsilon stored at `+0xF8` is `1.0e-6`.
+
+### Generated expansion parameters
+
+The scalar loop in `FUN_1800d4bf0` consumes the source expansion matrix in
+feature-major groups of `C` values and forms the runtime arrays as follows:
+
+```text
+W'[f,c] = W[f,c] * A[c]
+gamma[f] = sourceBias[f] + sum_c(W[f,c] * B[c])
+beta[f]  = sum_c(W[f,c] * A[c])
+```
+
+Here `A` and `B` are the two 32-element descriptor vectors. The runtime
+builder writes `W'` to `+0xC8`, `gamma` to `+0xD8`, and `beta` to
+`+0xE8`. The 64x32 projection source is copied into the nested descriptor
+without an additional matrix transpose in `FUN_1800d4610`.
+
+### History/ring-buffer boundary
+
+`FUN_1800c5d50` calls `FUN_1800c67e0` before the statistics and MLP steps.
+The history helper is stateful: it sizes a workspace from the channel count,
+chunk position count and the descriptor's history depth; copies each incoming
+chunk into a rotating history slot; then builds pointers to the retained slots
+before applying the depthwise filter. Consequently, the stateless Android
+`vea_s5_run_residual_dw_mlp_block_f32` path, which accepts already materialized
+`[channel][7][position]` windows and applies a direct reflect-padded 7x7
+convolution, is currently a reference kernel, not a proven bit-exact port of
+`FUN_1800c67e0`.
+
+The residual affine order was checked against the original operator and the
+C++ helper matches it: `(projected + optionalBias) * residualScale + residual`.
+The expansion, normalization/GELU, projection and residual stages are thus
+connected as an isolated block reference, but the streaming history scheduler
+and complete singing forward pass remain unfinished.
+
+### Android implementation status
+
+- `S5MegpoidRuntimeBlockTensorIndex` indexes exact keys and retains the
+  per-property shape metadata.
+- `S5MegpoidRuntimeBlockAssembler` decodes all eight tensor roles, checks
+  metadata and element counts, forms the generated expansion matrix and
+  affine arrays, and keeps both the source channel-major filter and the
+  `[W][C][H]` native-record permutation.
+- `S5VoicebankModelPackage.prepareRuntimeBlocks(..., positions)` prepares
+  the eight blocks from the loaded voicebank package. It requires the
+  caller's actual chunk length.
+- `runReferenceWindow` is explicitly limited to kernel-level experiments;
+  it does not claim to reproduce the original stateful history path.
+- `SynthesisEngine.render` remains unimplemented. No end-to-end vocal
+  synthesis or WAV/PCM output is claimed.
