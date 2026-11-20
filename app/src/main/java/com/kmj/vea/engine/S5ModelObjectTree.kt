@@ -29,6 +29,53 @@ class S5ModelObjectTree private constructor(val root: S5ModelValue.ObjectValue) 
 
     fun findByLookupKey(key: String): S5ModelValue? = root.fields[key]
 
+    data class LookupMatch(
+        val path: String,
+        val value: S5ModelValue
+    )
+
+    /**
+     * Searches every nested object and array for a property key.
+     *
+     * Some shared VTMG parameter dictionaries are stored below a top-level
+     * model container. The ordinary findByLookupKey() remains root-only to
+     * preserve its original contract; named-parameter callers can use this
+     * explicit recursive variant and reject ambiguous duplicate keys.
+     */
+    fun findAllByLookupKeyRecursive(key: String): List<LookupMatch> {
+        require(key.isNotEmpty()) { "Lookup key must not be empty." }
+        val matches = mutableListOf<LookupMatch>()
+        val stack = mutableListOf(root to "$")
+        while (stack.isNotEmpty()) {
+            val (current, path) = stack.removeAt(stack.lastIndex)
+            when (current) {
+                is S5ModelValue.ObjectValue -> current.fields.forEach { (childKey, child) ->
+                    val childPath = "$path/$childKey"
+                    if (childKey == key) matches += LookupMatch(childPath, child)
+                    stack += child to childPath
+                }
+                is S5ModelValue.ArrayValue -> current.values.forEachIndexed { index, child ->
+                    stack += child to "$path[$index]"
+                }
+                else -> Unit
+            }
+        }
+        return matches
+    }
+
+    /**
+     * Returns the sole recursive key match. Missing keys return null; duplicate
+     * matches are rejected rather than selecting one based on traversal order.
+     */
+    fun findUniqueByLookupKeyRecursive(key: String): LookupMatch? {
+        val matches = findAllByLookupKeyRecursive(key)
+        require(matches.size <= 1) {
+            "Model lookup key '$key' is ambiguous at: " +
+                matches.joinToString { it.path }
+        }
+        return matches.singleOrNull()
+    }
+
     /** Hashes a full property name; the injectable hasher keeps JVM tests independent of JNI. */
     fun findParameter(
         parameterName: String,
