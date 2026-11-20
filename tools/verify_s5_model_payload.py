@@ -386,6 +386,7 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                         f"member={item.filename}",
                         f"name={function_key}",
                         f"present={lookup_key in all_keys}",
+                        f"values={[describe_value(value) for value in key_values.get(lookup_key, [])]}",
                         f"lookup_key={lookup_key}",
                     )
                 recovered += 1
