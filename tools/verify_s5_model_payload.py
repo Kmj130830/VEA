@@ -430,6 +430,23 @@ NAMED_MODEL_LAYER_BANK_COUNTS = {
 }
 
 
+def inspect_named_layer_container_keys(
+    member: str, key_values: dict[str, list[object]]
+) -> None:
+    """Report hashed child-key names under FUN_180068190's layer container."""
+    container_key = MODEL_STATIC_LOOKUP_KEYS["fun_180068190_key_3"]
+    for occurrence_index, value in enumerate(key_values.get(container_key, [])):
+        if isinstance(value, dict):
+            print(
+                "MODEL_NAMED_LAYER_CONTAINER_KEYS",
+                f"member={member}",
+                f"occurrence={occurrence_index}",
+                f"key_count={len(value)}",
+                f"keys={sorted(value.keys())}",
+                f"value_kinds={{{', '.join(repr(k) + ': ' + repr(describe_value(v)) for k, v in sorted(value.items()))}}}",
+            )
+
+
 def inspect_megpoid_named_layer_parameters(
     member: str, key_values: dict[str, list[object]]
 ) -> None:
@@ -678,6 +695,7 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                 if item.filename == "AI_Megpoid.vtb2":
                     inspect_megpoid_layer_property_pairs(root, item.filename)
                 if item.filename.lower().endswith(".vtmg"):
+                    inspect_named_layer_container_keys(item.filename, key_values)
                     inspect_megpoid_named_layer_parameters(item.filename, key_values)
                 for root_key, root_value in root.items():
                     shape = value_shape(root_value)
