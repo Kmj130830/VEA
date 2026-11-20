@@ -267,7 +267,7 @@ object NativeS5TensorBridge {
         epsilon: Float
     ): FloatArray {
         check(loaded) { "Native S5 tensor library is not loaded." }
-        require(expandedFeatures > 0 && expandedFeatures % channels.coerceAtLeast(1) == 0) {
+        require(channels > 0 && expandedFeatures > 0 && expandedFeatures % channels == 0) {
             "Expanded feature count must be a positive multiple of channels."
         }
         val shape = S5MegpoidResidualBlockShape(
