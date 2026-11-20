@@ -124,6 +124,30 @@ class S5ModelArchiveReaderTest {
         }
     }
 
+
+    @Test
+    fun readsSharedModelArchiveWithoutSingerMemberWhenAllowed() {
+        val reader = S5ModelArchiveReader(
+            payloadDecoder = S5ModelPayloadDecoder { json.toByteArray(StandardCharsets.UTF_8) }
+        )
+        val archive = reader.read(
+            ByteArrayInputStream(
+                makeZip(
+                    "COMMON7.vpit" to modelMember("VPIT"),
+                    "VOCALOID7.vhnv" to modelMember("VHNV"),
+                    "VOCALOID7.vtmg" to modelMember("VTMG")
+                )
+            ),
+            requireSingerModelMember = false
+        )
+
+        assertEquals(
+            setOf("COMMON7.vpit", "VOCALOID7.vhnv", "VOCALOID7.vtmg"),
+            archive.members.keys
+        )
+        assertTrue(archive.members.values.all { it.sha256.matches(Regex("[0-9a-f]{64}")) })
+    }
+
     private fun modelMember(magic: String): ByteArray {
         val raw = ByteArray(136 + 24)
         val buffer = ByteBuffer.wrap(raw).order(ByteOrder.LITTLE_ENDIAN)
