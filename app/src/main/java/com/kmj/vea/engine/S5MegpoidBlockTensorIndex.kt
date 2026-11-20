@@ -106,6 +106,17 @@ data class S5MegpoidModelPropertyPair(
      * first. ROW_MAJOR/COLUMN_MAJOR selects the observed param_11 traversal
      * branch; callers must supply the descriptor's real orientation.
      */
+    /**
+     * Decodes using the orientation selected by the repeated-block wrapper.
+     *
+     * FUN_18005e9b0 passes zero in the Win64 stack slot for FUN_180063ca0's
+     * param_11 at callsite 0x18005eb04, selecting its row-major fill branch.
+     */
+    fun decodeNativeMatrixBankPayloadOrNull(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidDecodedMatrixBank? =
+        decodeMatrixBankPayloadOrNull(S5MegpoidMatrixInputOrder.ROW_MAJOR, tensorDecoder)
+
     fun decodeMatrixBankPayloadOrNull(
         inputOrder: S5MegpoidMatrixInputOrder,
         tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
