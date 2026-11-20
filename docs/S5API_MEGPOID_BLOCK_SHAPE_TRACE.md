@@ -474,6 +474,59 @@ That requires tracing the constructor writes into these record offsets.
 
 This establishes where the residual operator is scheduled and how its per-position/per-block records are addressed. It does **not** yet show which `AI_Megpoid.vtb2` tensor paths populate the `0x100`-byte block-data records, the `0x88`-byte state records, or the workspace descriptors. Therefore the current Android matrix decoder remains an isolated layout conversion layer; it is not yet wired to `vea_s5_run_residual_dw_mlp_block_f32`, and no PCM synthesis is claimed.
 
+## Named neural layer weights in VOCALOID7.vtmg
+
+The named-layer path was traced separately from the fixed-key block path.
+
+- `FUN_180068190` selects the named-layer configuration and calls
+  `FUN_180064670` for the nine literal layer names:
+  `pre1`, `pre2`, `conv1`, `cond1`, `conv2`, `cond2`,
+  `conv3`, `cond3`, and `linear`.
+- `FUN_180064670` appends `.weight` and `.bias` to the supplied
+  layer name, hashes each complete property name, then resolves each
+  property from the supplied model object.
+- The corresponding tensor properties are present in the shared
+  `VOCALOID7.vtmg` member. Both weight and bias are single typed `*F32`
+  payloads for all nine layers in the supplied archive.
+- The recovered matrix-bank counts are 1 for `pre1`, `pre2`,
+  `cond1`, `cond2`, `cond3`, and `linear`; 3 for `conv1`,
+  `conv2`, and `conv3`.
+
+The payload-count audit gives the following values:
+
+| Layer | Matrix bank count | Weight elements | Bias elements | Weight elements per matrix | Quotient vs. bias |
+|---|---:|---:|---:|---:|---:|
+| `pre1` | 1 | 2,624 | 32 | 2,624 | 82 |
+| `pre2` | 1 | 1,024 | 32 | 1,024 | 32 |
+| `conv1` | 3 | 6,144 | 64 | 2,048 | 32 |
+| `cond1` | 1 | 1,664 | 64 | 1,664 | 26 |
+| `conv2` | 3 | 6,144 | 64 | 2,048 | 32 |
+| `cond2` | 1 | 1,664 | 64 | 1,664 | 26 |
+| `conv3` | 3 | 6,144 | 64 | 2,048 | 32 |
+| `cond3` | 1 | 1,664 | 64 | 1,664 | 26 |
+| `linear` | 1 | 96 | 3 | 96 | 32 |
+
+These are validated element-count relationships, not semantic axis labels:
+the current report does not call either weight dimension input/output
+channels. The Android `S5MegpoidNamedLayerTensorIndex` now resolves these
+nine named weight/bias pairs from the shared model tree and exposes
+shape-count candidates without assigning an unsupported matrix orientation.
+
+### Parameter-key byte order
+
+The dynamic S5 parameter hash is an MD5 digest of the UTF-8 parameter name
+followed by the recovered 24-byte suffix. The model JSON stores the resulting
+16 digest bytes in canonical lowercase hexadecimal byte order. The initial
+native implementation formatted each 32-bit MD5 state word as an integer,
+which reversed the byte order inside each word. The native formatter has been
+corrected to emit each state word's four bytes in little-endian digest order.
+Tests now include the real model keys for `pre1.weight` and `conv1.bias`,
+in addition to the generic MD5 test vectors.
+
+This makes named-property lookup compatible with the actual `VOCALOID7.vtmg`
+JSON keys. It does not by itself identify how these named matrices feed the
+runtime residual operator or establish an end-to-end inference schedule.
+
 ## What is still not connected
 
 - The nine fixed lookup keys in `AI_Megpoid.vtb2` have been found and indexed.
