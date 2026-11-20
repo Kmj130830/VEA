@@ -606,6 +606,7 @@ def inspect_megpoid_layer_property_pairs(root: dict, member: str) -> None:
     repeated_block_shape_count = 0
     repeated_block_banks: dict[int, int] = {}
     single_bank_entry_candidate_count = 0
+    root_group_stats: dict[str, dict[str, object]] = {}
     while stack:
         current, path = stack.pop()
         if isinstance(current, dict):
@@ -613,6 +614,17 @@ def inspect_megpoid_layer_property_pairs(root: dict, member: str) -> None:
                 first = typed_tensor_lengths(current[first_key])
                 second = typed_tensor_lengths(current[second_key])
                 pair_count += 1
+                top_group = path.split("/", 2)[1] if "/" in path else "$"
+                group_stats = root_group_stats.setdefault(
+                    top_group,
+                    {
+                        "pairs": 0,
+                        "repeated": 0,
+                        "single_bank_candidate": 0,
+                        "repeated_banks": {},
+                    },
+                )
+                group_stats["pairs"] = int(group_stats["pairs"]) + 1
                 ratio = None
                 if len(first) != 1 or len(second) != 1:
                     ambiguous_count += 1
@@ -644,6 +656,9 @@ def inspect_megpoid_layer_property_pairs(root: dict, member: str) -> None:
                             and primary_elements == secondary_elements * ratio
                         ):
                             single_bank_entry_candidate_count += 1
+                            group_stats["single_bank_candidate"] = (
+                                int(group_stats["single_bank_candidate"]) + 1
+                            )
                         # FUN_180052f90 callsite 0x180053421 passes
                         # columns = descriptor[+4], rows = 2*descriptor[+4],
                         # matrixCount = descriptor[+0].
@@ -656,6 +671,12 @@ def inspect_megpoid_layer_property_pairs(root: dict, member: str) -> None:
                                     repeated_block_shape_count += 1
                                     repeated_block_banks[matrix_count] = (
                                         repeated_block_banks.get(matrix_count, 0) + 1
+                                    )
+                                    group_stats["repeated"] = int(group_stats["repeated"]) + 1
+                                    group_banks = group_stats["repeated_banks"]
+                                    assert isinstance(group_banks, dict)
+                                    group_banks[matrix_count] = (
+                                        int(group_banks.get(matrix_count, 0)) + 1
                                     )
                 print(
                     "MODEL_LAYER_PROPERTY_PAIR",
@@ -684,6 +705,7 @@ def inspect_megpoid_layer_property_pairs(root: dict, member: str) -> None:
         f"repeated_block_matrix_counts={dict(sorted(repeated_block_banks.items()))}",
         f"single_bank_entry_shape_candidates={single_bank_entry_candidate_count}",
         f"single_bank_only_candidates={single_bank_entry_candidate_count - repeated_block_shape_count}",
+        f"root_group_stats={dict(sorted(root_group_stats.items()))}",
     )
 
 
