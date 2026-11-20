@@ -158,11 +158,19 @@ extern "C" VeaS5TensorStatus vea_s5_hash_parameter_key(
     const VeaS5TensorStatus status = ComputeS5KeyWords(name_bytes, name_size, &words);
     if (status != VEA_S5_TENSOR_STATUS_OK) return status;
 
-    char formatted[kRequired] = {};
-    const int written = std::snprintf(
-        formatted, sizeof(formatted), "%08x%08x%08x%08x",
-        words[0], words[1], words[2], words[3]);
-    if (written != 32) return VEA_S5_TENSOR_STATUS_MALFORMED_DATA;
-    std::memcpy(out_hex, formatted, sizeof(formatted));
+    // The model JSON stores the MD5 digest as its 16 digest bytes in
+    // canonical hex order. Each MD5 state word is serialized little-endian.
+    // Writing each word as an integer ("%08x") reverses the four bytes and
+    // does not match keys such as VOCALOID7.vtmg's pre1.weight entry.
+    constexpr char kHex[] = "0123456789abcdef";
+    size_t cursor = 0;
+    for (const uint32_t word : words) {
+        for (uint32_t byte_index = 0; byte_index < 4u; ++byte_index) {
+            const uint8_t byte = static_cast<uint8_t>(word >> (byte_index * 8u));
+            out_hex[cursor++] = kHex[byte >> 4u];
+            out_hex[cursor++] = kHex[byte & 0x0fu];
+        }
+    }
+    out_hex[cursor] = '\\0';
     return VEA_S5_TENSOR_STATUS_OK;
 }
