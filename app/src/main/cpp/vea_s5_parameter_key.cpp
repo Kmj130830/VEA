@@ -171,6 +171,6 @@ extern "C" VeaS5TensorStatus vea_s5_hash_parameter_key(
             out_hex[cursor++] = kHex[byte & 0x0fu];
         }
     }
-    out_hex[cursor] = '\\0';
+    out_hex[cursor] = '\0';
     return VEA_S5_TENSOR_STATUS_OK;
 }
