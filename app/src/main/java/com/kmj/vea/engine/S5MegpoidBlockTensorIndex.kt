@@ -28,15 +28,20 @@ enum class S5MegpoidBlockLookupSlot(val lookupKey: String) {
  * columns * banks when the descriptor path is the one recovered here. It does
  * not identify either matrix's semantic role.
  */
+data class S5MegpoidRepeatedBlockMatrixShape(
+    val rows: Int,
+    val columns: Int,
+    val matrixCount: Int
+)
+
 data class S5MegpoidModelPropertyPair(
     val containingObjectPath: String,
     val first: S5MegpoidModelTensorReference,
     val second: S5MegpoidModelTensorReference
 ) {
     /**
-     * Candidate (columns * banks) factor from the recovered descriptor layout.
-     * Null means the observed payload lengths do not satisfy the descriptor
-     * divisibility relationship, or contain an empty tensor.
+     * Exact element-count quotient of the primary matrix payload and secondary
+     * vector payload. For FUN_180063ca0 this equals columns * matrixCount.
      */
     val primaryToSecondaryElementRatio: Int?
         get() {
@@ -45,6 +50,33 @@ data class S5MegpoidModelPropertyPair(
             if (primary <= 0 || secondary <= 0 || primary % secondary != 0) return null
             return primary / secondary
         }
+
+    /**
+     * Recovered FUN_180052f90 first-property call shape.
+     *
+     * At callsite 0x180053421, the caller passes:
+     *   columns = descriptor[+4]
+     *   rows = 2 * descriptor[+4]
+     *   matrixCount = descriptor[+0]
+     *
+     * FUN_180064e90 loads the second property as a one-row vector whose
+     * element count equals the matrix row count. Therefore this candidate is
+     * available only when KEY_2 has an even element count and the primary /
+     * secondary quotient is divisible by rows / 2. Pairs not satisfying this
+     * pattern belong to another loader path or remain unclassified.
+     */
+    fun repeatedBlockMatrixShapeOrNull(): S5MegpoidRepeatedBlockMatrixShape? {
+        val rows = second.elementCount
+        if (rows < 2 || rows % 2 != 0) return null
+        val columns = rows / 2
+        val ratio = primaryToSecondaryElementRatio ?: return null
+        if (ratio % columns != 0) return null
+        val matrixCount = ratio / columns
+        if (matrixCount <= 0) return null
+        val expectedElements = rows.toLong() * columns.toLong() * matrixCount.toLong()
+        if (expectedElements != first.elementCount.toLong()) return null
+        return S5MegpoidRepeatedBlockMatrixShape(rows, columns, matrixCount)
+    }
 }
 
 /**
