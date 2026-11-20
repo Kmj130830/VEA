@@ -106,35 +106,58 @@ This contract is derived from the observed runtime projection dimensions and
 the existing Android C++ function signature. It does not yet identify the
 matching object-tree paths for each buffer.
 
-## Matrix-property lookup correction
+## Primary matrix and secondary layer property
 
-The second Ghidra report includes the full body of `FUN_180052f90` and
-`FUN_18005e9b0`. It clarifies an important distinction in the earlier flat
-tensor index:
+The follow-up decompilation of `FUN_180063ca0` corrects an earlier
+interpretation: the two fixed hashes passed through `FUN_18005e9b0` are not
+two matrix tensors.
 
-- The first two fixed hashes are generated as two property names inside the
-  selected per-layer object.
-- `FUN_180052f90` obtains that layer object and passes the two property names
-  to `FUN_18005e9b0`.
-- `FUN_18005e9b0` copies both names and passes the layer object plus those
-  names to `FUN_180063ca0`.
-- `FUN_180063ca0` resolves the two properties independently and creates
-  matrix objects using the supplied row/column descriptor arguments. It
-  supports multiple numeric storage forms, including float32 and float16
-  paths, and writes matrix elements into the native matrix objects.
+- `FUN_180052f90` constructs two fixed lookup keys and passes them with a
+  selected layer object to `FUN_18005e9b0`.
+- `FUN_18005e9b0` copies those key strings and calls `FUN_180063ca0`.
+- `FUN_180063ca0` resolves its first key and creates a bank of
+  `NVGen::BlockMatrix16` / `BlockMatrix32` objects. Their per-matrix shape
+  is initialized from descriptor arguments `param_7` (rows) and
+  `param_6` (columns); `param_8` is the number of matrix objects in the
+  bank. The typed payload is loaded from `*F32` or `*F16` representation.
+- After the primary matrix load, the function conditionally resolves its
+  second key when the descriptor's `param_5` value is nonzero and passes
+  the resulting object node to `FUN_180064e90`. This is a separate
+  secondary-property path, not a second BlockMatrix construction in the
+  observed body of `FUN_180063ca0`.
 
-Therefore KEY_1 and KEY_2 are not two independent top-level model-block
-sections. They are a pair of layer-property lookups within a layer object.
-The Android index now exposes `matrixPropertyPairs()`, which pairs typed
-leaves only when exactly one KEY_1 and one KEY_2 occur under the same
-immediate parent object. Ambiguous and incomplete groups are deliberately
-excluded. The pair names remain neutral; the available evidence does not yet
-prove which one is a kernel, bias, projection, or another matrix role.
+The exact behavior of `FUN_180064e90` is being traced separately. Therefore
+the two Android fields intentionally retain neutral names:
+`S5MegpoidModelPropertyPair.first` (primary matrix payload) and
+`S5MegpoidModelPropertyPair.second` (secondary property payload). The API
+pairs them only when each fixed key has exactly one typed tensor leaf under
+the same immediate parent object. Ambiguous and incomplete groups are omitted.
 
-The shape arguments passed to `FUN_180063ca0` are also not sufficient on
-their own to assign a semantic role to the pair. The next step is to connect
-the descriptor fields at each call site to the runtime operator dimensions
-and then validate the resulting element counts against the actual model data.
+## Actual AI Megpoid VTB2 pair audit
+
+The updated payload-validation workflow inspected the real
+`AI_Megpoid.vtb2` JSON object tree and found **88 objects** containing both
+fixed keys. All 88 had exactly one typed `*F32` leaf under each key; none
+were ambiguous or malformed.
+
+Most common observed element-count pairs (primary / secondary):
+
+| Primary elements | Secondary elements | Count |
+|---:|---:|---:|
+| 92,160 | 192 | 16 |
+| 9,216 | 96 | 12 |
+| 18,432 | 192 | 12 |
+| 24,576 | 128 | 9 |
+| 12,288 | 64 | 6 |
+| 2,304 | 256 | 6 |
+| 32,768 | 256 | 6 |
+| 98,304 | 256 | 6 |
+
+These counts prove structural co-location and typed-payload sizes. They do not
+by themselves prove the logical row/column orientation or the semantic role
+of the secondary property. Matrix dimensions must still be checked against
+the descriptor values and `FUN_180064e90` before assigning either payload
+to a specific renderer input.
 
 ## What is still not connected
 
