@@ -374,6 +374,62 @@ Inside `FUN_1800c7ad0`, the residual stage is an explicit nested loop:
 - Each iteration calls `FUN_1800c5d50` with that block-data entry, the current input/output workspace descriptors, and its companion state entry. The two workspace descriptors are then swapped for the next block.
 - The dispatcher also calls `FUN_1800c5260`, `FUN_1800c5440`, and either `FUN_1800c6390` or `FUN_1800c72d0` around the residual loop. These are separate preprocessing/transition stages and should not be folded into the residual block's tensor bundle without a field-level data-flow trace.
 
+## Residual runtime record offsets
+
+The decompilation of `FUN_1800c7ad0` and `FUN_1800c5d50` exposes a
+field-level contract for the records passed to the residual operator.
+
+`FUN_1800c7ad0` computes each block-data pointer as
+`blockBase + blockIndex * 0x100` and each companion state pointer as
+`stateBase + blockIndex * 0x88`. It passes them as the first and fourth
+arguments to `FUN_1800c5d50`, respectively.
+
+The first argument is an observed `0x100`-byte block-data record. Its
+recovered fields are:
+
+| Byte offset | Access in the runtime code | Established use |
+|---:|---|---|
+| `0x00` | `*param_1` | Channel count `C` |
+| `0x04` | `param_1[1]` | Expansion multiplier `E`; expanded count is `C * E` |
+| `0x10` | Passed as `param_1 + 4` to `FUN_1800c67e0` | Start of the depthwise/history descriptor |
+| `0x20` | Pointer read by `FUN_1800c67e0` from descriptor offset `+0x10) | Depthwise filter coefficients; the runtime uses a 7-by-7 path when both descriptor dimensions are 7 |
+| `0x90` | `param_1[0x24]` | Flag indicating whether an optional residual-bias pointer is present |
+| `0x98` | Pointer consumed by the second `FUN_1800c3740` call | Projection matrix, mapping `C * E -> C` |
+| `0xA8` | Optional pointer consumed by the residual affine merge | Residual bias |
+| `0xB8` | Pointer consumed by the residual affine merge | Residual scale |
+| `0xC8` | Pointer consumed by the first `FUN_1800c3740` call | Expansion matrix, mapping `C -> C * E` |
+| `0xD8` | Per-channel array consumed by the normalization/GELU affine step | Expansion normalization scale (`gamma`) |
+| `0xE8` | Per-channel array consumed by the normalization/GELU affine step | Expansion normalization bias (`beta`) |
+| `0xF8` | `param_1[0x3e]` | Epsilon term |
+
+The depthwise descriptor begins at `0x10`: `FUN_1800c67e0` reads its
+first three integer fields at `0x10`, `0x14`, and `0x18), and reads
+the coefficient pointer at `0x20`. The observed 7-by-7 path therefore
+consumes `C * 49` depthwise coefficients, matching the size contract of
+the Android scalar residual kernel.
+
+The companion `0x88`-byte state record is a workspace/history structure,
+not another matrix bank. `FUN_1800c5d50` stores the first scratch workspace
+pointer at `+0x00`, its `C` and `N` dimensions at `+0x18` and
+`+0x1c`, the expanded workspace pointer at `+0x20), and its
+`C * E` and `N` dimensions at `+0x38` and `+0x3c`. The substructure
+starting at `+0x40` is passed into `FUN_1800c67e0` for history/ring-buffer
+preparation.
+
+The offset roles align with the Android kernel's argument shapes:
+
+- depthwise coefficients: `C * 49`;
+- expansion matrix: `(C * E) * C`;
+- projection matrix: `C * (C * E)`;
+- normalization arrays: `C) each;
+- residual scale and optional bias: `C) each;
+- sequence workspaces: `C * N) and `C * E * N).
+
+This is the first confirmed connection between native runtime record fields
+and the existing Android kernel's input contract. It still does not identify
+which hashed `AI_Megpoid.vtb2` tensor path is stored at each pointer offset.
+That requires tracing the constructor writes into these record offsets.
+
 This establishes where the residual operator is scheduled and how its per-position/per-block records are addressed. It does **not** yet show which `AI_Megpoid.vtb2` tensor paths populate the `0x100`-byte block-data records, the `0x88`-byte state records, or the workspace descriptors. Therefore the current Android matrix decoder remains an isolated layout conversion layer; it is not yet wired to `vea_s5_run_residual_dw_mlp_block_f32`, and no PCM synthesis is claimed.
 
 ## What is still not connected
