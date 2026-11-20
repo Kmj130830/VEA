@@ -479,6 +479,8 @@ def inspect_megpoid_layer_property_pairs(root: dict, member: str) -> None:
     ambiguous_count = 0
     integer_ratio_count = 0
     ratio_counts: dict[int, int] = {}
+    repeated_block_shape_count = 0
+    repeated_block_banks: dict[int, int] = {}
     while stack:
         current, path = stack.pop()
         if isinstance(current, dict):
@@ -506,6 +508,19 @@ def inspect_megpoid_layer_property_pairs(root: dict, member: str) -> None:
                         ratio = primary_elements // secondary_elements
                         integer_ratio_count += 1
                         ratio_counts[ratio] = ratio_counts.get(ratio, 0) + 1
+                        # FUN_180052f90 callsite 0x180053421 passes
+                        # columns = descriptor[+4], rows = 2*descriptor[+4],
+                        # matrixCount = descriptor[+0].
+                        if secondary_elements >= 2 and secondary_elements % 2 == 0:
+                            columns = secondary_elements // 2
+                            if ratio % columns == 0:
+                                matrix_count = ratio // columns
+                                expected = secondary_elements * columns * matrix_count
+                                if matrix_count > 0 and expected == primary_elements:
+                                    repeated_block_shape_count += 1
+                                    repeated_block_banks[matrix_count] = (
+                                        repeated_block_banks.get(matrix_count, 0) + 1
+                                    )
                 print(
                     "MODEL_LAYER_PROPERTY_PAIR",
                     f"member={member}",
@@ -529,6 +544,8 @@ def inspect_megpoid_layer_property_pairs(root: dict, member: str) -> None:
         f"ambiguous_objects={ambiguous_count}",
         f"integer_ratio_pairs={integer_ratio_count}",
         f"ratio_counts={dict(sorted(ratio_counts.items()))}",
+        f"repeated_block_shape_pairs={repeated_block_shape_count}",
+        f"repeated_block_matrix_counts={dict(sorted(repeated_block_banks.items()))}",
     )
 
 
