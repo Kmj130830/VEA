@@ -253,7 +253,7 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
             if root is not None:
                 keys = list(root.keys())
                 sample = [str(key)[:32] for key in keys[:4]]
-                counts, _, parameter_matches, module_matches = summarize_model_tree(root)
+                counts, all_keys, parameter_matches, module_matches = summarize_model_tree(root)
                 print(
                     "JSON_OK",
                     f"archive={path.name}!/{item.filename}",
