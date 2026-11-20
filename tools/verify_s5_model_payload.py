@@ -677,6 +677,7 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                 inspect_megpoid_block_descriptor_fields(item.filename, root, key_values)
                 if item.filename == "AI_Megpoid.vtb2":
                     inspect_megpoid_layer_property_pairs(root, item.filename)
+                if item.filename.lower().endswith(".vtmg"):
                     inspect_megpoid_named_layer_parameters(item.filename, key_values)
                 for root_key, root_value in root.items():
                     shape = value_shape(root_value)
