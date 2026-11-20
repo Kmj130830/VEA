@@ -238,6 +238,13 @@ They remain structural property pairs but are not assigned this matrix shape.
 The model constructor contains other `FUN_18005e9b0` call sites with
 different dimension tuples, so those pairs require a separate call-site map.
 
+The shape candidate API deliberately preserves this distinction:
+`repeatedBlockMatrixShapeOrNull()` represents the row/column/bank tuple
+recovered from the `FUN_180052f90` callsite, while
+`singleBankEntryShapeCandidateOrNull()` represents only the alternate
+single-bank arithmetic. Neither field assigns a semantic role to KEY_1 or
+KEY_2.
+
 ## Native matrix-bank input traversal for the repeated-block wrapper
 
 The generic `FUN_180063ca0` loader supports two traversal modes, selected by
@@ -268,11 +275,36 @@ decoder. This establishes tensor layout conversion only; it does not identify
 the tensor's semantic role or run the model's forward pass.
 
 A distinct entry-level call inside `FUN_1800537e0` at `0x180053e13`
-passes `(EAX, R10D, 1)`, where the caller computes
-`EAX = [RSI + 0x10]` and `R10D = 2 * [RSI + 0x14] * [RSI + 0x08]`.
-That is a single-bank shape path. Its descriptor source has not yet been
-linked to each of the 19 remaining property pairs and is not used to classify
-them here.
+passes `EAX`, `R10D`, and `1` as wrapper dimensions. The
+`FUN_18005e9b0` stack argument forwarding maps these to
+`FUN_180063ca0`'s `param_6` (columns), `param_7` (rows), and
+`param_8` (matrix count), respectively. The caller computes:
+
+```
+columns = EAX = [RSI + 0x10]
+rows = R10D = 2 * [RSI + 0x14] * [RSI + 0x08]
+matrixCount = 1
+KEY_1 elements = rows * columns
+KEY_2 elements = rows
+KEY_1 / KEY_2 = columns
+```
+
+The Android index exposes this as
+`singleBankEntryShapeCandidateOrNull()`. The candidate is returned only for
+a positive, even KEY_2 length and an integral positive KEY_1/KEY_2 ratio.
+This is a shape-compatibility test, not a callsite association: the exact
+descriptor object and callsite ancestry have not yet been linked to each
+paired tensor object. Consequently it must not be used to override the
+69 path-specific repeated-block classifications above.
+
+The real payload audit found **87 of 88** pairs are arithmetically compatible
+with this single-bank shape, because their KEY_2 element counts are even.
+Of these, **69 also match** the repeated-block callsite formula, and **18**
+are single-bank-only compatibility candidates under the currently audited
+shape formula. One pair has KEY_2 length 1 and cannot satisfy the
+`R10D = 2 * a * b` even-row condition. These counts do not prove that the
+87 objects actually use the entry-level call; they quantify the ambiguity
+that remains until descriptor paths are mapped.
 
 ## Actual AI Megpoid VTB2 pair audit
 
