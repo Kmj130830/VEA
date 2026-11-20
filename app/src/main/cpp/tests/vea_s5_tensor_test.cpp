@@ -28,7 +28,7 @@ int main() {
         key_abc, sizeof(key_abc), hashed_key, sizeof(hashed_key),
         &hashed_key_required) == VEA_S5_TENSOR_STATUS_OK);
     assert(hashed_key_required == 33);
-    assert(std::strcmp(hashed_key, "7d736cde130f0bb75f2cdbe49c5e01d5") == 0);
+    assert(std::strcmp(hashed_key, "de6c737db70b0f13e4db2c5fd5015e9c") == 0);
 
     // A 48-byte key forces MD5 to process two 64-byte blocks after the salt.
     static constexpr char long_key[] =
@@ -38,7 +38,22 @@ int main() {
         reinterpret_cast<const uint8_t*>(long_key), sizeof(long_key) - 1u,
         hashed_key, sizeof(hashed_key), &hashed_key_required) ==
         VEA_S5_TENSOR_STATUS_OK);
-    assert(std::strcmp(hashed_key, "ec980bc709d9902a7f97a0a548d98c6d") == 0);
+    assert(std::strcmp(hashed_key, "c70b98ec2a90d909a5a0977f6d8cd948") == 0);
+
+    // These names are present as typed-tensor keys in the supplied
+    // VOCALOID7.vtmg model member. Their JSON keys are canonical MD5 byte hex.
+    static constexpr char pre1_weight[] = "pre1.weight";
+    static constexpr char conv1_bias[] = "conv1.bias";
+    assert(vea_s5_hash_parameter_key(
+        reinterpret_cast<const uint8_t*>(pre1_weight), sizeof(pre1_weight) - 1u,
+        hashed_key, sizeof(hashed_key), &hashed_key_required) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(std::strcmp(hashed_key, "f8b15a70e9fe50b828e5803435580c63") == 0);
+    assert(vea_s5_hash_parameter_key(
+        reinterpret_cast<const uint8_t*>(conv1_bias), sizeof(conv1_bias) - 1u,
+        hashed_key, sizeof(hashed_key), &hashed_key_required) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(std::strcmp(hashed_key, "bf1fb08e8ffbab205dbb90120465e856") == 0);
 
     char small_hashed_key[8] = "stable";
     assert(vea_s5_hash_parameter_key(
