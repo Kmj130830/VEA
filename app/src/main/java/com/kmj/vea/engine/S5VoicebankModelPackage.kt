@@ -29,6 +29,21 @@ data class S5VoicebankModelPackage(
     }
 
     /**
+     * Lazily indexes the eight FUN_1800ced10 model-property families for
+     * the four-by-two block grid confirmed in AI_Megpoid.vtb2.
+     * The exact keys were recovered from S5API's static factory initializers
+     * and matched against the supplied bank's model tree.
+     */
+    val runtimeBlockTensorIndex: S5MegpoidRuntimeBlockTensorIndex by lazy(
+        LazyThreadSafetyMode.PUBLICATION
+    ) {
+        S5MegpoidRuntimeBlockTensorIndex.build(
+            singerModel.tree,
+            S5MegpoidRuntimeBlockFactoryKeys.ALL
+        )
+    }
+
+    /**
      * Lazily indexes the nine named neural layers in the shared VOCALOID7.vtmg.
      * This resolves actual model tensors but does not yet execute their network.
      */
