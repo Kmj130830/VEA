@@ -20,22 +20,38 @@ enum class S5MegpoidBlockLookupSlot(val lookupKey: String) {
 }
 
 /**
- * A typed tensor discovered below one of FUN_1800537e0's fixed lookup keys.
- * The original encoded value is retained in the parsed model tree and decoded
- * only when the renderer asks for it.
- */
-/**
- * Two layer-property tensors found in the same containing object. Static code
- * shows that the first property becomes a BlockMatrix array and the second is
- * handled by a separate consumer. Their semantic roles are intentionally not
- * guessed.
+ * Two layer-property tensors found in the same containing object.
+ *
+ * For the traced FUN_180063ca0 path, [first] becomes a bank of matrices with
+ * element count rows * columns * banks. [second] is passed to FUN_180064e90
+ * as a one-row vector whose length equals rows. The ratio therefore reflects
+ * columns * banks when the descriptor path is the one recovered here. It does
+ * not identify either matrix's semantic role.
  */
 data class S5MegpoidModelPropertyPair(
     val containingObjectPath: String,
     val first: S5MegpoidModelTensorReference,
     val second: S5MegpoidModelTensorReference
-)
+) {
+    /**
+     * Candidate (columns * banks) factor from the recovered descriptor layout.
+     * Null means the observed payload lengths do not satisfy the descriptor
+     * divisibility relationship, or contain an empty tensor.
+     */
+    val primaryToSecondaryElementRatio: Int?
+        get() {
+            val primary = first.elementCount
+            val secondary = second.elementCount
+            if (primary <= 0 || secondary <= 0 || primary % secondary != 0) return null
+            return primary / secondary
+        }
+}
 
+/**
+ * A typed tensor discovered below one of FUN_1800537e0's fixed lookup keys.
+ * The original encoded value is retained in the parsed model tree and decoded
+ * only when a caller explicitly requests it.
+ */
 class S5MegpoidModelTensorReference internal constructor(
     val slot: S5MegpoidBlockLookupSlot,
     val objectPath: String,
