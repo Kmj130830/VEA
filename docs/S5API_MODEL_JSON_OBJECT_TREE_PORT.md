@@ -35,7 +35,11 @@ CI's native differential check compares complete decoded byte arrays for all fiv
 
 The validated AI_Megpoid.vtb2 JSON object tree contains 258 objects, 108 arrays, 299 strings, 626 numbers, 87 booleans, one null, 859 32-character hex keys, 282 *F32 strings and one *S32 string. The inventory found no *F16 strings. These are structural counts only; tensor contents are not printed by CI.
 
-The static generic RNN constructor supplies base rnn and suffixes including .weight_ih_l, .weight_hh_l, .bias_ih_l and .bias_hh_l. Nevertheless, none of the direct layer-zero salted-key candidates, including reverse variants, matched a key in the supplied five decoded model trees. The current parser and hash helper therefore must not yet be described as having loaded Megpoid's RNN weights. The next analysis step is to recover the model-derived +0xf11 flag value through FUN_18004e1e0 and determine whether the conditional RNN constructor is enabled for AI Megpoid.
+The static generic RNN constructor supplies base rnn and suffixes including .weight_ih_l, .weight_hh_l, .bias_ih_l and .bias_hh_l. None of the direct layer-zero salted-key candidates, including reverse variants, matched a key in the supplied five decoded model trees.
+
+The two model feature checks are now resolved against those actual trees. FUN_18004e3b0 queries the fixed object-tree key 69d61aca6f87b9618d4c65b9560cb5be; FUN_18004e1e0 queries 9f174dc2b1ab89f96f4577e17d5e568a. Both keys are absent from all five supplied decoded members, including AI_Megpoid.vtb2. These are existence checks in the typed object tree, so the corresponding flags evaluate false for the supplied model set. The second flag is copied to the model context at +0xf11 and is passed into the model-layer setup path. This confirms that the conditional path guarded by that flag is not enabled by the supplied AI Megpoid model. It does not by itself identify the alternate model graph or prove that no other recurrent implementation exists elsewhere.
+
+The parser and salted-key helper must therefore not be described as having loaded Megpoid's RNN weights. The next target is to trace the active non-conditional model path from the VDM voicebank metadata into the S5API/VSM model execution path, rather than forcing the generic RNN parameter names onto this model.
 
 ## Android ZIP archive reader
 
