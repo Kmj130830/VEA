@@ -30,7 +30,7 @@ class S5MegpoidRuntimeBlockTensorIndexTest {
         assertEquals("*F32", tensor?.marker)
         assertEquals(1, tensor?.elementCount)
         assertEquals("$/$lookupKey/payload", tensor?.objectPath)
-        assertEquals(0.0f, tensor?.decodeFloatArray()?.single() ?: Float.NaN)
+        assertEquals(0.0f, tensor?.decodeFloatArray(zeroTensorDecoder)?.single() ?: Float.NaN)
     }
 
     @Test
@@ -103,7 +103,7 @@ class S5MegpoidRuntimeBlockTensorIndexTest {
             lookupKey = "44444444444444444444444444444444"
         )
         val tree = S5ModelObjectTree.parseUtf8(
-            """{" """ + key.lookupKey + """ ":"*F32AAAAAA=="}"""
+            """{"" + key.lookupKey + "":"*F32AAAAAA=="}"""
         )
 
         assertThrows(IllegalArgumentException::class.java) {
@@ -125,5 +125,12 @@ class S5MegpoidRuntimeBlockTensorIndexTest {
                 lookupKey = "not-a-hash"
             )
         }
+    }
+
+    private val zeroTensorDecoder = object : S5TypedTensorDecoder {
+        override fun decodeFloatArray(encoded: String): FloatArray =
+            FloatArray(if (encoded.startsWith("*F32")) 1 else 0)
+
+        override fun decodeInt32Array(encoded: String): IntArray = IntArray(0)
     }
 }
