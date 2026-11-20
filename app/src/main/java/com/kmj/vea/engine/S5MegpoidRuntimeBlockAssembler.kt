@@ -9,7 +9,9 @@ package com.kmj.vea.engine
 class S5MegpoidCompiledRuntimeBlock internal constructor(
     val row: Int,
     val column: Int,
-    val shape: S5MegpoidResidualBlockShape,
+    val channels: Int,
+    val expansionMultiplier: Int,
+    val expandedFeatures: Int,
     /** Original [channel][height][width] layout used by the current reference kernel. */
     val depthwiseWeightsChannelMajor: FloatArray,
     /** Exact FUN_1800d4bf0 record layout: [width][channel][height]. */
@@ -32,6 +34,15 @@ class S5MegpoidCompiledRuntimeBlock internal constructor(
         residualInput: FloatArray,
         epsilon: Float = S5MegpoidResidualBlockShape.DEFAULT_EPSILON
     ): FloatArray {
+        require(residualInput.size % channels == 0) {
+            "Residual input length must be divisible by the block channel count."
+        }
+        val positions = residualInput.size / channels
+        val shape = S5MegpoidResidualBlockShape(
+            channels = channels,
+            expansionMultiplier = expansionMultiplier,
+            positions = positions
+        )
         shape.validateInputs(
             historyRows = historyRows,
             depthwiseWeights = depthwiseWeightsChannelMajor,
@@ -54,9 +65,9 @@ class S5MegpoidCompiledRuntimeBlock internal constructor(
             residualInput = residualInput,
             residualScale = residualScale,
             residualBias = projectionBias,
-            channels = shape.channels,
-            positions = shape.positions,
-            expandedFeatures = shape.expandedFeatures,
+            channels = channels,
+            positions = positions,
+            expandedFeatures = expandedFeatures,
             epsilon = epsilon
         )
     }
@@ -84,8 +95,7 @@ object S5MegpoidRuntimeBlockAssembler {
         index: S5MegpoidRuntimeBlockTensorIndex,
         row: Int,
         column: Int,
-        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder,
-        positions: Int
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
     ): S5MegpoidCompiledRuntimeBlock {
         require(row in 0 until S5MegpoidRuntimeBlockFactoryKey.TABLE_SIZE)
         require(column in 0 until S5MegpoidRuntimeBlockFactoryKey.TABLE_SIZE)
@@ -128,15 +138,13 @@ object S5MegpoidRuntimeBlockAssembler {
         val channels = EXPECTED_CHANNELS
         val expandedFeatures = EXPECTED_EXPANDED_FEATURES
         val expansionMultiplier = expandedFeatures / channels
-        val shape = S5MegpoidResidualBlockShape(
-            channels = channels,
-            expansionMultiplier = expansionMultiplier,
-            positions = positions
-        )
-
-        val effectiveExpansionWeights = FloatArray(shape.expansionWeightElementCount)
-        val gamma = FloatArray(shape.expandedAffineElementCount)
-        val beta = FloatArray(shape.expandedAffineElementCount)
+        val expansionWeightCount = channels.toLong() * expandedFeatures.toLong()
+        require(expansionWeightCount <= Int.MAX_VALUE) {
+            "Expanded matrix exceeds the supported Kotlin array limit."
+        }
+        val effectiveExpansionWeights = FloatArray(expansionWeightCount.toInt())
+        val gamma = FloatArray(expandedFeatures)
+        val beta = FloatArray(expandedFeatures)
 
         for (feature in 0 until expandedFeatures) {
             var gammaValue = sourceExpansionBias[feature]
@@ -163,7 +171,9 @@ object S5MegpoidRuntimeBlockAssembler {
         return S5MegpoidCompiledRuntimeBlock(
             row = row,
             column = column,
-            shape = shape,
+            channels = channels,
+            expansionMultiplier = expansionMultiplier,
+            expandedFeatures = expandedFeatures,
             depthwiseWeightsChannelMajor = depthwiseSource,
             nativeRecordDepthwiseFilter = transposedDepthwiseFilter,
             expansionWeights = effectiveExpansionWeights,
