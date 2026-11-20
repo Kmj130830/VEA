@@ -579,6 +579,46 @@ This makes named-property lookup compatible with the actual `VOCALOID7.vtmg`
 JSON keys. It does not by itself identify how these named matrices feed the
 runtime residual operator or establish an end-to-end inference schedule.
 
+### Named-layer descriptor-pair storage
+
+The decompiled factory `Func_4cd84bb7` allocates a 0x200-byte model object
+and calls `FUN_180068190(puVar2 + 4, ...)`. Since the first argument is a
+32-bit pointer, `FUN_180068190`'s `param_1` begins 0x10 bytes into that
+allocation. Its nine calls to `FUN_180064670` pass destination addresses
+`param_1 + 4`, `+8`, `+0xc`, `+0x10`, `+0x14`, `+0x18`,
+`+0x1c`, `+0x20`, and `+0x24`. These are byte offsets
+`0x20` through `0xa0` from the original allocation base, spaced by
+`0x10` bytes.
+
+Each destination is a pair of pointers: the weight matrix-descriptor bank
+and the one-row bias descriptor. The mapping is:
+
+| Layer | Object-base pair offset |
+|---|---:|
+| pre1 | 0x20 |
+| pre2 | 0x30 |
+| conv1 | 0x40 |
+| cond1 | 0x50 |
+| conv2 | 0x60 |
+| cond2 | 0x70 |
+| conv3 | 0x80 |
+| cond3 | 0x90 |
+| linear | 0xA0 |
+
+The Android implementation now has a native owner for this exact descriptor
+region. `vea_s5_named_layer_parameter_set_create()` allocates one native
+arena, packs each weight source as a matrix bank, packs each bias as a
+one-row descriptor, then writes the two descriptor pointers at the recovered
+slot offsets in a 0xb0-byte table mirror. It validates all nine slot offsets,
+source element counts, matrix-bank counts, and descriptor dimensions. JNI
+returns an opaque handle, and `S5MegpoidNativeParameterSet.close()` releases
+the arena. This mirrors the descriptor-pair region only; it is not a complete
+copy of the vendor's 0x200-byte object or its virtual methods.
+
+This is persistent native parameter preparation, not inference. The neural
+forward schedule, temporal feature inputs, operator-specific connections,
+and synthesis-to-PCM path still require separate tracing and implementation.
+
 ## What is still not connected
 
 - The nine fixed lookup keys in `AI_Megpoid.vtb2` have been found and indexed.
