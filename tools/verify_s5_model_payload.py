@@ -6,6 +6,8 @@ model payloads to disk, or prints parameter/tensor contents.
 """
 from __future__ import annotations
 
+import argparse
+import ctypes
 import json
 import struct
 import zipfile
@@ -95,7 +97,48 @@ def try_json_object(payload: bytes) -> dict | None:
     return None
 
 
-def inspect_archive(path: Path) -> int:
+class NativeDecoder:
+    """Call the independently compiled Android-port C ABI for byte comparison."""
+
+    def __init__(self, library_path: Path) -> None:
+        self.library = ctypes.CDLL(str(library_path))
+        self.decode = self.library.vea_s5_decode_model_payload
+        byte_pointer = ctypes.POINTER(ctypes.c_uint8)
+        self.decode.argtypes = [
+            byte_pointer,
+            ctypes.c_size_t,
+            byte_pointer,
+            ctypes.c_size_t,
+            ctypes.POINTER(ctypes.c_size_t),
+        ]
+        self.decode.restype = ctypes.c_int
+
+    def __call__(self, data: bytes) -> bytes:
+        source_type = ctypes.c_uint8 * len(data)
+        source = source_type.from_buffer_copy(data) if data else None
+        source_pointer = ctypes.cast(source, ctypes.POINTER(ctypes.c_uint8)) if source else None
+
+        required = ctypes.c_size_t()
+        status = self.decode(source_pointer, len(data), None, 0, ctypes.byref(required))
+        if status not in (0, 4):
+            raise RuntimeError("Native S5 decoder size query failed: status=" + str(status))
+
+        output_type = ctypes.c_uint8 * required.value
+        output = output_type()
+        output_pointer = ctypes.cast(output, ctypes.POINTER(ctypes.c_uint8)) if required.value else None
+        status = self.decode(
+            source_pointer,
+            len(data),
+            output_pointer,
+            required.value,
+            ctypes.byref(required),
+        )
+        if status != 0:
+            raise RuntimeError("Native S5 decoder failed: status=" + str(status))
+        return bytes(output)
+
+
+def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
     if not path.is_file():
         print("MISSING_ARCHIVE", path)
         return 0
@@ -114,6 +157,18 @@ def inspect_archive(path: Path) -> int:
                 continue
 
             decoded = decode_payload(data)
+            if native_decoder is not None:
+                native_decoded = native_decoder(data)
+                if native_decoded != decoded:
+                    raise SystemExit(
+                        "NATIVE_DIFFERENTIAL_MISMATCH "
+                        + f"archive={path.name}!/{item.filename}"
+                    )
+                print(
+                    "NATIVE_MATCH",
+                    f"archive={path.name}!/{item.filename}",
+                    f"decoded_bytes={len(native_decoded)}",
+                )
             root = try_json_object(decoded)
             if root is not None:
                 keys = list(root.keys())
@@ -144,10 +199,22 @@ def inspect_archive(path: Path) -> int:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--native-library",
+        type=Path,
+        default=None,
+        help="Optional host build of libveas5tensor.so for byte-for-byte differential checks.",
+    )
+    args = parser.parse_args()
+    native_decoder = NativeDecoder(args.native_library) if args.native_library else None
+
     total = 0
     for archive in (Path("megpoidV7.zip"), Path("AI Model.zip")):
-        total += inspect_archive(archive)
+        total += inspect_archive(archive, native_decoder)
     print("S5_JSON_OBJECTS_RECOVERED", total)
+    if native_decoder is not None:
+        print("S5_NATIVE_DIFFERENTIAL", "PASS")
 
 
 if __name__ == "__main__":
