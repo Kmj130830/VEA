@@ -45,8 +45,15 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
         "180083c50", // integer-to-string component used by RNN name builder
         "1800c4730", // runtime model-state resolver before forward dispatch
         "1800ccce0", // caller that constructs/copies model runtime state
-        "1800d3f00", // initialization helper near frame setup
-        "1800d3f6d", // initialization call site inside the render object
+        "1800ced10", // builds per-block runtime records from parsed model configuration
+        "1800d4bf0", // per-block 0x100-byte runtime record builder
+        "1800b3130", // grow the 0x100-stride runtime record vector
+        "1800b28a0", // append/construct a runtime block record
+        "1800bc0c0", // copy a built runtime block record into an existing slot
+        "1800b0b30", // adjust companion 0x88-byte state-record vector
+        "1800b36d0", // grow companion 0x88-byte state-record vector
+        "1800d3f00", // interior address retained for the constructor's long body
+        "1800d3f6d", // constructor/frame-preparation call site
         "1800cdbb0", // runtime model-state copy constructor for DNN arrays
         "1800d5a00", // frame/workspace vector preparation
         "1800bbcc0", // 0x88-byte workspace record initializer
@@ -201,7 +208,7 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
 
             out.println("## Raw instruction listing for tensor-loader ABI");
             out.println();
-            for (String hex : new String[] { "180010260", "1800812a0", "180081e20", "180010740", "180010540", "1800103e0", "18001acc0", "180083610", "180014f70", "180083c50", "180024a90", "18005ebe0", "18008d470", "18008d470", "180052f90", "1800537e0", "1800589d0", "18005e9b0", "180063ca0", "180064e90", "1800c4730", "1800ccce0", "1800d3f00", "1800d3f6d", "1800cdbb0", "1800d5a00", "1800bbcc0", "1800afab0", "1800aff50", "1800b0110", "1800d9580", "1800d9830", "1800d9700", "1800b4410", "1800c7ad0", "1800c72d0", "1800c5260", "1800c5440", "1800c5d50", "1800c67e0", "1800afc30", "1800af720", "1800b3bd0", "1800c3740", "1800aec40", "180126c20", "180126d40", "1800aed70", "1800aea60", "1800ae770", "1800ae950", "1800aeea0", "180126e30", "180127120", "1801271a0", "180127330" }) {
+            for (String hex : new String[] { "180010260", "1800812a0", "180081e20", "180010740", "180010540", "1800103e0", "18001acc0", "180083610", "180014f70", "180083c50", "180024a90", "18005ebe0", "18008d470", "18008d470", "180052f90", "1800537e0", "1800589d0", "18005e9b0", "180063ca0", "180064e90", "1800c4730", "1800ccce0", "1800ced10", "1800d4bf0", "1800b3130", "1800b28a0", "1800bc0c0", "1800b0b30", "1800b36d0", "1800d3f00", "1800d3f6d", "1800cdbb0", "1800d5a00", "1800bbcc0", "1800afab0", "1800aff50", "1800b0110", "1800d9580", "1800d9830", "1800d9700", "1800b4410", "1800c7ad0", "1800c72d0", "1800c5260", "1800c5440", "1800c5d50", "1800c67e0", "1800afc30", "1800af720", "1800b3bd0", "1800c3740", "1800aec40", "180126c20", "180126d40", "1800aed70", "1800aea60", "1800ae770", "1800ae950", "1800aeea0", "180126e30", "180127120", "1801271a0", "180127330" }) {
                 monitor.checkCancelled();
                 Address address = toAddr(hex);
                 Function f = currentProgram.getFunctionManager().getFunctionAt(address);
