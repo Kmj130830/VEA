@@ -35,19 +35,23 @@ class S5MegpoidBlockTensorIndexTest {
     }
 
     @Test
-    fun pairsPrimaryAndSecondaryPropertiesOnlyWithinTheSameLayerObject() {
+    fun pairsPrimaryAndSecondaryPropertiesAndReportsDescriptorElementRatio() {
         val firstKey = S5MegpoidBlockLookupSlot.KEY_1.lookupKey
         val secondKey = S5MegpoidBlockLookupSlot.KEY_2.lookupKey
         val tree = S5ModelObjectTree.parseUtf8(
-            """{"layers":[{"$firstKey":"*F32AAAAAA==","$secondKey":"*F32AQAAAA=="},{"$firstKey":"*F32AgAAAA=="}]}"""
+            """{"layers":[{"$firstKey":"*F32AAAAAAAAAAA=","$secondKey":"*F32AAAAAA=="},{"$firstKey":"*F32AAAAAAAAAAA=","$secondKey":"*F32AAAAAAAAAAAAAAAA="}]}"""
         )
 
         val pairs = S5MegpoidBlockTensorIndex.build(tree).modelPropertyPairs()
 
-        assertEquals(1, pairs.size)
-        assertEquals("$/layers[0]", pairs.single().containingObjectPath)
-        assertEquals(S5MegpoidBlockLookupSlot.KEY_1, pairs.single().first.slot)
-        assertEquals(S5MegpoidBlockLookupSlot.KEY_2, pairs.single().second.slot)
+        assertEquals(2, pairs.size)
+        assertEquals("$/layers[0]", pairs[0].containingObjectPath)
+        assertEquals(2, pairs[0].first.elementCount)
+        assertEquals(1, pairs[0].second.elementCount)
+        assertEquals(2, pairs[0].primaryToSecondaryElementRatio)
+        assertEquals(2, pairs[1].first.elementCount)
+        assertEquals(3, pairs[1].second.elementCount)
+        assertEquals(null, pairs[1].primaryToSecondaryElementRatio)
     }
 
     @Test
