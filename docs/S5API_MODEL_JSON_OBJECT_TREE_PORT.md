@@ -37,6 +37,14 @@ The validated AI_Megpoid.vtb2 JSON object tree contains 258 objects, 108 arrays,
 
 The static generic RNN constructor supplies base rnn and suffixes including .weight_ih_l, .weight_hh_l, .bias_ih_l and .bias_hh_l. Nevertheless, none of the direct layer-zero salted-key candidates, including reverse variants, matched a key in the supplied five decoded model trees. The current parser and hash helper therefore must not yet be described as having loaded Megpoid's RNN weights. The next analysis step is to recover the model-derived +0xf11 flag value through FUN_18004e1e0 and determine whether the conditional RNN constructor is enabled for AI Megpoid.
 
+## Android ZIP archive reader
+
+`S5ModelArchiveReader` now accepts a ZIP input stream and loads the known model members used by the supplied AI Megpoid package. It validates the member name-to-magic mapping and the 136-byte header length field, invokes the native payload decoder, and parses each decoded JSON root into an `S5ModelObjectTree`.
+
+The reader requires `AI_Megpoid.vtb2` and also recognizes `AI_Megpoid.vpit`, `COMMON7.vpit`, `VOCALOID7.vhnv` and `VOCALOID7.vtmg`. Artwork, manifest and unrelated ZIP members are skipped. The full ZIP stream is nevertheless subject to decompression limits (128 entries, 128 MiB per entry, 256 MiB total by default); duplicate recognized basenames are rejected. The payload decoder is injectable so JVM tests can exercise archive/header/JSON wiring without loading JNI.
+
+This gives Android a tested archive-to-object-tree loading path. It does not infer the model graph or turn its tensor values into an executable singer.
+
 ## Deliberate limits
 
 - The payload transform is not a full voicebank/runtime loader; the final 128 bytes of the supplied members are outside the JSON range produced by the recovered function and their role remains unknown.
