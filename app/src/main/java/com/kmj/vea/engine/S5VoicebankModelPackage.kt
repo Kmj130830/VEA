@@ -47,16 +47,14 @@ data class S5VoicebankModelPackage(
      * Decodes and assembles the eight runtime residual-block parameter sets
      * (4 rows x 2 columns) from AI_Megpoid.vtb2.
      *
-     * This prepares block weights only. S5API's stateful history/ring-buffer
-     * operator FUN_1800c67e0 and the full singing renderer are separate stages.
-     * The caller must supply the actual frame-position count for its inference
-     * chunk; no assumed default is used.
+     * This prepares reusable block weights only. Audio chunk length is not
+     * part of the stored model parameters; it is validated when a block is
+     * executed with a concrete history window. S5API's stateful history/ring
+     * operator FUN_1800c67e0 and the full singing renderer remain separate.
      */
     fun prepareRuntimeBlocks(
-        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder,
-        positions: Int
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
     ): List<S5MegpoidCompiledRuntimeBlock> = buildList {
-        require(positions >= S5MegpoidResidualBlockShape.KERNEL_WIDTH)
         for (row in 0 until S5MegpoidRuntimeBlockFactoryKeys.BLOCK_ROWS) {
             for (column in 0 until S5MegpoidRuntimeBlockFactoryKeys.BLOCK_COLUMNS) {
                 add(
@@ -64,8 +62,7 @@ data class S5VoicebankModelPackage(
                         index = runtimeBlockTensorIndex,
                         row = row,
                         column = column,
-                        tensorDecoder = tensorDecoder,
-                        positions = positions
+                        tensorDecoder = tensorDecoder
                     )
                 )
             }
