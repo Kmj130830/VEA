@@ -39,6 +39,17 @@ data class S5VoicebankModelPackage(
             ?: throw IllegalStateException("Shared VOCALOID7.vtmg model member is missing.")
         S5MegpoidNamedLayerTensorIndex.build(sharedModel.tree)
     }
+
+    /**
+     * Decodes and packs all nine shared named-layer weight/bias pairs into
+     * the native BlockMatrix representation for a later inference stage.
+     */
+    fun prepareNamedLayerParameters(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder,
+        matrixPacker: (FloatArray, Int, Int, Int) -> FloatArray =
+            NativeS5TensorBridge::packMatrixBank
+    ): List<S5MegpoidPackedNamedLayer> =
+        namedLayerTensorIndex.packAllLayers(tensorDecoder, matrixPacker)
 }
 
 class S5VoicebankModelPackageAssembler(
