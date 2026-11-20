@@ -78,13 +78,12 @@ class S5MegpoidRuntimeBlockAssemblerTest {
             index = index,
             row = row,
             column = column,
-            tensorDecoder = LittleEndianFloatDecoder,
-            positions = 7
+            tensorDecoder = LittleEndianFloatDecoder
         )
 
-        assertEquals(32, compiled.shape.channels)
-        assertEquals(2, compiled.shape.expansionMultiplier)
-        assertEquals(7, compiled.shape.positions)
+        assertEquals(32, compiled.channels)
+        assertEquals(2, compiled.expansionMultiplier)
+        assertEquals(64, compiled.expandedFeatures)
         assertEquals(1568, compiled.depthwiseWeightsChannelMajor.size)
         assertEquals(1568, compiled.nativeRecordDepthwiseFilter.size)
         assertEquals(2048, compiled.expansionWeights.size)
@@ -135,8 +134,7 @@ class S5MegpoidRuntimeBlockAssemblerTest {
                 index = index,
                 row = 0,
                 column = 0,
-                tensorDecoder = LittleEndianFloatDecoder,
-                positions = 7
+                tensorDecoder = LittleEndianFloatDecoder
             )
         }
     }
