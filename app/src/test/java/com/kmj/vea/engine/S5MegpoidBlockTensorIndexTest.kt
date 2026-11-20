@@ -55,6 +55,29 @@ class S5MegpoidBlockTensorIndexTest {
         assertEquals(2, pairs[1].first.elementCount)
         assertEquals(3, pairs[1].second.elementCount)
         assertEquals(null, pairs[1].primaryToSecondaryElementRatio)
+        assertEquals(null, pairs[0].singleBankEntryShapeCandidateOrNull())
+        assertEquals(null, pairs[1].singleBankEntryShapeCandidateOrNull())
+    }
+
+    @Test
+    fun keepsSingleBankEntryShapeAsCompatibilityCandidateNotRepeatedBankMatch() {
+        val firstKey = S5MegpoidBlockLookupSlot.KEY_1.lookupKey
+        val secondKey = S5MegpoidBlockLookupSlot.KEY_2.lookupKey
+        val primary = typedF32Zeros(24)
+        val secondary = typedF32Zeros(4)
+        val tree = S5ModelObjectTree.parseUtf8(
+            """{"$firstKey":"$primary","$secondKey":"$secondary"}"""
+        )
+        val pair = S5MegpoidBlockTensorIndex.build(tree).modelPropertyPairs().single()
+
+        assertEquals(
+            S5MegpoidRepeatedBlockMatrixShape(rows = 4, columns = 2, matrixCount = 3),
+            pair.repeatedBlockMatrixShapeOrNull()
+        )
+        assertEquals(
+            S5MegpoidRepeatedBlockMatrixShape(rows = 4, columns = 6, matrixCount = 1),
+            pair.singleBankEntryShapeCandidateOrNull()
+        )
     }
 
     @Test
