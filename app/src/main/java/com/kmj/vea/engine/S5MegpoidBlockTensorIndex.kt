@@ -93,9 +93,9 @@ class S5MegpoidBlockTensorIndex private constructor(
         S5MegpoidBlockLookupSlot.entries.associateWith { tensors(it).size }
 
     /**
-     * Pairs the two matrix-property keys only when both typed tensor leaves
-     * share the same immediate containing object. Incomplete or ambiguous
-     * groups are omitted rather than guessed.
+     * Pairs the primary BlockMatrix property and its secondary vector property
+     * only when both typed leaves share the same immediate containing object.
+     * Incomplete or ambiguous groups are omitted rather than guessed.
      */
     fun modelPropertyPairs(): List<S5MegpoidModelPropertyPair> {
         val firstByParent = tensors(S5MegpoidBlockLookupSlot.KEY_1)
