@@ -88,6 +88,18 @@ MODEL_FLAG_LOOKUP_KEYS = {
 }
 
 
+# Additional fixed keys observed in the S5API model configuration constructors.
+# Function/address labels are used because the original semantic field names are unknown.
+MODEL_STATIC_LOOKUP_KEYS = {
+    "fun_180056f40_key_1": "3fecf2d78547692b4157889e04a498f0",
+    "fun_180056f40_key_2": "2aff5930df33d03ad1f33c3091886f13",
+    "fun_180068190_key_1": "16560fbd272d1f5059d620dc7e15a5aa",
+    "fun_180068190_key_2": "a0716df263a40c427d460246c4c079f3",
+    "fun_180068190_key_3": "3c77d931295c40d4d75d971398fee8a1",
+    "fun_180068190_key_4": "888fa825a5384e08aee475f9baf75ebe",
+}
+
+
 S5_KEY_SUFFIX = bytes.fromhex(
     "69 23 33 65 2e 63 5a 54 25 35 6b 39 6a 32 64 2c 32 5a 72 53 2f 2b 2f 32"
 )
@@ -331,6 +343,14 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                         "MODEL_FEATURE_FLAG",
                         f"member={item.filename}",
                         f"name={flag_name}",
+                        f"present={lookup_key in all_keys}",
+                        f"lookup_key={lookup_key}",
+                    )
+                for function_key, lookup_key in MODEL_STATIC_LOOKUP_KEYS.items():
+                    print(
+                        "MODEL_STATIC_KEY",
+                        f"member={item.filename}",
+                        f"name={function_key}",
                         f"present={lookup_key in all_keys}",
                         f"lookup_key={lookup_key}",
                     )
