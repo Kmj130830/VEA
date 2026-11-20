@@ -51,6 +51,7 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
         "1800d4a90", // populate the first nested descriptor within each runtime block
         "1800d4610", // populate additional nested descriptors within each runtime block
         "1800c0320", // attach a shared vector descriptor into the runtime block
+        "1800e63b0", // formats the per-block property-key string before lookup
         "1800f1110", // model property key factory used by per-block construction
         "180114660", // model property key factory used by per-block construction
         "18011b770", // model property key factory used by per-block construction
@@ -220,7 +221,7 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
 
             out.println("## Raw instruction listing for tensor-loader ABI");
             out.println();
-            for (String hex : new String[] { "180010260", "1800812a0", "180081e20", "180010740", "180010540", "1800103e0", "18001acc0", "180083610", "180014f70", "180083c50", "180024a90", "18005ebe0", "18008d470", "18008d470", "180052f90", "1800537e0", "1800589d0", "18005e9b0", "180063ca0", "180064e90", "1800c4730", "1800ccce0", "1800ced10", "1800d4bf0", "1800bc5e0", "1800d4a90", "1800d4610", "1800c0320", "1800f1110", "180114660", "18011b770", "180106440", "18010d550", "1800f8220", "1800ff330", "1800ea000", "1800b3130", "1800b28a0", "1800bc0c0", "1800b0b30", "1800b36d0", "1800d3f00", "1800d3f6d", "1800cdbb0", "1800d5a00", "1800bbcc0", "1800afab0", "1800aff50", "1800b0110", "1800d9580", "1800d9830", "1800d9700", "1800b4410", "1800c7ad0", "1800c72d0", "1800c5260", "1800c5440", "1800c5d50", "1800c67e0", "1800afc30", "1800af720", "1800b3bd0", "1800c3740", "1800aec40", "180126c20", "180126d40", "1800aed70", "1800aea60", "1800ae770", "1800ae950", "1800aeea0", "180126e30", "180127120", "1801271a0", "180127330" }) {
+            for (String hex : new String[] { "180010260", "1800812a0", "180081e20", "180010740", "180010540", "1800103e0", "18001acc0", "180083610", "180014f70", "180083c50", "180024a90", "18005ebe0", "18008d470", "18008d470", "180052f90", "1800537e0", "1800589d0", "18005e9b0", "180063ca0", "180064e90", "1800c4730", "1800ccce0", "1800ced10", "1800d4bf0", "1800bc5e0", "1800d4a90", "1800d4610", "1800c0320", "1800e63b0", "1800f1110", "180114660", "18011b770", "180106440", "18010d550", "1800f8220", "1800ff330", "1800ea000", "1800b3130", "1800b28a0", "1800bc0c0", "1800b0b30", "1800b36d0", "1800d3f00", "1800d3f6d", "1800cdbb0", "1800d5a00", "1800bbcc0", "1800afab0", "1800aff50", "1800b0110", "1800d9580", "1800d9830", "1800d9700", "1800b4410", "1800c7ad0", "1800c72d0", "1800c5260", "1800c5440", "1800c5d50", "1800c67e0", "1800afc30", "1800af720", "1800b3bd0", "1800c3740", "1800aec40", "180126c20", "180126d40", "1800aed70", "1800aea60", "1800ae770", "1800ae950", "1800aeea0", "180126e30", "180127120", "1801271a0", "180127330" }) {
                 monitor.checkCancelled();
                 Address address = toAddr(hex);
                 Function f = currentProgram.getFunctionManager().getFunctionAt(address);
@@ -272,6 +273,32 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
             out.println("- Distinct candidate functions retained for decompilation: " +
                 recordOffsetFunctions.size());
             out.println();
+
+            out.println("## Model property-key factory table bytes");
+            out.println();
+            out.println("> Initial 16 entries (0x20-byte stride) from each static table base.");
+            for (String tableHex : new String[] {
+                    "1801d3c60", "1801d1c50", "1801cfc40", "1801cdc30",
+                    "1801cbc20", "1801c9c10", "1801c7c00", "1801c5bf0" }) {
+                monitor.checkCancelled();
+                Address tableAddress = toAddr(tableHex);
+                out.println("### Table at " + tableAddress);
+                for (int offset = 0; offset < 0x200; offset += 16) {
+                    byte[] raw = new byte[16];
+                    int read = currentProgram.getMemory().getBytes(tableAddress.add(offset), raw);
+                    StringBuilder hexBytes = new StringBuilder();
+                    StringBuilder ascii = new StringBuilder();
+                    for (int index = 0; index < read; index++) {
+                        int value = raw[index] & 0xff;
+                        if (index > 0) hexBytes.append(' ');
+                        hexBytes.append(String.format("%02x", value));
+                        ascii.append(value >= 0x20 && value <= 0x7e ? (char)value : '.');
+                    }
+                    out.println("- +" + Integer.toHexString(offset) + " " + hexBytes +
+                        " |" + ascii + "|");
+                }
+                out.println();
+            }
 
             out.println("## Target and caller decompilation");
             out.println();
