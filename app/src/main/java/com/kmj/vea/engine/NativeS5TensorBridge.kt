@@ -181,6 +181,22 @@ object NativeS5TensorBridge {
     }
 
     /**
+     * Builds then hashes one recurrent tensor property name, e.g.
+     * rnn.weight_ih_l0_reverse -> its 32-character object-tree key.
+     */
+    fun buildRecurrentParameterLookupKey(
+        base: String,
+        memberSuffix: String,
+        layerIndex: Int,
+        reverseDirection: Boolean = false
+    ): String {
+        val propertyName = buildRecurrentParameterName(
+            base, memberSuffix, layerIndex, reverseDirection
+        )
+        return hashParameterLookupKey(propertyName)
+    }
+
+    /**
      * Runs the recovered residual depthwise/MLP block from FUN_1800c5d50.
      * historyRows: [channel][7][position], depthwise weights: [channel][49].
      * expand weights: [expandedFeature][channel], project weights: [channel][expandedFeature].
