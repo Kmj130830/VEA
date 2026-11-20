@@ -125,7 +125,7 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
 
             out.println("## Raw instruction listing for tensor-loader ABI");
             out.println();
-            for (String hex : new String[] { "18005e9b0", "180063ca0", "180064e90" }) {
+            for (String hex : new String[] { "180052f90", "1800537e0", "1800589d0", "18005e9b0", "180063ca0", "180064e90" }) {
                 monitor.checkCancelled();
                 Address address = toAddr(hex);
                 Function f = currentProgram.getFunctionManager().getFunctionAt(address);
