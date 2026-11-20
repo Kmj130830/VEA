@@ -184,6 +184,67 @@ path. It must not be generalized to the separate runtime residual block
 unless a call/data-flow trace explicitly links the constructed matrices to
 that block's pointers.
 
+## Repeated-block descriptor shape recovered at the call site
+
+The raw instruction listing of `FUN_180052f90` resolves the repeated-block
+call at `0x180053421`. At that site RSI points to the per-block descriptor.
+Immediately before the call, the code loads:
+
+- `[RSI + 0x04]` as the first matrix dimension;
+- twice that value as the second matrix dimension;
+- `[RSI]` as the matrix-bank count.
+
+These are passed to `FUN_18005e9b0` as dimensions `param_5`,
+`param_6`, and `param_7`. The wrapper forwards them as
+`FUN_180063ca0` parameters `param_6` (columns), `param_7` (rows), and
+`param_8` (matrix count). Consequently, for this call path:
+
+```
+columns = descriptor[+0x04]
+rows = 2 * descriptor[+0x04]
+matrixCount = descriptor[+0x00]
+
+KEY_1 elements = rows * columns * matrixCount
+KEY_2 elements = rows
+KEY_1 / KEY_2 = columns * matrixCount
+```
+
+The corresponding Kotlin shape candidate is:
+
+```
+rows = KEY_2 elements
+columns = rows / 2
+matrixCount = (KEY_1 elements / KEY_2 elements) / columns
+```
+
+The index exposes this through `repeatedBlockMatrixShapeOrNull()`. A shape
+is returned only when KEY_2 is even, the element-count quotient is integral,
+and the reconstructed `rows * columns * matrixCount` equals the KEY_1
+element count.
+
+The real model audit reports that **69 of the 88** paired objects match this
+repeated-block shape. Their inferred matrix-count distribution is:
+
+| Matrix count | Paired objects |
+|---:|---:|
+| 1 | 18 |
+| 2 | 14 |
+| 3 | 15 |
+| 5 | 16 |
+| 6 | 6 |
+
+The remaining **19 pairs do not match this specific call-site formula**.
+They remain structural property pairs but are not assigned this matrix shape.
+The model constructor contains other `FUN_18005e9b0` call sites with
+different dimension tuples, so those pairs require a separate call-site map.
+
+A distinct entry-level call inside `FUN_1800537e0` at `0x180053e13`
+passes `(EAX, R10D, 1)`, where the caller computes
+`EAX = [RSI + 0x10]` and `R10D = 2 * [RSI + 0x14] * [RSI + 0x08]`.
+That is a single-bank shape path. Its descriptor source has not yet been
+linked to each of the 19 remaining property pairs and is not used to classify
+them here.
+
 ## Actual AI Megpoid VTB2 pair audit
 
 The updated payload-validation workflow inspected the real
@@ -214,9 +275,10 @@ payload audit checks the equivalent condition that the primary element count
 is a positive integer multiple of the secondary element count. **All 88 paired
 objects pass**. The observed quotient frequencies are 96 (26), 480 (16),
 192 (15), 128 (10), 9 (7), 384 (6), 16 (4), and 32, 35, 64, 418 (one each).
-The quotient validates the combined `param_6 * param_8` factor, but it does
-not recover the two dimensions separately or assign a semantic role to either
-payload.
+The quotient validates the combined `param_6 * param_8` factor for the
+matrix loader. The repeated-block row/column/bank decomposition is supported
+for 69 pairs as documented above; the remaining 19 are not shape-classified
+by that call path. Neither payload is assigned a semantic role.
 
 ## What is still not connected
 
