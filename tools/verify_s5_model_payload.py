@@ -134,7 +134,7 @@ def s5_lookup_key(parameter_name: str) -> str:
 
 def summarize_model_tree(
     root: dict,
-) -> tuple[dict[str, int], set[str], list[str], list[str], dict[str, list[object]]]:
+) -> tuple[dict[str, int], set[str], list[str], list[str], int, dict[str, list[object]]]:
     counts = {
         "objects": 0,
         "arrays": 0,
@@ -201,7 +201,10 @@ def summarize_model_tree(
         "conv3", "cond3", "linear",
     ]
     matching_modules = [name for name in module_names if s5_lookup_key(name) in all_keys]
-    return counts, all_keys, matching_parameters, matching_modules, key_values
+    return (
+        counts, all_keys, matching_parameters, matching_modules,
+        rnn_candidate_count, key_values
+    )
 
 
 def describe_value(value: object) -> str:
@@ -760,7 +763,7 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
             if root is not None:
                 keys = list(root.keys())
                 sample = [str(key)[:32] for key in keys[:4]]
-                counts, all_keys, parameter_matches, module_matches, key_values = summarize_model_tree(root)
+                counts, all_keys, parameter_matches, module_matches, rnn_candidate_count, key_values = summarize_model_tree(root)
                 print(
                     "JSON_OK",
                     f"archive={path.name}!/{item.filename}",
@@ -802,7 +805,7 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                 print(
                     "RNN_PARAMETER_LOOKUP_CANDIDATES",
                     f"member={item.filename}",
-                    f"matched={len(parameter_matches)}/128",
+                    f"matched={len(parameter_matches)}/{rnn_candidate_count}",
                     f"names={parameter_matches}",
                 )
                 print(
