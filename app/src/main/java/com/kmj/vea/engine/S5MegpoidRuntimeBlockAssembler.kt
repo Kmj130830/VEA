@@ -10,7 +10,10 @@ class S5MegpoidCompiledRuntimeBlock internal constructor(
     val row: Int,
     val column: Int,
     val shape: S5MegpoidResidualBlockShape,
-    val depthwiseFilter: FloatArray,
+    /** Original [channel][height][width] layout used by the current reference kernel. */
+    val depthwiseWeightsChannelMajor: FloatArray,
+    /** Exact FUN_1800d4bf0 record layout: [width][channel][height]. */
+    val nativeRecordDepthwiseFilter: FloatArray,
     val expansionWeights: FloatArray,
     val expansionGamma: FloatArray,
     val expansionBeta: FloatArray,
@@ -19,17 +22,19 @@ class S5MegpoidCompiledRuntimeBlock internal constructor(
     val residualScale: FloatArray
 ) {
     /**
-     * Executes one residual block window. historyRows is [channel][7][position]
-     * and residualInput is [channel][position], matching the native operator.
+     * Executes the isolated reference-kernel path on an already materialized
+     * [channel][7][position] window. This does NOT emulate S5API's stateful
+     * FUN_1800c67e0 ring-buffer/history scheduler; use only for kernel-level
+     * experiments until that temporal state machine is ported.
      */
-    fun run(
+    fun runReferenceWindow(
         historyRows: FloatArray,
         residualInput: FloatArray,
         epsilon: Float = S5MegpoidResidualBlockShape.DEFAULT_EPSILON
     ): FloatArray {
         shape.validateInputs(
             historyRows = historyRows,
-            depthwiseWeights = depthwiseFilter,
+            depthwiseWeights = depthwiseWeightsChannelMajor,
             expandWeights = expansionWeights,
             expandedBiasA = expansionGamma,
             expandedBiasB = expansionBeta,
@@ -41,7 +46,7 @@ class S5MegpoidCompiledRuntimeBlock internal constructor(
         )
         return NativeS5TensorBridge.runResidualDepthwiseMlpBlock(
             historyRows = historyRows,
-            depthwiseWeights = depthwiseFilter,
+            depthwiseWeights = depthwiseWeightsChannelMajor,
             expandWeights = expansionWeights,
             expandedBiasA = expansionGamma,
             expandedBiasB = expansionBeta,
@@ -79,7 +84,7 @@ object S5MegpoidRuntimeBlockAssembler {
         row: Int,
         column: Int,
         tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder,
-        positions: Int = 7
+        positions: Int
     ): S5MegpoidCompiledRuntimeBlock {
         require(row in 0 until S5MegpoidRuntimeBlockFactoryKey.TABLE_SIZE)
         require(column in 0 until S5MegpoidRuntimeBlockFactoryKey.TABLE_SIZE)
@@ -158,7 +163,8 @@ object S5MegpoidRuntimeBlockAssembler {
             row = row,
             column = column,
             shape = shape,
-            depthwiseFilter = transposedDepthwiseFilter,
+            depthwiseWeightsChannelMajor = depthwiseSource,
+            nativeRecordDepthwiseFilter = transposedDepthwiseFilter,
             expansionWeights = effectiveExpansionWeights,
             expansionGamma = gamma,
             expansionBeta = beta,
@@ -169,9 +175,9 @@ object S5MegpoidRuntimeBlockAssembler {
     }
 
     /**
-     * Mirrors FUN_1800d4bf0's source index
-     * ((height * channel + y) * width + x) and destination index
-     * ((x + width * channel) * height + y).
+     * Mirrors FUN_1800d4bf0's three-axis permutation:
+     * source [C][H][W] index ((c * H + y) * W + x)
+     * becomes native-record [W][C][H] index ((x * C + c) * H + y).
      */
     fun transposeDepthwiseFilter(
         source: FloatArray,
