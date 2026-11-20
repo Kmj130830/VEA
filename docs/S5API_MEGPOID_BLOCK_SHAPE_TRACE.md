@@ -361,9 +361,9 @@ by that call path. Neither payload is assigned a semantic role.
 
 The active native execution path is now traced one call layer above the residual operator.
 
-- `FUN_1800aec40` is a thin forward-call wrapper. It validates the network object pointer, obtains a positive state/count field from the companion object returned by `FUN_1800c4730`, copies that value to the network object at byte offset `0x624`, and calls `FUN_1800c7ad0`.
-- The wrapper call at `0x1800aecba` passes three caller-supplied values alongside the network object. Their semantic types are not named by the current decompilation.
-- `FUN_180126c20` calls this wrapper at `0x180126cde`, making it the next higher-level owner to inspect for frame/input preparation.
+- `FUN_180126c20` is the higher-level entry wrapper. It rejects a null first context pointer with `E1016`, rejects a null/empty second context pointer with `E1017`, and otherwise forwards to `FUN_1800aec40` at `0x180126cde`.
+- `FUN_1800aec40` validates the network object pointer and raises `E100D` if it is absent. It obtains a companion object through `FUN_1800c4730`, requires the 32-bit field at byte offset `0x624` to be positive (`E1004` otherwise), copies that field into the network object at the same offset, and calls `FUN_1800c7ad0`.
+- The wrapper forwards three additional caller-supplied values to `FUN_1800c7ad0`. The current Ghidra prototypes disagree on one forwarded argument's width, and do not establish whether these values are buffers, lengths, or flags; they remain opaque in this trace.
 
 Inside `FUN_1800c7ad0`, the residual stage is an explicit nested loop:
 
