@@ -45,7 +45,7 @@ class S5MegpoidModelTensorReference internal constructor(
 }
 
 /**
- * Lazy index of the fixed model-block keys and all nested *F32/*F16 tensors
+ * Lazy index of the fixed model-block keys and all nested *F32 and *F16 tensors
  * they reference. This is a model-data binding layer; it does not run a
  * forward pass or claim to be an audio renderer.
  */
