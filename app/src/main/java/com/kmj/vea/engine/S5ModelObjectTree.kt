@@ -67,10 +67,20 @@ class S5ModelObjectTree private constructor(val root: S5ModelValue.ObjectValue) 
          */
         fun parseModelPayload(
             encodedPayload: ByteArray,
-            limits: Limits = Limits()
+            limits: Limits = Limits(),
+            payloadDecoder: S5ModelPayloadDecoder = NativeS5ModelPayloadDecoder
         ): S5ModelObjectTree =
-            parseUtf8(NativeS5TensorBridge.decodeModelPayload(encodedPayload), limits)
+            parseUtf8(payloadDecoder.decode(encodedPayload), limits)
     }
+}
+
+fun interface S5ModelPayloadDecoder {
+    fun decode(encodedPayload: ByteArray): ByteArray
+}
+
+object NativeS5ModelPayloadDecoder : S5ModelPayloadDecoder {
+    override fun decode(encodedPayload: ByteArray): ByteArray =
+        NativeS5TensorBridge.decodeModelPayload(encodedPayload)
 }
 
 interface S5TypedTensorDecoder {
