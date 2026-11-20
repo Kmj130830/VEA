@@ -579,6 +579,39 @@ This makes named-property lookup compatible with the actual `VOCALOID7.vtmg`
 JSON keys. It does not by itself identify how these named matrices feed the
 runtime residual operator or establish an end-to-end inference schedule.
 
+### Neural forward-dispatch entry chain
+
+The current report traces the runtime entry point used from the higher-level
+render routine:
+
+`Func_92864e29` → `FUN_180126c20` → `FUN_1800aec40` →
+`FUN_1800c7ad0`.
+
+- `Func_92864e29` prepares per-frame feature and state buffers, invokes
+  `FUN_180127330`, then calls `FUN_180126c20` with the selected model
+  context, a non-null runtime-state pointer, and the per-frame state buffer.
+- `FUN_180126c20` is a guard/wrapper. It rejects a null model context
+  (`E1016`) and a null runtime-state pointer (`E1017`), then forwards
+  the argument bundle to `FUN_1800aec40`.
+- `FUN_1800aec40` resolves the runtime engine pointer from that bundle,
+  obtains the required model-state count through `FUN_1800c4730`, checks
+  that it is positive, copies it into the runtime state, and dispatches
+  `FUN_1800c7ad0`.
+- `FUN_1800c7ad0` is the central operator-graph execution routine. Its
+  block loop calls `FUN_1800c5d50` at `0x1800cae94` with the current
+  0x100-byte block-data record, state/history records, and per-block
+  workspace. The caller then swaps the associated workspace/state records
+  before continuing the loop.
+
+The render routine subsequently calls `FUN_180126e30` and
+`FUN_180126d40` with per-frame ring-buffer slices. Those two functions
+have now been added to the Ghidra export targets so their buffer direction,
+length, and relationship to the synthesis output can be confirmed.
+
+This establishes a verified call chain into the neural operator graph. It
+does not yet prove the exact semantics of the top-level frame buffer or show
+a PCM/audio-sample output from this invocation.
+
 ### Optional GRU parameter-loading path
 
 A separate generic recurrent loader, `FUN_18005ebe0`, is called with a
