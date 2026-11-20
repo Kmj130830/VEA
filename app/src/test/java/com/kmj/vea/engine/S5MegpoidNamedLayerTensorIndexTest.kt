@@ -65,6 +65,19 @@ class S5MegpoidNamedLayerTensorIndexTest {
     }
 
     @Test
+    fun mapsNamedLayerDescriptorPairsToFactoryObjectOffsets() {
+        assertEquals(0x20, S5MegpoidNamedLayer.PRE1.descriptorPairOffsetBytes)
+        assertEquals(0x30, S5MegpoidNamedLayer.PRE2.descriptorPairOffsetBytes)
+        assertEquals(0x40, S5MegpoidNamedLayer.CONV1.descriptorPairOffsetBytes)
+        assertEquals(0x50, S5MegpoidNamedLayer.COND1.descriptorPairOffsetBytes)
+        assertEquals(0x60, S5MegpoidNamedLayer.CONV2.descriptorPairOffsetBytes)
+        assertEquals(0x70, S5MegpoidNamedLayer.COND2.descriptorPairOffsetBytes)
+        assertEquals(0x80, S5MegpoidNamedLayer.CONV3.descriptorPairOffsetBytes)
+        assertEquals(0x90, S5MegpoidNamedLayer.COND3.descriptorPairOffsetBytes)
+        assertEquals(0xa0, S5MegpoidNamedLayer.LINEAR.descriptorPairOffsetBytes)
+    }
+
+    @Test
     fun packsNamedWeightsUsingRecoveredDescriptorAxesAndPadding() {
         val index = S5MegpoidNamedLayerTensorIndex.build(modelTree(), ::lookupKey)
         val layer = index.requireLayer(S5MegpoidNamedLayer.CONV1)
