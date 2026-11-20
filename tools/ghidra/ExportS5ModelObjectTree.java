@@ -63,6 +63,12 @@ public class ExportS5ModelObjectTree extends GhidraScript {
         "180010740", // key concatenation helper
         "180010540", // key suffix/helper
         "180083c50", // recurrent layer-index to string formatter
+        "18004e3b0", // model boolean flag used before RNN layer initialization
+        "18004e1e0", // second model boolean flag used before RNN layer initialization
+        "18004d170", // model subobject accessor for the first conditional path
+        "18004d3b0", // model subobject accessor for the second conditional path
+        "18004c460", // model subobject accessor for the third conditional path
+        "18004c6a0", // model subobject accessor for the fourth conditional path
         "180065d50", // typed object child/value accessor
         "18001e360", // alternate typed tensor reader caller
         "18005e120", // recurrent matrix/tensor reader caller
