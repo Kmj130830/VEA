@@ -391,6 +391,65 @@ def model_value_layout(value: object, max_tensors: int = 96) -> dict[str, object
     }
 
 
+def typed_tensor_lengths(value: object) -> list[dict[str, object]]:
+    """Return typed tensor scalar counts, never tensor contents."""
+    layouts: list[dict[str, object]] = []
+    stack = [value]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, str) and current[:4] in {"*F32", "*F16"}:
+            layouts.append(decode_typed_payload_layout(current))
+        elif isinstance(current, dict):
+            stack.extend(current.values())
+        elif isinstance(current, list):
+            stack.extend(current)
+    return layouts
+
+
+def inspect_megpoid_matrix_property_pairs(root: dict, member: str) -> None:
+    """Find objects that contain both matrix-property keys and report only lengths."""
+    first_key = MODEL_STATIC_LOOKUP_KEYS["fun_1800537e0_key_1"]
+    second_key = MODEL_STATIC_LOOKUP_KEYS["fun_1800537e0_key_2"]
+    stack: list[tuple[object, str]] = [(root, "$")]
+    pair_count = 0
+    ambiguous_count = 0
+    while stack:
+        current, path = stack.pop()
+        if isinstance(current, dict):
+            if first_key in current and second_key in current:
+                first = typed_tensor_lengths(current[first_key])
+                second = typed_tensor_lengths(current[second_key])
+                pair_count += 1
+                if len(first) != 1 or len(second) != 1:
+                    ambiguous_count += 1
+                    classification = "ambiguous"
+                elif first[0].get("invalid_base64") or second[0].get("invalid_base64"):
+                    classification = "invalid"
+                else:
+                    classification = "paired"
+                print(
+                    "MODEL_MATRIX_PROPERTY_PAIR",
+                    f"member={member}",
+                    f"parent={path}",
+                    f"first_count={len(first)}",
+                    f"first_elements={[item.get('elements') for item in first]}",
+                    f"second_count={len(second)}",
+                    f"second_elements={[item.get('elements') for item in second]}",
+                    f"classification={classification}",
+                )
+            for key, child in current.items():
+                stack.append((child, path + "/" + key))
+        elif isinstance(current, list):
+            for index, child in enumerate(current):
+                stack.append((child, f"{path}[{index}]"))
+    print(
+        "MODEL_MATRIX_PROPERTY_PAIR_SUMMARY",
+        f"member={member}",
+        f"pair_objects={pair_count}",
+        f"ambiguous_objects={ambiguous_count}",
+    )
+
+
 def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
     if not path.is_file():
         print("MISSING_ARCHIVE", path)
@@ -437,6 +496,8 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                     f"key_sample={sample}",
                 )
                 print("TREE_SUMMARY", f"member={item.filename}", counts)
+                if item.filename == "AI_Megpoid.vtb2":
+                    inspect_megpoid_matrix_property_pairs(root, item.filename)
                 for root_key, root_value in root.items():
                     shape = value_shape(root_value)
                     direct_fields = len(root_value) if isinstance(root_value, (dict, list)) else 0
