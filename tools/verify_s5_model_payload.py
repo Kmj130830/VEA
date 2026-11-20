@@ -728,7 +728,123 @@ def inspect_megpoid_layer_property_pairs(root: dict, member: str) -> None:
     )
 
 
-def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
+MEGPOID_BLOCK_FACTORY_FIELDS = (
+    ("FUN_1800f1110", "residual_scale_at_+0xB8", "residual scale input (param9)"),
+    ("FUN_180114660", "projection_optional_bias_at_+0xA8", "optional bias for descriptor +0x88 (param8)"),
+    ("FUN_18011b770", "projection_weights_at_+0x98", "weights for descriptor +0x88 (param7)"),
+    ("FUN_180106440", "depthwise_optional_bias_at_+0x78", "optional bias for descriptor +0x58 (param6)"),
+    ("FUN_18010d550", "depthwise_descriptor_weights_at_+0x68", "weights for descriptor +0x58 (param5)"),
+    ("FUN_1800f8220", "shared_descriptor_vector_at_+0x48", "second shared descriptor input (param4)"),
+    ("FUN_1800ff330", "shared_descriptor_vector_at_+0x38", "first shared descriptor input (param3)"),
+    ("FUN_1800ea000", "transposed_3d_tensor_at_+0x20", "source tensor transposed on its final two axes (param2)"),
+)
+
+
+def extract_megpoid_factory_keys(report_path: Path) -> list[dict[str, object]]:
+    """Recover the 8x256 fixed keys from static Ghidra decompilation.
+
+    Each initializer writes four uint32 constants, formats them through
+    FUN_18001acc0 as 8-digit hexadecimal words, and stores the resulting
+    32-character key in its indexed 0x20-byte table slot using FUN_1800e63b0.
+    """
+    report = report_path.read_text(encoding="utf-8")
+    pattern = re.compile(
+        r"local_28 = (0x[0-9a-fA-F]+);\\s*"
+        r"local_24 = (0x[0-9a-fA-F]+);\\s*"
+        r"local_20 = (0x[0-9a-fA-F]+);\\s*"
+        r"local_1c = (0x[0-9a-fA-F]+);.*?"
+        r"FUN_1800e63b0\\(local_128,(&DAT_[0-9a-fA-F]+)\\);",
+        re.S,
+    )
+    tables: list[dict[str, object]] = []
+    for function_name, target_field, role in MEGPOID_BLOCK_FACTORY_FIELDS:
+        sections = list(re.finditer(rf"^### \\d+\\. {function_name} at ", report, re.M))
+        if not sections:
+            raise ValueError(f"Ghidra report is missing decompilation for {function_name}.")
+        start = sections[-1].start()
+        end = report.find("\\n### ", start + 5)
+        section = report[start:end if end >= 0 else len(report)]
+        matches = list(pattern.finditer(section))
+        if len(matches) != 256:
+            raise ValueError(
+                f"{function_name} must contain 256 initialized table keys; found {len(matches)}."
+            )
+        entries = []
+        first_address = int(matches[0].group(5).replace("&DAT_", ""), 16)
+        for index, match in enumerate(matches):
+            words = [int(value, 16) for value in match.groups()[:4]]
+            lookup_key = "".join(f"{word:08x}" for word in words)
+            table_address = int(match.group(5).replace("&DAT_", ""), 16)
+            if table_address != first_address + index * 0x20:
+                raise ValueError(
+                    f"{function_name} table slot {index} is not at the expected 0x20-byte stride."
+                )
+            entries.append({
+                "index": index,
+                "row": index // 16,
+                "column": index % 16,
+                "lookup_key": lookup_key,
+            })
+        tables.append({
+            "factory": function_name,
+            "target_field": target_field,
+            "role": role,
+            "base_address": f"0x{first_address:08X}",
+            "entry_count": len(entries),
+            "entries": entries,
+        })
+    return tables
+
+
+def inspect_megpoid_dynamic_block_keys(
+    member: str, root: dict, factory_tables: list[dict[str, object]]
+) -> None:
+    """Match recovered factory keys against the model tree without exposing tensor values."""
+    keys_to_factories: dict[str, list[tuple[dict[str, object], dict[str, object]]]] = {}
+    for table in factory_tables:
+        for entry in table["entries"]:
+            keys_to_factories.setdefault(str(entry["lookup_key"]), []).append((table, entry))
+
+    matches_by_factory = {str(table["factory"]): 0 for table in factory_tables}
+    stack: list[tuple[object, str]] = [(root, "$")]
+    while stack:
+        current, path = stack.pop()
+        if isinstance(current, dict):
+            for key, child in current.items():
+                for table, entry in keys_to_factories.get(key, []):
+                    matches_by_factory[str(table["factory"])] += 1
+                    print(
+                        "MODEL_BLOCK_DYNAMIC_KEY_MATCH",
+                        f"member={member}",
+                        f"factory={table['factory']}",
+                        f"target_field={table['target_field']}",
+                        f"role={table['role']}",
+                        f"index={entry['index']}",
+                        f"row={entry['row']}",
+                        f"column={entry['column']}",
+                        f"lookup_key={key}",
+                        f"parent_path={path}",
+                        "value_layout=" + json.dumps(model_value_layout(child), sort_keys=True),
+                    )
+                stack.append((child, path + "/" + key))
+        elif isinstance(current, list):
+            for index, child in enumerate(current):
+                stack.append((child, f"{path}[{index}]"))
+
+    for table in factory_tables:
+        factory = str(table["factory"])
+        print(
+            "MODEL_BLOCK_DYNAMIC_KEY_SUMMARY",
+            f"member={member}",
+            f"factory={factory}",
+            f"target_field={table['target_field']}",
+            f"matched_entries={matches_by_factory[factory]}",
+            f"candidate_entries={table['entry_count']}",
+            f"base_address={table['base_address']}",
+        )
+
+
+def inspect_archive(path: Path, native_decoder: NativeDecoder | None, factory_tables: list[dict[str, object]] | None = None) -> int:
     if not path.is_file():
         print("MISSING_ARCHIVE", path)
         return 0
@@ -777,6 +893,8 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                 inspect_megpoid_block_descriptor_fields(item.filename, root, key_values)
                 if item.filename == "AI_Megpoid.vtb2":
                     inspect_megpoid_layer_property_pairs(root, item.filename)
+                    if factory_tables is not None:
+                        inspect_megpoid_dynamic_block_keys(item.filename, root, factory_tables)
                 if item.filename.lower().endswith(".vtmg"):
                     inspect_vtmg_typed_root_objects(item.filename, root)
                     inspect_named_layer_container_keys(item.filename, key_values)
@@ -866,12 +984,29 @@ def main() -> None:
         default=None,
         help="Optional host build of libveas5tensor.so for byte-for-byte differential checks.",
     )
+    parser.add_argument(
+        "--ghidra-report",
+        type=Path,
+        default=None,
+        help="Optional S5API Megpoid block-shape Ghidra report used to recover the eight 16x16 model-key tables.",
+    )
     args = parser.parse_args()
     native_decoder = NativeDecoder(args.native_library) if args.native_library else None
+    factory_tables = (
+        extract_megpoid_factory_keys(args.ghidra_report)
+        if args.ghidra_report is not None else None
+    )
+    if factory_tables is not None:
+        print(
+            "MODEL_BLOCK_DYNAMIC_KEY_CANDIDATES",
+            f"factories={len(factory_tables)}",
+            f"candidate_keys={sum(int(table['entry_count']) for table in factory_tables)}",
+            f"ghidra_report={args.ghidra_report}",
+        )
 
     total = 0
     for archive in (Path("megpoidV7.zip"), Path("AI Model.zip")):
-        total += inspect_archive(archive, native_decoder)
+        total += inspect_archive(archive, native_decoder, factory_tables)
     print("S5_JSON_OBJECTS_RECOVERED", total)
     if native_decoder is not None:
         print("S5_NATIVE_DIFFERENTIAL", "PASS")
