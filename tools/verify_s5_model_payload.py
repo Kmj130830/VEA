@@ -497,7 +497,7 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                 )
                 print("TREE_SUMMARY", f"member={item.filename}", counts)
                 if item.filename == "AI_Megpoid.vtb2":
-                    inspect_megpoid_matrix_property_pairs(root, item.filename)
+                    inspect_megpoid_layer_property_pairs(root, item.filename)
                 for root_key, root_value in root.items():
                     shape = value_shape(root_value)
                     direct_fields = len(root_value) if isinstance(root_value, (dict, list)) else 0
