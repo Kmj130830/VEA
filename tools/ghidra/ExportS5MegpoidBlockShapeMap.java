@@ -61,6 +61,14 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
         "1800c72d0", // adjacent runtime block operator
         "1800c5260", // related linear/operator helper
         "1800c5440", // related linear/operator helper
+        "1800c7920", // activation/normalization stage in the model forward graph
+        "1800c3930", // conditional feature/operator helper in the model forward graph
+        "1800c3840", // matrix/vector operation helper used by forward graph
+        "1800c1a30", // final output/normalization stage in forward graph
+        "1800c5130", // inner operation called by sequence-conditioned layer helpers
+        "1800ce460", // alternate sequence helper selected by FUN_1800c72d0
+        "1800ce750", // alternate sequence helper selected by FUN_1800c72d0
+        "1800df720", // operator mode/config selector used by conditional dispatch
         "1800c5d50", // residual depthwise-MLP runtime operator
         "1800c67e0", // depthwise history/ring-buffer producer
         "1800afc30", // 0x100-stride block-data vector copy helper
@@ -201,7 +209,7 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
 
             out.println("## Raw instruction listing for tensor-loader ABI");
             out.println();
-            for (String hex : new String[] { "180010260", "1800812a0", "180081e20", "180010740", "180010540", "1800103e0", "18001acc0", "180083610", "180014f70", "180083c50", "180024a90", "18005ebe0", "18008d470", "18008d470", "180052f90", "1800537e0", "1800589d0", "18005e9b0", "180063ca0", "180064e90", "1800c4730", "1800ccce0", "1800d3f00", "1800d3f6d", "1800cdbb0", "1800d5a00", "1800bbcc0", "1800afab0", "1800aff50", "1800b0110", "1800d9580", "1800d9830", "1800d9700", "1800b4410", "1800c7ad0", "1800c72d0", "1800c5260", "1800c5440", "1800c5d50", "1800c67e0", "1800afc30", "1800af720", "1800b3bd0", "1800c3740", "1800aec40", "180126c20", "180126d40", "1800aed70", "1800aea60", "1800ae770", "1800ae950", "1800aeea0", "180126e30", "180127120", "1801271a0", "180127330" }) {
+            for (String hex : new String[] { "180010260", "1800812a0", "180081e20", "180010740", "180010540", "1800103e0", "18001acc0", "180083610", "180014f70", "180083c50", "180024a90", "18005ebe0", "18008d470", "18008d470", "180052f90", "1800537e0", "1800589d0", "18005e9b0", "180063ca0", "180064e90", "1800c4730", "1800ccce0", "1800d3f00", "1800d3f6d", "1800cdbb0", "1800d5a00", "1800bbcc0", "1800afab0", "1800aff50", "1800b0110", "1800d9580", "1800d9830", "1800d9700", "1800b4410", "1800c7ad0", "1800c72d0", "1800c5260", "1800c5440", "1800c7920", "1800c3930", "1800c3840", "1800c1a30", "1800c5130", "1800ce460", "1800ce750", "1800df720", "1800c5d50", "1800c67e0", "1800afc30", "1800af720", "1800b3bd0", "1800c3740", "1800aec40", "180126c20", "180126d40", "1800aed70", "1800aea60", "1800ae770", "1800ae950", "1800aeea0", "180126e30", "180127120", "1801271a0", "180127330" }) {
                 monitor.checkCancelled();
                 Address address = toAddr(hex);
                 Function f = currentProgram.getFunctionManager().getFunctionAt(address);
