@@ -34,6 +34,8 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
         "180020190", // .weight member reader
         "1800214c0", // .bias member reader
         "180010260", // salted model-parameter key transformation
+        "180081e20", // numeric hex ostream manipulator used for key formatting
+        "1800812a0", // MD5 block finalizer / digest output path
         "180010740", // model parameter string construction
         "180010540", // model parameter string concatenation
         "1800103e0", // model parameter string copy
@@ -185,7 +187,7 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
 
             out.println("## Raw instruction listing for tensor-loader ABI");
             out.println();
-            for (String hex : new String[] { "180010260", "180010740", "180010540", "1800103e0", "18001acc0", "180083610", "180014f70", "180083c50", "180024a90", "18005ebe0", "18008d5b2", "180052f90", "1800537e0", "1800589d0", "18005e9b0", "180063ca0", "180064e90", "1800c7ad0", "1800c72d0", "1800c5260", "1800c5440", "1800c5d50", "1800c67e0", "1800afc30", "1800af720", "1800b3bd0", "1800c3740", "1800aec40", "180126c20" }) {
+            for (String hex : new String[] { "180010260", "1800812a0", "180081e20", "180010740", "180010540", "1800103e0", "18001acc0", "180083610", "180014f70", "180083c50", "180024a90", "18005ebe0", "18008d5b2", "180052f90", "1800537e0", "1800589d0", "18005e9b0", "180063ca0", "180064e90", "1800c7ad0", "1800c72d0", "1800c5260", "1800c5440", "1800c5d50", "1800c67e0", "1800afc30", "1800af720", "1800b3bd0", "1800c3740", "1800aec40", "180126c20" }) {
                 monitor.checkCancelled();
                 Address address = toAddr(hex);
                 Function f = currentProgram.getFunctionManager().getFunctionAt(address);
