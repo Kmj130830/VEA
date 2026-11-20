@@ -113,8 +113,10 @@ MODEL_STATIC_LOOKUP_KEYS = {
 # Numeric descriptor properties resolved in Func_47a12a73 before FUN_1800589d0.
 # The values become FUN_180052f90's dim0 (param_8) and dim1 (param_6) fields.
 MODEL_BLOCK_DESCRIPTOR_KEYS = {
-    "block_dim1": "0322875158f9b1bff9162ba2fa7dd262",
-    "block_dim0": "d7226a031351dcf206e02f41499ed9b6",
+    # Func_47a12a73 assigns these to original descriptor slots [0], [1], [5].
+    "descriptor_param0": "52e6fc7b15bd76513d7169444b901f84",
+    "descriptor_param1": "0322875158f9b1bff9162ba2fa7dd262",
+    "descriptor_param5": "d7226a031351dcf206e02f41499ed9b6",
 }
 
 
@@ -417,22 +419,54 @@ def typed_tensor_lengths(value: object) -> list[dict[str, object]]:
 def inspect_megpoid_block_descriptor_fields(
     member: str, key_values: dict[str, list[object]]
 ) -> None:
-    """Report only scalar metadata feeding the block shape descriptor."""
+    """Report scalar descriptor slots and their JSON paths, never tensor values."""
+    occurrences_by_key: dict[str, list[tuple[str, object]]] = {
+        key: [] for key in MODEL_BLOCK_DESCRIPTOR_KEYS.values()
+    }
+    stack: list[tuple[object, str]] = [(root, "$")]
+    while stack:
+        current, path = stack.pop()
+        if isinstance(current, dict):
+            for key, child in current.items():
+                if key in occurrences_by_key:
+                    occurrences_by_key[key].append((path + "/" + key, child))
+                stack.append((child, path + "/" + key))
+        elif isinstance(current, list):
+            for index, child in enumerate(current):
+                stack.append((child, f"{path}[{index}]"))
+
+    values_by_label: dict[str, list[int | float]] = {}
     for label, key in MODEL_BLOCK_DESCRIPTOR_KEYS.items():
-        values = key_values.get(key, [])
+        occurrences = occurrences_by_key[key]
         numeric = [
-            value for value in values
+            value for _, value in occurrences
             if isinstance(value, (int, float)) and not isinstance(value, bool)
         ]
-        kinds = sorted({describe_value(value) for value in values})
+        values_by_label[label] = numeric
         print(
             "MODEL_BLOCK_DESCRIPTOR_FIELD",
             f"member={member}",
             f"field={label}",
             f"key={key}",
-            f"occurrences={len(values)}",
-            f"numeric_values={sorted(set(numeric))}",
-            f"value_kinds={kinds}",
+            f"occurrences={len(occurrences)}",
+            f"values_and_paths={[(path, value if isinstance(value, (int, float)) and not isinstance(value, bool) else describe_value(value)) for path, value in occurrences]}",
+        )
+
+    p0 = values_by_label.get("descriptor_param0", [])
+    p1 = values_by_label.get("descriptor_param1", [])
+    if p0 and p1:
+        candidate_ratios = sorted({
+            int((value / 2) * width)
+            for value in p0
+            for width in p1
+            if value % 2 == 0 and value > 0 and width > 0
+        })
+        print(
+            "MODEL_BLOCK_DESCRIPTOR_RATIO_CANDIDATES",
+            f"member={member}",
+            f"param0_values={sorted(set(p0))}",
+            f"param1_values={sorted(set(p1))}",
+            f"candidate_ratios={(candidate_ratios)}",
         )
 
 
