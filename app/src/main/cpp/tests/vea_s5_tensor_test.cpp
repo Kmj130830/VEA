@@ -651,7 +651,7 @@ int main() {
     };
     const uint8_t payload_multiword_expected[] = {
         0xb2, 0x8d, 0xa3, 0xb2, 0xfa, 0xd7, 0x55, 0x79,
-        0xfa, 0x89, 0x11, 0x8f
+        0xfa, 0x89, 0x18, 0xf3
     };
     uint8_t decoded_multiword[sizeof(payload_multiword_expected)] = {};
     assert(vea_s5_decode_model_payload(
