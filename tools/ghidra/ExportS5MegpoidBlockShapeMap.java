@@ -59,7 +59,7 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
         "180056f40", // generic RNN constructor (known disabled for this bank)
         "180068190", // named model layer loader
         "18008d470", // named-layer model context builder / runtime entry
-        "18008d5b2", // direct caller of the named model layer loader
+        "18008d470", // exported model-layer object constructor entry point
         "180064670", // tensor-to-matrix descriptor loader
         "1800c5d50", // residual depthwise/MLP runtime block
         "1800c67e0", // depthwise history/ring-buffer producer
@@ -133,43 +133,13 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
                 out.println();
             }
 
-            out.println("## Neural runtime vtable data neighborhood");
+            out.println("## Relative function tables");
             out.println();
-            Address vtableMethodSlot = toAddr("180a5bea8");
-            for (long offset = -0x80; offset <= 0x40; offset += 8) {
-                monitor.checkCancelled();
-                Address slot = offset < 0
-                    ? vtableMethodSlot.subtract(-offset)
-                    : vtableMethodSlot.add(offset);
-                byte[] raw = new byte[8];
-                int read = currentProgram.getMemory().getBytes(slot, raw);
-                long pointer = 0;
-                if (read == 8) {
-                    pointer = java.nio.ByteBuffer.wrap(raw)
-                        .order(java.nio.ByteOrder.LITTLE_ENDIAN).getLong();
-                }
-                Address pointerAddress = pointer == 0 ? null : toAddr(Long.toHexString(pointer));
-                Function pointerFunction = pointerAddress == null ? null :
-                    currentProgram.getFunctionManager().getFunctionAt(pointerAddress);
-                out.println("- Slot " + slot + " bytes=" + formatBytes(raw, read) +
-                    " pointer=" + (pointerAddress == null ? "<unreadable/null>" : pointerAddress) +
-                    " target=" + (pointerFunction == null ? "<not a function>" : pointerFunction.getName()));
-
-                ReferenceIterator slotRefs = currentProgram.getReferenceManager().getReferencesTo(slot);
-                while (slotRefs.hasNext()) {
-                    Reference ref = slotRefs.next();
-                    Function caller = currentProgram.getFunctionManager()
-                        .getFunctionContaining(ref.getFromAddress());
-                    out.println("  - Ref from " + ref.getFromAddress() + " in " +
-                        (caller == null ? "<unknown>" : caller.getName()) +
-                        " [" + ref.getReferenceType() + "]");
-                    if (caller != null && callers.size() < MAX_CALLERS) {
-                        callers.put(caller.getEntryPoint(), caller);
-                        refsByCaller.computeIfAbsent(caller.getEntryPoint(), k -> new ArrayList<>())
-                            .add(ref);
-                    }
-                }
-            }
+            dumpRelativeFunctionTable(
+                out, "named-layer model object vtable", "180a5a348", -0x80, 0x80);
+            dumpRelativeFunctionTable(
+                out, "neural runtime operator vtable", "180a5bea8", -0x80, 0x40);
+            out.println();
             out.println();
 
             out.println("## Direct caller instruction contexts");
@@ -188,7 +158,7 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
 
             out.println("## Raw instruction listing for tensor-loader ABI");
             out.println();
-            for (String hex : new String[] { "180010260", "1800812a0", "180081e20", "180010740", "180010540", "1800103e0", "18001acc0", "180083610", "180014f70", "180083c50", "180024a90", "18005ebe0", "18008d470", "18008d5b2", "180052f90", "1800537e0", "1800589d0", "18005e9b0", "180063ca0", "180064e90", "1800c7ad0", "1800c72d0", "1800c5260", "1800c5440", "1800c5d50", "1800c67e0", "1800afc30", "1800af720", "1800b3bd0", "1800c3740", "1800aec40", "180126c20" }) {
+            for (String hex : new String[] { "180010260", "1800812a0", "180081e20", "180010740", "180010540", "1800103e0", "18001acc0", "180083610", "180014f70", "180083c50", "180024a90", "18005ebe0", "18008d470", "18008d470", "180052f90", "1800537e0", "1800589d0", "18005e9b0", "180063ca0", "180064e90", "1800c7ad0", "1800c72d0", "1800c5260", "1800c5440", "1800c5d50", "1800c67e0", "1800afc30", "1800af720", "1800b3bd0", "1800c3740", "1800aec40", "180126c20" }) {
                 monitor.checkCancelled();
                 Address address = toAddr(hex);
                 Function f = currentProgram.getFunctionManager().getFunctionAt(address);
@@ -285,6 +255,41 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
             }
         }
         println("Megpoid block shape report written: " + output.getAbsolutePath());
+    }
+
+    private void dumpRelativeFunctionTable(
+            PrintWriter out, String label, String baseHex,
+            long startOffset, long endOffset) throws Exception {
+        Address base = toAddr(baseHex);
+        out.println("### " + label + " at " + base);
+        for (long offset = startOffset; offset <= endOffset; offset += 4L) {
+            monitor.checkCancelled();
+            Address slot = offset < 0 ? base.subtract(-offset) : base.add(offset);
+            byte[] raw = new byte[4];
+            int read = currentProgram.getMemory().getBytes(slot, raw);
+            if (read != 4) continue;
+            long rva = Integer.toUnsignedLong(
+                java.nio.ByteBuffer.wrap(raw).order(java.nio.ByteOrder.LITTLE_ENDIAN).getInt());
+            Address candidate = currentProgram.getImageBase().add(rva);
+            Function target = currentProgram.getFunctionManager().getFunctionAt(candidate);
+            if (target == null) target = currentProgram.getFunctionManager().getFunctionContaining(candidate);
+            if (target == null) continue;
+
+            out.println("- Slot " + slot + " rva=0x" + Long.toHexString(rva) +
+                " target=" + candidate + " function=" + target.getName() +
+                " entry=" + target.getEntryPoint());
+
+            ReferenceIterator refs = currentProgram.getReferenceManager().getReferencesTo(slot);
+            while (refs.hasNext()) {
+                Reference ref = refs.next();
+                Function caller = currentProgram.getFunctionManager()
+                    .getFunctionContaining(ref.getFromAddress());
+                out.println("  - Slot reference from " + ref.getFromAddress() + " in " +
+                    (caller == null ? "<unknown>" : caller.getName()) +
+                    " [" + ref.getReferenceType() + "]");
+            }
+        }
+        out.println();
     }
 
     private String formatBytes(byte[] bytes, int length) {
