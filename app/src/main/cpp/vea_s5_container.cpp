@@ -47,7 +47,7 @@ extern "C" VeaS5ContainerStatus vea_s5_parse_container_header(
     out_header->payload_size = declared_payload_size;
     out_header->format_word = ReadU32LE(header_bytes + 8);
     std::memcpy(out_header->raw_bytes_after_format_word, header_bytes + 12,
-                VEA_S5_CONTAINER_OPAQUE_METADATA_SIZE);
+                VEA_S5_CONTAINER_RAW_REMAINDER_SIZE);
     return VEA_S5_CONTAINER_STATUS_OK;
 }
 
