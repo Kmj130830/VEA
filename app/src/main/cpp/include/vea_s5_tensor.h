@@ -41,6 +41,11 @@ typedef struct VeaS5MatrixDescriptor {
     float* values;
 } VeaS5MatrixDescriptor;
 
+#define VEA_S5_NAMED_LAYER_COUNT 9u
+#define VEA_S5_NAMED_LAYER_DESCRIPTOR_TABLE_BYTES 0xb0u
+
+typedef struct VeaS5NamedLayerParameterSet VeaS5NamedLayerParameterSet;
+
 
 /*
  * Recovered per-direction parameter layout for the S5API recurrent module.
@@ -160,6 +165,38 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_pack_row_major_f32(
     uint32_t axis0_count,
     uint32_t axis1_count,
     VeaS5MatrixDescriptor** out_descriptor);
+
+/*
+ * Persistent owner for the nine VOCALOID7.vtmg named-layer descriptor pairs.
+ * The 0xb0-byte table mirrors the descriptor-pointer region of the vendor
+ * model object. Pair slots are fixed at 0x20, 0x30, ..., 0xa0 from object base.
+ * Each pair stores {weight descriptor bank pointer, bias descriptor pointer}.
+ * Weight values are packed from [axis0][axis1][matrix] source order.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_named_layer_parameter_set_create(
+    const float* const* weight_sources,
+    const size_t* weight_source_counts,
+    const float* const* bias_sources,
+    const size_t* bias_source_counts,
+    const uint32_t* axis0_counts,
+    const uint32_t* axis1_counts,
+    const uint32_t* matrix_counts,
+    const uint32_t* descriptor_pair_offsets,
+    size_t layer_count,
+    VeaS5NamedLayerParameterSet** out_set);
+
+VEA_S5_TENSOR_API void vea_s5_named_layer_parameter_set_destroy(
+    VeaS5NamedLayerParameterSet* parameter_set);
+
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_named_layer_parameter_set_get_layer(
+    const VeaS5NamedLayerParameterSet* parameter_set,
+    size_t layer_index,
+    const VeaS5MatrixDescriptor** out_weight_descriptors,
+    size_t* out_weight_descriptor_count,
+    const VeaS5MatrixDescriptor** out_bias_descriptor,
+    uint32_t* out_axis0_count,
+    uint32_t* out_axis1_count,
+    uint32_t* out_padded_axis0_count);
 
 /* Decode S5API tagged Base64 arrays: float32, float16 and signed int32 types. */
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_decode_typed_float_array(
