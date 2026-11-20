@@ -529,11 +529,12 @@ The same function's fill loops establish source order as
 `[axis0][axis1][matrix]`. The Android
 `S5MegpoidNamedLayerTensorIndex` now resolves all nine named weight/bias
 pairs, exposes these exact descriptor axes, and offers
-`packWeightMatrixBank()`. That method decodes the weight payload and passes
-it to the existing native `packMatrixBank()` using the recovered axis counts
-and bank count; it verifies the packed output includes the descriptor's
-axis0 padding. This connects real VTMG weights to the Android BlockMatrix
-layout, but does not run the neural network.
+`packWeightMatrixBank()` and `packBiasVector()`. The weight method decodes
+the tensor and passes it to native `packMatrixBank()` with the recovered
+axis counts and bank count. The bias method uses native `packRowMajor()`
+with the bias length as axis0 and a single axis1 row. Both paths validate the
+8-element axis0 padding. This prepares both descriptor value buffers from
+the real VTMG tensors, but does not run the neural network.
 
 ### Parameter-key byte order
 
