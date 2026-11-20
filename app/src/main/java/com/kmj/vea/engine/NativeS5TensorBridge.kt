@@ -187,7 +187,8 @@ object NativeS5TensorBridge {
 
     /**
      * Hashes a full S5API model-object property name into its salted MD5 lookup key.
-     * The result uses the recovered four-word, 32-character lowercase hex layout.
+     * The result is the 16 digest bytes serialized as 32 lowercase hex characters,
+     * matching the property-name keys stored in the model JSON object tree.
      */
     fun hashParameterLookupKey(parameterName: String): String {
         check(loaded) { "Native S5 tensor library is not loaded." }
