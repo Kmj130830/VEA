@@ -5,17 +5,19 @@ import java.util.Base64
 /** Named layer members resolved by FUN_180068190 in VOCALOID7.vtmg. */
 enum class S5MegpoidNamedLayer(
     val modelName: String,
-    val matrixCount: Int
+    val matrixCount: Int,
+    /** Pair of pointers: banked weight descriptors followed by the bias descriptor. */
+    val descriptorPairOffsetBytes: Int
 ) {
-    PRE1("pre1", 1),
-    PRE2("pre2", 1),
-    CONV1("conv1", 3),
-    COND1("cond1", 1),
-    CONV2("conv2", 3),
-    COND2("cond2", 1),
-    CONV3("conv3", 3),
-    COND3("cond3", 1),
-    LINEAR("linear", 1)
+    PRE1("pre1", 1, 0x20),
+    PRE2("pre2", 1, 0x30),
+    CONV1("conv1", 3, 0x40),
+    COND1("cond1", 1, 0x50),
+    CONV2("conv2", 3, 0x60),
+    COND2("cond2", 1, 0x70),
+    CONV3("conv3", 3, 0x80),
+    COND3("cond3", 1, 0x90),
+    LINEAR("linear", 1, 0xa0)
 }
 
 /**
