@@ -417,7 +417,7 @@ def typed_tensor_lengths(value: object) -> list[dict[str, object]]:
 
 
 def inspect_megpoid_block_descriptor_fields(
-    member: str, key_values: dict[str, list[object]]
+    member: str, root: dict, key_values: dict[str, list[object]]
 ) -> None:
     """Report scalar descriptor slots and their JSON paths, never tensor values."""
     occurrences_by_key: dict[str, list[tuple[str, object]]] = {
@@ -578,7 +578,7 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                     f"key_sample={sample}",
                 )
                 print("TREE_SUMMARY", f"member={item.filename}", counts)
-                inspect_megpoid_block_descriptor_fields(item.filename, key_values)
+                inspect_megpoid_block_descriptor_fields(item.filename, root, key_values)
                 if item.filename == "AI_Megpoid.vtb2":
                     inspect_megpoid_layer_property_pairs(root, item.filename)
                 for root_key, root_value in root.items():
