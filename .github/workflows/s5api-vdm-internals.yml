@@ -8,6 +8,12 @@ on:
       - "tools/ghidra/ExportVdmDatabaseInternals.java"
       - ".github/workflows/s5api-vdm-internals.yml"
 
+  pull_request:
+    paths:
+      - "Editor.zip"
+      - "tools/ghidra/ExportVdmDatabaseInternals.java"
+      - ".github/workflows/s5api-vdm-internals.yml"
+
 permissions:
   contents: read
 jobs:
