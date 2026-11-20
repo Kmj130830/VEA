@@ -33,6 +33,9 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
         "180006c80", // numeric JSON-array conversion
         "180020190", // .weight member reader
         "1800214c0", // .bias member reader
+        "180010260", // salted model-parameter key transformation
+        "180010740", // model parameter string construction
+        "1800103e0", // model parameter string copy
         "180056d60", // model feature-flag dispatch
         "180056f40", // generic RNN constructor (known disabled for this bank)
         "180068190", // named model layer loader
@@ -125,7 +128,7 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
 
             out.println("## Raw instruction listing for tensor-loader ABI");
             out.println();
-            for (String hex : new String[] { "180052f90", "1800537e0", "1800589d0", "18005e9b0", "180063ca0", "180064e90" }) {
+            for (String hex : new String[] { "180010260", "180010740", "1800103e0", "180052f90", "1800537e0", "1800589d0", "18005e9b0", "180063ca0", "180064e90" }) {
                 monitor.checkCancelled();
                 Address address = toAddr(hex);
                 Function f = currentProgram.getFunctionManager().getFunctionAt(address);
