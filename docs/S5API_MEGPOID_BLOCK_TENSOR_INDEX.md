@@ -122,3 +122,49 @@ each unmatched pair.
 
 This remains a structural model-data binding improvement. It does not add
 neural inference or PCM rendering.
+
+## Follow-up: named neural layer parameters in VOCALOID7.vtmg
+
+The shared-model loader `FUN_180068190` was traced independently of the
+fixed-key block index. It calls `FUN_180064670` for nine named layers and
+resolves each layer's `.weight` and `.bias` properties from the shared
+`VOCALOID7.vtmg` object tree.
+
+`S5MegpoidNamedLayerTensorIndex` now exposes those typed properties from
+the loaded shared model member. `S5VoicebankModelPackage.namedLayerTensorIndex`
+builds this index lazily. The index validates that each property is a typed
+F32/F16 string, records its scalar count, and keeps float decoding deferred
+until a caller requests the tensor.
+
+The current archive contains all 18 named parameter tensors:
+
+| Layer | Matrix count | Weight elements | Bias elements |
+|---|---:|---:|---:|
+| pre1 | 1 | 2,624 | 32 |
+| pre2 | 1 | 1,024 | 32 |
+| conv1 | 3 | 6,144 | 64 |
+| cond1 | 1 | 1,664 | 64 |
+| conv2 | 3 | 6,144 | 64 |
+| cond2 | 1 | 1,664 | 64 |
+| conv3 | 3 | 6,144 | 64 |
+| cond3 | 1 | 1,664 | 64 |
+| linear | 1 | 96 | 3 |
+
+The matrix-count values come from the nine `FUN_180068190` call sites.
+`shapeCandidateOrNull()` verifies the relation between total weight count,
+matrix count, and bias count, but deliberately does not call the quotient
+input/output channels or choose row/column orientation.
+
+### Correct parameter hash serialization
+
+The model tree stores the salted MD5 digest as its 16 bytes in canonical
+lowercase hexadecimal order. The native hash implementation previously
+formatted its four 32-bit state words directly, reversing the byte order
+inside each word. The formatter now emits the bytes of each state word in
+little-endian order. Native tests include both generic MD5 vectors and two
+real `VOCALOID7.vtmg` keys (`pre1.weight` and `conv1.bias`).
+
+These named tensors are now addressable from the verified model package.
+They have not yet been assigned to the residual operator's runtime record
+offsets, and this index does not claim to execute the named-layer network or
+produce PCM audio.
