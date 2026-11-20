@@ -27,6 +27,8 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
         "1800537e0", // model-block object/parameter construction
         "180052f90", // related nested block setup
         "18005e9b0", // common typed object/tensor loader
+        "180063ca0", // weight/bias object-to-tensor loader
+        "180006c80", // numeric JSON-array conversion
         "180020190", // .weight member reader
         "1800214c0", // .bias member reader
         "180056d60", // model feature-flag dispatch
