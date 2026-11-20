@@ -413,6 +413,8 @@ def inspect_megpoid_layer_property_pairs(root: dict, member: str) -> None:
     stack: list[tuple[object, str]] = [(root, "$")]
     pair_count = 0
     ambiguous_count = 0
+    integer_ratio_count = 0
+    ratio_counts: dict[int, int] = {}
     while stack:
         current, path = stack.pop()
         if isinstance(current, dict):
@@ -420,13 +422,26 @@ def inspect_megpoid_layer_property_pairs(root: dict, member: str) -> None:
                 first = typed_tensor_lengths(current[first_key])
                 second = typed_tensor_lengths(current[second_key])
                 pair_count += 1
+                ratio = None
                 if len(first) != 1 or len(second) != 1:
                     ambiguous_count += 1
                     classification = "ambiguous"
                 elif first[0].get("invalid_base64") or second[0].get("invalid_base64"):
                     classification = "invalid"
                 else:
+                    primary_elements = first[0].get("elements")
+                    secondary_elements = second[0].get("elements")
                     classification = "paired"
+                    if (
+                        isinstance(primary_elements, int)
+                        and isinstance(secondary_elements, int)
+                        and primary_elements > 0
+                        and secondary_elements > 0
+                        and primary_elements % secondary_elements == 0
+                    ):
+                        ratio = primary_elements // secondary_elements
+                        integer_ratio_count += 1
+                        ratio_counts[ratio] = ratio_counts.get(ratio, 0) + 1
                 print(
                     "MODEL_LAYER_PROPERTY_PAIR",
                     f"member={member}",
@@ -435,6 +450,7 @@ def inspect_megpoid_layer_property_pairs(root: dict, member: str) -> None:
                     f"first_elements={[item.get('elements') for item in first]}",
                     f"second_count={len(second)}",
                     f"second_elements={[item.get('elements') for item in second]}",
+                    f"primary_to_secondary_ratio={ratio}",
                     f"classification={classification}",
                 )
             for key, child in current.items():
@@ -447,6 +463,8 @@ def inspect_megpoid_layer_property_pairs(root: dict, member: str) -> None:
         f"member={member}",
         f"pair_objects={pair_count}",
         f"ambiguous_objects={ambiguous_count}",
+        f"integer_ratio_pairs={integer_ratio_count}",
+        f"ratio_counts={dict(sorted(ratio_counts.items()))}",
     )
 
 
