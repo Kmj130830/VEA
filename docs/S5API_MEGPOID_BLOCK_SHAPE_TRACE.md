@@ -369,8 +369,8 @@ Inside `FUN_1800c7ad0`, the residual stage is an explicit nested loop:
 
 - The outer loop runs while the current sequence index is below `param_1[5] - 1`.
 - For each sequence position, the inner loop visits `param_1[6]` residual block entries.
-- The block-data entry address is computed with a `0x100`-byte stride from the pointer stored at `param_1 + 0xb8`.
-- The companion block-state entry uses a `0x88`-byte stride from the pointer stored at `param_1 + 0xbe`.
+- The block-data entry address is computed with a `0x100`-byte stride from the pointer stored at byte offset `0x2E0` of the dispatch object. In the decompiler's `int *param_1` notation this is `*(longlong *)(param_1 + 0xb8)`.
+- The companion block-state entry uses a `0x88`-byte stride from the pointer stored at byte offset `0x2F8`. In the same `int *param_1` notation this is `*(longlong *)(param_1 + 0xbe)`.
 - Each iteration calls `FUN_1800c5d50` with that block-data entry, the current input/output workspace descriptors, and its companion state entry. The two workspace descriptors are then swapped for the next block.
 - The dispatcher also calls `FUN_1800c5260`, `FUN_1800c5440`, and either `FUN_1800c6390` or `FUN_1800c72d0` around the residual loop. These are separate preprocessing/transition stages and should not be folded into the residual block's tensor bundle without a field-level data-flow trace.
 
@@ -392,7 +392,7 @@ recovered fields are:
 | `0x00` | `*param_1` | Channel count `C` |
 | `0x04` | `param_1[1]` | Expansion multiplier `E`; expanded count is `C * E` |
 | `0x10` | Passed as `param_1 + 4` to `FUN_1800c67e0` | Start of the depthwise/history descriptor |
-| `0x20` | Pointer read by `FUN_1800c67e0` from descriptor offset `+0x10) | Depthwise filter coefficients; the runtime uses a 7-by-7 path when both descriptor dimensions are 7 |
+| `0x20` | Coefficient pointer read by `FUN_1800c67e0` from the descriptor beginning at `0x10` | Depthwise filter coefficients; the optimized runtime path is selected when both filter dimensions are 7 |
 | `0x90` | `param_1[0x24]` | Flag indicating whether an optional residual-bias pointer is present |
 | `0x98` | Pointer consumed by the second `FUN_1800c3740` call | Projection matrix, mapping `C * E -> C` |
 | `0xA8` | Optional pointer consumed by the residual affine merge | Residual bias |
@@ -402,19 +402,28 @@ recovered fields are:
 | `0xE8` | Per-channel array consumed by the normalization/GELU affine step | Expansion normalization bias (`beta`) |
 | `0xF8` | `param_1[0x3e]` | Epsilon term |
 
-The depthwise descriptor begins at `0x10`: `FUN_1800c67e0` reads its
-first three integer fields at `0x10`, `0x14`, and `0x18), and reads
-the coefficient pointer at `0x20`. The observed 7-by-7 path therefore
-consumes `C * 49` depthwise coefficients, matching the size contract of
-the Android scalar residual kernel.
+The depthwise descriptor begins at byte offset `0x10`. `FUN_1800c67e0`
+receives the block-data pointer advanced by four 32-bit integers, reads the
+descriptor's three integer fields at record offsets `0x10`, `0x14`, and
+`0x18`, and reads the coefficient pointer at record offset `0x20`.
+The observed 7-by-7 path therefore consumes `C * 49` depthwise
+coefficients, matching the size contract of the Android scalar residual
+kernel.
 
 The companion `0x88`-byte state record is a workspace/history structure,
 not another matrix bank. `FUN_1800c5d50` stores the first scratch workspace
 pointer at `+0x00`, its `C` and `N` dimensions at `+0x18` and
-`+0x1c`, the expanded workspace pointer at `+0x20), and its
+`+0x1c`, the expanded workspace pointer at `+0x20`, and its
 `C * E` and `N` dimensions at `+0x38` and `+0x3c`. The substructure
 starting at `+0x40` is passed into `FUN_1800c67e0` for history/ring-buffer
 preparation.
+
+The normalization pointers at record offsets `0xD8` and `0xE8`
+are consumed together by the native affine expression
+`gamma - inverse_std * mean * beta`: the `0xD8` array supplies gamma
+and the `0xE8` array supplies beta. This matches the Android kernel's
+formula, so its `expanded_bias_a` input maps to the `0xD8` gamma array
+and `expanded_bias_b` maps to the `0xE8` beta array.
 
 The offset roles align with the Android kernel's argument shapes:
 
