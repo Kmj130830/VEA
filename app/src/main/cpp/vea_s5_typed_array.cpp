@@ -135,8 +135,9 @@ float HalfToFloat(uint16_t half) {
 }
 }  // namespace
 
-extern "C" VeaS5TensorStatus vea_s5_decode_typed_float_array(
+extern "C" VeaS5TensorStatus vea_s5_decode_typed_float_array_with_f16_callback(
     VeaS5Arena* arena, const char* encoded, size_t encoded_size,
+    VeaS5F16ToFloatCallback f16_callback, void* callback_context,
     float** out_values, size_t* out_count) {
     if (arena == nullptr || encoded == nullptr || out_values == nullptr || out_count == nullptr ||
         encoded_size < 4u) return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
@@ -157,6 +158,24 @@ extern "C" VeaS5TensorStatus vea_s5_decode_typed_float_array(
     if (decoded.size() % scalar_bytes != 0u)
         return VEA_S5_TENSOR_STATUS_MALFORMED_DATA;
     const size_t count = decoded.size() / scalar_bytes;
+
+    // Run model-specific conversion before touching the arena. A callback error
+    // therefore leaves the caller's arena unchanged and the outputs empty.
+    std::vector<float> callback_values;
+    if (is_f16 && f16_callback != nullptr) {
+        try {
+            callback_values.resize(count);
+        } catch (...) {
+            return VEA_S5_TENSOR_STATUS_OUT_OF_MEMORY;
+        }
+        for (size_t i = 0; i < count; ++i) {
+            const uint16_t raw = ReadU16LE(decoded.data() + i * 2u);
+            const VeaS5TensorStatus callback_status =
+                f16_callback(raw, callback_context, &callback_values[i]);
+            if (callback_status != VEA_S5_TENSOR_STATUS_OK) return callback_status;
+        }
+    }
+
     float* values = nullptr;
     const VeaS5TensorStatus status = vea_s5_arena_alloc_f32(arena, count, &values);
     if (status != VEA_S5_TENSOR_STATUS_OK) return status;
@@ -164,6 +183,8 @@ extern "C" VeaS5TensorStatus vea_s5_decode_typed_float_array(
     if (is_f32) {
         for (size_t i = 0; i < count; ++i)
             values[i] = std::bit_cast<float>(ReadU32LE(decoded.data() + i * 4u));
+    } else if (f16_callback != nullptr) {
+        for (size_t i = 0; i < count; ++i) values[i] = callback_values[i];
     } else {
         for (size_t i = 0; i < count; ++i)
             values[i] = HalfToFloat(ReadU16LE(decoded.data() + i * 2u));
@@ -171,6 +192,13 @@ extern "C" VeaS5TensorStatus vea_s5_decode_typed_float_array(
     *out_values = values;
     *out_count = count;
     return VEA_S5_TENSOR_STATUS_OK;
+}
+
+extern "C" VeaS5TensorStatus vea_s5_decode_typed_float_array(
+    VeaS5Arena* arena, const char* encoded, size_t encoded_size,
+    float** out_values, size_t* out_count) {
+    return vea_s5_decode_typed_float_array_with_f16_callback(
+        arena, encoded, encoded_size, nullptr, nullptr, out_values, out_count);
 }
 
 extern "C" VeaS5TensorStatus vea_s5_decode_typed_int32_array(

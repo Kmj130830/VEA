@@ -8,6 +8,12 @@ on:
       - "tools/ghidra/ExportS5RnnTensorOps.java"
       - "tools/ghidra/ExportS5RnnCallSites.java"
       - ".github/workflows/s5api-rnn-tensor-ops.yml"
+  pull_request:
+    paths:
+      - "Editor.zip"
+      - "tools/ghidra/ExportS5RnnTensorOps.java"
+      - "tools/ghidra/ExportS5RnnCallSites.java"
+      - ".github/workflows/s5api-rnn-tensor-ops.yml"
 
 permissions:
   contents: read
