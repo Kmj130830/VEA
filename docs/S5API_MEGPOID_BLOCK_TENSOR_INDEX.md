@@ -194,3 +194,17 @@ These named tensors are now addressable from the verified model package.
 They have not yet been assigned to the residual operator's runtime record
 offsets, and this index does not claim to execute the named-layer network or
 produce PCM audio.
+
+### Nested VTMG dictionary lookup
+
+The real shared `VOCALOID7.vtmg` JSON tree stores the 18 named `.weight`
+and `.bias` properties below the top-level `6957915c8dfb4d554a8df92ee40e523d`
+container object. They are not direct root properties.
+
+`S5ModelObjectTree.findAllByLookupKeyRecursive()` now searches nested objects
+and arrays and returns each match with its JSON path.
+`findUniqueByLookupKeyRecursive()` returns the sole match, reports a missing
+key as null, and rejects duplicate matches rather than silently choosing one.
+The named-layer index uses this recursive unique lookup. Its unit-test JSON
+fixture mirrors the actual nested container structure, and separate tests
+cover array traversal and ambiguous duplicate keys.
