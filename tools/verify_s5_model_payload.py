@@ -91,7 +91,9 @@ def s5_lookup_key(parameter_name: str) -> str:
     return "".join(f"{word:08x}" for word in words)
 
 
-def summarize_model_tree(root: dict) -> tuple[dict[str, int], set[str], list[str]]:
+def summarize_model_tree(
+    root: dict,
+) -> tuple[dict[str, int], set[str], list[str], list[str]]:
     counts = {
         "objects": 0,
         "arrays": 0,
@@ -141,7 +143,12 @@ def summarize_model_tree(root: dict) -> tuple[dict[str, int], set[str], list[str
     matching_parameters = [
         name for name in candidates if s5_lookup_key(name) in all_keys
     ]
-    return counts, all_keys, matching_parameters
+    module_names = [
+        "pre1", "pre2", "conv1", "cond1", "conv2", "cond2",
+        "conv3", "cond3", "linear",
+    ]
+    matching_modules = [name for name in module_names if s5_lookup_key(name) in all_keys]
+    return counts, all_keys, matching_parameters, matching_modules
 
 
 def try_json_object(payload: bytes) -> dict | None:
@@ -238,7 +245,7 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
             if root is not None:
                 keys = list(root.keys())
                 sample = [str(key)[:32] for key in keys[:4]]
-                counts, _, parameter_matches = summarize_model_tree(root)
+                counts, _, parameter_matches, module_matches = summarize_model_tree(root)
                 print(
                     "JSON_OK",
                     f"archive={path.name}!/{item.filename}",
@@ -254,6 +261,12 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                     f"member={item.filename}",
                     f"matched={len(parameter_matches)}/8",
                     f"names={parameter_matches}",
+                )
+                print(
+                    "MODEL_CONFIG_LOOKUP_CANDIDATES",
+                    f"member={item.filename}",
+                    f"matched={len(module_matches)}/9",
+                    f"names={module_matches}",
                 )
                 recovered += 1
             else:
