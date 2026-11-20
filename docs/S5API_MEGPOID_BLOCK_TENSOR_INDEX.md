@@ -181,6 +181,26 @@ descriptor created by `FUN_180064670`. The prepared result retains both
 unpadded bias values and the padded one-row bias buffer. No
 input/output-channel names are assigned beyond the recovered descriptor axes.
 
+### Persistent native descriptor-pair table
+
+The named-layer factory writes two descriptor pointers per layer into the
+vendor object at offsets `0x20`, `0x30`, `0x40`, `0x50`,
+`0x60`, `0x70`, `0x80`, `0x90`, and `0xA0`. The first pointer
+is the banked weight descriptor array; the second is the one-row bias
+descriptor. These offsets are derived by combining the factory's
+`FUN_180068190(puVar2 + 4, ...)` call with the callee's pointer arithmetic.
+
+The native library now exposes `vea_s5_named_layer_parameter_set_create()`.
+It creates one persistent aligned arena, packs all nine weight/bias pairs,
+and places their descriptor pointers in a 0xb0-byte table mirror at the exact
+vendor offsets. The JNI bridge exposes this as
+`S5MegpoidNativeParameterSet`; its owner must call `close()` when the
+voicebank is unloaded. Native tests verify each layer's descriptor axis
+counts, matrix count, bias dimensions, padding, and table-offset validation.
+
+This is a descriptor-layout bridge. It does not yet invoke the named-layer
+network's virtual methods, run the temporal network, or synthesize PCM.
+
 ### Correct parameter hash serialization
 
 The model tree stores the salted MD5 digest as its 16 bytes in canonical
