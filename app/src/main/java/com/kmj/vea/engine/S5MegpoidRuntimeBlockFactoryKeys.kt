@@ -40,25 +40,25 @@ object S5MegpoidRuntimeBlockFactoryKeys {
         key(S5MegpoidRuntimeBlockFactory.PROJECTION_WEIGHTS, 3, 0, "cc871bacb5c0b026f2506cafe3c8b361"),
         key(S5MegpoidRuntimeBlockFactory.PROJECTION_WEIGHTS, 3, 1, "56fb99ecd4f79c9224e79e9a6cb258f4"),
 
-        // FUN_180106440 -> depthwise optional bias at +0x78
-        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_OPTIONAL_BIAS, 0, 0, "135887eb4ccd6fe76c02f50cd4136bfe"),
-        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_OPTIONAL_BIAS, 0, 1, "331bcb363ac37635e09bbf49465fce07"),
-        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_OPTIONAL_BIAS, 1, 0, "7674c8681480dc34260d17042649238c"),
-        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_OPTIONAL_BIAS, 1, 1, "bd81ba739a9e44aee0ddfeb881be711a"),
-        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_OPTIONAL_BIAS, 2, 0, "3d4183d6d0af36f1a05079ae5bacf5c4"),
-        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_OPTIONAL_BIAS, 2, 1, "7fef04e53887aedced3b65f9ba776f9d"),
-        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_OPTIONAL_BIAS, 3, 0, "b890f396f8087a6cb069b6a16e404d4f"),
-        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_OPTIONAL_BIAS, 3, 1, "66492256d7c08ca02bbbf74b3faae62c"),
+        // FUN_180106440 -> expansion-layer bias at +0x78
+        key(S5MegpoidRuntimeBlockFactory.EXPANSION_OPTIONAL_BIAS, 0, 0, "135887eb4ccd6fe76c02f50cd4136bfe"),
+        key(S5MegpoidRuntimeBlockFactory.EXPANSION_OPTIONAL_BIAS, 0, 1, "331bcb363ac37635e09bbf49465fce07"),
+        key(S5MegpoidRuntimeBlockFactory.EXPANSION_OPTIONAL_BIAS, 1, 0, "7674c8681480dc34260d17042649238c"),
+        key(S5MegpoidRuntimeBlockFactory.EXPANSION_OPTIONAL_BIAS, 1, 1, "bd81ba739a9e44aee0ddfeb881be711a"),
+        key(S5MegpoidRuntimeBlockFactory.EXPANSION_OPTIONAL_BIAS, 2, 0, "3d4183d6d0af36f1a05079ae5bacf5c4"),
+        key(S5MegpoidRuntimeBlockFactory.EXPANSION_OPTIONAL_BIAS, 2, 1, "7fef04e53887aedced3b65f9ba776f9d"),
+        key(S5MegpoidRuntimeBlockFactory.EXPANSION_OPTIONAL_BIAS, 3, 0, "b890f396f8087a6cb069b6a16e404d4f"),
+        key(S5MegpoidRuntimeBlockFactory.EXPANSION_OPTIONAL_BIAS, 3, 1, "66492256d7c08ca02bbbf74b3faae62c"),
 
-        // FUN_18010d550 -> depthwise descriptor weights at +0x68
-        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_WEIGHTS, 0, 0, "2be3c647a25538e9536d6757202f82c4"),
-        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_WEIGHTS, 0, 1, "de282d6c923b674399f1c1c72c628baf"),
-        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_WEIGHTS, 1, 0, "b1465ea6660173b4a49fc88d6cebf333"),
-        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_WEIGHTS, 1, 1, "a15cd1ac0be5abbba27a53fe03786820"),
-        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_WEIGHTS, 2, 0, "207f5586069747df3328b61d143fd74c"),
-        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_WEIGHTS, 2, 1, "633af40060c0bd27f5637d7a495522a6"),
-        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_WEIGHTS, 3, 0, "763f264fbcf91eb0ee4f198e3c7668f4"),
-        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_WEIGHTS, 3, 1, "224d0c06603f0018052fa9e634fafde1"),
+        // FUN_18010d550 -> expansion matrix weights at +0x68
+        key(S5MegpoidRuntimeBlockFactory.EXPANSION_WEIGHTS, 0, 0, "2be3c647a25538e9536d6757202f82c4"),
+        key(S5MegpoidRuntimeBlockFactory.EXPANSION_WEIGHTS, 0, 1, "de282d6c923b674399f1c1c72c628baf"),
+        key(S5MegpoidRuntimeBlockFactory.EXPANSION_WEIGHTS, 1, 0, "b1465ea6660173b4a49fc88d6cebf333"),
+        key(S5MegpoidRuntimeBlockFactory.EXPANSION_WEIGHTS, 1, 1, "a15cd1ac0be5abbba27a53fe03786820"),
+        key(S5MegpoidRuntimeBlockFactory.EXPANSION_WEIGHTS, 2, 0, "207f5586069747df3328b61d143fd74c"),
+        key(S5MegpoidRuntimeBlockFactory.EXPANSION_WEIGHTS, 2, 1, "633af40060c0bd27f5637d7a495522a6"),
+        key(S5MegpoidRuntimeBlockFactory.EXPANSION_WEIGHTS, 3, 0, "763f264fbcf91eb0ee4f198e3c7668f4"),
+        key(S5MegpoidRuntimeBlockFactory.EXPANSION_WEIGHTS, 3, 1, "224d0c06603f0018052fa9e634fafde1"),
 
         // FUN_1800f8220 -> shared descriptor B at +0x48
         key(S5MegpoidRuntimeBlockFactory.SHARED_DESCRIPTOR_B, 0, 0, "778daaef71320c69cab546db59bafbf3"),
@@ -80,15 +80,15 @@ object S5MegpoidRuntimeBlockFactoryKeys {
         key(S5MegpoidRuntimeBlockFactory.SHARED_DESCRIPTOR_A, 3, 0, "9b88ad439704ac9bd8863c32b5f7df02"),
         key(S5MegpoidRuntimeBlockFactory.SHARED_DESCRIPTOR_A, 3, 1, "1e8f2ad78e8a5d82d80d0f82bcfae5cf"),
 
-        // FUN_1800ea000 -> transposed 3-D tensor at +0x20
-        key(S5MegpoidRuntimeBlockFactory.TRANSPOSED_TENSOR, 0, 0, "8abf41425bad2554193a661080753070"),
-        key(S5MegpoidRuntimeBlockFactory.TRANSPOSED_TENSOR, 0, 1, "fbaf01274f7d7328e85fe2606636e54a"),
-        key(S5MegpoidRuntimeBlockFactory.TRANSPOSED_TENSOR, 1, 0, "78ab983f61c5c58ff84d45113026ad8a"),
-        key(S5MegpoidRuntimeBlockFactory.TRANSPOSED_TENSOR, 1, 1, "0f551cb9b37ff307437be80b2f80961d"),
-        key(S5MegpoidRuntimeBlockFactory.TRANSPOSED_TENSOR, 2, 0, "771075dad8a161731f1ec7849ffccccc"),
-        key(S5MegpoidRuntimeBlockFactory.TRANSPOSED_TENSOR, 2, 1, "0beaee9f704f4ac85d8f87a10cfeadc1"),
-        key(S5MegpoidRuntimeBlockFactory.TRANSPOSED_TENSOR, 3, 0, "b639196457944060e60e66b234e2a5e1"),
-        key(S5MegpoidRuntimeBlockFactory.TRANSPOSED_TENSOR, 3, 1, "3294d2ee186d6fedf65089d86b78b302")
+        // FUN_1800ea000 -> depthwise filter tensor (3-D transpose) at +0x20
+        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_FILTER, 0, 0, "8abf41425bad2554193a661080753070"),
+        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_FILTER, 0, 1, "fbaf01274f7d7328e85fe2606636e54a"),
+        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_FILTER, 1, 0, "78ab983f61c5c58ff84d45113026ad8a"),
+        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_FILTER, 1, 1, "0f551cb9b37ff307437be80b2f80961d"),
+        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_FILTER, 2, 0, "771075dad8a161731f1ec7849ffccccc"),
+        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_FILTER, 2, 1, "0beaee9f704f4ac85d8f87a10cfeadc1"),
+        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_FILTER, 3, 0, "b639196457944060e60e66b234e2a5e1"),
+        key(S5MegpoidRuntimeBlockFactory.DEPTHWISE_FILTER, 3, 1, "3294d2ee186d6fedf65089d86b78b302")
     )
 
     private fun key(
