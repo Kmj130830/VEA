@@ -137,9 +137,10 @@ class S5MegpoidNamedLayerTensorIndexTest {
             "linear.weight" to Pair("ecf71a24e4595ed754ce7c2a519102f0", 96),
             "linear.bias" to Pair("e7e58da68e9b65d684a141ccf7071bca", 3)
         )
+        // The actual VOCALOID7.vtmg stores these tensors in a nested dictionary.
         val json = properties.joinToString(
-            prefix = "{",
-            postfix = "}"
+            prefix = """{"6957915c8dfb4d554a8df92ee40e523d":{""",
+            postfix = "}}"
         ) { (_, entry) ->
             "\"${entry.first}\":\"*F32${encodedZeros(entry.second)}\""
         }
