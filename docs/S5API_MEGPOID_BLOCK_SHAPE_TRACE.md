@@ -506,11 +506,34 @@ The payload-count audit gives the following values:
 | `cond3` | 1 | 1,664 | 64 | 1,664 | 26 |
 | `linear` | 1 | 96 | 3 | 96 | 32 |
 
-These are validated element-count relationships, not semantic axis labels:
-the current report does not call either weight dimension input/output
-channels. The Android `S5MegpoidNamedLayerTensorIndex` now resolves these
-nine named weight/bias pairs from the shared model tree and exposes
-shape-count candidates without assigning an unsupported matrix orientation.
+The full `FUN_180064670` body establishes the descriptor axes directly.
+It writes `param_5` to descriptor `axis0`, `param_4` to `axis1`,
+and `align_up(param_5, 8)` to `padded_axis0`; `param_6` is the
+number of matrix objects in the bank. The separate bias descriptor is a
+one-row vector whose length is `param_5`. Therefore the verified named-layer
+descriptor values are:
+
+| Layer | axis0 | axis1 | padded axis0 | Matrix count |
+|---|---:|---:|---:|---:|
+| `pre1` | 32 | 82 | 32 | 1 |
+| `pre2` | 32 | 32 | 32 | 1 |
+| `conv1` | 64 | 32 | 64 | 3 |
+| `cond1` | 64 | 26 | 64 | 1 |
+| `conv2` | 64 | 32 | 64 | 3 |
+| `cond2` | 64 | 26 | 64 | 1 |
+| `conv3` | 64 | 32 | 64 | 3 |
+| `cond3` | 64 | 26 | 64 | 1 |
+| `linear` | 3 | 32 | 8 | 1 |
+
+The same function's fill loops establish source order as
+`[axis0][axis1][matrix]`. The Android
+`S5MegpoidNamedLayerTensorIndex` now resolves all nine named weight/bias
+pairs, exposes these exact descriptor axes, and offers
+`packWeightMatrixBank()`. That method decodes the weight payload and passes
+it to the existing native `packMatrixBank()` using the recovered axis counts
+and bank count; it verifies the packed output includes the descriptor's
+axis0 padding. This connects real VTMG weights to the Android BlockMatrix
+layout, but does not run the neural network.
 
 ### Parameter-key byte order
 
