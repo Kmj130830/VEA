@@ -178,8 +178,12 @@ def summarize_model_tree(
         elif value is None:
             counts["nulls"] += 1
 
+    # FUN_18005ebe0 forms one GRU parameter property for each layer
+    # index and each configured direction. Scan a conservative full range,
+    # rather than checking only l0, so a later layer is not misreported absent.
     candidates = [
-        f"rnn.{member}_l0{direction}"
+        f"rnn.{member}_l{layer}{direction}"
+        for layer in range(16)
         for member in ("weight_ih", "weight_hh", "bias_ih", "bias_hh")
         for direction in ("", "_reverse")
     ]
