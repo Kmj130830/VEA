@@ -103,5 +103,22 @@ only when both counts are positive and exactly divisible. It is a structural
 descriptor consistency value, not a semantic label for weights, biases, or
 conditioning roles.
 
+For the repeated-block loader call at `0x180053421`, the raw caller
+instructions establish `columns = descriptor[+4]`,
+`rows = 2 * descriptor[+4]`, and
+`matrixCount = descriptor[+0]`. The second property contains one row of
+length `rows`; the first property contains
+`rows * columns * matrixCount) elements. The new
+`repeatedBlockMatrixShapeOrNull()` helper reconstructs this shape only when
+the element counts satisfy the exact relationship.
+
+The actual AI Megpoid audit found **69/88** paired objects matching this
+specific repeated-block shape. The inferred matrix-count distribution is
+1 (18), 2 (14), 3 (15), 5 (16), and 6 (6). The remaining 19 paired objects
+are retained without this shape classification because other loader call
+sites use different dimension tuples. The separate entry-level call at
+`0x180053e13` has a single-bank tuple, but has not yet been associated with
+each unmatched pair.
+
 This remains a structural model-data binding improvement. It does not add
 neural inference or PCM rendering.
