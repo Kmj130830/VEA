@@ -14,6 +14,10 @@ class S5MegpoidNamedLayerTensorIndexTest {
 
         assertEquals(9, index.layers.size)
         assertEquals(2624, index.requireLayer(S5MegpoidNamedLayer.PRE1).weight.elementCount)
+        assertEquals(
+            "$/6957915c8dfb4d554a8df92ee40e523d/f8b15a70e9fe50b828e5803435580c63",
+            index.requireLayer(S5MegpoidNamedLayer.PRE1).weight.objectPath
+        )
         assertEquals(32, index.requireLayer(S5MegpoidNamedLayer.PRE1).bias.elementCount)
         assertEquals(1024, index.requireLayer(S5MegpoidNamedLayer.PRE2).weight.elementCount)
         assertEquals(6144, index.requireLayer(S5MegpoidNamedLayer.CONV1).weight.elementCount)
