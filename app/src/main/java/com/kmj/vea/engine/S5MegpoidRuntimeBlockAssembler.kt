@@ -70,8 +70,9 @@ class S5MegpoidCompiledRuntimeBlock internal constructor(
  *   gamma[f] = sourceBias[f] + sum_c(sourceWeight[f,c] * descriptorB[c])
  *   beta[f] = sum_c(sourceWeight[f,c] * descriptorA[c])
  *
- * The depthwise filter is separately transposed on its final two axes, as
- * observed in the native record builder.
+ * The depthwise filter is separately permuted from [C][H][W] to [W][C][H],
+ * matching the native record builder. The original channel-major payload is
+ * retained separately for the current reference convolution kernel.
  */
 object S5MegpoidRuntimeBlockAssembler {
     const val DEPTHWISE_FILTER_HEIGHT = 7
