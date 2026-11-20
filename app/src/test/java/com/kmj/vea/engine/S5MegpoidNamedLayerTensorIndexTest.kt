@@ -27,14 +27,16 @@ class S5MegpoidNamedLayerTensorIndexTest {
     fun validatesBankedWeightElementCountsWithoutGuessingAxisNames() {
         val index = S5MegpoidNamedLayerTensorIndex.build(modelTree(), ::lookupKey)
 
-        val pre1 = index.requireLayer(S5MegpoidNamedLayer.PRE1).shapeCandidateOrNull()
+        val pre1 = index.requireLayer(S5MegpoidNamedLayer.PRE1).shapeOrNull()
         assertNotNull(pre1)
         assertEquals(
-            S5MegpoidNamedLayerShapeCandidate(
+            S5MegpoidNamedLayerShape(
                 matrixCount = 1,
+                axis0Count = 32,
+                axis1Count = 82,
+                paddedAxis0Count = 32,
                 weightElementsPerMatrix = 2624,
-                biasElementCount = 32,
-                weightToBiasElementRatio = 82
+                biasElementCount = 32
             ),
             pre1
         )
@@ -42,22 +44,41 @@ class S5MegpoidNamedLayerTensorIndexTest {
         val conv1 = index.requireLayer(S5MegpoidNamedLayer.CONV1).shapeCandidateOrNull()
         assertNotNull(conv1)
         assertEquals(
-            S5MegpoidNamedLayerShapeCandidate(
+            S5MegpoidNamedLayerShape(
                 matrixCount = 3,
+                axis0Count = 64,
+                axis1Count = 32,
+                paddedAxis0Count = 64,
                 weightElementsPerMatrix = 2048,
-                biasElementCount = 64,
-                weightToBiasElementRatio = 32
+                biasElementCount = 64
             ),
             conv1
         )
 
         val cond1 = index.requireLayer(S5MegpoidNamedLayer.COND1).shapeCandidateOrNull()
         assertNotNull(cond1)
-        assertEquals(26, cond1?.weightToBiasElementRatio)
+        assertEquals(26, cond1?.axis1Count)
 
         val linear = index.requireLayer(S5MegpoidNamedLayer.LINEAR).shapeCandidateOrNull()
         assertNotNull(linear)
-        assertEquals(32, linear?.weightToBiasElementRatio)
+        assertEquals(32, linear?.axis1Count)
+    }
+
+    @Test
+    fun packsNamedWeightsUsingRecoveredDescriptorAxesAndPadding() {
+        val index = S5MegpoidNamedLayerTensorIndex.build(modelTree(), ::lookupKey)
+        val layer = index.requireLayer(S5MegpoidNamedLayer.CONV1)
+        var receivedAxes: List<Int>? = null
+
+        val packed = layer.packWeightMatrixBank(TestDecoder()) { values, axis0, axis1, matrices ->
+            receivedAxes = listOf(axis0, axis1, matrices)
+            assertEquals(6144, values.size)
+            FloatArray(axis1 * ((axis0 + 7) / 8 * 8) * matrices)
+        }
+
+        assertEquals(listOf(64, 32, 3), receivedAxes)
+        assertEquals(S5MegpoidNamedLayerShape(3, 64, 32, 64, 2048, 64), packed.shape)
+        assertEquals(32 * 64 * 3, packed.packedValues.size)
     }
 
     @Test
