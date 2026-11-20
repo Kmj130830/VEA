@@ -1,3 +1,5 @@
+package com.kmj.vea.engine
+
 data class S5MegpoidNativeLayerShape(
     val axis0Count: Int,
     val axis1Count: Int,
@@ -28,8 +30,6 @@ class S5MegpoidNativeParameterSet internal constructor(
         NativeS5TensorBridge.destroyNamedLayerParameterSet(handle)
     }
 }
-
-package com.kmj.vea.engine
 
 data class S5RnnDirectionLayout(
     val layerIndex: Int,
