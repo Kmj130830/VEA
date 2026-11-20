@@ -60,6 +60,16 @@ class S5ModelObjectTree private constructor(val root: S5ModelValue.ObjectValue) 
 
         fun parseUtf8(utf8: String, limits: Limits = Limits()): S5ModelObjectTree =
             parseUtf8(utf8.toByteArray(StandardCharsets.UTF_8), limits)
+
+        /**
+         * Decodes a supplied S5API model payload, then parses its UTF-8 JSON root object.
+         * This still expects the caller to provide the model member bytes, not a ZIP archive.
+         */
+        fun parseModelPayload(
+            encodedPayload: ByteArray,
+            limits: Limits = Limits()
+        ): S5ModelObjectTree =
+            parseUtf8(NativeS5TensorBridge.decodeModelPayload(encodedPayload), limits)
     }
 }
 
