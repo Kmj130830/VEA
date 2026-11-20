@@ -159,6 +159,37 @@ def summarize_model_tree(
     return counts, all_keys, matching_parameters, matching_modules
 
 
+def value_shape(value: object) -> dict[str, int]:
+    counts = {
+        "objects": 0, "arrays": 0, "strings": 0, "numbers": 0,
+        "booleans": 0, "nulls": 0, "typed_f32": 0, "typed_f16": 0, "typed_s32": 0,
+    }
+    stack = [value]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, dict):
+            counts["objects"] += 1
+            stack.extend(current.values())
+        elif isinstance(current, list):
+            counts["arrays"] += 1
+            stack.extend(current)
+        elif isinstance(current, str):
+            counts["strings"] += 1
+            if current.startswith("*F32"):
+                counts["typed_f32"] += 1
+            elif current.startswith("*F16"):
+                counts["typed_f16"] += 1
+            elif current.startswith("*S32"):
+                counts["typed_s32"] += 1
+        elif isinstance(current, bool):
+            counts["booleans"] += 1
+        elif isinstance(current, (int, float)):
+            counts["numbers"] += 1
+        elif current is None:
+            counts["nulls"] += 1
+    return counts
+
+
 def try_json_object(payload: bytes) -> dict | None:
     # The native JSON parser receives a byte range, not necessarily a
     # NUL-terminated C string. Permit only trailing JSON whitespace/NUL padding.
@@ -264,6 +295,25 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                     f"key_sample={sample}",
                 )
                 print("TREE_SUMMARY", f"member={item.filename}", counts)
+                for root_key, root_value in root.items():
+                    shape = value_shape(root_value)
+                    direct_fields = len(root_value) if isinstance(root_value, (dict, list)) else 0
+                    root_type = (
+                        "object" if isinstance(root_value, dict) else
+                        "array" if isinstance(root_value, list) else
+                        "string" if isinstance(root_value, str) else
+                        "boolean" if isinstance(root_value, bool) else
+                        "number" if isinstance(root_value, (int, float)) else
+                        "null"
+                    )
+                    print(
+                        "ROOT_SHAPE",
+                        f"member={item.filename}",
+                        f"key={root_key}",
+                        f"type={root_type}",
+                        f"direct_fields={direct_fields}",
+                        f"shape={shape}",
+                    )
                 print(
                     "RNN_PARAMETER_LOOKUP_CANDIDATES",
                     f"member={item.filename}",
