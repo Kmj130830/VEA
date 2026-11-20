@@ -20,6 +20,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.kmj.vea.engine.S5ModelArchive
 import com.kmj.vea.engine.S5ModelArchiveReader
+import com.kmj.vea.engine.S5VoicebankModelPackage
+import com.kmj.vea.engine.S5VoicebankModelPackageAssembler
 import com.kmj.vea.data.*
 import com.kmj.vea.audio.PianoPreview
 import com.kmj.vea.data.StandardMidiExporter
@@ -35,51 +37,117 @@ enum class EditorMode {
 fun VeaApp() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var loadedModelArchive by remember { mutableStateOf<S5ModelArchive?>(null) }
-    var modelArchiveStatus by rememberSaveable { mutableStateOf("V7 model not loaded") }
+    var singerBankArchive by remember { mutableStateOf<S5ModelArchive?>(null) }
+    var sharedModelArchive by remember { mutableStateOf<S5ModelArchive?>(null) }
+    var loadedVoicebankPackage by remember { mutableStateOf<S5VoicebankModelPackage?>(null) }
+    var modelArchiveStatus by rememberSaveable { mutableStateOf("AI Megpoid V7 model set not loaded") }
     var isImportingModelArchive by remember { mutableStateOf(false) }
 
-    val modelArchiveLauncher = rememberLauncherForActivityResult(
+    fun refreshVoicebankPackage(
+        bankArchive: S5ModelArchive?,
+        commonArchive: S5ModelArchive?
+    ) {
+        if (bankArchive == null) {
+            loadedVoicebankPackage = null
+            modelArchiveStatus = "Select the AI Megpoid BANK ZIP"
+            return
+        }
+        if (commonArchive == null) {
+            loadedVoicebankPackage = null
+            modelArchiveStatus = "Bank archive parsed · now select the shared CORE ZIP"
+            return
+        }
+
+        runCatching {
+            S5VoicebankModelPackageAssembler().assemble(bankArchive, commonArchive)
+        }.fold(
+            onSuccess = { modelPackage ->
+                loadedVoicebankPackage = modelPackage
+                modelArchiveStatus = "AI Megpoid V7 · ${modelPackage.modelMemberCount}/5 model files verified"
+                Toast.makeText(
+                    context,
+                    "AI Megpoid V7 model set verified and connected to the editor session. Audio synthesis is the next stage.",
+                    Toast.LENGTH_LONG
+                ).show()
+            },
+            onFailure = { error ->
+                loadedVoicebankPackage = null
+                modelArchiveStatus = "Model set rejected: " + (error.message ?: "verification failed")
+                Toast.makeText(context, modelArchiveStatus, Toast.LENGTH_LONG).show()
+            }
+        )
+    }
+
+    val bankModelArchiveLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
             isImportingModelArchive = true
-            modelArchiveStatus = "Reading V7 model archive..."
+            modelArchiveStatus = "Reading AI Megpoid singer-bank ZIP..."
             scope.launch {
                 val result = withContext(Dispatchers.IO) {
                     runCatching {
                         val input = context.contentResolver.openInputStream(uri)
-                            ?: error("Cannot open the selected archive.")
-                        S5ModelArchiveReader().read(input)
+                            ?: error("Cannot open the selected singer-bank archive.")
+                        S5ModelArchiveReader().read(input, requireSingerModelMember = true)
                     }
                 }
                 isImportingModelArchive = false
                 result.fold(
                     onSuccess = { archive ->
-                        loadedModelArchive = archive
-                        modelArchiveStatus = "${archive.members.size} model members loaded"
-                        Toast.makeText(
-                            context,
-                            "AI Megpoid V7 model data loaded. Singing inference is not enabled yet.",
-                            Toast.LENGTH_LONG
-                        ).show()
+                        singerBankArchive = archive
+                        refreshVoicebankPackage(archive, sharedModelArchive)
                     },
                     onFailure = { error ->
-                        loadedModelArchive = null
-                        modelArchiveStatus = "Load failed: " + (error.message ?: "Unknown archive error")
-                        Toast.makeText(
-                            context,
-                            modelArchiveStatus,
-                            Toast.LENGTH_LONG
-                        ).show()
+                        singerBankArchive = null
+                        loadedVoicebankPackage = null
+                        modelArchiveStatus = "Bank ZIP load failed: " + (error.message ?: "unknown error")
+                        Toast.makeText(context, modelArchiveStatus, Toast.LENGTH_LONG).show()
                     }
                 )
             }
         }
     }
 
-    fun launchModelArchivePicker() {
-        modelArchiveLauncher.launch(
+    val sharedModelArchiveLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            isImportingModelArchive = true
+            modelArchiveStatus = "Reading shared VOCALOID7 model ZIP..."
+            scope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val input = context.contentResolver.openInputStream(uri)
+                            ?: error("Cannot open the shared model archive.")
+                        S5ModelArchiveReader().read(input, requireSingerModelMember = false)
+                    }
+                }
+                isImportingModelArchive = false
+                result.fold(
+                    onSuccess = { archive ->
+                        sharedModelArchive = archive
+                        refreshVoicebankPackage(singerBankArchive, archive)
+                    },
+                    onFailure = { error ->
+                        sharedModelArchive = null
+                        loadedVoicebankPackage = null
+                        modelArchiveStatus = "CORE ZIP load failed: " + (error.message ?: "unknown error")
+                        Toast.makeText(context, modelArchiveStatus, Toast.LENGTH_LONG).show()
+                    }
+                )
+            }
+        }
+    }
+
+    fun launchBankModelArchivePicker() {
+        bankModelArchiveLauncher.launch(
+            arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream", "*/*")
+        )
+    }
+
+    fun launchSharedModelArchivePicker() {
+        sharedModelArchiveLauncher.launch(
             arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream", "*/*")
         )
     }
@@ -141,6 +209,14 @@ fun VeaApp() {
     }
 
     fun updateTrackVoice(trackId: String, singerId: String, singerName: String, styleId: String) {
+        if (loadedVoicebankPackage?.voicebankId != singerId) {
+            Toast.makeText(
+                context,
+                "Load and verify the matching voicebank model files before assigning this singer.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
         val next = project.copy(
             tracks = project.tracks.map { track ->
                 if (track.id == trackId) track.copy(
@@ -277,9 +353,10 @@ fun VeaApp() {
                     canUndo = canUndo,
                     canRedo = canRedo,
                     modelArchiveStatus = modelArchiveStatus,
-                    modelLoaded = loadedModelArchive != null,
+                    modelLoaded = loadedVoicebankPackage != null,
                     isImportingModelArchive = isImportingModelArchive,
-                    onImportModelArchive = ::launchModelArchivePicker
+                    onImportBankArchive = ::launchBankModelArchivePicker,
+                    onImportSharedModelArchive = ::launchSharedModelArchivePicker
                 )
             } else {
                 val track = project.tracks.firstOrNull { it.id == selectedTrackId }
