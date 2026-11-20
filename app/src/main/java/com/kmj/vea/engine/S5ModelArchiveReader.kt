@@ -65,7 +65,7 @@ class S5ModelArchiveReader(
                 val entry = zip.nextEntry ?: break
                 entryCount++
                 require(entryCount <= limits.maxEntries) {
-                    "Model archive exceeds the \${limits.maxEntries}-entry limit."
+                    "Model archive exceeds the ${limits.maxEntries}-entry limit."
                 }
 
                 val basename = entry.name.replace('\\', '/').substringAfterLast('/')
@@ -82,7 +82,7 @@ class S5ModelArchiveReader(
                 }
 
                 if (entry.size > limits.maxEntryBytes) {
-                    throw IllegalArgumentException("ZIP member '\${entry.name}' exceeds the per-entry size limit.")
+                    throw IllegalArgumentException("ZIP member '${entry.name}' exceeds the per-entry size limit.")
                 }
 
                 val captured = if (expectedMagic != null) ByteArrayOutputStream() else null
@@ -97,7 +97,7 @@ class S5ModelArchiveReader(
                     entryBytes += count.toLong()
                     totalUncompressedBytes += count.toLong()
                     require(entryBytes <= limits.maxEntryBytes) {
-                        "ZIP member '\${entry.name}' exceeds the per-entry size limit."
+                        "ZIP member '${entry.name}' exceeds the per-entry size limit."
                     }
                     require(totalUncompressedBytes <= limits.maxTotalUncompressedBytes) {
                         "Model archive exceeds the total uncompressed-size limit."
@@ -124,7 +124,7 @@ class S5ModelArchiveReader(
         }
 
         require(loaded.containsKey(S5ModelArchive.AI_MEGPOID_MODEL)) {
-            "Archive does not contain \${S5ModelArchive.AI_MEGPOID_MODEL}."
+            "Archive does not contain ${S5ModelArchive.AI_MEGPOID_MODEL}."
         }
         return S5ModelArchive(loaded.toMap())
     }
