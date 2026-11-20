@@ -219,9 +219,13 @@ class S5MegpoidNamedLayerTensorIndex private constructor(
             ): S5MegpoidNamedLayerTensorReference {
                 val propertyName = "${layer.modelName}.$suffix"
                 val lookupKey = keyHasher(propertyName)
-                val value = modelTree.findByLookupKey(lookupKey) as? S5ModelValue.StringValue
+                val match = modelTree.findUniqueByLookupKeyRecursive(lookupKey)
                     ?: throw IllegalArgumentException(
-                        "Named model property '$propertyName' is missing or is not a typed string."
+                        "Named model property '$propertyName' (key $lookupKey) is missing from the model tree."
+                    )
+                val value = match.value as? S5ModelValue.StringValue
+                    ?: throw IllegalArgumentException(
+                        "Named model property '$propertyName' at ${match.path} is not a typed string."
                     )
                 val marker = value.value.take(4)
                 require(marker == "*F32" || marker == "*F16") {
