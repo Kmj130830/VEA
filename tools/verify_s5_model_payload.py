@@ -507,8 +507,9 @@ def inspect_megpoid_named_layer_parameters(
         weight_occurrences, weight_tensors = discovered["weight"]
         bias_occurrences, bias_tensors = discovered["bias"]
         classification = "unresolved"
-        inferred_rows = None
-        bias_columns = None
+        axis0_count = None
+        axis1_count = None
+        padded_axis0_count = None
         if (
             weight_occurrences == 1
             and bias_occurrences == 1
@@ -523,20 +524,24 @@ def inspect_megpoid_named_layer_parameters(
                 and weight_elements > 0
                 and bias_elements > 0
             ):
+                # FUN_180064670 writes param_5 to axis0, param_4 to axis1,
+                # and param_6 to the number of BlockMatrix objects.
                 denominator = bias_elements * matrix_count
                 if denominator > 0 and weight_elements % denominator == 0:
-                    candidate_rows = weight_elements // denominator
-                    if candidate_rows > 0:
-                        inferred_rows = candidate_rows
-                        bias_columns = bias_elements
-                        classification = "shape_count_consistent"
+                    candidate_axis1 = weight_elements // denominator
+                    if candidate_axis1 > 0:
+                        axis0_count = bias_elements
+                        axis1_count = candidate_axis1
+                        padded_axis0_count = ((axis0_count + 7) // 8) * 8
+                        classification = "descriptor_axes_consistent"
         print(
             "MODEL_NAMED_LAYER_SHAPE",
             f"member={member}",
             f"layer={layer}",
             f"matrix_count={matrix_count}",
-            f"rows={inferred_rows}",
-            f"columns_from_bias={bias_columns}",
+            f"axis0_count={axis0_count}",
+            f"axis1_count={axis1_count}",
+            f"padded_axis0_count={padded_axis0_count}",
             f"classification={classification}",
         )
 
