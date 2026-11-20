@@ -646,12 +646,16 @@ buffers into an axis0-padded descriptor representation. This is a
 separate parameter path from the nine named `pre/conv/cond/linear`
 layers indexed above.
 
-The provided Megpoid JSON audit previously found no `rnn.*_l0` lookup
-keys. The validator now scans layer indices 0 through 15 and both
-directions, rather than checking only layer zero. Until that expanded scan
-finishes, the current Megpoid package's use of this optional GRU path remains
-unconfirmed. The presence of a generic loader in S5API does not prove that
-this voicebank supplies or enables those recurrent weights.
+The expanded model-payload CI scan checked 128 possible GRU keys
+(16 layer indices × 4 parameter members × 2 direction variants) in each of
+the five supplied model members: `AI_Megpoid.vpit`,
+`AI_Megpoid.vtb2`, `COMMON7.vpit`, `VOCALOID7.vhnv`, and
+`VOCALOID7.vtmg`. The result was **0/128 matches in every member**.
+Therefore the generic GRU loader is present in S5API, but its expected
+parameter properties are not present in the supplied Megpoid model object
+trees; this path is not currently a viable parameter source for this bank.
+The Android GRU dimension utility remains generic infrastructure only and
+is not connected to the Megpoid named-layer parameter set.
 
 ### Named-layer descriptor-pair storage
 
