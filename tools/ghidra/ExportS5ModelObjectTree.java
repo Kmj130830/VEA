@@ -198,6 +198,15 @@ public class ExportS5ModelObjectTree extends GhidraScript {
             dumpBytes(out, "18019b770", 4);
             dumpBytes(out, "18019b778", 4);
             out.println();
+            out.println("## Encoded text block decoder disassembly");
+            out.println();
+            dumpWindow(out, toAddr("18002aa90"), 0x10, 0x260);
+            dumpWindow(out, toAddr("180068190"), 0x10, 0x180);
+            out.println();
+            out.println("## JSON parser entry disassembly");
+            out.println();
+            dumpWindow(out, toAddr("18000daa0"), 0x10, 0x220);
+            out.println();
             out.println("## F16 callback target disassembly windows");
             out.println();
             dumpWindow(out, toAddr("18003cb70"), 0x20, 0xa0);
