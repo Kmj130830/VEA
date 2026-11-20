@@ -181,12 +181,18 @@ def summarize_model_tree(
     # FUN_18005ebe0 forms one GRU parameter property for each layer
     # index and each configured direction. Scan a conservative full range,
     # rather than checking only l0, so a later layer is not misreported absent.
+    rnn_layer_scan_count = 16
+    rnn_parameter_member_count = 4
+    rnn_direction_variants = 2
     candidates = [
         f"rnn.{member}_l{layer}{direction}"
-        for layer in range(16)
+        for layer in range(rnn_layer_scan_count)
         for member in ("weight_ih", "weight_hh", "bias_ih", "bias_hh")
         for direction in ("", "_reverse")
     ]
+    rnn_candidate_count = (
+        rnn_layer_scan_count * rnn_parameter_member_count * rnn_direction_variants
+    )
     matching_parameters = [
         name for name in candidates if s5_lookup_key(name) in all_keys
     ]
@@ -796,7 +802,7 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                 print(
                     "RNN_PARAMETER_LOOKUP_CANDIDATES",
                     f"member={item.filename}",
-                    f"matched={len(parameter_matches)}/8",
+                    f"matched={len(parameter_matches)}/128",
                     f"names={parameter_matches}",
                 )
                 print(
