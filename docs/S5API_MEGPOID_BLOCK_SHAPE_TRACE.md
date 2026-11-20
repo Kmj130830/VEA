@@ -124,7 +124,7 @@ tensor index:
   paths, and writes matrix elements into the native matrix objects.
 
 Therefore KEY_1 and KEY_2 are not two independent top-level model-block
-sections. They are a pair of matrix-property lookups within a layer object.
+sections. They are a pair of layer-property lookups within a layer object.
 The Android index now exposes `matrixPropertyPairs()`, which pairs typed
 leaves only when exactly one KEY_1 and one KEY_2 occur under the same
 immediate parent object. Ambiguous and incomplete groups are deliberately
