@@ -163,12 +163,21 @@ KEY_2 elements = param_7
 KEY_1 elements / KEY_2 elements = param_6 * param_8
 ```
 
-The Kotlin index now exposes this integer quotient as
+The FUN_180052f90 caller supplies the descriptor fields as
+`param_6 = dim1`, `param_7 = 2 * dim1`, and `param_8 = dim0). The resulting
+sizes can therefore be written as:
+
+```
+KEY_1 elements = 2 * dim1 * dim1 * dim0
+KEY_2 elements = 2 * dim1
+KEY_1 / KEY_2 = dim1 * dim0
+```
+
+The Kotlin index exposes this integer quotient as
 `primaryToSecondaryElementRatio`. It is null when either tensor is empty or
-the primary count is not divisible by the secondary count. The quotient is a
-descriptor consistency check: it combines the primary matrix column count and
-matrix-bank count, but does not separate those two dimensions or identify
-the semantic role of either property.
+the primary count is not divisible by the secondary count. The quotient
+validates the combined `dim1 * dim0` factor, but does not separate those two
+dimensions or identify the semantic role of either property.
 
 This relationship is specific to the recovered `FUN_180063ca0` constructor
 path. It must not be generalized to the separate runtime residual block
@@ -178,9 +187,12 @@ that block's pointers.
 ## Actual AI Megpoid VTB2 pair audit
 
 The updated payload-validation workflow inspected the real
-`AI_Megpoid.vtb2` JSON object tree and found **88 objects** containing both
-fixed keys. All 88 had exactly one typed `*F32` leaf under each key; none
-were ambiguous or malformed.
+`AI_Megpoid.vtb2` JSON object tree. The recursive inventory contains 100 KEY_1
+occurrences and 88 KEY_2 occurrences. The same immediate parent object
+contains both keys in **88 objects**. All 88 paired objects had exactly one
+typed `*F32` leaf under each key; none were ambiguous or malformed. The
+remaining 12 KEY_1 occurrences were not paired under an immediate common
+parent and are excluded from this descriptor-pair check.
 
 Most common observed element-count pairs (primary / secondary):
 
@@ -199,9 +211,12 @@ These counts prove structural co-location and typed-payload sizes. The
 descriptor relationship above adds a stronger invariant: each pair should
 satisfy `primaryElements = secondaryElements * param_6 * param_8`. The
 payload audit checks the equivalent condition that the primary element count
-is a positive integer multiple of the secondary element count. This validates
-the combined `param_6 * param_8` factor, but it does not recover the two
-dimensions separately or assign a semantic role to either payload.
+is a positive integer multiple of the secondary element count. **All 88 paired
+objects pass**. The observed quotient frequencies are 96 (26), 480 (16),
+192 (15), 128 (10), 9 (7), 384 (6), 16 (4), and 32, 35, 64, 418 (one each).
+The quotient validates the combined `param_6 * param_8` factor, but it does
+not recover the two dimensions separately or assign a semantic role to either
+payload.
 
 ## What is still not connected
 
