@@ -23,6 +23,7 @@ import com.kmj.vea.engine.S5ModelArchiveReader
 import com.kmj.vea.engine.S5VoicebankModelPackage
 import com.kmj.vea.engine.S5VoicebankModelPackageAssembler
 import com.kmj.vea.engine.S5MegpoidPackedNamedLayer
+import com.kmj.vea.engine.S5MegpoidCompiledRuntimeBlock
 import com.kmj.vea.data.*
 import com.kmj.vea.audio.PianoPreview
 import com.kmj.vea.data.StandardMidiExporter
@@ -44,6 +45,9 @@ fun VeaApp() {
     var preparedNamedLayerParameters by remember {
         mutableStateOf<List<S5MegpoidPackedNamedLayer>?>(null)
     }
+    var preparedRuntimeBlocks by remember {
+        mutableStateOf<List<S5MegpoidCompiledRuntimeBlock>?>(null)
+    }
     var isPreparingModelParameters by remember { mutableStateOf(false) }
     var modelArchiveStatus by rememberSaveable { mutableStateOf("AI Megpoid V7 model set not loaded") }
     var isImportingModelArchive by remember { mutableStateOf(false) }
@@ -55,6 +59,7 @@ fun VeaApp() {
         // Invalidate any prior packed package as soon as the inputs change.
         loadedVoicebankPackage = null
         preparedNamedLayerParameters = null
+        preparedRuntimeBlocks = null
         isPreparingModelParameters = false
 
         if (bankArchive == null) {
@@ -73,30 +78,36 @@ fun VeaApp() {
                 loadedVoicebankPackage = modelPackage
                 isPreparingModelParameters = true
                 modelArchiveStatus =
-                    "Model files verified · preparing 9 named-layer matrix banks..."
+                    "Model files verified · preparing 9 named layers and 8 residual blocks..."
                 scope.launch {
                     val preparation = withContext(Dispatchers.Default) {
-                        runCatching { modelPackage.prepareNamedLayerParameters() }
+                        runCatching {
+                            val namedLayers = modelPackage.prepareNamedLayerParameters()
+                            val runtimeBlocks = modelPackage.prepareRuntimeBlocks()
+                            namedLayers to runtimeBlocks
+                        }
                     }
                     // Ignore an older preparation job if the user imported a
                     // different bank or shared model while this one was running.
                     if (loadedVoicebankPackage !== modelPackage) return@launch
                     isPreparingModelParameters = false
                     preparation.fold(
-                        onSuccess = { prepared ->
-                            preparedNamedLayerParameters = prepared
+                        onSuccess = { (namedLayers, runtimeBlocks) ->
+                            preparedNamedLayerParameters = namedLayers
+                            preparedRuntimeBlocks = runtimeBlocks
                             modelArchiveStatus =
-                                "AI Megpoid V7 · 5 files verified · ${prepared.size}/9 layer banks packed"
+                                "AI Megpoid V7 · 5 files verified · ${namedLayers.size}/9 named layers · ${runtimeBlocks.size}/8 residual blocks prepared"
                             Toast.makeText(
                                 context,
-                                "AI Megpoid model parameters decoded and packed for all nine named layers. The singing renderer is still a separate stage.",
+                                "AI Megpoid model parameters prepared: ${namedLayers.size}/9 named layers and ${runtimeBlocks.size}/8 residual blocks. The streaming history scheduler and singing renderer remain separate stages.",
                                 Toast.LENGTH_LONG
                             ).show()
                         },
                         onFailure = { error ->
                             preparedNamedLayerParameters = null
+                            preparedRuntimeBlocks = null
                             modelArchiveStatus =
-                                "Model files verified, but native layer preparation failed: " +
+                                "Model files verified, but neural parameter preparation failed: " +
                                 (error.message ?: "unknown error")
                             Toast.makeText(context, modelArchiveStatus, Toast.LENGTH_LONG).show()
                         }
@@ -106,6 +117,7 @@ fun VeaApp() {
             onFailure = { error ->
                 loadedVoicebankPackage = null
                 preparedNamedLayerParameters = null
+                preparedRuntimeBlocks = null
                 isPreparingModelParameters = false
                 modelArchiveStatus = "Model set rejected: " + (error.message ?: "verification failed")
                 Toast.makeText(context, modelArchiveStatus, Toast.LENGTH_LONG).show()
@@ -120,6 +132,7 @@ fun VeaApp() {
             isImportingModelArchive = true
             loadedVoicebankPackage = null
             preparedNamedLayerParameters = null
+            preparedRuntimeBlocks = null
             isPreparingModelParameters = false
             modelArchiveStatus = "Reading AI Megpoid singer-bank ZIP..."
             scope.launch {
@@ -140,6 +153,7 @@ fun VeaApp() {
                         singerBankArchive = null
                         loadedVoicebankPackage = null
                         preparedNamedLayerParameters = null
+                        preparedRuntimeBlocks = null
                         isPreparingModelParameters = false
                         modelArchiveStatus = "Bank ZIP load failed: " + (error.message ?: "unknown error")
                         Toast.makeText(context, modelArchiveStatus, Toast.LENGTH_LONG).show()
@@ -156,6 +170,7 @@ fun VeaApp() {
             isImportingModelArchive = true
             loadedVoicebankPackage = null
             preparedNamedLayerParameters = null
+            preparedRuntimeBlocks = null
             isPreparingModelParameters = false
             modelArchiveStatus = "Reading shared VOCALOID7 model ZIP..."
             scope.launch {
@@ -176,6 +191,7 @@ fun VeaApp() {
                         sharedModelArchive = null
                         loadedVoicebankPackage = null
                         preparedNamedLayerParameters = null
+                        preparedRuntimeBlocks = null
                         isPreparingModelParameters = false
                         modelArchiveStatus = "CORE ZIP load failed: " + (error.message ?: "unknown error")
                         Toast.makeText(context, modelArchiveStatus, Toast.LENGTH_LONG).show()
@@ -400,7 +416,8 @@ fun VeaApp() {
                     canUndo = canUndo,
                     canRedo = canRedo,
                     modelArchiveStatus = modelArchiveStatus,
-                    modelLoaded = preparedNamedLayerParameters != null,
+                    modelLoaded = preparedNamedLayerParameters != null &&
+                        preparedRuntimeBlocks?.size == 8,
                     isImportingModelArchive = isImportingModelArchive || isPreparingModelParameters,
                     onImportBankArchive = ::launchBankModelArchivePicker,
                     onImportSharedModelArchive = ::launchSharedModelArchivePicker
