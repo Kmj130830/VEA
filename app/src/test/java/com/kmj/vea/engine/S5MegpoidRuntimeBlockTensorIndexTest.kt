@@ -8,6 +8,32 @@ import org.junit.Test
 
 class S5MegpoidRuntimeBlockTensorIndexTest {
     @Test
+    fun staticMegpoidFactoryTableContainsTheValidatedFourByTwoGrid() {
+        val keys = S5MegpoidRuntimeBlockFactoryKeys.ALL
+        assertEquals(64, keys.size)
+        S5MegpoidRuntimeBlockFactory.entries.forEach { factory ->
+            val factoryKeys = keys.filter { it.factory == factory }
+            assertEquals(8, factoryKeys.size)
+            assertEquals(
+                setOf(0 to 0, 0 to 1, 1 to 0, 1 to 1, 2 to 0, 2 to 1, 3 to 0, 3 to 1),
+                factoryKeys.map { it.row to it.column }.toSet()
+            )
+        }
+
+        val json = keys.joinToString(prefix = "{", postfix = "}") { key ->
+            "\\"" + key.lookupKey + "\\":{\\"weight\\":\\"*F32AAAAAA==\\"}"
+        }
+        val tree = S5ModelObjectTree.parseUtf8(json)
+        val index = S5MegpoidRuntimeBlockTensorIndex.build(tree, keys)
+
+        assertEquals(64, index.totalTensorReferences)
+        assertEquals(8, index.tensors(S5MegpoidRuntimeBlockFactory.TRANSPOSED_TENSOR, 3, 1).size)
+        assertEquals(1, index.tensors(
+            S5MegpoidRuntimeBlockFactory.TRANSPOSED_TENSOR, 3, 1
+        ).size)
+    }
+
+    @Test
     fun indexesTypedTensorForTheExactFactoryRowAndColumn() {
         val lookupKey = "11111111111111111111111111111111"
         val tree = S5ModelObjectTree.parseUtf8(
