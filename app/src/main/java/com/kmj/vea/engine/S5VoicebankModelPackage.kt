@@ -44,6 +44,35 @@ data class S5VoicebankModelPackage(
     }
 
     /**
+     * Decodes and assembles the eight runtime residual-block parameter sets
+     * (4 rows x 2 columns) from AI_Megpoid.vtb2.
+     *
+     * This prepares block weights only. S5API's stateful history/ring-buffer
+     * operator FUN_1800c67e0 and the full singing renderer are separate stages.
+     * The caller must supply the actual frame-position count for its inference
+     * chunk; no assumed default is used.
+     */
+    fun prepareRuntimeBlocks(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder,
+        positions: Int
+    ): List<S5MegpoidCompiledRuntimeBlock> = buildList {
+        require(positions >= S5MegpoidResidualBlockShape.KERNEL_WIDTH)
+        for (row in 0 until S5MegpoidRuntimeBlockFactoryKeys.BLOCK_ROWS) {
+            for (column in 0 until S5MegpoidRuntimeBlockFactoryKeys.BLOCK_COLUMNS) {
+                add(
+                    S5MegpoidRuntimeBlockAssembler.compile(
+                        index = runtimeBlockTensorIndex,
+                        row = row,
+                        column = column,
+                        tensorDecoder = tensorDecoder,
+                        positions = positions
+                    )
+                )
+            }
+        }
+    }
+
+    /**
      * Lazily indexes the nine named neural layers in the shared VOCALOID7.vtmg.
      * This resolves actual model tensors but does not yet execute their network.
      */
