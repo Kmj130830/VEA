@@ -188,7 +188,7 @@ object S5MegpoidRuntimeBlockAssembler {
     /**
      * Mirrors FUN_1800d4bf0's three-axis permutation:
      * source [C][H][W] index ((c * H + y) * W + x)
-     * becomes native-record [W][C][H] index ((x * C + c) * H + y).
+     * becomes native-record [C][W][H] index ((c * W + x) * H + y).
      */
     fun transposeDepthwiseFilter(
         source: FloatArray,
