@@ -115,6 +115,14 @@ class S5MegpoidBlockTensorIndexTest {
         )
         assertEquals(secondary.toList(), rowMajor.secondaryProperty.toList())
 
+        val nativeOrder = pair.decodeNativeMatrixBankPayloadOrNull(decoder)!!
+        assertEquals(rowMajor.shape, nativeOrder.shape)
+        assertEquals(
+            rowMajor.matrices.map { it.toList() },
+            nativeOrder.matrices.map { it.toList() }
+        )
+        assertEquals(rowMajor.secondaryProperty.toList(), nativeOrder.secondaryProperty.toList())
+
         val columnMajor = pair.decodeMatrixBankPayloadOrNull(
             S5MegpoidMatrixInputOrder.COLUMN_MAJOR,
             decoder
