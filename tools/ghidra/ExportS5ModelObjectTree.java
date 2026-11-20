@@ -62,6 +62,7 @@ public class ExportS5ModelObjectTree extends GhidraScript {
         "180088949", // model constructor callsite that installs the converter
         "180010740", // key concatenation helper
         "180010540", // key suffix/helper
+        "180083c50", // recurrent layer-index to string formatter
         "180065d50", // typed object child/value accessor
         "18001e360", // alternate typed tensor reader caller
         "18005e120", // recurrent matrix/tensor reader caller
