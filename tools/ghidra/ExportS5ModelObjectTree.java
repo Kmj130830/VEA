@@ -79,6 +79,10 @@ public class ExportS5ModelObjectTree extends GhidraScript {
         "1800537e0", // writes a pointer at object offset +0x208
         "180052f90", // per-entry block parser called by FUN_1800537e0
         "18005e9b0", // subobject/tensor descriptor loader used by FUN_1800537e0
+        "180063ca0", // typed model parameter/tensor loader called by FUN_18005e9b0
+        "1800589d0", // alternate model-block setup path
+        "18005452e", // caller of FUN_180052f90 during per-entry block traversal
+        "1800501ba", // caller of FUN_18005e9b0 during nested parameter setup
         "18005903a", // caller site for FUN_1800537e0 during model-layer traversal
         "1800c5d50", // active residual depthwise/MLP runtime block
         "1800c67e0", // depthwise-convolution state/history preparation
