@@ -267,15 +267,26 @@ object NativeS5TensorBridge {
         epsilon: Float
     ): FloatArray {
         check(loaded) { "Native S5 tensor library is not loaded." }
-        require(channels > 0 && positions >= 7 && expandedFeatures > 0)
-        require(historyRows.size == channels * 7 * positions)
-        require(depthwiseWeights.size == channels * 49)
-        require(expandWeights.size == expandedFeatures * channels)
-        require(expandedBiasA.size >= expandedFeatures && expandedBiasB.size >= expandedFeatures)
-        require(projectWeights.size == channels * expandedFeatures)
-        require(residualInput.size == channels * positions && residualScale.size >= channels)
-        require(residualBias == null || residualBias.size >= channels)
-        require(epsilon.isFinite() && epsilon >= 0.0f)
+        require(expandedFeatures > 0 && expandedFeatures % channels.coerceAtLeast(1) == 0) {
+            "Expanded feature count must be a positive multiple of channels."
+        }
+        val shape = S5MegpoidResidualBlockShape(
+            channels = channels,
+            expansionMultiplier = expandedFeatures / channels,
+            positions = positions
+        )
+        shape.validateInputs(
+            historyRows = historyRows,
+            depthwiseWeights = depthwiseWeights,
+            expandWeights = expandWeights,
+            expandedBiasA = expandedBiasA,
+            expandedBiasB = expandedBiasB,
+            projectWeights = projectWeights,
+            residualInput = residualInput,
+            residualScale = residualScale,
+            residualBias = residualBias,
+            epsilon = epsilon
+        )
         return nativeRunResidualDwMlpBlock(
             historyRows, depthwiseWeights, expandWeights, expandedBiasA, expandedBiasB,
             projectWeights, residualInput, residualScale, residualBias,
