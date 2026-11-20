@@ -124,6 +124,35 @@ class S5MegpoidNamedLayerTensorIndexTest {
     }
 
     @Test
+    fun buildsNativeParameterInputsInVendorLayerOrderAndObjectOffsets() {
+        val inputs = S5MegpoidNamedLayerTensorIndex.build(modelTree(), ::lookupKey)
+            .buildNativeParameterInputs(TestDecoder())
+
+        assertEquals(9, inputs.weightArrays.size)
+        assertEquals(9, inputs.biasArrays.size)
+        assertEquals(
+            listOf(32, 32, 64, 64, 64, 64, 64, 64, 3),
+            inputs.axis0Counts.toList()
+        )
+        assertEquals(
+            listOf(82, 32, 32, 26, 32, 26, 32, 26, 32),
+            inputs.axis1Counts.toList()
+        )
+        assertEquals(
+            listOf(1, 1, 3, 1, 3, 1, 3, 1, 1),
+            inputs.matrixCounts.toList()
+        )
+        assertEquals(
+            listOf(0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xa0),
+            inputs.descriptorPairOffsets.toList()
+        )
+        assertEquals(6144, inputs.weightArrays[2].size)
+        assertEquals(64, inputs.biasArrays[2].size)
+        assertEquals(96, inputs.weightArrays[8].size)
+        assertEquals(3, inputs.biasArrays[8].size)
+    }
+
+    @Test
     fun decodesNamedLayerTensorOnlyWhenRequested() {
         val index = S5MegpoidNamedLayerTensorIndex.build(modelTree(), ::lookupKey)
         val weight = index.requireLayer(S5MegpoidNamedLayer.CONV1).weight
