@@ -27,7 +27,9 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
         "1800537e0", // model-block object/parameter construction
         "180052f90", // related nested block setup
         "18005e9b0", // common typed object/tensor loader
-        "180063ca0", // weight/bias object-to-tensor loader
+        "180063ca0", // primary typed matrix-array loader
+        "180064e90", // secondary property loader/consumer
+        "180064670", // matrix descriptor and numeric tensor packer
         "180006c80", // numeric JSON-array conversion
         "180020190", // .weight member reader
         "1800214c0", // .bias member reader
@@ -41,7 +43,7 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
         "1800c6390"  // banked linear projection operator
     };
     private static final int MAX_CALLERS = 48;
-    private static final int CONTEXT_INSTRUCTIONS = 7;
+    private static final int CONTEXT_INSTRUCTIONS = 18;
 
     @Override
     public void run() throws Exception {
