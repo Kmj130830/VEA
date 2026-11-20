@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <cmath>
 #include <limits>
+#include <array>
+#include <vector>
 
 namespace {
 
@@ -64,6 +66,114 @@ int main() {
     assert(vea_s5_hash_parameter_key(
         nullptr, 1, hashed_key, sizeof(hashed_key), &hashed_key_required) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
+    // Build the persistent 9-layer descriptor-pair table at the same
+    // object offsets used by FUN_180068190 (0x20 through 0xa0).
+    constexpr size_t kLayerCount = VEA_S5_NAMED_LAYER_COUNT;
+    const std::array<uint32_t, kLayerCount> layer_axis0 = {
+        2u, 2u, 4u, 4u, 4u, 4u, 4u, 4u, 1u
+    };
+    const std::array<uint32_t, kLayerCount> layer_axis1 = {
+        3u, 2u, 2u, 3u, 2u, 3u, 2u, 3u, 2u
+    };
+    const std::array<uint32_t, kLayerCount> layer_banks = {
+        1u, 1u, 3u, 1u, 3u, 1u, 3u, 1u, 1u
+    };
+    std::array<uint32_t, kLayerCount> layer_offsets{};
+    std::array<std::vector<float>, kLayerCount> layer_weights;
+    std::array<std::vector<float>, kLayerCount> layer_biases;
+    std::array<const float*, kLayerCount> layer_weight_ptrs{};
+    std::array<const float*, kLayerCount> layer_bias_ptrs{};
+    std::array<size_t, kLayerCount> layer_weight_counts{};
+    std::array<size_t, kLayerCount> layer_bias_counts{};
+    for (size_t layer = 0; layer < kLayerCount; ++layer) {
+        layer_offsets[layer] = 0x20u + static_cast<uint32_t>(layer) * 0x10u;
+        const size_t weight_count =
+            static_cast<size_t>(layer_axis0[layer]) * layer_axis1[layer] * layer_banks[layer];
+        layer_weights[layer].resize(weight_count);
+        layer_biases[layer].resize(layer_axis0[layer]);
+        for (size_t index = 0; index < weight_count; ++index) {
+            layer_weights[layer][index] =
+                static_cast<float>(1000u * layer + index + 1u);
+        }
+        for (size_t index = 0; index < layer_biases[layer].size(); ++index) {
+            layer_biases[layer][index] =
+                static_cast<float>(100u * layer + index + 1u);
+        }
+        layer_weight_ptrs[layer] = layer_weights[layer].data();
+        layer_bias_ptrs[layer] = layer_biases[layer].data();
+        layer_weight_counts[layer] = layer_weights[layer].size();
+        layer_bias_counts[layer] = layer_biases[layer].size();
+    }
+
+    VeaS5NamedLayerParameterSet* named_layer_set = nullptr;
+    assert(vea_s5_named_layer_parameter_set_create(
+        layer_weight_ptrs.data(), layer_weight_counts.data(),
+        layer_bias_ptrs.data(), layer_bias_counts.data(),
+        layer_axis0.data(), layer_axis1.data(), layer_banks.data(),
+        layer_offsets.data(), kLayerCount, &named_layer_set) == VEA_S5_TENSOR_STATUS_OK);
+    assert(named_layer_set != nullptr);
+
+    for (size_t layer = 0; layer < kLayerCount; ++layer) {
+        const VeaS5MatrixDescriptor* weight_descriptors = nullptr;
+        const VeaS5MatrixDescriptor* bias_descriptor = nullptr;
+        size_t weight_descriptor_count = 0;
+        uint32_t axis0 = 0, axis1 = 0, padded_axis0 = 0;
+        assert(vea_s5_named_layer_parameter_set_get_layer(
+            named_layer_set, layer, &weight_descriptors, &weight_descriptor_count,
+            &bias_descriptor, &axis0, &axis1, &padded_axis0) ==
+            VEA_S5_TENSOR_STATUS_OK);
+        assert(weight_descriptors != nullptr);
+        assert(bias_descriptor != nullptr);
+        assert(weight_descriptor_count == layer_banks[layer]);
+        assert(axis0 == layer_axis0[layer]);
+        assert(axis1 == layer_axis1[layer]);
+        assert(padded_axis0 == ((axis0 + 7u) & ~7u));
+        assert(weight_descriptors[0].axis0 == axis0);
+        assert(weight_descriptors[0].axis1 == axis1);
+        assert(weight_descriptors[0].padded_axis0 == padded_axis0);
+        assert(bias_descriptor->axis0 == axis0);
+        assert(bias_descriptor->axis1 == 1u);
+        assert(bias_descriptor->padded_axis0 == padded_axis0);
+
+        const size_t source_index =
+            (static_cast<size_t>(axis0 - 1u) * axis1 + (axis1 - 1u)) *
+            layer_banks[layer];
+        const size_t output_index =
+            static_cast<size_t>(axis1 - 1u) * padded_axis0 + (axis0 - 1u);
+        for (size_t bank = 0; bank < weight_descriptor_count; ++bank) {
+            assert(weight_descriptors[bank].values[output_index] ==
+                layer_weights[layer][source_index + bank]);
+        }
+        assert(bias_descriptor->values[axis0 - 1u] == layer_biases[layer].back());
+        for (uint32_t padding = axis0; padding < padded_axis0; ++padding) {
+            assert(bias_descriptor->values[padding] == 0.0f);
+        }
+    }
+
+    // Invalid table offsets and incomplete source vectors are rejected atomically.
+    auto invalid_offsets = layer_offsets;
+    invalid_offsets[4] += 8u;
+    VeaS5NamedLayerParameterSet* rejected_set = nullptr;
+    assert(vea_s5_named_layer_parameter_set_create(
+        layer_weight_ptrs.data(), layer_weight_counts.data(),
+        layer_bias_ptrs.data(), layer_bias_counts.data(),
+        layer_axis0.data(), layer_axis1.data(), layer_banks.data(),
+        invalid_offsets.data(), kLayerCount, &rejected_set) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(rejected_set == nullptr);
+
+    auto invalid_weight_counts = layer_weight_counts;
+    invalid_weight_counts[2] -= 1u;
+    assert(vea_s5_named_layer_parameter_set_create(
+        layer_weight_ptrs.data(), invalid_weight_counts.data(),
+        layer_bias_ptrs.data(), layer_bias_counts.data(),
+        layer_axis0.data(), layer_axis1.data(), layer_banks.data(),
+        layer_offsets.data(), kLayerCount, &rejected_set) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(rejected_set == nullptr);
+
+    vea_s5_named_layer_parameter_set_destroy(named_layer_set);
 
     VeaS5Arena* arena = nullptr;
     assert(vea_s5_arena_create(8192, &arena) == VEA_S5_TENSOR_STATUS_OK);
