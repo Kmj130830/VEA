@@ -106,6 +106,36 @@ This contract is derived from the observed runtime projection dimensions and
 the existing Android C++ function signature. It does not yet identify the
 matching object-tree paths for each buffer.
 
+## Matrix-property lookup correction
+
+The second Ghidra report includes the full body of `FUN_180052f90` and
+`FUN_18005e9b0`. It clarifies an important distinction in the earlier flat
+tensor index:
+
+- The first two fixed hashes are generated as two property names inside the
+  selected per-layer object.
+- `FUN_180052f90` obtains that layer object and passes the two property names
+  to `FUN_18005e9b0`.
+- `FUN_18005e9b0` copies both names and passes the layer object plus those
+  names to `FUN_180063ca0`.
+- `FUN_180063ca0` resolves the two properties independently and creates
+  matrix objects using the supplied row/column descriptor arguments. It
+  supports multiple numeric storage forms, including float32 and float16
+  paths, and writes matrix elements into the native matrix objects.
+
+Therefore KEY_1 and KEY_2 are not two independent top-level model-block
+sections. They are a pair of matrix-property lookups within a layer object.
+The Android index now exposes `matrixPropertyPairs()`, which pairs typed
+leaves only when exactly one KEY_1 and one KEY_2 occur under the same
+immediate parent object. Ambiguous and incomplete groups are deliberately
+excluded. The pair names remain neutral; the available evidence does not yet
+prove which one is a kernel, bias, projection, or another matrix role.
+
+The shape arguments passed to `FUN_180063ca0` are also not sufficient on
+their own to assign a semantic role to the pair. The next step is to connect
+the descriptor fields at each call site to the runtime operator dimensions
+and then validate the resulting element counts against the actual model data.
+
 ## What is still not connected
 
 - The nine fixed lookup keys in `AI_Megpoid.vtb2` have been found and indexed.
