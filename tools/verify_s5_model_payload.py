@@ -11,6 +11,7 @@ import base64
 import ctypes
 import hashlib
 import json
+import re
 import struct
 import zipfile
 from pathlib import Path
