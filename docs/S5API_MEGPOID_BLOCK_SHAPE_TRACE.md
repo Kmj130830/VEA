@@ -238,6 +238,35 @@ They remain structural property pairs but are not assigned this matrix shape.
 The model constructor contains other `FUN_18005e9b0` call sites with
 different dimension tuples, so those pairs require a separate call-site map.
 
+## Native matrix-bank input traversal for the repeated-block wrapper
+
+The generic `FUN_180063ca0` loader supports two traversal modes, selected by
+its `param_11` argument:
+
+- `param_11 == 0`: rows are the outer loop and columns are the inner loop;
+  source coordinates are consumed in row-major order.
+- `param_11 != 0`: columns are the outer loop and rows are the inner loop;
+  source coordinates are consumed in column-major order.
+
+In both modes, values for the matrix bank are interleaved per coordinate, and
+the loader visits the allocated matrix-object pointer array from its final
+entry back to its first entry.
+
+For the repeated-block constructor path, the raw call context in
+`FUN_18005e9b0` at `0x18005eb04` writes zero to `[RSP + 0x50]` immediately
+before calling `FUN_180063ca0`. Under the Win64 calling convention this is
+the eleventh argument, `param_11`; therefore this wrapper selects the
+row-major branch. The Android model-pair decoder now exposes
+`decodeNativeMatrixBankPayloadOrNull()`, which fixes this call path to
+row-major traversal while retaining the lower-level explicit-orientation
+decoder for other loader call sites.
+
+The native-order unit test checks all three aspects independently:
+interleaved per-coordinate values, reverse matrix-object bank order, and
+equivalence between the wrapper-specific decoder and the explicit row-major
+decoder. This establishes tensor layout conversion only; it does not identify
+the tensor's semantic role or run the model's forward pass.
+
 A distinct entry-level call inside `FUN_1800537e0` at `0x180053e13`
 passes `(EAX, R10D, 1)`, where the caller computes
 `EAX = [RSI + 0x10]` and `R10D = 2 * [RSI + 0x14] * [RSI + 0x08]`.
