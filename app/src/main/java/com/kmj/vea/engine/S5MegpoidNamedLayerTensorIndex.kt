@@ -67,7 +67,10 @@ data class S5MegpoidPackedNamedLayer(
     val layer: S5MegpoidNamedLayer,
     val shape: S5MegpoidNamedLayerShape,
     val packedWeightValues: FloatArray,
-    val biasValues: FloatArray
+    /** Unpadded bias values, retained for diagnostics and higher-level operators. */
+    val biasValues: FloatArray,
+    /** One-row bias BlockMatrix values with the same axis0 padding as the vendor loader. */
+    val packedBiasValues: FloatArray
 )
 
 data class S5MegpoidNamedLayerParameters(
@@ -107,6 +110,27 @@ data class S5MegpoidNamedLayerParameters(
     fun decodeBiasArray(
         tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
     ): FloatArray = bias.decodeFloatArray(tensorDecoder)
+
+    /**
+     * Packs bias as the vendor's separate one-row matrix descriptor:
+     * axis0 = bias length, axis1 = 1, padded axis0 = alignUp(axis0, 8).
+     */
+    fun packBiasVector(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder,
+        biasPacker: (FloatArray, Int, Int) -> FloatArray =
+            NativeS5TensorBridge::packRowMajor
+    ): FloatArray {
+        val shape = shapeOrNull()
+            ?: throw IllegalStateException(
+                "Named layer '${layer.modelName}' has inconsistent weight/bias element counts."
+            )
+        val decodedBias = decodeBiasArray(tensorDecoder)
+        val packed = biasPacker(decodedBias, shape.axis0Count, 1)
+        check(packed.size == shape.paddedAxis0Count) {
+            "Native bias packing returned an unexpected element count for '${layer.modelName}'."
+        }
+        return packed
+    }
 
     /**
      * Decodes source-order weights [axis0][axis1][matrix] and packs them with
@@ -165,18 +189,22 @@ class S5MegpoidNamedLayerTensorIndex private constructor(
     fun packAllLayers(
         tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder,
         matrixPacker: (FloatArray, Int, Int, Int) -> FloatArray =
-            NativeS5TensorBridge::packMatrixBank
+            NativeS5TensorBridge::packMatrixBank,
+        biasPacker: (FloatArray, Int, Int) -> FloatArray =
+            NativeS5TensorBridge::packRowMajor
     ): List<S5MegpoidPackedNamedLayer> = layers.map { parameters ->
         val packed = parameters.packWeightMatrixBank(tensorDecoder, matrixPacker)
         val biasValues = parameters.decodeBiasArray(tensorDecoder)
         check(biasValues.size == packed.shape.axis0Count) {
             "Bias length does not match axis0 for '${parameters.layer.modelName}'."
         }
+        val packedBias = parameters.packBiasVector(tensorDecoder, biasPacker)
         S5MegpoidPackedNamedLayer(
             layer = parameters.layer,
             shape = packed.shape,
             packedWeightValues = packed.packedValues,
-            biasValues = biasValues
+            biasValues = biasValues,
+            packedBiasValues = packedBias
         )
     }
 
