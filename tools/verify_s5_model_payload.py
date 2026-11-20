@@ -386,6 +386,7 @@ def model_value_layout(value: object, max_tensors: int = 96) -> dict[str, object
         kind = json_value_kind(child)
         child_kinds[kind] = child_kinds.get(kind, 0) + 1
 
+    direct_child_keys = sorted(value.keys()) if isinstance(value, dict) else []
     tensors: list[dict[str, object]] = []
     stack: list[tuple[object, str, int]] = [(value, "$", 0)]
     visited = 0
@@ -397,17 +398,19 @@ def model_value_layout(value: object, max_tensors: int = 96) -> dict[str, object
         if isinstance(current, str) and current[:4] in {"*F32", "*F16", "*S32"}:
             tensors.append({"path": path, **decode_typed_payload_layout(current)})
         elif isinstance(current, dict):
-            items = list(current.values())
-            for index in range(len(items) - 1, -1, -1):
-                stack.append((items[index], f"{path}/field{index}", depth + 1))
+            items = list(current.items())
+            for key, child in reversed(items):
+                stack.append((child, f"{path}/{key}", depth + 1))
         elif isinstance(current, list):
-            for index in range(len(current) - 1, -1, -1):
-                stack.append((current[index], f"{path}[{index}]", depth + 1))
+            for index, child in reversed(list(enumerate(current))):
+                stack.append((child, f"{path}[{index}]", depth + 1))
 
     return {
         "node_kind": json_value_kind(value),
         "direct_children": len(child_values),
         "direct_child_kinds": child_kinds,
+        "direct_child_keys": direct_child_keys[:64],
+        "direct_child_keys_truncated": len(direct_child_keys) > 64,
         "rectangular_numeric_shape": shape,
         "recursive_value_counts": value_shape(value),
         "typed_payloads": tensors,
