@@ -30,9 +30,11 @@ interface SynthesisEngine {
 /**
  * Integration boundary for native, on-device VOCALOID AI rendering.
  *
- * The ARM64 JNI bridge is now built into the app. It currently implements
- * only a recovered Korean-input canonicalization primitive; no Yamaha G2P
- * phoneme engine or VOCALOID singing renderer is available yet.
+ * The ARM64 JNI bridge now covers model-payload decoding, typed F32/F16
+ * tensor decoding, and BlockMatrix packing. The editor can prepare the nine
+ * shared VTMG named-layer weight banks and bias vectors. It still lacks the
+ * Yamaha G2P phoneme engine, the complete VSM execution schedule, and the
+ * VOCALOID singing forward pass that renders final PCM audio.
  */
 class VocaloidAiEngineAdapter : SynthesisEngine {
     override fun status(): EngineStatus {
