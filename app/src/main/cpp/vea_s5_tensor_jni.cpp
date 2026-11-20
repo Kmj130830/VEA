@@ -10,6 +10,7 @@
 #include <limits>
 #include <new>
 #include <vector>
+#include <array>
 
 namespace {
 
