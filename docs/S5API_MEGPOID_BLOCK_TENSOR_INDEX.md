@@ -90,5 +90,18 @@ These values are structural size evidence only; the exact auxiliary-property
 meaning and final matrix orientation still require the `FUN_180064e90`
 consumer trace and descriptor cross-check.
 
+The descriptor math gives a concrete count relation. `FUN_180063ca0`
+creates `param_8` matrices of `param_7 × param_6`, so KEY_1 contains
+`param_7 * param_6 * param_8) elements. It then calls
+`FUN_180064e90(secondary, 1, param_7, ...)`, which creates a one-row,
+`param_7)-column tensor (with the column stride padded to a multiple of 8).
+KEY_2 therefore contains `param_7) elements, and the ratio
+`KEY_1 / KEY_2` equals `param_6 * param_8`.
+
+The Android pair value `primaryToSecondaryElementRatio` reports this quotient
+only when both counts are positive and exactly divisible. It is a structural
+descriptor consistency value, not a semantic label for weights, biases, or
+conditioning roles.
+
 This remains a structural model-data binding improvement. It does not add
 neural inference or PCM rendering.
