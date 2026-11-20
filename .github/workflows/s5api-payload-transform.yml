@@ -24,5 +24,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Verify supplied model archive integrity and recovered JSON transform
-        run: python3 tools/verify_s5_model_payload.py
+      - name: Build the portable S5 decoder with the host compiler
+        run: |
+          cmake -S app/src/main/cpp -B build/s5-payload-host -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/s5-payload-host --target veas5tensor --parallel 2
+      - name: Differentially verify native decoder and JSON roots against supplied model archives
+        run: |
+          python3 tools/verify_s5_model_payload.py --native-library build/s5-payload-host/libveas5tensor.so
