@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import hashlib
 import json
 import struct
 import zipfile
@@ -77,6 +78,70 @@ def decode_payload(data: bytes) -> bytes:
             out[word_count * 4 + index] = (mixed >> (index * 8)) & 0xFF
 
     return bytes(out)
+
+
+S5_KEY_SUFFIX = bytes.fromhex(
+    "69 23 33 65 2e 63 5a 54 25 35 6b 39 6a 32 64 2c 32 5a 72 53 2f 2b 2f 32"
+)
+
+
+def s5_lookup_key(parameter_name: str) -> str:
+    digest = hashlib.md5(parameter_name.encode("utf-8") + S5_KEY_SUFFIX).digest()
+    words = struct.unpack("<4I", digest)
+    return "".join(f"{word:08x}" for word in words)
+
+
+def summarize_model_tree(root: dict) -> tuple[dict[str, int], set[str], list[str]]:
+    counts = {
+        "objects": 0,
+        "arrays": 0,
+        "strings": 0,
+        "numbers": 0,
+        "booleans": 0,
+        "nulls": 0,
+        "hashed_keys_32hex": 0,
+        "typed_f32": 0,
+        "typed_f16": 0,
+        "typed_s32": 0,
+    }
+    all_keys: set[str] = set()
+    stack: list[object] = [root]
+    while stack:
+        value = stack.pop()
+        if isinstance(value, dict):
+            counts["objects"] += 1
+            for key, child in value.items():
+                all_keys.add(key)
+                if len(key) == 32 and all(ch in "0123456789abcdef" for ch in key):
+                    counts["hashed_keys_32hex"] += 1
+                stack.append(child)
+        elif isinstance(value, list):
+            counts["arrays"] += 1
+            stack.extend(value)
+        elif isinstance(value, str):
+            counts["strings"] += 1
+            if value.startswith("*F32"):
+                counts["typed_f32"] += 1
+            elif value.startswith("*F16"):
+                counts["typed_f16"] += 1
+            elif value.startswith("*S32"):
+                counts["typed_s32"] += 1
+        elif isinstance(value, bool):
+            counts["booleans"] += 1
+        elif isinstance(value, (int, float)):
+            counts["numbers"] += 1
+        elif value is None:
+            counts["nulls"] += 1
+
+    candidates = [
+        f"rnn.{member}_l0{direction}"
+        for member in ("weight_ih", "weight_hh", "bias_ih", "bias_hh")
+        for direction in ("", "_reverse")
+    ]
+    matching_parameters = [
+        name for name in candidates if s5_lookup_key(name) in all_keys
+    ]
+    return counts, all_keys, matching_parameters
 
 
 def try_json_object(payload: bytes) -> dict | None:
@@ -173,6 +238,7 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
             if root is not None:
                 keys = list(root.keys())
                 sample = [str(key)[:32] for key in keys[:4]]
+                counts, _, parameter_matches = summarize_model_tree(root)
                 print(
                     "JSON_OK",
                     f"archive={path.name}!/{item.filename}",
@@ -181,6 +247,13 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                     f"decoded_bytes={len(decoded)}",
                     f"root_entries={len(root)}",
                     f"key_sample={sample}",
+                )
+                print("TREE_SUMMARY", f"member={item.filename}", counts)
+                print(
+                    "RNN_PARAMETER_LOOKUP_CANDIDATES",
+                    f"member={item.filename}",
+                    f"matched={len(parameter_matches)}/8",
+                    f"names={parameter_matches}",
                 )
                 recovered += 1
             else:
