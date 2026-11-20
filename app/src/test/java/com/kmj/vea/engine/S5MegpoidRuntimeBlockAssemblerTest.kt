@@ -78,13 +78,15 @@ class S5MegpoidRuntimeBlockAssemblerTest {
             index = index,
             row = row,
             column = column,
-            tensorDecoder = LittleEndianFloatDecoder
+            tensorDecoder = LittleEndianFloatDecoder,
+            positions = 7
         )
 
         assertEquals(32, compiled.shape.channels)
         assertEquals(2, compiled.shape.expansionMultiplier)
         assertEquals(7, compiled.shape.positions)
-        assertEquals(1568, compiled.depthwiseFilter.size)
+        assertEquals(1568, compiled.depthwiseWeightsChannelMajor.size)
+        assertEquals(1568, compiled.nativeRecordDepthwiseFilter.size)
         assertEquals(2048, compiled.expansionWeights.size)
         assertEquals(64, compiled.expansionGamma.size)
         assertEquals(64, compiled.expansionBeta.size)
@@ -103,10 +105,13 @@ class S5MegpoidRuntimeBlockAssemblerTest {
         assertEquals(64.0f, compiled.expansionBeta[0])
         assertEquals(64.0f, compiled.expansionBeta[63])
 
-        // The source filter's first channel is transposed in its final two axes.
-        assertEquals(depthwise[0], compiled.depthwiseFilter[0])
-        assertEquals(depthwise[7], compiled.depthwiseFilter[1])
-        assertEquals(depthwise[1], compiled.depthwiseFilter[7])
+        // The reference kernel retains [channel][height][width] source order.
+        assertEquals(depthwise.toList(), compiled.depthwiseWeightsChannelMajor.toList())
+
+        // S5API's record builder permutes [C][H][W] into [W][C][H].
+        assertEquals(depthwise[0], compiled.nativeRecordDepthwiseFilter[0])
+        assertEquals(depthwise[7], compiled.nativeRecordDepthwiseFilter[1])
+        assertEquals(depthwise[1], compiled.nativeRecordDepthwiseFilter[7])
         assertEquals(5.0f, compiled.projectionWeights[0])
         assertEquals(7.0f, compiled.projectionBias[0])
         assertEquals(0.5f, compiled.residualScale[0])
@@ -130,7 +135,8 @@ class S5MegpoidRuntimeBlockAssemblerTest {
                 index = index,
                 row = 0,
                 column = 0,
-                tensorDecoder = LittleEndianFloatDecoder
+                tensorDecoder = LittleEndianFloatDecoder,
+                positions = 7
             )
         }
     }
