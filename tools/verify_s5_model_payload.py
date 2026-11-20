@@ -388,6 +388,38 @@ def model_value_layout(value: object, max_tensors: int = 96) -> dict[str, object
         child_kinds[kind] = child_kinds.get(kind, 0) + 1
 
     direct_child_keys = sorted(value.keys()) if isinstance(value, dict) else []
+    integer_metadata_arrays: list[dict[str, object]] = []
+    metadata_stack: list[tuple[object, str, int]] = [(value, "$", 0)]
+    while metadata_stack and len(integer_metadata_arrays) < 32:
+        current, path, depth = metadata_stack.pop()
+        if depth > 16:
+            continue
+        if isinstance(current, dict):
+            for key, child in reversed(list(current.items())):
+                metadata_stack.append((child, f"{path}/{key}", depth + 1))
+        elif isinstance(current, list):
+            flat_values: list[int] = []
+            flatten_stack = [current]
+            all_integers = True
+            while flatten_stack:
+                item = flatten_stack.pop()
+                if isinstance(item, list):
+                    flatten_stack.extend(item)
+                elif isinstance(item, int) and not isinstance(item, bool):
+                    flat_values.append(item)
+                else:
+                    all_integers = False
+                    break
+            if all_integers and 0 < len(flat_values) <= 32:
+                integer_metadata_arrays.append({
+                    "path": path,
+                    "shape": uniform_array_shape(current),
+                    "values": flat_values,
+                })
+            for index, child in reversed(list(enumerate(current))):
+                if isinstance(child, (dict, list)):
+                    metadata_stack.append((child, f"{path}[{index}]", depth + 1))
+
     tensors: list[dict[str, object]] = []
     stack: list[tuple[object, str, int]] = [(value, "$", 0)]
     visited = 0
@@ -412,6 +444,8 @@ def model_value_layout(value: object, max_tensors: int = 96) -> dict[str, object
         "direct_child_kinds": child_kinds,
         "direct_child_keys": direct_child_keys[:64],
         "direct_child_keys_truncated": len(direct_child_keys) > 64,
+        "integer_metadata_arrays": integer_metadata_arrays,
+        "integer_metadata_arrays_truncated": bool(metadata_stack),
         "rectangular_numeric_shape": shape,
         "recursive_value_counts": value_shape(value),
         "typed_payloads": tensors,
