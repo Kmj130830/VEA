@@ -97,6 +97,15 @@ MODEL_STATIC_LOOKUP_KEYS = {
     "fun_180068190_key_2": "a0716df263a40c427d460246c4c079f3",
     "fun_180068190_key_3": "3c77d931295c40d4d75d971398fee8a1",
     "fun_180068190_key_4": "888fa825a5384e08aee475f9baf75ebe",
+    "fun_1800537e0_key_1": "30c16498ff30815c43d58f610a91f938",
+    "fun_1800537e0_key_2": "c169d8ef47cc23f097ff312d08a6f829",
+    "fun_1800537e0_key_3": "9e4170a67e795e687b0df130d8086421",
+    "fun_1800537e0_key_4": "6eaa6d5161e42effbaa006bb0cd3f587",
+    "fun_1800537e0_key_5": "eedbb0e6fd15547ef093d893e7cf42f8",
+    "fun_1800537e0_key_6": "987646cc1b7b3d17fdb85ccaeaed092e",
+    "fun_1800537e0_key_7": "4fd7be386f8043b7cdcf1e69d16579c8",
+    "fun_1800537e0_key_8": "830bb9b50d0881b9373eb1baa7bf7313",
+    "fun_1800537e0_key_9": "dcef88c51681aa4ed5dee8a40b692534",
 }
 
 
