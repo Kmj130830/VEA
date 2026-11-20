@@ -24,7 +24,7 @@ class S5MegpoidNamedLayerTensorIndexTest {
     }
 
     @Test
-    fun validatesBankedWeightElementCountsWithoutGuessingAxisNames() {
+    fun recoversNamedLayerAxisDimensionsAndPaddedAxis0() {
         val index = S5MegpoidNamedLayerTensorIndex.build(modelTree(), ::lookupKey)
 
         val pre1 = index.requireLayer(S5MegpoidNamedLayer.PRE1).shapeOrNull()
@@ -41,7 +41,7 @@ class S5MegpoidNamedLayerTensorIndexTest {
             pre1
         )
 
-        val conv1 = index.requireLayer(S5MegpoidNamedLayer.CONV1).shapeCandidateOrNull()
+        val conv1 = index.requireLayer(S5MegpoidNamedLayer.CONV1).shapeOrNull()
         assertNotNull(conv1)
         assertEquals(
             S5MegpoidNamedLayerShape(
@@ -55,11 +55,11 @@ class S5MegpoidNamedLayerTensorIndexTest {
             conv1
         )
 
-        val cond1 = index.requireLayer(S5MegpoidNamedLayer.COND1).shapeCandidateOrNull()
+        val cond1 = index.requireLayer(S5MegpoidNamedLayer.COND1).shapeOrNull()
         assertNotNull(cond1)
         assertEquals(26, cond1?.axis1Count)
 
-        val linear = index.requireLayer(S5MegpoidNamedLayer.LINEAR).shapeCandidateOrNull()
+        val linear = index.requireLayer(S5MegpoidNamedLayer.LINEAR).shapeOrNull()
         assertNotNull(linear)
         assertEquals(32, linear?.axis1Count)
     }
