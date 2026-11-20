@@ -122,7 +122,7 @@ def s5_lookup_key(parameter_name: str) -> str:
 
 def summarize_model_tree(
     root: dict,
-) -> tuple[dict[str, int], set[str], list[str], list[str]]:
+) -> tuple[dict[str, int], set[str], list[str], list[str], dict[str, list[object]]]:
     counts = {
         "objects": 0,
         "arrays": 0,
