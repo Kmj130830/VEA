@@ -95,7 +95,7 @@ class S5MegpoidNamedLayerTensorIndexTest {
             prefix = "{",
             postfix = "}"
         ) { (_, entry) ->
-            "\"\${entry.first}\":\"*F32\${encodedZeros(entry.second)}\""
+            "\"${entry.first}\":\"*F32${encodedZeros(entry.second)}\""
         }
         return S5ModelObjectTree.parseUtf8(json)
     }
