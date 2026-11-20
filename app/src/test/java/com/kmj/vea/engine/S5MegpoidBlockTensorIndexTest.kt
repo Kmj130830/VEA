@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
 import org.junit.Test
+import java.util.Base64
 
 class S5MegpoidBlockTensorIndexTest {
     @Test
@@ -52,6 +53,33 @@ class S5MegpoidBlockTensorIndexTest {
         assertEquals(2, pairs[1].first.elementCount)
         assertEquals(3, pairs[1].second.elementCount)
         assertEquals(null, pairs[1].primaryToSecondaryElementRatio)
+    }
+
+    @Test
+    fun infersRepeatedBlockMatrixRowsColumnsAndBankCountOnlyForMatchingPairs() {
+        val firstKey = S5MegpoidBlockLookupSlot.KEY_1.lookupKey
+        val secondKey = S5MegpoidBlockLookupSlot.KEY_2.lookupKey
+        val primaryValid = typedF32Zeros(24)
+        val secondaryValid = typedF32Zeros(4)
+        val primaryNonMatching = typedF32Zeros(12)
+        val secondaryNonMatching = typedF32Zeros(4)
+        val tree = S5ModelObjectTree.parseUtf8(
+            """{"layers":[{"$firstKey":"$primaryValid","$secondKey":"$secondaryValid"},{"$firstKey":"$primaryNonMatching","$secondKey":"$secondaryNonMatching"}]}"""
+        )
+
+        val pairs = S5MegpoidBlockTensorIndex.build(tree).modelPropertyPairs()
+        val validShape = pairs[0].repeatedBlockMatrixShapeOrNull()
+
+        assertEquals(2, pairs.size)
+        assertEquals(24, pairs[0].first.elementCount)
+        assertEquals(4, pairs[0].second.elementCount)
+        assertEquals(S5MegpoidRepeatedBlockMatrixShape(rows = 4, columns = 2, matrixCount = 3), validShape)
+        assertEquals(null, pairs[1].repeatedBlockMatrixShapeOrNull())
+    }
+
+    private fun typedF32Zeros(elements: Int): String {
+        val payload = Base64.getEncoder().encodeToString(ByteArray(elements * 4))
+        return "*F32" + payload
     }
 
     @Test
