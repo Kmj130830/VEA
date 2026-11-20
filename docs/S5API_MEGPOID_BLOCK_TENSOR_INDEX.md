@@ -151,9 +151,32 @@ The current archive contains all 18 named parameter tensors:
 | linear | 1 | 96 | 3 |
 
 The matrix-count values come from the nine `FUN_180068190` call sites.
-`shapeCandidateOrNull()` verifies the relation between total weight count,
-matrix count, and bias count, but deliberately does not call the quotient
-input/output channels or choose row/column orientation.
+The `FUN_180064670` constructor stores `param_5` as `axis0`,
+`param_4` as `axis1`, and `align_up(param_5, 8)` as
+`padded_axis0`; the matrix bank count is `param_6). The secondary
+bias vector has one row and `param_5` elements. The recovered descriptor
+axes are therefore:
+
+| Layer | axis0 | axis1 | padded axis0 | Matrix count |
+|---|---:|---:|---:|---:|
+| pre1 | 32 | 82 | 32 | 1 |
+| pre2 | 32 | 32 | 32 | 1 |
+| conv1 | 64 | 32 | 64 | 3 |
+| cond1 | 64 | 26 | 64 | 1 |
+| conv2 | 64 | 32 | 64 | 3 |
+| cond2 | 64 | 26 | 64 | 1 |
+| conv3 | 64 | 32 | 64 | 3 |
+| cond3 | 64 | 26 | 64 | 1 |
+| linear | 3 | 32 | 8 | 1 |
+
+The source traversal order in `FUN_180064670` is
+`[axis0][axis1][matrix]`, matching the existing native
+`packMatrixBank()` input contract. `S5MegpoidNamedLayerParameters`
+now exposes `shapeOrNull()` and `packWeightMatrixBank()`. The latter
+decodes the selected layer's real weight payload, invokes the native matrix
+packer with these descriptor dimensions, and verifies the resulting packed
+storage length including axis0 padding. No input/output-channel names are
+assigned beyond the recovered descriptor axes.
 
 ### Correct parameter hash serialization
 
