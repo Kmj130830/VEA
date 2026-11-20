@@ -67,19 +67,28 @@ specific native forward operation.
 No AI Megpoid PCM output is produced by this milestone.
 
 
-## Follow-up: nested layer property pairs
+## Follow-up: primary matrix and secondary layer property
 
 The later static trace of `FUN_180052f90` → `FUN_18005e9b0` →
-`FUN_180063ca0` refined the meaning of the first two hashes. KEY_1 and KEY_2
-are two property lookups performed inside a selected layer object and passed
-together to the matrix-object loader; they are not two independent top-level
-block sections. The index now offers `modelPropertyPairs()`, pairing only
-unique typed leaves with the same immediate parent path. Incomplete or
-ambiguous groups are omitted.
+`FUN_180063ca0` distinguishes the two fixed-key values:
 
-The pair members deliberately retain neutral names. Static evidence proves
-that both values are loaded as layer properties, but does not yet establish
-which is a kernel, bias, projection, or another matrix role. Shape validation
-against the descriptor arguments and the residual runtime operator is the
-next step. This is a structural binding improvement only; it does not add
+- KEY_1 is resolved as the primary typed tensor and instantiated as one or
+  more `BlockMatrix` objects using descriptor-supplied row/column dimensions.
+- KEY_2 is resolved later only when the relevant descriptor field enables the
+  secondary-property path. It is passed to `FUN_180064e90`, not instantiated
+  as a second `BlockMatrix` by `FUN_180063ca0`.
+
+The index exposes `modelPropertyPairs()` to group the two typed values only
+when they share the same immediate parent object. This pairing preserves the
+observed data relationship without assigning a semantic name to KEY_2.
+
+The real `AI_Megpoid.vtb2` audit found 88 such containing objects. Every one
+had exactly one `*F32` tensor for each fixed key; no incomplete or ambiguous
+pairs were found. The common primary/secondary element counts include
+92,160/192 (16 objects), 9,216/96 (12), 18,432/192 (12), and 24,576/128 (9).
+These values are structural size evidence only; the exact auxiliary-property
+meaning and final matrix orientation still require the `FUN_180064e90`
+consumer trace and descriptor cross-check.
+
+This remains a structural model-data binding improvement. It does not add
 neural inference or PCM rendering.
