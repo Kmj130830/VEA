@@ -200,11 +200,49 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
                 out.println();
             }
 
+            out.println("## Global runtime-record pointer offset scan");
+            out.println();
+            out.println("> Scans non-stack memory operands for the runtime record-array pointer offsets observed by FUN_1800c7ad0.");
+            out.println("> This is a candidate scan only; an offset match does not by itself prove the same object type.");
+            out.println();
+            LinkedHashMap<Address, Function> recordOffsetFunctions = new LinkedHashMap<>();
+            InstructionIterator globalInstructions = currentProgram.getListing().getInstructions(true);
+            int recordOffsetHits = 0;
+            while (globalInstructions.hasNext()) {
+                monitor.checkCancelled();
+                Instruction instruction = globalInstructions.next();
+                String rendered = format(instruction);
+                boolean offsetMatch = rendered.contains("0x2e0]") || rendered.contains("0x2f8]");
+                boolean stackReference = rendered.contains("RBP") || rendered.contains("RSP");
+                if (!offsetMatch || stackReference) continue;
+
+                Function owner = currentProgram.getFunctionManager()
+                    .getFunctionContaining(instruction.getAddress());
+                out.println("- " + rendered + " [" +
+                    (owner == null ? "<unknown>" : owner.getName()) + "]");
+                recordOffsetHits++;
+                if (owner != null && recordOffsetFunctions.size() < 32) {
+                    recordOffsetFunctions.putIfAbsent(owner.getEntryPoint(), owner);
+                }
+                if (recordOffsetHits >= 300) {
+                    out.println("- Scan output capped at 300 matching instructions.");
+                    break;
+                }
+            }
+            out.println("- Matching non-stack instructions: " + recordOffsetHits);
+            out.println("- Distinct candidate functions retained for decompilation: " +
+                recordOffsetFunctions.size());
+            out.println();
+
             out.println("## Target and caller decompilation");
             out.println();
             LinkedHashMap<Address, Function> all = new LinkedHashMap<>(targets);
             for (Map.Entry<Address, Function> item : callers.entrySet()) {
                 if (all.size() >= MAX_CALLERS + targets.size()) break;
+                all.putIfAbsent(item.getKey(), item.getValue());
+            }
+            for (Map.Entry<Address, Function> item : recordOffsetFunctions.entrySet()) {
+                if (all.size() >= MAX_CALLERS + targets.size() + 16) break;
                 all.putIfAbsent(item.getKey(), item.getValue());
             }
 
