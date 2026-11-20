@@ -277,6 +277,61 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeParseContainerHeader(
     return env->ExceptionCheck() ? nullptr : result;
 }
 
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeDecodeModelPayload(
+    JNIEnv* env, jobject, jbyteArray input_array) {
+    if (input_array == nullptr) return nullptr;
+    const jsize input_length = env->GetArrayLength(input_array);
+    if (input_length < 0) return nullptr;
+
+    jbyte* input = env->GetByteArrayElements(input_array, nullptr);
+    if (input == nullptr) return nullptr;
+
+    size_t output_size = 0u;
+    const VeaS5ContainerStatus query_status = vea_s5_decode_model_payload(
+        reinterpret_cast<const uint8_t*>(input),
+        static_cast<size_t>(input_length),
+        nullptr, 0u, &output_size);
+    if (query_status != VEA_S5_CONTAINER_STATUS_BUFFER_TOO_SMALL &&
+        query_status != VEA_S5_CONTAINER_STATUS_OK) {
+        env->ReleaseByteArrayElements(input_array, input, JNI_ABORT);
+        return nullptr;
+    }
+    if (output_size > static_cast<size_t>(std::numeric_limits<jsize>::max())) {
+        env->ReleaseByteArrayElements(input_array, input, JNI_ABORT);
+        return nullptr;
+    }
+
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(output_size));
+    if (result == nullptr) {
+        env->ReleaseByteArrayElements(input_array, input, JNI_ABORT);
+        return nullptr;
+    }
+
+    if (output_size != 0u) {
+        jbyte* output = env->GetByteArrayElements(result, nullptr);
+        if (output == nullptr) {
+            env->ReleaseByteArrayElements(input_array, input, JNI_ABORT);
+            return nullptr;
+        }
+        size_t written = 0u;
+        const VeaS5ContainerStatus status = vea_s5_decode_model_payload(
+            reinterpret_cast<const uint8_t*>(input),
+            static_cast<size_t>(input_length),
+            reinterpret_cast<uint8_t*>(output),
+            output_size,
+            &written);
+        env->ReleaseByteArrayElements(result, output,
+            status == VEA_S5_CONTAINER_STATUS_OK ? 0 : JNI_ABORT);
+        env->ReleaseByteArrayElements(input_array, input, JNI_ABORT);
+        if (status != VEA_S5_CONTAINER_STATUS_OK || written != output_size) return nullptr;
+    } else {
+        env->ReleaseByteArrayElements(input_array, input, JNI_ABORT);
+    }
+
+    return env->ExceptionCheck() ? nullptr : result;
+}
+
 extern "C" JNIEXPORT jfloatArray JNICALL
 Java_com_kmj_vea_engine_NativeS5TensorBridge_nativePackRowMajor(
     JNIEnv* env,
