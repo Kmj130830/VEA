@@ -123,6 +123,27 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
                 out.println();
             }
 
+            out.println("## Raw instruction listing for tensor-loader ABI");
+            out.println();
+            for (String hex : new String[] { "18005e9b0", "180063ca0", "180064e90" }) {
+                monitor.checkCancelled();
+                Address address = toAddr(hex);
+                Function f = currentProgram.getFunctionManager().getFunctionAt(address);
+                if (f == null) f = currentProgram.getFunctionManager().getFunctionContaining(address);
+                out.println("### " + hex + (f == null ? " (not recovered)" : " " + f.getName()));
+                if (f != null) {
+                    out.println("- Prototype: " + prototype(f));
+                    out.println("- Body bytes: " + f.getBody().getNumAddresses());
+                    InstructionIterator instructions =
+                        currentProgram.getListing().getInstructions(f.getBody(), true);
+                    while (instructions.hasNext()) {
+                        monitor.checkCancelled();
+                        out.println("- " + format(instructions.next()));
+                    }
+                }
+                out.println();
+            }
+
             out.println("## Target and caller decompilation");
             out.println();
             LinkedHashMap<Address, Function> all = new LinkedHashMap<>(targets);
