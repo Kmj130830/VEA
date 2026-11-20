@@ -4,6 +4,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
 import org.junit.Test
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.Base64
 
 class S5MegpoidBlockTensorIndexTest {
@@ -83,6 +85,55 @@ class S5MegpoidBlockTensorIndexTest {
     }
 
     @Test
+    fun decodesInterleavedMatrixBanksIntoNativeObjectOrder() {
+        val firstKey = S5MegpoidBlockLookupSlot.KEY_1.lookupKey
+        val secondKey = S5MegpoidBlockLookupSlot.KEY_2.lookupKey
+        val primary = FloatArray(24) { it.toFloat() }
+        val secondary = floatArrayOf(100f, 101f, 102f, 103f)
+        val tree = S5ModelObjectTree.parseUtf8(
+            """{"$firstKey":"${typedF32(primary)}","$secondKey":"${typedF32(secondary)}"}"""
+        )
+        val pair = S5MegpoidBlockTensorIndex.build(tree).modelPropertyPairs().single()
+        val decoder = Base64F32TensorDecoder()
+
+        val rowMajor = pair.decodeMatrixBankPayloadOrNull(
+            S5MegpoidMatrixInputOrder.ROW_MAJOR,
+            decoder
+        )!!
+        assertEquals(S5MegpoidRepeatedBlockMatrixShape(4, 2, 3), rowMajor.shape)
+        assertEquals(
+            listOf(2f, 5f, 8f, 11f, 14f, 17f, 20f, 23f),
+            rowMajor.matrices[0].toList()
+        )
+        assertEquals(
+            listOf(1f, 4f, 7f, 10f, 13f, 16f, 19f, 22f),
+            rowMajor.matrices[1].toList()
+        )
+        assertEquals(
+            listOf(0f, 3f, 6f, 9f, 12f, 15f, 18f, 21f),
+            rowMajor.matrices[2].toList()
+        )
+        assertEquals(secondary.toList(), rowMajor.secondaryProperty.toList())
+
+        val columnMajor = pair.decodeMatrixBankPayloadOrNull(
+            S5MegpoidMatrixInputOrder.COLUMN_MAJOR,
+            decoder
+        )!!
+        assertEquals(
+            listOf(2f, 14f, 5f, 17f, 8f, 20f, 11f, 23f),
+            columnMajor.matrices[0].toList()
+        )
+        assertEquals(
+            listOf(1f, 13f, 4f, 16f, 7f, 19f, 10f, 22f),
+            columnMajor.matrices[1].toList()
+        )
+        assertEquals(
+            listOf(0f, 12f, 3f, 15f, 6f, 18f, 9f, 21f),
+            columnMajor.matrices[2].toList()
+        )
+    }
+
+    @Test
     fun rejectsMalformedBase64LengthsAndMisalignedTensorPayloads() {
         val key = S5MegpoidBlockLookupSlot.KEY_1.lookupKey
         val malformedLength = S5ModelObjectTree.parseUtf8(
@@ -98,6 +149,27 @@ class S5MegpoidBlockTensorIndexTest {
         assertThrows(IllegalArgumentException::class.java) {
             S5MegpoidBlockTensorIndex.build(misalignedF32)
         }
+    }
+
+    private fun typedF32(values: FloatArray): String {
+        val bytes = ByteBuffer.allocate(values.size * Float.SIZE_BYTES)
+            .order(ByteOrder.LITTLE_ENDIAN)
+            .apply { values.forEach(::putFloat) }
+            .array()
+        return "*F32" + Base64.getEncoder().encodeToString(bytes)
+    }
+
+    private class Base64F32TensorDecoder : S5TypedTensorDecoder {
+        override fun decodeFloatArray(encoded: String): FloatArray {
+            require(encoded.startsWith("*F32"))
+            val bytes = Base64.getDecoder().decode(encoded.substring(4))
+            require(bytes.size % Float.SIZE_BYTES == 0)
+            val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+            return FloatArray(bytes.size / Float.SIZE_BYTES) { buffer.float }
+        }
+
+        override fun decodeInt32Array(encoded: String): IntArray =
+            error("No integer tensor is expected in this test.")
     }
 
     private class TestTensorDecoder : S5TypedTensorDecoder {
