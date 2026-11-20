@@ -126,6 +126,45 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
                 out.println();
             }
 
+            out.println("## Neural runtime vtable data neighborhood");
+            out.println();
+            Address vtableMethodSlot = toAddr("180a5bea8");
+            for (long offset = -0x80; offset <= 0x40; offset += 8) {
+                monitor.checkCancelled();
+                Address slot = offset < 0
+                    ? vtableMethodSlot.subtract(-offset)
+                    : vtableMethodSlot.add(offset);
+                byte[] raw = new byte[8];
+                int read = currentProgram.getMemory().getBytes(slot, raw);
+                long pointer = 0;
+                if (read == 8) {
+                    pointer = java.nio.ByteBuffer.wrap(raw)
+                        .order(java.nio.ByteOrder.LITTLE_ENDIAN).getLong();
+                }
+                Address pointerAddress = pointer == 0 ? null : toAddr(Long.toHexString(pointer));
+                Function pointerFunction = pointerAddress == null ? null :
+                    currentProgram.getFunctionManager().getFunctionAt(pointerAddress);
+                out.println("- Slot " + slot + " bytes=" + formatBytes(raw, read) +
+                    " pointer=" + (pointerAddress == null ? "<unreadable/null>" : pointerAddress) +
+                    " target=" + (pointerFunction == null ? "<not a function>" : pointerFunction.getName()));
+
+                ReferenceIterator slotRefs = currentProgram.getReferenceManager().getReferencesTo(slot);
+                while (slotRefs.hasNext()) {
+                    Reference ref = slotRefs.next();
+                    Function caller = currentProgram.getFunctionManager()
+                        .getFunctionContaining(ref.getFromAddress());
+                    out.println("  - Ref from " + ref.getFromAddress() + " in " +
+                        (caller == null ? "<unknown>" : caller.getName()) +
+                        " [" + ref.getReferenceType() + "]");
+                    if (caller != null && callers.size() < MAX_CALLERS) {
+                        callers.put(caller.getEntryPoint(), caller);
+                        refsByCaller.computeIfAbsent(caller.getEntryPoint(), k -> new ArrayList<>())
+                            .add(ref);
+                    }
+                }
+            }
+            out.println();
+
             out.println("## Direct caller instruction contexts");
             out.println();
             for (Map.Entry<Address, Function> item : callers.entrySet()) {
@@ -201,6 +240,16 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
             }
         }
         println("Megpoid block shape report written: " + output.getAbsolutePath());
+    }
+
+    private String formatBytes(byte[] bytes, int length) {
+        if (length <= 0) return "<unreadable>";
+        StringBuilder result = new StringBuilder();
+        for (int i = 0; i < length; i++) {
+            if (i > 0) result.append(' ');
+            result.append(String.format("%02x", bytes[i] & 0xff));
+        }
+        return result.toString();
     }
 
     private void dumpCallContext(PrintWriter out, Function caller, Address referenceAddress) {
