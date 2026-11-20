@@ -47,9 +47,11 @@ data class S5VoicebankModelPackage(
     fun prepareNamedLayerParameters(
         tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder,
         matrixPacker: (FloatArray, Int, Int, Int) -> FloatArray =
-            NativeS5TensorBridge::packMatrixBank
+            NativeS5TensorBridge::packMatrixBank,
+        biasPacker: (FloatArray, Int, Int) -> FloatArray =
+            NativeS5TensorBridge::packRowMajor
     ): List<S5MegpoidPackedNamedLayer> =
-        namedLayerTensorIndex.packAllLayers(tensorDecoder, matrixPacker)
+        namedLayerTensorIndex.packAllLayers(tensorDecoder, matrixPacker, biasPacker)
 }
 
 class S5VoicebankModelPackageAssembler(
