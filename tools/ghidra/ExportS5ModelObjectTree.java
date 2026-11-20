@@ -105,7 +105,14 @@ public class ExportS5ModelObjectTree extends GhidraScript {
         "1800c0290", // field-copy helper used for the +0x208 member
         "1800c03a0", // adjacent context member-copy helper
         "18001a840", // shared field assignment helper
-        "18004f2d0"  // selects CPU-specific tensor operator function pointers
+        "18004f2d0", // selects CPU-specific tensor operator function pointers
+        "18003cb70", // scalar fallback installed in table slot +0x1e / context +0x208
+        "1800a58b0", // AVX-512 converter installed in table slot +0x1e / context +0x208
+        "1800a58e0", // adjacent AVX-512 table slot +0x1d
+        "1800a7e60", // AVX-512 table slot +0x14
+        "1800a8e40", // AVX-512 table slot +0x1b
+        "1800a5370", // alternate CPU path table slot +0x14
+        "180072b30"  // baseline CPU path table slot +0x00
     };
 
     @Override
