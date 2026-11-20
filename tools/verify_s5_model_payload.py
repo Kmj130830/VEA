@@ -110,6 +110,14 @@ MODEL_STATIC_LOOKUP_KEYS = {
 }
 
 
+# Numeric descriptor properties resolved in Func_47a12a73 before FUN_1800589d0.
+# The values become FUN_180052f90's dim0 (param_8) and dim1 (param_6) fields.
+MODEL_BLOCK_DESCRIPTOR_KEYS = {
+    "block_dim1": "0322875158f9b1bff9162ba2fa7dd262",
+    "block_dim0": "d7226a031351dcf206e02f41499ed9b6",
+}
+
+
 S5_KEY_SUFFIX = bytes.fromhex(
     "69 23 33 65 2e 63 5a 54 25 35 6b 39 6a 32 64 2c 32 5a 72 53 2f 2b 2f 32"
 )
@@ -406,6 +414,28 @@ def typed_tensor_lengths(value: object) -> list[dict[str, object]]:
     return layouts
 
 
+def inspect_megpoid_block_descriptor_fields(
+    member: str, key_values: dict[str, list[object]]
+) -> None:
+    """Report only scalar metadata feeding the block shape descriptor."""
+    for label, key in MODEL_BLOCK_DESCRIPTOR_KEYS.items():
+        values = key_values.get(key, [])
+        numeric = [
+            value for value in values
+            if isinstance(value, (int, float)) and not isinstance(value, bool)
+        ]
+        kinds = sorted({describe_value(value) for value in values})
+        print(
+            "MODEL_BLOCK_DESCRIPTOR_FIELD",
+            f"member={member}",
+            f"field={label}",
+            f"key={key}",
+            f"occurrences={len(values)}",
+            f"numeric_values={sorted(set(numeric))}",
+            f"value_kinds={kinds}",
+        )
+
+
 def inspect_megpoid_layer_property_pairs(root: dict, member: str) -> None:
     """Find objects that contain both layer-property keys and report only lengths."""
     first_key = MODEL_STATIC_LOOKUP_KEYS["fun_1800537e0_key_1"]
@@ -514,6 +544,7 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                     f"key_sample={sample}",
                 )
                 print("TREE_SUMMARY", f"member={item.filename}", counts)
+                inspect_megpoid_block_descriptor_fields(item.filename, key_values)
                 if item.filename == "AI_Megpoid.vtb2":
                     inspect_megpoid_layer_property_pairs(root, item.filename)
                 for root_key, root_value in root.items():
