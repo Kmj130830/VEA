@@ -19,6 +19,14 @@ data class S5VoicebankModelPackage(
 
     val modelMemberCount: Int
         get() = models.members.size
+
+    /**
+     * Lazily indexes the fixed S5API model-block tensor references contained
+     * in AI_Megpoid.vtb2. Values remain encoded until explicitly requested.
+     */
+    val modelBlockTensorIndex: S5MegpoidBlockTensorIndex by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        S5MegpoidBlockTensorIndex.build(singerModel.tree)
+    }
 }
 
 class S5VoicebankModelPackageAssembler(
