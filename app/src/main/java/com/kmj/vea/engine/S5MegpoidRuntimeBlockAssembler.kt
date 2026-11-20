@@ -14,7 +14,7 @@ class S5MegpoidCompiledRuntimeBlock internal constructor(
     val expandedFeatures: Int,
     /** Original [channel][height][width] layout used by the current reference kernel. */
     val depthwiseWeightsChannelMajor: FloatArray,
-    /** Exact FUN_1800d4bf0 record layout: [width][channel][height]. */
+    /** Exact FUN_1800d4bf0 record layout: [channel][width][height]. */
     val nativeRecordDepthwiseFilter: FloatArray,
     val expansionWeights: FloatArray,
     val expansionGamma: FloatArray,
@@ -81,7 +81,7 @@ class S5MegpoidCompiledRuntimeBlock internal constructor(
  *   gamma[f] = sourceBias[f] + sum_c(sourceWeight[f,c] * descriptorB[c])
  *   beta[f] = sum_c(sourceWeight[f,c] * descriptorA[c])
  *
- * The depthwise filter is separately permuted from [C][H][W] to [W][C][H],
+ * The depthwise filter is separately permuted from [C][H][W] to [C][W][H],
  * matching the native record builder. The original channel-major payload is
  * retained separately for the current reference convolution kernel.
  */
