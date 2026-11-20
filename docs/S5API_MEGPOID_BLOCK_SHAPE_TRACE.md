@@ -525,6 +525,34 @@ descriptor values are:
 | `cond3` | 64 | 26 | 64 | 1 |
 | `linear` | 3 | 32 | 8 | 1 |
 
+The exported factory wrapper `Func_4cd84bb7` allocates a 0x200-byte
+object and calls `FUN_180068190` with the model-object base advanced by
+0x10 bytes. The nine `param_7` destinations passed to
+`FUN_180064670` therefore occupy these 16-byte descriptor-pair slots
+relative to the returned factory-object base:
+
+| Layer | Factory-object byte offset | Slot contents |
+|---|---:|---|
+| `pre1` | `0x20` | weight-bank pointer, bias-vector pointer |
+| `pre2` | `0x30` | weight-bank pointer, bias-vector pointer |
+| `conv1` | `0x40` | weight-bank pointer, bias-vector pointer |
+| `cond1` | `0x50` | weight-bank pointer, bias-vector pointer |
+| `conv2` | `0x60` | weight-bank pointer, bias-vector pointer |
+| `cond2` | `0x70` | weight-bank pointer, bias-vector pointer |
+| `conv3` | `0x80` | weight-bank pointer, bias-vector pointer |
+| `cond3` | `0x90` | weight-bank pointer, bias-vector pointer |
+| `linear` | `0xA0` | weight-bank pointer, bias-vector pointer |
+
+This comes from the direct call arguments: the wrapper passes
+`puVar2 + 4` as `FUN_180068190`'s first argument, and the function
+sets its per-layer output pointer to `param_1 + 4`, `+8`, `+0xC`,
+... `+0x24` (32-bit units). Inside `FUN_180064670`, the first pointer
+receives the banked weight descriptors and the second pointer receives the
+one-row bias descriptor. The Android enum now records these returned-object
+offsets as `descriptorPairOffsetBytes`; tests pin all nine offsets. This is
+a memory-layout mapping only: the external factory object is not yet being
+constructed or passed to a recovered inference method by the Android app.
+
 The same function's fill loops establish source order as
 `[axis0][axis1][matrix]`. The Android
 `S5MegpoidNamedLayerTensorIndex` now resolves all nine named weight/bias
