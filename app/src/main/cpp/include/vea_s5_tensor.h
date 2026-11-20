@@ -219,8 +219,9 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_build_recurrent_parameter_name(
 /*
  * Computes the S5API parameter lookup key:
  *   md5(name_bytes || fixed_24_byte_suffix)
- * and formats the four 32-bit digest state words as eight lowercase hex
- * digits each (word-wise hex, not the canonical MD5 byte-string rendering).
+ * and serializes the 16 digest bytes in canonical lowercase hexadecimal
+ * order. Each 32-bit MD5 state word is emitted as four little-endian bytes,
+ * matching the keys stored in the model JSON object tree.
  * The output buffer requires 33 bytes including the NUL terminator.
  *
  * This function ports the statically recovered lookup-key construction;
