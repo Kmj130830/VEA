@@ -605,6 +605,7 @@ def inspect_megpoid_layer_property_pairs(root: dict, member: str) -> None:
     ratio_counts: dict[int, int] = {}
     repeated_block_shape_count = 0
     repeated_block_banks: dict[int, int] = {}
+    single_bank_entry_candidate_count = 0
     while stack:
         current, path = stack.pop()
         if isinstance(current, dict):
@@ -632,6 +633,17 @@ def inspect_megpoid_layer_property_pairs(root: dict, member: str) -> None:
                         ratio = primary_elements // secondary_elements
                         integer_ratio_count += 1
                         ratio_counts[ratio] = ratio_counts.get(ratio, 0) + 1
+                        # FUN_1800537e0 callsite 0x180053e13 passes:
+                        # columns = descriptor[+0x10], rows =
+                        # 2*descriptor[+0x14]*descriptor[+0x08], bankCount = 1.
+                        # Even KEY_2 length is only arithmetic compatibility;
+                        # it cannot associate this object with that callsite.
+                        if (
+                            secondary_elements >= 2
+                            and secondary_elements % 2 == 0
+                            and primary_elements == secondary_elements * ratio
+                        ):
+                            single_bank_entry_candidate_count += 1
                         # FUN_180052f90 callsite 0x180053421 passes
                         # columns = descriptor[+4], rows = 2*descriptor[+4],
                         # matrixCount = descriptor[+0].
@@ -670,6 +682,8 @@ def inspect_megpoid_layer_property_pairs(root: dict, member: str) -> None:
         f"ratio_counts={dict(sorted(ratio_counts.items()))}",
         f"repeated_block_shape_pairs={repeated_block_shape_count}",
         f"repeated_block_matrix_counts={dict(sorted(repeated_block_banks.items()))}",
+        f"single_bank_entry_shape_candidates={single_bank_entry_candidate_count}",
+        f"single_bank_only_candidates={single_bank_entry_candidate_count - repeated_block_shape_count}",
     )
 
 
