@@ -133,6 +133,48 @@ the two Android fields intentionally retain neutral names:
 pairs them only when each fixed key has exactly one typed tensor leaf under
 the same immediate parent object. Ambiguous and incomplete groups are omitted.
 
+## Descriptor relationship between the two properties
+
+The full `FUN_180063ca0` and `FUN_180064e90` bodies establish a stronger
+shape invariant for the paired properties.
+
+For the first property, `FUN_180063ca0` creates `param_8` BlockMatrix objects.
+Each matrix is initialized with `param_7` rows and `param_6` columns. The
+F32/typed-double fill loops traverse those rows and columns and write one
+value into each matrix object per coordinate. Therefore:
+
+```
+KEY_1 elements = param_7 * param_6 * param_8
+```
+
+For the second property, the same function calls:
+
+```c
+FUN_180064e90(secondaryNode, 1, param_7, outputDescriptor, ...);
+```
+
+The helper stores column count `param_7`, row count `1`, and padded column
+stride `align_up(param_7, 8)`. It supports tagged double arrays and `*F32`
+or `*F16` encoded payloads, converting the output to float32 storage.
+Therefore:
+
+```
+KEY_2 elements = param_7
+KEY_1 elements / KEY_2 elements = param_6 * param_8
+```
+
+The Kotlin index now exposes this integer quotient as
+`primaryToSecondaryElementRatio`. It is null when either tensor is empty or
+the primary count is not divisible by the secondary count. The quotient is a
+descriptor consistency check: it combines the primary matrix column count and
+matrix-bank count, but does not separate those two dimensions or identify
+the semantic role of either property.
+
+This relationship is specific to the recovered `FUN_180063ca0` constructor
+path. It must not be generalized to the separate runtime residual block
+unless a call/data-flow trace explicitly links the constructed matrices to
+that block's pointers.
+
 ## Actual AI Megpoid VTB2 pair audit
 
 The updated payload-validation workflow inspected the real
@@ -153,11 +195,13 @@ Most common observed element-count pairs (primary / secondary):
 | 32,768 | 256 | 6 |
 | 98,304 | 256 | 6 |
 
-These counts prove structural co-location and typed-payload sizes. They do not
-by themselves prove the logical row/column orientation or the semantic role
-of the secondary property. Matrix dimensions must still be checked against
-the descriptor values and `FUN_180064e90` before assigning either payload
-to a specific renderer input.
+These counts prove structural co-location and typed-payload sizes. The
+descriptor relationship above adds a stronger invariant: each pair should
+satisfy `primaryElements = secondaryElements * param_6 * param_8`. The
+payload audit checks the equivalent condition that the primary element count
+is a positive integer multiple of the secondary element count. This validates
+the combined `param_6 * param_8` factor, but it does not recover the two
+dimensions separately or assign a semantic role to either payload.
 
 ## What is still not connected
 
