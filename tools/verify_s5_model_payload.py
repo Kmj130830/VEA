@@ -761,7 +761,9 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                 if item.filename.lower().endswith(".vtmg"):
                     inspect_vtmg_typed_root_objects(item.filename, root)
                     inspect_named_layer_container_keys(item.filename, key_values)
-                    inspect_megpoid_named_layer_parameters(item.filename, key_values)
+                # The name-based parameter loader takes the current model object
+                # as input; audit all archive members rather than assuming VTMG.
+                inspect_megpoid_named_layer_parameters(item.filename, key_values)
                 for root_key, root_value in root.items():
                     shape = value_shape(root_value)
                     direct_fields = len(root_value) if isinstance(root_value, (dict, list)) else 0
