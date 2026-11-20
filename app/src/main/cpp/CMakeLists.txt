@@ -35,6 +35,7 @@ add_library(veas5tensor SHARED
     vea_s5_banked_linear.cpp
     vea_s5_block.cpp
     vea_s5_rnn_layout.cpp
+    vea_s5_named_layer_set.cpp
 )
 target_include_directories(veas5tensor PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_definitions(veas5tensor PRIVATE VEA_S5_TENSOR_BUILD)

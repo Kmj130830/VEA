@@ -47,6 +47,32 @@ class S5ModelObjectTreeTest {
     }
 
     @Test
+    fun findsUniqueLookupKeyInsideNestedObjectAndArrayContainers() {
+        val tree = S5ModelObjectTree.parseUtf8(
+            """{"container":{"layers":[{"weightKey":{"value":17}}]}}"""
+        )
+
+        val match = tree.findUniqueByLookupKeyRecursive("weightKey")
+
+        assertEquals("$/container/layers[0]/weightKey", match?.path)
+        assertEquals(17.0, (match?.value as S5ModelValue.ObjectValue)
+            .fields.getValue("value").let { (it as S5ModelValue.NumberValue).value }, 0.0)
+        assertNull(tree.findUniqueByLookupKeyRecursive("missing"))
+    }
+
+    @Test
+    fun rejectsAmbiguousRecursiveLookupKeysInsteadOfSelectingOne() {
+        val tree = S5ModelObjectTree.parseUtf8(
+            """{"left":{"weightKey":"one"},"right":{"weightKey":"two"}}"""
+        )
+
+        assertEquals(2, tree.findAllByLookupKeyRecursive("weightKey").size)
+        assertThrows(IllegalArgumentException::class.java) {
+            tree.findUniqueByLookupKeyRecursive("weightKey")
+        }
+    }
+
+    @Test
     fun acceptsUtf8AndValidEscapedSurrogatePairs() {
         val tree = S5ModelObjectTree.parseUtf8("""{"text":"한글 😀 \uD83D\uDE00"}""")
         assertEquals("한글 😀 😀", tree.findByLookupKey("text")!!.asString())

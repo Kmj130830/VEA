@@ -65,3 +65,166 @@ operators. Only after that mapping is verified should tensors be passed to a
 specific native forward operation.
 
 No AI Megpoid PCM output is produced by this milestone.
+
+
+## Follow-up: primary matrix and secondary layer property
+
+The later static trace of `FUN_180052f90` → `FUN_18005e9b0` →
+`FUN_180063ca0` distinguishes the two fixed-key values:
+
+- KEY_1 is resolved as the primary typed tensor and instantiated as one or
+  more `BlockMatrix` objects using descriptor-supplied row/column dimensions.
+- KEY_2 is resolved later only when the relevant descriptor field enables the
+  secondary-property path. It is passed to `FUN_180064e90`, not instantiated
+  as a second `BlockMatrix` by `FUN_180063ca0`.
+
+The index exposes `modelPropertyPairs()` to group the two typed values only
+when they share the same immediate parent object. This pairing preserves the
+observed data relationship without assigning a semantic name to KEY_2.
+
+The real `AI_Megpoid.vtb2` audit found 88 such containing objects. Every one
+had exactly one `*F32` tensor for each fixed key; no incomplete or ambiguous
+pairs were found. The common primary/secondary element counts include
+92,160/192 (16 objects), 9,216/96 (12), 18,432/192 (12), and 24,576/128 (9).
+These values are structural size evidence only; the exact auxiliary-property
+meaning and final matrix orientation still require the `FUN_180064e90`
+consumer trace and descriptor cross-check.
+
+The descriptor math gives a concrete count relation. `FUN_180063ca0`
+creates `param_8` matrices of `param_7 × param_6`, so KEY_1 contains
+`param_7 * param_6 * param_8) elements. It then calls
+`FUN_180064e90(secondary, 1, param_7, ...)`, which creates a one-row,
+`param_7)-column tensor (with the column stride padded to a multiple of 8).
+KEY_2 therefore contains `param_7) elements, and the ratio
+`KEY_1 / KEY_2` equals `param_6 * param_8`.
+
+The Android pair value `primaryToSecondaryElementRatio` reports this quotient
+only when both counts are positive and exactly divisible. It is a structural
+descriptor consistency value, not a semantic label for weights, biases, or
+conditioning roles.
+
+For the repeated-block loader call at `0x180053421`, the raw caller
+instructions establish `columns = descriptor[+4]`,
+`rows = 2 * descriptor[+4]`, and
+`matrixCount = descriptor[+0]`. The second property contains one row of
+length `rows`; the first property contains
+`rows * columns * matrixCount) elements. The new
+`repeatedBlockMatrixShapeOrNull()` helper reconstructs this shape only when
+the element counts satisfy the exact relationship.
+
+The actual AI Megpoid audit found **69/88** paired objects matching this
+specific repeated-block shape. The inferred matrix-count distribution is
+1 (18), 2 (14), 3 (15), 5 (16), and 6 (6). The remaining 19 paired objects
+are retained without this shape classification because other loader call
+sites use different dimension tuples. The separate entry-level call at
+`0x180053e13` has a single-bank tuple, but has not yet been associated with
+each unmatched pair.
+
+This remains a structural model-data binding improvement. It does not add
+neural inference or PCM rendering.
+
+## Follow-up: named neural layer parameters in VOCALOID7.vtmg
+
+The shared-model loader `FUN_180068190` was traced independently of the
+fixed-key block index. It calls `FUN_180064670` for nine named layers and
+resolves each layer's `.weight` and `.bias` properties from the shared
+`VOCALOID7.vtmg` object tree.
+
+`S5MegpoidNamedLayerTensorIndex` now exposes those typed properties from
+the loaded shared model member. `S5VoicebankModelPackage.namedLayerTensorIndex`
+builds this index lazily. The index validates that each property is a typed
+F32/F16 string, records its scalar count, and keeps float decoding deferred
+until a caller requests the tensor.
+
+The current archive contains all 18 named parameter tensors:
+
+| Layer | Matrix count | Weight elements | Bias elements |
+|---|---:|---:|---:|
+| pre1 | 1 | 2,624 | 32 |
+| pre2 | 1 | 1,024 | 32 |
+| conv1 | 3 | 6,144 | 64 |
+| cond1 | 1 | 1,664 | 64 |
+| conv2 | 3 | 6,144 | 64 |
+| cond2 | 1 | 1,664 | 64 |
+| conv3 | 3 | 6,144 | 64 |
+| cond3 | 1 | 1,664 | 64 |
+| linear | 1 | 96 | 3 |
+
+The matrix-count values come from the nine `FUN_180068190` call sites.
+The `FUN_180064670` constructor stores `param_5` as `axis0`,
+`param_4` as `axis1`, and `align_up(param_5, 8)` as
+`padded_axis0`; the matrix bank count is `param_6`. The secondary
+bias vector has one row and `param_5` elements. The recovered descriptor
+axes are therefore:
+
+| Layer | axis0 | axis1 | padded axis0 | Matrix count |
+|---|---:|---:|---:|---:|
+| pre1 | 32 | 82 | 32 | 1 |
+| pre2 | 32 | 32 | 32 | 1 |
+| conv1 | 64 | 32 | 64 | 3 |
+| cond1 | 64 | 26 | 64 | 1 |
+| conv2 | 64 | 32 | 64 | 3 |
+| cond2 | 64 | 26 | 64 | 1 |
+| conv3 | 64 | 32 | 64 | 3 |
+| cond3 | 64 | 26 | 64 | 1 |
+| linear | 3 | 32 | 8 | 1 |
+
+The source traversal order in `FUN_180064670` is
+`[axis0][axis1][matrix]`, matching the existing native
+`packMatrixBank()` input contract. `S5MegpoidNamedLayerParameters`
+now exposes `shapeOrNull()`, `packWeightMatrixBank()`, and
+`packBiasVector()`. The weight path decodes the selected layer's payload,
+invokes the native matrix-bank packer, and verifies storage length including
+axis0 padding. The bias path invokes native `packRowMajor()` with
+`axis0 = bias count` and `axis1 = 1`, matching the second one-row
+descriptor created by `FUN_180064670`. The prepared result retains both
+unpadded bias values and the padded one-row bias buffer. No
+input/output-channel names are assigned beyond the recovered descriptor axes.
+
+### Persistent native descriptor-pair table
+
+The named-layer factory writes two descriptor pointers per layer into the
+vendor object at offsets `0x20`, `0x30`, `0x40`, `0x50`,
+`0x60`, `0x70`, `0x80`, `0x90`, and `0xA0`. The first pointer
+is the banked weight descriptor array; the second is the one-row bias
+descriptor. These offsets are derived by combining the factory's
+`FUN_180068190(puVar2 + 4, ...)` call with the callee's pointer arithmetic.
+
+The native library now exposes `vea_s5_named_layer_parameter_set_create()`.
+It creates one persistent aligned arena, packs all nine weight/bias pairs,
+and places their descriptor pointers in a 0xb0-byte table mirror at the exact
+vendor offsets. The JNI bridge exposes this as
+`S5MegpoidNativeParameterSet`; its owner must call `close()` when the
+voicebank is unloaded. Native tests verify each layer's descriptor axis
+counts, matrix count, bias dimensions, padding, and table-offset validation.
+
+This is a descriptor-layout bridge. It does not yet invoke the named-layer
+network's virtual methods, run the temporal network, or synthesize PCM.
+
+### Correct parameter hash serialization
+
+The model tree stores the salted MD5 digest as its 16 bytes in canonical
+lowercase hexadecimal order. The native hash implementation previously
+formatted its four 32-bit state words directly, reversing the byte order
+inside each word. The formatter now emits the bytes of each state word in
+little-endian order. Native tests include both generic MD5 vectors and two
+real `VOCALOID7.vtmg` keys (`pre1.weight` and `conv1.bias`).
+
+These named tensors are now addressable from the verified model package.
+They have not yet been assigned to the residual operator's runtime record
+offsets, and this index does not claim to execute the named-layer network or
+produce PCM audio.
+
+### Nested VTMG dictionary lookup
+
+The real shared `VOCALOID7.vtmg` JSON tree stores the 18 named `.weight`
+and `.bias` properties below the top-level `6957915c8dfb4d554a8df92ee40e523d`
+container object. They are not direct root properties.
+
+`S5ModelObjectTree.findAllByLookupKeyRecursive()` now searches nested objects
+and arrays and returns each match with its JSON path.
+`findUniqueByLookupKeyRecursive()` returns the sole match, reports a missing
+key as null, and rejects duplicate matches rather than silently choosing one.
+The named-layer index uses this recursive unique lookup. Its unit-test JSON
+fixture mirrors the actual nested container structure, and separate tests
+cover array traversal and ambiguous duplicate keys.

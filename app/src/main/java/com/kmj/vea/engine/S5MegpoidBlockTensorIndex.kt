@@ -6,7 +6,9 @@ package com.kmj.vea.engine
  * the binary analysis has not established semantic parameter names.
  */
 enum class S5MegpoidBlockLookupSlot(val lookupKey: String) {
+    /** Primary typed-matrix property consumed by FUN_180063ca0. */
     KEY_1("30c16498ff30815c43d58f610a91f938"),
+    /** Secondary property consumed by FUN_180064e90 when its descriptor enables it. */
     KEY_2("c169d8ef47cc23f097ff312d08a6f829"),
     KEY_3("9e4170a67e795e687b0df130d8086421"),
     KEY_4("6eaa6d5161e42effbaa006bb0cd3f587"),
@@ -18,9 +20,168 @@ enum class S5MegpoidBlockLookupSlot(val lookupKey: String) {
 }
 
 /**
+ * Two layer-property tensors found in the same containing object.
+ *
+ * For the traced FUN_180063ca0 path, [first] becomes a bank of matrices with
+ * element count rows * columns * banks. [second] is passed to FUN_180064e90
+ * as a one-row vector whose length equals rows. The ratio therefore reflects
+ * columns * banks when the descriptor path is the one recovered here. It does
+ * not identify either matrix's semantic role.
+ */
+data class S5MegpoidRepeatedBlockMatrixShape(
+    val rows: Int,
+    val columns: Int,
+    val matrixCount: Int
+)
+
+/** Source traversal order used by FUN_180063ca0's typed tensor fill loop. */
+enum class S5MegpoidMatrixInputOrder {
+    /** Each row traverses columns before advancing to the next row. */
+    ROW_MAJOR,
+    /** Each column traverses rows before advancing to the next column. */
+    COLUMN_MAJOR
+}
+
+/**
+ * Decoded payload for the primary matrix-property pair.
+ * [matrices] follows the matrix-object bank order allocated by S5API;
+ * [secondaryProperty] intentionally has no assigned semantic role.
+ */
+data class S5MegpoidDecodedMatrixBank(
+    val shape: S5MegpoidRepeatedBlockMatrixShape,
+    val matrices: List<FloatArray>,
+    val secondaryProperty: FloatArray
+)
+
+data class S5MegpoidModelPropertyPair(
+    val containingObjectPath: String,
+    val first: S5MegpoidModelTensorReference,
+    val second: S5MegpoidModelTensorReference
+) {
+    /**
+     * Exact element-count quotient of the primary matrix payload and secondary
+     * vector payload. For FUN_180063ca0 this equals columns * matrixCount.
+     */
+    val primaryToSecondaryElementRatio: Int?
+        get() {
+            val primary = first.elementCount
+            val secondary = second.elementCount
+            if (primary <= 0 || secondary <= 0 || primary % secondary != 0) return null
+            return primary / secondary
+        }
+
+    /**
+     * Recovered FUN_180052f90 first-property call shape.
+     *
+     * At callsite 0x180053421, the caller passes:
+     *   columns = descriptor[+4]
+     *   rows = 2 * descriptor[+4]
+     *   matrixCount = descriptor[+0]
+     *
+     * FUN_180064e90 loads the second property as a one-row vector whose
+     * element count equals the matrix row count. Therefore this candidate is
+     * available only when KEY_2 has an even element count and the primary /
+     * secondary quotient is divisible by rows / 2. Pairs not satisfying this
+     * pattern belong to another loader path or remain unclassified.
+     */
+    fun repeatedBlockMatrixShapeOrNull(): S5MegpoidRepeatedBlockMatrixShape? {
+        val rows = second.elementCount
+        if (rows < 2 || rows % 2 != 0) return null
+        val columns = rows / 2
+        val ratio = primaryToSecondaryElementRatio ?: return null
+        if (ratio % columns != 0) return null
+        val matrixCount = ratio / columns
+        if (matrixCount <= 0) return null
+        val expectedElements = rows.toLong() * columns.toLong() * matrixCount.toLong()
+        if (expectedElements != first.elementCount.toLong()) return null
+        return S5MegpoidRepeatedBlockMatrixShape(rows, columns, matrixCount)
+    }
+
+    /**
+     * Returns an arithmetic shape candidate for FUN_1800537e0's separate
+     * single-bank entry call at 0x180053e13.
+     *
+     * That caller supplies EAX, R10D, 1 to FUN_18005e9b0; the wrapper forwards
+     * them as FUN_180063ca0 columns, rows, and matrixCount. R10D is computed
+     * as 2 * descriptor[+0x14] * descriptor[+0x08], so the row count must be
+     * even. The source descriptor has not been associated with each tensor
+     * pair, so this remains a compatibility candidate, not a callsite match.
+     */
+    fun singleBankEntryShapeCandidateOrNull(): S5MegpoidRepeatedBlockMatrixShape? {
+        val rows = second.elementCount
+        if (rows <= 0 || rows % 2 != 0) return null
+        val columns = primaryToSecondaryElementRatio ?: return null
+        if (columns <= 0) return null
+        val expectedElements = rows.toLong() * columns.toLong()
+        if (expectedElements != first.elementCount.toLong()) return null
+        return S5MegpoidRepeatedBlockMatrixShape(rows, columns, matrixCount = 1)
+    }
+
+    /**
+     * Decodes the primary tensor into the exact bank order used by
+     * FUN_180063ca0.
+     *
+     * The native fill loop interleaves matrix values for each coordinate and
+     * visits the allocated matrix-pointer array from its final element to its
+     * first. ROW_MAJOR/COLUMN_MAJOR selects the observed param_11 traversal
+     * branch; callers must supply the descriptor's real orientation.
+     */
+    /**
+     * Decodes using the orientation selected by the repeated-block wrapper.
+     *
+     * FUN_18005e9b0 passes zero in the Win64 stack slot for FUN_180063ca0's
+     * param_11 at callsite 0x18005eb04, selecting its row-major fill branch.
+     */
+    fun decodeNativeMatrixBankPayloadOrNull(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidDecodedMatrixBank? =
+        decodeMatrixBankPayloadOrNull(S5MegpoidMatrixInputOrder.ROW_MAJOR, tensorDecoder)
+
+    fun decodeMatrixBankPayloadOrNull(
+        inputOrder: S5MegpoidMatrixInputOrder,
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidDecodedMatrixBank? {
+        val shape = repeatedBlockMatrixShapeOrNull() ?: return null
+        val expectedElements = shape.rows.toLong() *
+            shape.columns.toLong() * shape.matrixCount.toLong()
+        if (expectedElements > Int.MAX_VALUE || first.elementCount.toLong() != expectedElements) {
+            return null
+        }
+        if (second.elementCount != shape.rows) return null
+
+        val interleaved = first.decodeFloatArray(tensorDecoder)
+        val secondary = second.decodeFloatArray(tensorDecoder)
+        val matrixSize = shape.rows * shape.columns
+        val matrices = List(shape.matrixCount) { FloatArray(matrixSize) }
+
+        for (row in 0 until shape.rows) {
+            for (column in 0 until shape.columns) {
+                val coordinateIndex = when (inputOrder) {
+                    S5MegpoidMatrixInputOrder.ROW_MAJOR -> row * shape.columns + column
+                    S5MegpoidMatrixInputOrder.COLUMN_MAJOR -> column * shape.rows + row
+                }
+                val outputIndex = row * shape.columns + column
+                val sourceBase = coordinateIndex * shape.matrixCount
+                for (sourceBankIndex in 0 until shape.matrixCount) {
+                    val matrixObjectIndex = shape.matrixCount - 1 - sourceBankIndex
+                    matrices[matrixObjectIndex][outputIndex] =
+                        interleaved[sourceBase + sourceBankIndex]
+                }
+            }
+        }
+
+        return S5MegpoidDecodedMatrixBank(
+            shape = shape,
+            matrices = matrices,
+            secondaryProperty = secondary
+        )
+    }
+}
+
+/**
  * A typed tensor discovered below one of FUN_1800537e0's fixed lookup keys.
  * The original encoded value is retained in the parsed model tree and decoded
- * only when the renderer asks for it.
+ * only when a caller explicitly requests it.
  */
 class S5MegpoidModelTensorReference internal constructor(
     val slot: S5MegpoidBlockLookupSlot,
@@ -61,6 +222,37 @@ class S5MegpoidBlockTensorIndex private constructor(
 
     fun summary(): Map<S5MegpoidBlockLookupSlot, Int> =
         S5MegpoidBlockLookupSlot.entries.associateWith { tensors(it).size }
+
+    /**
+     * Pairs the primary BlockMatrix property and its secondary vector property
+     * only when both typed leaves share the same immediate containing object.
+     * Incomplete or ambiguous groups are omitted rather than guessed.
+     */
+    fun modelPropertyPairs(): List<S5MegpoidModelPropertyPair> {
+        fun containingLayerPath(tensor: S5MegpoidModelTensorReference): String {
+            // A tensor may be a direct string at the lookup key or nested below
+            // it (for example, <lookup-key>/weight). Strip the lookup-key
+            // segment itself so both layouts resolve to the owning layer object.
+            val lookupSegment = "/${tensor.slot.lookupKey}"
+            val lookupOffset = tensor.objectPath.indexOf(lookupSegment)
+            if (lookupOffset >= 0) return tensor.objectPath.substring(0, lookupOffset)
+            return tensor.objectPath.substringBeforeLast('/', missingDelimiterValue = "")
+        }
+
+        val firstByParent = tensors(S5MegpoidBlockLookupSlot.KEY_1)
+            .groupBy(::containingLayerPath)
+        val secondByParent = tensors(S5MegpoidBlockLookupSlot.KEY_2)
+            .groupBy(::containingLayerPath)
+        return firstByParent.keys.intersect(secondByParent.keys).sorted().mapNotNull { parent ->
+            val first = firstByParent[parent].orEmpty()
+            val second = secondByParent[parent].orEmpty()
+            if (first.size == 1 && second.size == 1) {
+                S5MegpoidModelPropertyPair(parent, first.single(), second.single())
+            } else {
+                null
+            }
+        }
+    }
 
     companion object {
         fun build(modelTree: S5ModelObjectTree): S5MegpoidBlockTensorIndex {

@@ -1,5 +1,36 @@
 package com.kmj.vea.engine
 
+data class S5MegpoidNativeLayerShape(
+    val axis0Count: Int,
+    val axis1Count: Int,
+    val paddedAxis0Count: Int,
+    val matrixCount: Int
+)
+
+/**
+ * Owner of persistent native BlockMatrix descriptor pairs for the nine
+ * VOCALOID7.vtmg layers. Always close this handle when the voicebank is removed.
+ */
+class S5MegpoidNativeParameterSet internal constructor(
+    private var nativeHandle: Long
+) : AutoCloseable {
+    val isClosed: Boolean
+        @Synchronized get() = nativeHandle == 0L
+
+    @Synchronized
+    fun layerShape(layer: S5MegpoidNamedLayer): S5MegpoidNativeLayerShape {
+        check(nativeHandle != 0L) { "Native Megpoid parameter set is closed." }
+        return NativeS5TensorBridge.getNamedLayerParameterShape(nativeHandle, layer.ordinal)
+    }
+
+    @Synchronized
+    override fun close() {
+        val handle = nativeHandle
+        nativeHandle = 0L
+        NativeS5TensorBridge.destroyNamedLayerParameterSet(handle)
+    }
+}
+
 data class S5RnnDirectionLayout(
     val layerIndex: Int,
     val directionIndex: Int,
@@ -187,7 +218,8 @@ object NativeS5TensorBridge {
 
     /**
      * Hashes a full S5API model-object property name into its salted MD5 lookup key.
-     * The result uses the recovered four-word, 32-character lowercase hex layout.
+     * The result is the 16 digest bytes serialized as 32 lowercase hex characters,
+     * matching the property-name keys stored in the model JSON object tree.
      */
     fun hashParameterLookupKey(parameterName: String): String {
         check(loaded) { "Native S5 tensor library is not loaded." }
@@ -385,6 +417,56 @@ object NativeS5TensorBridge {
         return result[0] to result[1]
     }
 
+    /**
+     * Creates a persistent native copy of all nine named-layer weight/bias
+     * descriptor pairs. The returned handle owns its arena until close().
+     */
+    fun createNamedLayerParameterSet(
+        weights: Array<FloatArray>,
+        biases: Array<FloatArray>,
+        axis0Counts: IntArray,
+        axis1Counts: IntArray,
+        matrixCounts: IntArray,
+        descriptorPairOffsets: IntArray
+    ): S5MegpoidNativeParameterSet {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        val count = S5MegpoidNamedLayer.entries.size
+        require(weights.size == count && biases.size == count &&
+            axis0Counts.size == count && axis1Counts.size == count &&
+            matrixCounts.size == count && descriptorPairOffsets.size == count) {
+            "Exactly $count named-layer weight/bias pairs are required."
+        }
+        val handle = nativeCreateNamedLayerParameterSet(
+            weights, biases, axis0Counts, axis1Counts, matrixCounts, descriptorPairOffsets
+        )
+        check(handle != 0L) {
+            "Native S5 named-layer descriptor preparation failed."
+        }
+        return S5MegpoidNativeParameterSet(handle)
+    }
+
+    internal fun getNamedLayerParameterShape(
+        handle: Long,
+        layerIndex: Int
+    ): S5MegpoidNativeLayerShape {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(handle != 0L)
+        require(layerIndex in S5MegpoidNamedLayer.entries.indices)
+        val values = nativeGetNamedLayerParameterShape(handle, layerIndex)
+            ?: throw IllegalStateException("Could not read native named-layer descriptor pair.")
+        check(values.size == 4)
+        return S5MegpoidNativeLayerShape(
+            axis0Count = values[0],
+            axis1Count = values[1],
+            paddedAxis0Count = values[2],
+            matrixCount = values[3]
+        )
+    }
+
+    internal fun destroyNamedLayerParameterSet(handle: Long) {
+        if (handle != 0L && loaded) nativeDestroyNamedLayerParameterSet(handle)
+    }
+
     private external fun nativeRunResidualDwMlpBlock(
         historyRows: FloatArray, depthwiseWeights: FloatArray,
         expandWeights: FloatArray, expandedBiasA: FloatArray, expandedBiasB: FloatArray,
@@ -412,6 +494,16 @@ object NativeS5TensorBridge {
     private external fun nativeApplyGelu(values: FloatArray, scale: Float, bias: Float): FloatArray?
     private external fun nativeComputeMeanInvStd(sum: Float, sumSquares: Float, count: Int, epsilon: Float): FloatArray?
     private external fun nativeReduceSumAndSquares(values: FloatArray): FloatArray?
+    private external fun nativeCreateNamedLayerParameterSet(
+        weights: Array<FloatArray>,
+        biases: Array<FloatArray>,
+        axis0Counts: IntArray,
+        axis1Counts: IntArray,
+        matrixCounts: IntArray,
+        descriptorPairOffsets: IntArray
+    ): Long
+    private external fun nativeGetNamedLayerParameterShape(handle: Long, layerIndex: Int): IntArray?
+    private external fun nativeDestroyNamedLayerParameterSet(handle: Long)
     private external fun nativeApplyGatedActivation(planes: FloatArray, count: Int, mode: Int): FloatArray?
     private external fun nativeDecodeTypedFloatArray(encoded: ByteArray): FloatArray?
     private external fun nativeDecodeTypedInt32Array(encoded: ByteArray): IntArray?

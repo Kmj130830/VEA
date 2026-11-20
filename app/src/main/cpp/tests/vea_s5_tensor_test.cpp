@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <cmath>
 #include <limits>
+#include <array>
+#include <vector>
 
 namespace {
 
@@ -28,7 +30,7 @@ int main() {
         key_abc, sizeof(key_abc), hashed_key, sizeof(hashed_key),
         &hashed_key_required) == VEA_S5_TENSOR_STATUS_OK);
     assert(hashed_key_required == 33);
-    assert(std::strcmp(hashed_key, "7d736cde130f0bb75f2cdbe49c5e01d5") == 0);
+    assert(std::strcmp(hashed_key, "de6c737db70b0f13e4db2c5fd5015e9c") == 0);
 
     // A 48-byte key forces MD5 to process two 64-byte blocks after the salt.
     static constexpr char long_key[] =
@@ -38,7 +40,51 @@ int main() {
         reinterpret_cast<const uint8_t*>(long_key), sizeof(long_key) - 1u,
         hashed_key, sizeof(hashed_key), &hashed_key_required) ==
         VEA_S5_TENSOR_STATUS_OK);
-    assert(std::strcmp(hashed_key, "ec980bc709d9902a7f97a0a548d98c6d") == 0);
+    assert(std::strcmp(hashed_key, "c70b98ec2a90d909a5a0977f6d8cd948") == 0);
+
+    // These names are present as typed-tensor keys in the supplied
+    // VOCALOID7.vtmg model member. Their JSON keys are canonical MD5 byte hex.
+    static constexpr char pre1_weight[] = "pre1.weight";
+    static constexpr char conv1_bias[] = "conv1.bias";
+    assert(vea_s5_hash_parameter_key(
+        reinterpret_cast<const uint8_t*>(pre1_weight), sizeof(pre1_weight) - 1u,
+        hashed_key, sizeof(hashed_key), &hashed_key_required) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(std::strcmp(hashed_key, "f8b15a70e9fe50b828e5803435580c63") == 0);
+    assert(vea_s5_hash_parameter_key(
+        reinterpret_cast<const uint8_t*>(conv1_bias), sizeof(conv1_bias) - 1u,
+        hashed_key, sizeof(hashed_key), &hashed_key_required) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(std::strcmp(hashed_key, "bf1fb08e8ffbab205dbb90120465e856") == 0);
+
+    struct RealModelKeyVector { const char* name; const char* expected; };
+    static constexpr RealModelKeyVector real_model_keys[] = {
+        {"pre1.weight", "f8b15a70e9fe50b828e5803435580c63"},
+        {"pre1.bias", "e0b8e91e6062dd010960e012a5410dfc"},
+        {"pre2.weight", "5f070ac57c6e37c82ef5338f3325fdb0"},
+        {"pre2.bias", "a236e71e934a1ef9421a3aa58dc4a32d"},
+        {"conv1.weight", "220316df91912792cb42bc663a8df636"},
+        {"conv1.bias", "bf1fb08e8ffbab205dbb90120465e856"},
+        {"cond1.weight", "edf0ab9aee552c38c05ca173eee22ac1"},
+        {"cond1.bias", "696e7aab6b19e87bda4d64d30787f024"},
+        {"conv2.weight", "7352c2e9486a73ce344f167dfad31876"},
+        {"conv2.bias", "c968ce1719cfab911f40b224b5bb28df"},
+        {"cond2.weight", "d2513a339c1cd73dccef828453a4d23a"},
+        {"cond2.bias", "f6b8236c129bd838ccee88b5e54ab949"},
+        {"conv3.weight", "7646bc7c9e90a59c368ef2b779853dff"},
+        {"conv3.bias", "68b10aa33dc35fe0030cd4bcf63d69b1"},
+        {"cond3.weight", "aa0c15b96de654347f8cf7f3d318d537"},
+        {"cond3.bias", "84560ce6291c9ad58de7fcace89954cf"},
+        {"linear.weight", "ecf71a24e4595ed754ce7c2a519102f0"},
+        {"linear.bias", "e7e58da68e9b65d684a141ccf7071bca"}
+    };
+    for (const auto& vector : real_model_keys) {
+        assert(vea_s5_hash_parameter_key(
+            reinterpret_cast<const uint8_t*>(vector.name), std::strlen(vector.name),
+            hashed_key, sizeof(hashed_key), &hashed_key_required) ==
+            VEA_S5_TENSOR_STATUS_OK);
+        assert(std::strcmp(hashed_key, vector.expected) == 0);
+    }
 
     char small_hashed_key[8] = "stable";
     assert(vea_s5_hash_parameter_key(
@@ -49,6 +95,116 @@ int main() {
     assert(vea_s5_hash_parameter_key(
         nullptr, 1, hashed_key, sizeof(hashed_key), &hashed_key_required) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
+    // Build the persistent 9-layer descriptor-pair table at the same
+    // object offsets used by FUN_180068190 (0x20 through 0xa0).
+    constexpr size_t kLayerCount = VEA_S5_NAMED_LAYER_COUNT;
+    // These are the exact descriptor dimensions recovered from the
+    // supplied VOCALOID7.vtmg member, in FUN_180068190 layer order.
+    const std::array<uint32_t, kLayerCount> layer_axis0 = {
+        32u, 32u, 64u, 64u, 64u, 64u, 64u, 64u, 3u
+    };
+    const std::array<uint32_t, kLayerCount> layer_axis1 = {
+        82u, 32u, 32u, 26u, 32u, 26u, 32u, 26u, 32u
+    };
+    const std::array<uint32_t, kLayerCount> layer_banks = {
+        1u, 1u, 3u, 1u, 3u, 1u, 3u, 1u, 1u
+    };
+    std::array<uint32_t, kLayerCount> layer_offsets{};
+    std::array<std::vector<float>, kLayerCount> layer_weights;
+    std::array<std::vector<float>, kLayerCount> layer_biases;
+    std::array<const float*, kLayerCount> layer_weight_ptrs{};
+    std::array<const float*, kLayerCount> layer_bias_ptrs{};
+    std::array<size_t, kLayerCount> layer_weight_counts{};
+    std::array<size_t, kLayerCount> layer_bias_counts{};
+    for (size_t layer = 0; layer < kLayerCount; ++layer) {
+        layer_offsets[layer] = 0x20u + static_cast<uint32_t>(layer) * 0x10u;
+        const size_t weight_count =
+            static_cast<size_t>(layer_axis0[layer]) * layer_axis1[layer] * layer_banks[layer];
+        layer_weights[layer].resize(weight_count);
+        layer_biases[layer].resize(layer_axis0[layer]);
+        for (size_t index = 0; index < weight_count; ++index) {
+            layer_weights[layer][index] =
+                static_cast<float>(1000u * layer + index + 1u);
+        }
+        for (size_t index = 0; index < layer_biases[layer].size(); ++index) {
+            layer_biases[layer][index] =
+                static_cast<float>(100u * layer + index + 1u);
+        }
+        layer_weight_ptrs[layer] = layer_weights[layer].data();
+        layer_bias_ptrs[layer] = layer_biases[layer].data();
+        layer_weight_counts[layer] = layer_weights[layer].size();
+        layer_bias_counts[layer] = layer_biases[layer].size();
+    }
+
+    VeaS5NamedLayerParameterSet* named_layer_set = nullptr;
+    assert(vea_s5_named_layer_parameter_set_create(
+        layer_weight_ptrs.data(), layer_weight_counts.data(),
+        layer_bias_ptrs.data(), layer_bias_counts.data(),
+        layer_axis0.data(), layer_axis1.data(), layer_banks.data(),
+        layer_offsets.data(), kLayerCount, &named_layer_set) == VEA_S5_TENSOR_STATUS_OK);
+    assert(named_layer_set != nullptr);
+
+    for (size_t layer = 0; layer < kLayerCount; ++layer) {
+        const VeaS5MatrixDescriptor* weight_descriptors = nullptr;
+        const VeaS5MatrixDescriptor* bias_descriptor = nullptr;
+        size_t weight_descriptor_count = 0;
+        uint32_t axis0 = 0, axis1 = 0, padded_axis0 = 0;
+        assert(vea_s5_named_layer_parameter_set_get_layer(
+            named_layer_set, layer, &weight_descriptors, &weight_descriptor_count,
+            &bias_descriptor, &axis0, &axis1, &padded_axis0) ==
+            VEA_S5_TENSOR_STATUS_OK);
+        assert(weight_descriptors != nullptr);
+        assert(bias_descriptor != nullptr);
+        assert(weight_descriptor_count == layer_banks[layer]);
+        assert(axis0 == layer_axis0[layer]);
+        assert(axis1 == layer_axis1[layer]);
+        assert(padded_axis0 == ((axis0 + 7u) & ~7u));
+        assert(weight_descriptors[0].axis0 == axis0);
+        assert(weight_descriptors[0].axis1 == axis1);
+        assert(weight_descriptors[0].padded_axis0 == padded_axis0);
+        assert(bias_descriptor->axis0 == axis0);
+        assert(bias_descriptor->axis1 == 1u);
+        assert(bias_descriptor->padded_axis0 == padded_axis0);
+
+        const size_t source_index =
+            (static_cast<size_t>(axis0 - 1u) * axis1 + (axis1 - 1u)) *
+            layer_banks[layer];
+        const size_t output_index =
+            static_cast<size_t>(axis1 - 1u) * padded_axis0 + (axis0 - 1u);
+        for (size_t bank = 0; bank < weight_descriptor_count; ++bank) {
+            assert(weight_descriptors[bank].values[output_index] ==
+                layer_weights[layer][source_index + bank]);
+        }
+        assert(bias_descriptor->values[axis0 - 1u] == layer_biases[layer].back());
+        for (uint32_t padding = axis0; padding < padded_axis0; ++padding) {
+            assert(bias_descriptor->values[padding] == 0.0f);
+        }
+    }
+
+    // Invalid table offsets and incomplete source vectors are rejected atomically.
+    auto invalid_offsets = layer_offsets;
+    invalid_offsets[4] += 8u;
+    VeaS5NamedLayerParameterSet* rejected_set = nullptr;
+    assert(vea_s5_named_layer_parameter_set_create(
+        layer_weight_ptrs.data(), layer_weight_counts.data(),
+        layer_bias_ptrs.data(), layer_bias_counts.data(),
+        layer_axis0.data(), layer_axis1.data(), layer_banks.data(),
+        invalid_offsets.data(), kLayerCount, &rejected_set) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(rejected_set == nullptr);
+
+    auto invalid_weight_counts = layer_weight_counts;
+    invalid_weight_counts[2] -= 1u;
+    assert(vea_s5_named_layer_parameter_set_create(
+        layer_weight_ptrs.data(), invalid_weight_counts.data(),
+        layer_bias_ptrs.data(), layer_bias_counts.data(),
+        layer_axis0.data(), layer_axis1.data(), layer_banks.data(),
+        layer_offsets.data(), kLayerCount, &rejected_set) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(rejected_set == nullptr);
+
+    vea_s5_named_layer_parameter_set_destroy(named_layer_set);
 
     VeaS5Arena* arena = nullptr;
     assert(vea_s5_arena_create(8192, &arena) == VEA_S5_TENSOR_STATUS_OK);

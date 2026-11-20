@@ -27,6 +27,42 @@ data class S5VoicebankModelPackage(
     val modelBlockTensorIndex: S5MegpoidBlockTensorIndex by lazy(LazyThreadSafetyMode.PUBLICATION) {
         S5MegpoidBlockTensorIndex.build(singerModel.tree)
     }
+
+    /**
+     * Lazily indexes the nine named neural layers in the shared VOCALOID7.vtmg.
+     * This resolves actual model tensors but does not yet execute their network.
+     */
+    val namedLayerTensorIndex: S5MegpoidNamedLayerTensorIndex by lazy(
+        LazyThreadSafetyMode.PUBLICATION
+    ) {
+        val sharedModel = models.members["VOCALOID7.vtmg"]
+            ?: throw IllegalStateException("Shared VOCALOID7.vtmg model member is missing.")
+        S5MegpoidNamedLayerTensorIndex.build(sharedModel.tree)
+    }
+
+    /**
+     * Decodes and packs all nine shared named-layer weight/bias pairs into
+     * the native BlockMatrix representation for a later inference stage.
+     */
+    fun prepareNamedLayerParameters(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder,
+        matrixPacker: (FloatArray, Int, Int, Int) -> FloatArray =
+            NativeS5TensorBridge::packMatrixBank,
+        biasPacker: (FloatArray, Int, Int) -> FloatArray =
+            NativeS5TensorBridge::packRowMajor
+    ): List<S5MegpoidPackedNamedLayer> =
+        namedLayerTensorIndex.packAllLayers(tensorDecoder, matrixPacker, biasPacker)
+
+
+    /**
+     * Creates a persistent native descriptor table for all nine named layers.
+     * The caller owns the returned handle and must close it when the voicebank
+     * is unloaded. This prepares BlockMatrix storage; it does not run inference.
+     */
+    fun prepareNativeNamedLayerParameterSet(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidNativeParameterSet =
+        namedLayerTensorIndex.prepareNativeParameterSet(tensorDecoder)
 }
 
 class S5VoicebankModelPackageAssembler(

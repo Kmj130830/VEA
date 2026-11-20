@@ -110,20 +110,31 @@ MODEL_STATIC_LOOKUP_KEYS = {
 }
 
 
+# Numeric descriptor properties resolved in Func_47a12a73 before FUN_1800589d0.
+# The values become FUN_180052f90's dim0 (param_8) and dim1 (param_6) fields.
+MODEL_BLOCK_DESCRIPTOR_KEYS = {
+    # Func_47a12a73 assigns these to original descriptor slots [0], [1], [5].
+    "descriptor_param0": "15bd765152e6fc7b4b901f843d716944",
+    "descriptor_param1": "0322875158f9b1bff9162ba2fa7dd262",
+    "descriptor_param5": "d7226a031351dcf206e02f41499ed9b6",
+}
+
+
 S5_KEY_SUFFIX = bytes.fromhex(
     "69 23 33 65 2e 63 5a 54 25 35 6b 39 6a 32 64 2c 32 5a 72 53 2f 2b 2f 32"
 )
 
 
 def s5_lookup_key(parameter_name: str) -> str:
-    digest = hashlib.md5(parameter_name.encode("utf-8") + S5_KEY_SUFFIX).digest()
-    words = struct.unpack("<4I", digest)
-    return "".join(f"{word:08x}" for word in words)
+    # JSON object property names store the MD5 digest bytes in canonical hex
+    # order. FUN_18001acc0 formats four uint32 words for static-key lookup
+    # constants, but the dynamic parameter-key strings retain digest.hex().
+    return hashlib.md5(parameter_name.encode("utf-8") + S5_KEY_SUFFIX).hexdigest()
 
 
 def summarize_model_tree(
     root: dict,
-) -> tuple[dict[str, int], set[str], list[str], list[str], dict[str, list[object]]]:
+) -> tuple[dict[str, int], set[str], list[str], list[str], int, dict[str, list[object]]]:
     counts = {
         "objects": 0,
         "arrays": 0,
@@ -167,11 +178,21 @@ def summarize_model_tree(
         elif value is None:
             counts["nulls"] += 1
 
+    # FUN_18005ebe0 forms one GRU parameter property for each layer
+    # index and each configured direction. Scan a conservative full range,
+    # rather than checking only l0, so a later layer is not misreported absent.
+    rnn_layer_scan_count = 16
+    rnn_parameter_member_count = 4
+    rnn_direction_variants = 2
     candidates = [
-        f"rnn.{member}_l0{direction}"
+        f"rnn.{member}_l{layer}{direction}"
+        for layer in range(rnn_layer_scan_count)
         for member in ("weight_ih", "weight_hh", "bias_ih", "bias_hh")
         for direction in ("", "_reverse")
     ]
+    rnn_candidate_count = (
+        rnn_layer_scan_count * rnn_parameter_member_count * rnn_direction_variants
+    )
     matching_parameters = [
         name for name in candidates if s5_lookup_key(name) in all_keys
     ]
@@ -180,7 +201,10 @@ def summarize_model_tree(
         "conv3", "cond3", "linear",
     ]
     matching_modules = [name for name in module_names if s5_lookup_key(name) in all_keys]
-    return counts, all_keys, matching_parameters, matching_modules, key_values
+    return (
+        counts, all_keys, matching_parameters, matching_modules,
+        rnn_candidate_count, key_values
+    )
 
 
 def describe_value(value: object) -> str:
@@ -391,6 +415,319 @@ def model_value_layout(value: object, max_tensors: int = 96) -> dict[str, object
     }
 
 
+def typed_tensor_lengths(value: object) -> list[dict[str, object]]:
+    """Return typed tensor scalar counts, never tensor contents."""
+    layouts: list[dict[str, object]] = []
+    stack = [value]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, str) and current[:4] in {"*F32", "*F16"}:
+            layouts.append(decode_typed_payload_layout(current))
+        elif isinstance(current, dict):
+            stack.extend(current.values())
+        elif isinstance(current, list):
+            stack.extend(current)
+    return layouts
+
+
+NAMED_MODEL_LAYER_BANK_COUNTS = {
+    # Recovered from the nine FUN_180068190 -> FUN_180064670 call sites.
+    "pre1": 1,
+    "pre2": 1,
+    "conv1": 3,
+    "cond1": 1,
+    "conv2": 3,
+    "cond2": 1,
+    "conv3": 3,
+    "cond3": 1,
+    "linear": 1,
+}
+
+
+def inspect_vtmg_typed_root_objects(member: str, root: dict) -> None:
+    """List hashed names and sizes of immediate typed-tensor fields in VTMG."""
+    for root_key, value in sorted(root.items()):
+        if not isinstance(value, dict):
+            continue
+        typed_fields = []
+        for child_key, child_value in sorted(value.items()):
+            tensors = typed_tensor_lengths(child_value)
+            if tensors:
+                typed_fields.append(
+                    {
+                        "key": child_key,
+                        "value_kind": describe_value(child_value),
+                        "tensor_count": len(tensors),
+                        "elements": [item.get("elements") for item in tensors],
+                        "types": [item.get("type") for item in tensors],
+                    }
+                )
+        if typed_fields:
+            print(
+                "VTMG_TYPED_ROOT_OBJECT",
+                f"member={member}",
+                f"root_key={root_key}",
+                f"typed_field_count={len(typed_fields)}",
+                f"fields={typed_fields}",
+            )
+
+
+def inspect_named_layer_container_keys(
+    member: str, key_values: dict[str, list[object]]
+) -> None:
+    """Report hashed child-key names under FUN_180068190's layer container."""
+    container_key = MODEL_STATIC_LOOKUP_KEYS["fun_180068190_key_3"]
+    for occurrence_index, value in enumerate(key_values.get(container_key, [])):
+        if isinstance(value, dict):
+            print(
+                "MODEL_NAMED_LAYER_CONTAINER_KEYS",
+                f"member={member}",
+                f"occurrence={occurrence_index}",
+                f"key_count={len(value)}",
+                f"keys={sorted(value.keys())}",
+                f"value_kinds={{{', '.join(repr(k) + ': ' + repr(describe_value(v)) for k, v in sorted(value.items()))}}}",
+            )
+
+
+def inspect_megpoid_named_layer_parameters(
+    member: str, key_values: dict[str, list[object]]
+) -> None:
+    """Audit hashed .weight/.bias members for FUN_180068190's named layers."""
+    for layer, matrix_count in NAMED_MODEL_LAYER_BANK_COUNTS.items():
+        discovered: dict[str, tuple[int, list[dict[str, object]]]] = {}
+        for suffix in ("weight", "bias"):
+            parameter_name = f"{layer}.{suffix}"
+            lookup_key = s5_lookup_key(parameter_name)
+            occurrences = key_values.get(lookup_key, [])
+            tensors = [
+                tensor
+                for occurrence in occurrences
+                for tensor in typed_tensor_lengths(occurrence)
+            ]
+            discovered[suffix] = (len(occurrences), tensors)
+            print(
+                "MODEL_NAMED_LAYER_PARAMETER",
+                f"member={member}",
+                f"layer={layer}",
+                f"parameter={suffix}",
+                f"lookup_key={lookup_key}",
+                f"occurrences={len(occurrences)}",
+                f"typed_tensor_count={len(tensors)}",
+                f"typed_tensor_elements={[item.get('elements') for item in tensors]}",
+                f"typed_tensor_types={[item.get('type') for item in tensors]}",
+            )
+
+        weight_occurrences, weight_tensors = discovered["weight"]
+        bias_occurrences, bias_tensors = discovered["bias"]
+        classification = "unresolved"
+        axis0_count = None
+        axis1_count = None
+        padded_axis0_count = None
+        if (
+            weight_occurrences == 1
+            and bias_occurrences == 1
+            and len(weight_tensors) == 1
+            and len(bias_tensors) == 1
+        ):
+            weight_elements = weight_tensors[0].get("elements")
+            bias_elements = bias_tensors[0].get("elements")
+            if (
+                isinstance(weight_elements, int)
+                and isinstance(bias_elements, int)
+                and weight_elements > 0
+                and bias_elements > 0
+            ):
+                # FUN_180064670 writes param_5 to axis0, param_4 to axis1,
+                # and param_6 to the number of BlockMatrix objects.
+                denominator = bias_elements * matrix_count
+                if denominator > 0 and weight_elements % denominator == 0:
+                    candidate_axis1 = weight_elements // denominator
+                    if candidate_axis1 > 0:
+                        axis0_count = bias_elements
+                        axis1_count = candidate_axis1
+                        padded_axis0_count = ((axis0_count + 7) // 8) * 8
+                        classification = "descriptor_axes_consistent"
+        print(
+            "MODEL_NAMED_LAYER_SHAPE",
+            f"member={member}",
+            f"layer={layer}",
+            f"matrix_count={matrix_count}",
+            f"axis0_count={axis0_count}",
+            f"axis1_count={axis1_count}",
+            f"padded_axis0_count={padded_axis0_count}",
+            f"classification={classification}",
+        )
+
+
+def inspect_megpoid_block_descriptor_fields(
+    member: str, root: dict, key_values: dict[str, list[object]]
+) -> None:
+    """Report scalar descriptor slots and their JSON paths, never tensor values."""
+    occurrences_by_key: dict[str, list[tuple[str, object]]] = {
+        key: [] for key in MODEL_BLOCK_DESCRIPTOR_KEYS.values()
+    }
+    stack: list[tuple[object, str]] = [(root, "$")]
+    while stack:
+        current, path = stack.pop()
+        if isinstance(current, dict):
+            for key, child in current.items():
+                if key in occurrences_by_key:
+                    occurrences_by_key[key].append((path + "/" + key, child))
+                stack.append((child, path + "/" + key))
+        elif isinstance(current, list):
+            for index, child in enumerate(current):
+                stack.append((child, f"{path}[{index}]"))
+
+    values_by_label: dict[str, list[int | float]] = {}
+    for label, key in MODEL_BLOCK_DESCRIPTOR_KEYS.items():
+        occurrences = occurrences_by_key[key]
+        numeric = [
+            value for _, value in occurrences
+            if isinstance(value, (int, float)) and not isinstance(value, bool)
+        ]
+        values_by_label[label] = numeric
+        print(
+            "MODEL_BLOCK_DESCRIPTOR_FIELD",
+            f"member={member}",
+            f"field={label}",
+            f"key={key}",
+            f"occurrences={len(occurrences)}",
+            f"values_and_paths={[(path, value if isinstance(value, (int, float)) and not isinstance(value, bool) else describe_value(value)) for path, value in occurrences]}",
+        )
+
+    p0 = values_by_label.get("descriptor_param0", [])
+    p1 = values_by_label.get("descriptor_param1", [])
+    if p0 and p1:
+        candidate_ratios = sorted({
+            int((value / 2) * width)
+            for value in p0
+            for width in p1
+            if value % 2 == 0 and value > 0 and width > 0
+        })
+        print(
+            "MODEL_BLOCK_DESCRIPTOR_RATIO_CANDIDATES",
+            f"member={member}",
+            f"param0_values={sorted(set(p0))}",
+            f"param1_values={sorted(set(p1))}",
+            f"candidate_ratios={(candidate_ratios)}",
+        )
+
+
+def inspect_megpoid_layer_property_pairs(root: dict, member: str) -> None:
+    """Find objects that contain both layer-property keys and report only lengths."""
+    first_key = MODEL_STATIC_LOOKUP_KEYS["fun_1800537e0_key_1"]
+    second_key = MODEL_STATIC_LOOKUP_KEYS["fun_1800537e0_key_2"]
+    stack: list[tuple[object, str]] = [(root, "$")]
+    pair_count = 0
+    ambiguous_count = 0
+    integer_ratio_count = 0
+    ratio_counts: dict[int, int] = {}
+    repeated_block_shape_count = 0
+    repeated_block_banks: dict[int, int] = {}
+    single_bank_entry_candidate_count = 0
+    root_group_stats: dict[str, dict[str, object]] = {}
+    while stack:
+        current, path = stack.pop()
+        if isinstance(current, dict):
+            if first_key in current and second_key in current:
+                first = typed_tensor_lengths(current[first_key])
+                second = typed_tensor_lengths(current[second_key])
+                pair_count += 1
+                top_group = path.split("/", 2)[1] if "/" in path else "$"
+                group_stats = root_group_stats.setdefault(
+                    top_group,
+                    {
+                        "pairs": 0,
+                        "repeated": 0,
+                        "single_bank_candidate": 0,
+                        "repeated_banks": {},
+                    },
+                )
+                group_stats["pairs"] = int(group_stats["pairs"]) + 1
+                ratio = None
+                if len(first) != 1 or len(second) != 1:
+                    ambiguous_count += 1
+                    classification = "ambiguous"
+                elif first[0].get("invalid_base64") or second[0].get("invalid_base64"):
+                    classification = "invalid"
+                else:
+                    primary_elements = first[0].get("elements")
+                    secondary_elements = second[0].get("elements")
+                    classification = "paired"
+                    if (
+                        isinstance(primary_elements, int)
+                        and isinstance(secondary_elements, int)
+                        and primary_elements > 0
+                        and secondary_elements > 0
+                        and primary_elements % secondary_elements == 0
+                    ):
+                        ratio = primary_elements // secondary_elements
+                        integer_ratio_count += 1
+                        ratio_counts[ratio] = ratio_counts.get(ratio, 0) + 1
+                        # FUN_1800537e0 callsite 0x180053e13 passes:
+                        # columns = descriptor[+0x10], rows =
+                        # 2*descriptor[+0x14]*descriptor[+0x08], bankCount = 1.
+                        # Even KEY_2 length is only arithmetic compatibility;
+                        # it cannot associate this object with that callsite.
+                        if (
+                            secondary_elements >= 2
+                            and secondary_elements % 2 == 0
+                            and primary_elements == secondary_elements * ratio
+                        ):
+                            single_bank_entry_candidate_count += 1
+                            group_stats["single_bank_candidate"] = (
+                                int(group_stats["single_bank_candidate"]) + 1
+                            )
+                        # FUN_180052f90 callsite 0x180053421 passes
+                        # columns = descriptor[+4], rows = 2*descriptor[+4],
+                        # matrixCount = descriptor[+0].
+                        if secondary_elements >= 2 and secondary_elements % 2 == 0:
+                            columns = secondary_elements // 2
+                            if ratio % columns == 0:
+                                matrix_count = ratio // columns
+                                expected = secondary_elements * columns * matrix_count
+                                if matrix_count > 0 and expected == primary_elements:
+                                    repeated_block_shape_count += 1
+                                    repeated_block_banks[matrix_count] = (
+                                        repeated_block_banks.get(matrix_count, 0) + 1
+                                    )
+                                    group_stats["repeated"] = int(group_stats["repeated"]) + 1
+                                    group_banks = group_stats["repeated_banks"]
+                                    assert isinstance(group_banks, dict)
+                                    group_banks[matrix_count] = (
+                                        int(group_banks.get(matrix_count, 0)) + 1
+                                    )
+                print(
+                    "MODEL_LAYER_PROPERTY_PAIR",
+                    f"member={member}",
+                    f"parent={path}",
+                    f"first_count={len(first)}",
+                    f"first_elements={[item.get('elements') for item in first]}",
+                    f"second_count={len(second)}",
+                    f"second_elements={[item.get('elements') for item in second]}",
+                    f"primary_to_secondary_ratio={ratio}",
+                    f"classification={classification}",
+                )
+            for key, child in current.items():
+                stack.append((child, path + "/" + key))
+        elif isinstance(current, list):
+            for index, child in enumerate(current):
+                stack.append((child, f"{path}[{index}]"))
+    print(
+        "MODEL_LAYER_PROPERTY_PAIR_SUMMARY",
+        f"member={member}",
+        f"pair_objects={pair_count}",
+        f"ambiguous_objects={ambiguous_count}",
+        f"integer_ratio_pairs={integer_ratio_count}",
+        f"ratio_counts={dict(sorted(ratio_counts.items()))}",
+        f"repeated_block_shape_pairs={repeated_block_shape_count}",
+        f"repeated_block_matrix_counts={dict(sorted(repeated_block_banks.items()))}",
+        f"single_bank_entry_shape_candidates={single_bank_entry_candidate_count}",
+        f"single_bank_only_candidates={single_bank_entry_candidate_count - repeated_block_shape_count}",
+        f"root_group_stats={dict(sorted(root_group_stats.items()))}",
+    )
+
+
 def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
     if not path.is_file():
         print("MISSING_ARCHIVE", path)
@@ -426,7 +763,7 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
             if root is not None:
                 keys = list(root.keys())
                 sample = [str(key)[:32] for key in keys[:4]]
-                counts, all_keys, parameter_matches, module_matches, key_values = summarize_model_tree(root)
+                counts, all_keys, parameter_matches, module_matches, rnn_candidate_count, key_values = summarize_model_tree(root)
                 print(
                     "JSON_OK",
                     f"archive={path.name}!/{item.filename}",
@@ -437,6 +774,15 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                     f"key_sample={sample}",
                 )
                 print("TREE_SUMMARY", f"member={item.filename}", counts)
+                inspect_megpoid_block_descriptor_fields(item.filename, root, key_values)
+                if item.filename == "AI_Megpoid.vtb2":
+                    inspect_megpoid_layer_property_pairs(root, item.filename)
+                if item.filename.lower().endswith(".vtmg"):
+                    inspect_vtmg_typed_root_objects(item.filename, root)
+                    inspect_named_layer_container_keys(item.filename, key_values)
+                # The name-based parameter loader takes the current model object
+                # as input; audit all archive members rather than assuming VTMG.
+                inspect_megpoid_named_layer_parameters(item.filename, key_values)
                 for root_key, root_value in root.items():
                     shape = value_shape(root_value)
                     direct_fields = len(root_value) if isinstance(root_value, (dict, list)) else 0
@@ -459,7 +805,7 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                 print(
                     "RNN_PARAMETER_LOOKUP_CANDIDATES",
                     f"member={item.filename}",
-                    f"matched={len(parameter_matches)}/8",
+                    f"matched={len(parameter_matches)}/{rnn_candidate_count}",
                     f"names={parameter_matches}",
                 )
                 print(
