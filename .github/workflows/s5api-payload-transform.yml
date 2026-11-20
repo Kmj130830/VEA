@@ -1,0 +1,28 @@
+name: VEA S5API model payload transform validation
+
+on:
+  push:
+    paths:
+      - "megpoidV7.zip"
+      - "AI Model.zip"
+      - "tools/verify_s5_model_payload.py"
+      - ".github/workflows/s5api-payload-transform.yml"
+  pull_request:
+    paths:
+      - "megpoidV7.zip"
+      - "AI Model.zip"
+      - "tools/verify_s5_model_payload.py"
+      - ".github/workflows/s5api-payload-transform.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-model-json:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify supplied model archive integrity and recovered JSON transform
+        run: python3 tools/verify_s5_model_payload.py
