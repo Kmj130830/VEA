@@ -68,6 +68,35 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeBuildRecurrentParameterName(
     }
 }
 
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeHashParameterKey(
+    JNIEnv* env, jobject, jbyteArray name_array) {
+    if (name_array == nullptr) return nullptr;
+    const jsize length = env->GetArrayLength(name_array);
+    if (length < 0 || length > (1 << 20)) return nullptr;
+
+    try {
+        std::vector<uint8_t> name_bytes(static_cast<size_t>(length));
+        if (length != 0) {
+            env->GetByteArrayRegion(
+                name_array, 0, length, reinterpret_cast<jbyte*>(name_bytes.data()));
+            if (env->ExceptionCheck()) return nullptr;
+        }
+
+        char key[33] = {};
+        size_t required = 0;
+        const VeaS5TensorStatus status = vea_s5_hash_parameter_key(
+            name_bytes.empty() ? nullptr : name_bytes.data(),
+            name_bytes.size(), key, sizeof(key), &required);
+        if (status != VEA_S5_TENSOR_STATUS_OK || required != sizeof(key)) return nullptr;
+        return env->NewStringUTF(key);
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
 extern "C" JNIEXPORT jlongArray JNICALL
 Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeRnnDirectionLayout(
     JNIEnv* env, jobject,
@@ -245,6 +274,61 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeParseContainerHeader(
     };
     jlongArray result = env->NewLongArray(3);
     if (result != nullptr) env->SetLongArrayRegion(result, 0, 3, values);
+    return env->ExceptionCheck() ? nullptr : result;
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeDecodeModelPayload(
+    JNIEnv* env, jobject, jbyteArray input_array) {
+    if (input_array == nullptr) return nullptr;
+    const jsize input_length = env->GetArrayLength(input_array);
+    if (input_length < 0) return nullptr;
+
+    jbyte* input = env->GetByteArrayElements(input_array, nullptr);
+    if (input == nullptr) return nullptr;
+
+    size_t output_size = 0u;
+    const VeaS5ContainerStatus query_status = vea_s5_decode_model_payload(
+        reinterpret_cast<const uint8_t*>(input),
+        static_cast<size_t>(input_length),
+        nullptr, 0u, &output_size);
+    if (query_status != VEA_S5_CONTAINER_STATUS_BUFFER_TOO_SMALL &&
+        query_status != VEA_S5_CONTAINER_STATUS_OK) {
+        env->ReleaseByteArrayElements(input_array, input, JNI_ABORT);
+        return nullptr;
+    }
+    if (output_size > static_cast<size_t>(std::numeric_limits<jsize>::max())) {
+        env->ReleaseByteArrayElements(input_array, input, JNI_ABORT);
+        return nullptr;
+    }
+
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(output_size));
+    if (result == nullptr) {
+        env->ReleaseByteArrayElements(input_array, input, JNI_ABORT);
+        return nullptr;
+    }
+
+    if (output_size != 0u) {
+        jbyte* output = env->GetByteArrayElements(result, nullptr);
+        if (output == nullptr) {
+            env->ReleaseByteArrayElements(input_array, input, JNI_ABORT);
+            return nullptr;
+        }
+        size_t written = 0u;
+        const VeaS5ContainerStatus status = vea_s5_decode_model_payload(
+            reinterpret_cast<const uint8_t*>(input),
+            static_cast<size_t>(input_length),
+            reinterpret_cast<uint8_t*>(output),
+            output_size,
+            &written);
+        env->ReleaseByteArrayElements(result, output,
+            status == VEA_S5_CONTAINER_STATUS_OK ? 0 : JNI_ABORT);
+        env->ReleaseByteArrayElements(input_array, input, JNI_ABORT);
+        if (status != VEA_S5_CONTAINER_STATUS_OK || written != output_size) return nullptr;
+    } else {
+        env->ReleaseByteArrayElements(input_array, input, JNI_ABORT);
+    }
+
     return env->ExceptionCheck() ? nullptr : result;
 }
 

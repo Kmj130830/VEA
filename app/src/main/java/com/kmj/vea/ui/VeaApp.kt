@@ -15,6 +15,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import com.kmj.vea.engine.S5ModelArchive
+import com.kmj.vea.engine.S5ModelArchiveReader
 import com.kmj.vea.data.*
 import com.kmj.vea.audio.PianoPreview
 import com.kmj.vea.data.StandardMidiExporter
@@ -29,6 +34,56 @@ enum class EditorMode {
 @Composable
 fun VeaApp() {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var loadedModelArchive by remember { mutableStateOf<S5ModelArchive?>(null) }
+    var modelArchiveStatus by rememberSaveable { mutableStateOf("V7 model not loaded") }
+    var isImportingModelArchive by remember { mutableStateOf(false) }
+
+    val modelArchiveLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            isImportingModelArchive = true
+            modelArchiveStatus = "Reading V7 model archive..."
+            scope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val input = context.contentResolver.openInputStream(uri)
+                            ?: error("Cannot open the selected archive.")
+                        S5ModelArchiveReader().read(input)
+                    }
+                }
+                isImportingModelArchive = false
+                result.fold(
+                    onSuccess = { archive ->
+                        loadedModelArchive = archive
+                        modelArchiveStatus = "${archive.members.size} model members loaded"
+                        Toast.makeText(
+                            context,
+                            "AI Megpoid V7 model data loaded. Singing inference is not enabled yet.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    },
+                    onFailure = { error ->
+                        loadedModelArchive = null
+                        modelArchiveStatus = "Load failed: " + (error.message ?: "Unknown archive error")
+                        Toast.makeText(
+                            context,
+                            modelArchiveStatus,
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                )
+            }
+        }
+    }
+
+    fun launchModelArchivePicker() {
+        modelArchiveLauncher.launch(
+            arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream", "*/*")
+        )
+    }
+
     var modeName by rememberSaveable { mutableStateOf(EditorMode.ARRANGEMENT.name) }
     val mode = EditorMode.valueOf(modeName)
 
@@ -220,7 +275,11 @@ fun VeaApp() {
                     onStop = PianoPreview::stop,
                     onAssignVoice = ::updateTrackVoice,
                     canUndo = canUndo,
-                    canRedo = canRedo
+                    canRedo = canRedo,
+                    modelArchiveStatus = modelArchiveStatus,
+                    modelLoaded = loadedModelArchive != null,
+                    isImportingModelArchive = isImportingModelArchive,
+                    onImportModelArchive = ::launchModelArchivePicker
                 )
             } else {
                 val track = project.tracks.firstOrNull { it.id == selectedTrackId }

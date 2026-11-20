@@ -55,6 +55,23 @@ object NativeS5TensorBridge {
     }
 
     /**
+     * Applies the recovered S5API FUN_18002aa90 model-payload preparation step.
+     *
+     * Known VTBR/VPIT/VHNV/VTMG assets are decoded with the recovered seeded
+     * word stream; the native fallback copies unknown 16-byte-or-longer input.
+     * This is a container payload transform, not an activation or licensing
+     * operation. The decoded bytes are expected to contain a JSON object.
+     */
+    fun decodeModelPayload(input: ByteArray): ByteArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(input.size <= 128 * 1024 * 1024) {
+            "S5 model payload exceeds the 128 MiB safety limit."
+        }
+        return nativeDecodeModelPayload(input)
+            ?: throw IllegalArgumentException("S5 model payload decoding failed.")
+    }
+
+    /**
      * Returns matrices concatenated in matrix-index order. Each matrix is
      * axis1Count rows by alignUp(axis0Count, 8) columns. The unused padded
      * columns are zero-filled.
@@ -167,6 +184,34 @@ object NativeS5TensorBridge {
             ?: throw IllegalArgumentException("Could not build S5 recurrent parameter name.")
     }
 
+
+    /**
+     * Hashes a full S5API model-object property name into its salted MD5 lookup key.
+     * The result uses the recovered four-word, 32-character lowercase hex layout.
+     */
+    fun hashParameterLookupKey(parameterName: String): String {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        val nameBytes = parameterName.toByteArray(Charsets.UTF_8)
+        require(nameBytes.size <= 1 shl 20) { "Parameter name is unreasonably large." }
+        return nativeHashParameterKey(nameBytes)
+            ?: throw IllegalArgumentException("Could not hash S5 parameter lookup key.")
+    }
+
+    /**
+     * Builds then hashes one recurrent tensor property name, e.g.
+     * rnn.weight_ih_l0_reverse -> its 32-character object-tree key.
+     */
+    fun buildRecurrentParameterLookupKey(
+        base: String,
+        memberSuffix: String,
+        layerIndex: Int,
+        reverseDirection: Boolean = false
+    ): String {
+        val propertyName = buildRecurrentParameterName(
+            base, memberSuffix, layerIndex, reverseDirection
+        )
+        return hashParameterLookupKey(propertyName)
+    }
 
     /**
      * Runs the recovered residual depthwise/MLP block from FUN_1800c5d50.
@@ -361,6 +406,7 @@ object NativeS5TensorBridge {
         bidirectional: Boolean, layerIndex: Int, directionIndex: Int
     ): LongArray?
     private external fun nativeBuildRecurrentParameterName(base: String, memberSuffix: String, layerIndex: Int, reverseDirection: Boolean): String?
+    private external fun nativeHashParameterKey(nameBytes: ByteArray): String?
     private external fun nativeResidualAffineAdd(dst: FloatArray, residual: FloatArray, scale: Float, bias: Float): FloatArray?
     private external fun nativeDepthwiseConv7x7Reflect(inputRows: FloatArray, weights: FloatArray, width: Int): FloatArray?
     private external fun nativeApplyGelu(values: FloatArray, scale: Float, bias: Float): FloatArray?
@@ -416,4 +462,5 @@ object NativeS5TensorBridge {
         header: ByteArray,
         totalFileSize: Long
     ): LongArray?
+    private external fun nativeDecodeModelPayload(input: ByteArray): ByteArray?
 }

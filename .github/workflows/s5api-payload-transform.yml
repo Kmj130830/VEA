@@ -1,0 +1,33 @@
+name: VEA S5API model payload transform validation
+
+on:
+  push:
+    paths:
+      - "megpoidV7.zip"
+      - "AI Model.zip"
+      - "tools/verify_s5_model_payload.py"
+      - ".github/workflows/s5api-payload-transform.yml"
+  pull_request:
+    paths:
+      - "megpoidV7.zip"
+      - "AI Model.zip"
+      - "tools/verify_s5_model_payload.py"
+      - ".github/workflows/s5api-payload-transform.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-model-json:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the portable S5 decoder with the host compiler
+        run: |
+          cmake -S app/src/main/cpp -B build/s5-payload-host -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/s5-payload-host --target veas5tensor --parallel 2
+      - name: Differentially verify native decoder and JSON roots against supplied model archives
+        run: |
+          python3 tools/verify_s5_model_payload.py --native-library build/s5-payload-host/libveas5tensor.so

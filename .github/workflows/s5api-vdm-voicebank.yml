@@ -9,6 +9,13 @@ on:
       - "tools/ghidra/ExportVdmAnalysis.java"
       - ".github/workflows/s5api-vdm-voicebank.yml"
 
+  pull_request:
+    paths:
+      - "Editor.zip"
+      - "tools/inspect_editor_zip.py"
+      - "tools/ghidra/ExportVdmAnalysis.java"
+      - ".github/workflows/s5api-vdm-voicebank.yml"
+
 permissions:
   contents: read
 
