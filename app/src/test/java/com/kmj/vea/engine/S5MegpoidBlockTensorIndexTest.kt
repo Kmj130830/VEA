@@ -39,7 +39,7 @@ class S5MegpoidBlockTensorIndexTest {
         val firstKey = S5MegpoidBlockLookupSlot.KEY_1.lookupKey
         val secondKey = S5MegpoidBlockLookupSlot.KEY_2.lookupKey
         val tree = S5ModelObjectTree.parseUtf8(
-            """{"layers":[{"$firstKey":"*F32AAAAAAAAAAA=","$secondKey":"*F32AAAAAA=="},{"$firstKey":"*F32AAAAAAAAAAA=","$secondKey":"*F32AAAAAAAAAAAAAAAA="}]}"""
+            """{"layers":[{"$firstKey":"*F32AAAAAAAAAAA=","$secondKey":"*F32AAAAAA=="},{"$firstKey":"*F32AAAAAAAAAAA=","$secondKey":"*F32AAAAAAAAAAAAAAAA"}]}"""
         )
 
         val pairs = S5MegpoidBlockTensorIndex.build(tree).modelPropertyPairs()
