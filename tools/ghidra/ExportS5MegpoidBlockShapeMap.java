@@ -23,8 +23,13 @@ import java.util.Map;
  */
 public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
     private static final String[] TARGETS = {
+        "1800589d0", // per-voice model block array constructor
         "1800537e0", // model-block object/parameter construction
         "180052f90", // related nested block setup
+        "18005e9b0", // common typed object/tensor loader
+        "180020190", // .weight member reader
+        "1800214c0", // .bias member reader
+        "180056d60", // model feature-flag dispatch
         "180056f40", // generic RNN constructor (known disabled for this bank)
         "180068190", // named model layer loader
         "180064670", // tensor-to-matrix descriptor loader
