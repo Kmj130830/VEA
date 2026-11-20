@@ -103,7 +103,7 @@ class S5MegpoidRuntimeBlockTensorIndexTest {
             lookupKey = "44444444444444444444444444444444"
         )
         val tree = S5ModelObjectTree.parseUtf8(
-            """{"" + key.lookupKey + "":"*F32AAAAAA=="}"""
+            "{" + "\"" + key.lookupKey + "\":\"*F32AAAAAA==\"}"
         )
 
         assertThrows(IllegalArgumentException::class.java) {
