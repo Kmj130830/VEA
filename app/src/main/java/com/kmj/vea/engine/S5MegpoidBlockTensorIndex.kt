@@ -6,7 +6,9 @@ package com.kmj.vea.engine
  * the binary analysis has not established semantic parameter names.
  */
 enum class S5MegpoidBlockLookupSlot(val lookupKey: String) {
+    /** First of the two matrix-property keys passed to FUN_18005e9b0. */
     KEY_1("30c16498ff30815c43d58f610a91f938"),
+    /** Second of the two matrix-property keys passed to FUN_18005e9b0. */
     KEY_2("c169d8ef47cc23f097ff312d08a6f829"),
     KEY_3("9e4170a67e795e687b0df130d8086421"),
     KEY_4("6eaa6d5161e42effbaa006bb0cd3f587"),
@@ -22,6 +24,17 @@ enum class S5MegpoidBlockLookupSlot(val lookupKey: String) {
  * The original encoded value is retained in the parsed model tree and decoded
  * only when the renderer asks for it.
  */
+/**
+ * Two matrix-property tensors found in the same containing object. The binary
+ * proves that both properties are passed to the matrix loader; their semantic
+ * roles (for example, kernel versus bias) are intentionally not guessed.
+ */
+data class S5MegpoidModelMatrixPair(
+    val containingObjectPath: String,
+    val first: S5MegpoidModelTensorReference,
+    val second: S5MegpoidModelTensorReference
+)
+
 class S5MegpoidModelTensorReference internal constructor(
     val slot: S5MegpoidBlockLookupSlot,
     val objectPath: String,
@@ -61,6 +74,27 @@ class S5MegpoidBlockTensorIndex private constructor(
 
     fun summary(): Map<S5MegpoidBlockLookupSlot, Int> =
         S5MegpoidBlockLookupSlot.entries.associateWith { tensors(it).size }
+
+    /**
+     * Pairs the two matrix-property keys only when both typed tensor leaves
+     * share the same immediate containing object. Incomplete or ambiguous
+     * groups are omitted rather than guessed.
+     */
+    fun matrixPropertyPairs(): List<S5MegpoidModelMatrixPair> {
+        val firstByParent = tensors(S5MegpoidBlockLookupSlot.KEY_1)
+            .groupBy { it.objectPath.substringBeforeLast('/', missingDelimiterValue = "") }
+        val secondByParent = tensors(S5MegpoidBlockLookupSlot.KEY_2)
+            .groupBy { it.objectPath.substringBeforeLast('/', missingDelimiterValue = "") }
+        return firstByParent.keys.intersect(secondByParent.keys).sorted().mapNotNull { parent ->
+            val first = firstByParent[parent].orEmpty()
+            val second = secondByParent[parent].orEmpty()
+            if (first.size == 1 && second.size == 1) {
+                S5MegpoidModelMatrixPair(parent, first.single(), second.single())
+            } else {
+                null
+            }
+        }
+    }
 
     companion object {
         fun build(modelTree: S5ModelObjectTree): S5MegpoidBlockTensorIndex {
