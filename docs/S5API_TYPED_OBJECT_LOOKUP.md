@@ -161,6 +161,12 @@ of the outer object in `Func_47a12a73`. That is a distinct object base and
 is not the CPU callback slot described above; the two uses of `+0x208`
 must not be conflated.
 
+## Real model tree cross-check
+
+A recursive inventory of the supplied V7 model members shows that AI_Megpoid.vtb2 contains 258 object nodes, 108 arrays, 299 strings, 626 numeric values, 859 32-character hex keys and 282 *F32 strings. It contains no *F16 strings in this inventory. The two supplied VPIT files, VHNV and VTMG were also parsed as JSON object trees.
+
+The current generic RNN constructor path passes the literal base string rnn and suffix fragments such as .weight_ih_l and .weight_hh_l to FUN_180024a90. However, a recursive search of all five decoded model trees found no match for the direct salted-key candidates rnn.weight_ih_l0, rnn.weight_hh_l0, rnn.bias_ih_l0, rnn.bias_hh_l0 or their reverse variants. This does not invalidate the recovered hash function or generic RNN parameter layout, but it means the generic loader's expected simple names have not been cross-validated against AI Megpoid's actual parameter namespace. A separate model graph or additional namespace construction may be involved.
+
 ## Implementation implications
 
 - Implement field-name construction, salted digest calculation, digest text
