@@ -416,6 +416,85 @@ def typed_tensor_lengths(value: object) -> list[dict[str, object]]:
     return layouts
 
 
+NAMED_MODEL_LAYER_BANK_COUNTS = {
+    # Recovered from the nine FUN_180068190 -> FUN_180064670 call sites.
+    "pre1": 1,
+    "pre2": 1,
+    "conv1": 3,
+    "cond1": 1,
+    "conv2": 3,
+    "cond2": 1,
+    "conv3": 3,
+    "cond3": 1,
+    "linear": 1,
+}
+
+
+def inspect_megpoid_named_layer_parameters(
+    member: str, key_values: dict[str, list[object]]
+) -> None:
+    """Audit hashed .weight/.bias members for FUN_180068190's named layers."""
+    for layer, matrix_count in NAMED_MODEL_LAYER_BANK_COUNTS.items():
+        discovered: dict[str, tuple[int, list[dict[str, object]]]] = {}
+        for suffix in ("weight", "bias"):
+            parameter_name = f"{layer}.{suffix}"
+            lookup_key = s5_lookup_key(parameter_name)
+            occurrences = key_values.get(lookup_key, [])
+            tensors = [
+                tensor
+                for occurrence in occurrences
+                for tensor in typed_tensor_lengths(occurrence)
+            ]
+            discovered[suffix] = (len(occurrences), tensors)
+            print(
+                "MODEL_NAMED_LAYER_PARAMETER",
+                f"member={member}",
+                f"layer={layer}",
+                f"parameter={suffix}",
+                f"lookup_key={lookup_key}",
+                f"occurrences={len(occurrences)}",
+                f"typed_tensor_count={len(tensors)}",
+                f"typed_tensor_elements={[item.get('elements') for item in tensors]}",
+                f"typed_tensor_types={[item.get('type') for item in tensors]}",
+            )
+
+        weight_occurrences, weight_tensors = discovered["weight"]
+        bias_occurrences, bias_tensors = discovered["bias"]
+        classification = "unresolved"
+        inferred_rows = None
+        bias_columns = None
+        if (
+            weight_occurrences == 1
+            and bias_occurrences == 1
+            and len(weight_tensors) == 1
+            and len(bias_tensors) == 1
+        ):
+            weight_elements = weight_tensors[0].get("elements")
+            bias_elements = bias_tensors[0].get("elements")
+            if (
+                isinstance(weight_elements, int)
+                and isinstance(bias_elements, int)
+                and weight_elements > 0
+                and bias_elements > 0
+            ):
+                denominator = bias_elements * matrix_count
+                if denominator > 0 and weight_elements % denominator == 0:
+                    candidate_rows = weight_elements // denominator
+                    if candidate_rows > 0:
+                        inferred_rows = candidate_rows
+                        bias_columns = bias_elements
+                        classification = "shape_count_consistent"
+        print(
+            "MODEL_NAMED_LAYER_SHAPE",
+            f"member={member}",
+            f"layer={layer}",
+            f"matrix_count={matrix_count}",
+            f"rows={inferred_rows}",
+            f"columns_from_bias={bias_columns}",
+            f"classification={classification}",
+        )
+
+
 def inspect_megpoid_block_descriptor_fields(
     member: str, root: dict, key_values: dict[str, list[object]]
 ) -> None:
@@ -598,6 +677,7 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None) -> int:
                 inspect_megpoid_block_descriptor_fields(item.filename, root, key_values)
                 if item.filename == "AI_Megpoid.vtb2":
                     inspect_megpoid_layer_property_pairs(root, item.filename)
+                    inspect_megpoid_named_layer_parameters(item.filename, key_values)
                 for root_key, root_value in root.items():
                     shape = value_shape(root_value)
                     direct_fields = len(root_value) if isinstance(root_value, (dict, list)) else 0
