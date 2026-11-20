@@ -153,7 +153,7 @@ The current archive contains all 18 named parameter tensors:
 The matrix-count values come from the nine `FUN_180068190` call sites.
 The `FUN_180064670` constructor stores `param_5` as `axis0`,
 `param_4` as `axis1`, and `align_up(param_5, 8)` as
-`padded_axis0`; the matrix bank count is `param_6). The secondary
+`padded_axis0`; the matrix bank count is `param_6`. The secondary
 bias vector has one row and `param_5` elements. The recovered descriptor
 axes are therefore:
 
@@ -172,11 +172,14 @@ axes are therefore:
 The source traversal order in `FUN_180064670` is
 `[axis0][axis1][matrix]`, matching the existing native
 `packMatrixBank()` input contract. `S5MegpoidNamedLayerParameters`
-now exposes `shapeOrNull()` and `packWeightMatrixBank()`. The latter
-decodes the selected layer's real weight payload, invokes the native matrix
-packer with these descriptor dimensions, and verifies the resulting packed
-storage length including axis0 padding. No input/output-channel names are
-assigned beyond the recovered descriptor axes.
+now exposes `shapeOrNull()`, `packWeightMatrixBank()`, and
+`packBiasVector()`. The weight path decodes the selected layer's payload,
+invokes the native matrix-bank packer, and verifies storage length including
+axis0 padding. The bias path invokes native `packRowMajor()` with
+`axis0 = bias count` and `axis1 = 1`, matching the second one-row
+descriptor created by `FUN_180064670`. The prepared result retains both
+unpadded bias values and the padded one-row bias buffer. No
+input/output-channel names are assigned beyond the recovered descriptor axes.
 
 ### Correct parameter hash serialization
 
