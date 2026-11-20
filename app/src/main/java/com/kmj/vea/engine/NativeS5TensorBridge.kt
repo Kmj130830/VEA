@@ -55,6 +55,20 @@ object NativeS5TensorBridge {
     }
 
     /**
+     * Applies the recovered S5API FUN_18002aa90 model-payload preparation step.
+     *
+     * Known VTBR/VPIT/VHNV/VTMG assets are decoded with the recovered seeded
+     * word stream; the native fallback copies unknown 16-byte-or-longer input.
+     * This is a container payload transform, not an activation or licensing
+     * operation. The decoded bytes are expected to contain a JSON object.
+     */
+    fun decodeModelPayload(input: ByteArray): ByteArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        return nativeDecodeModelPayload(input)
+            ?: throw IllegalArgumentException("S5 model payload decoding failed.")
+    }
+
+    /**
      * Returns matrices concatenated in matrix-index order. Each matrix is
      * axis1Count rows by alignUp(axis0Count, 8) columns. The unused padded
      * columns are zero-filled.
@@ -445,4 +459,5 @@ object NativeS5TensorBridge {
         header: ByteArray,
         totalFileSize: Long
     ): LongArray?
+    private external fun nativeDecodeModelPayload(input: ByteArray): ByteArray?
 }
