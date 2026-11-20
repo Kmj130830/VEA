@@ -28,7 +28,7 @@ class S5ModelObjectTreeTest {
         )
         val branch = tree.findByLookupKey("branch")!!.asObject()
         assertArrayEquals(floatArrayOf(1f, 2.5f, -30f),
-            branch.fields.getValue("weights").asFloatArray())
+            branch.fields.getValue("weights").asFloatArray(), 0.0001f)
         assertTrue((branch.fields.getValue("enabled") as S5ModelValue.BooleanValue).value)
         assertTrue(branch.fields.getValue("empty") is S5ModelValue.NullValue)
     }
@@ -57,7 +57,7 @@ class S5ModelObjectTreeTest {
         val decoder = RecordingDecoder()
         val floatValue = S5ModelValue.StringValue("*F32AAAA")
         val intValue = S5ModelValue.StringValue("*S32AAAA")
-        assertArrayEquals(floatArrayOf(1.25f, -2.5f), floatValue.asFloatArray(decoder))
+        assertArrayEquals(floatArrayOf(1.25f, -2.5f), floatValue.asFloatArray(decoder), 0.0001f)
         assertArrayEquals(intArrayOf(-7, 42), intValue.asIntArray(decoder))
         assertEquals("*F32AAAA", decoder.floatInput)
         assertEquals("*S32AAAA", decoder.intInput)
