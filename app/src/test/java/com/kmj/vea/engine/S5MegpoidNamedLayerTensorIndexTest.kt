@@ -84,9 +84,16 @@ class S5MegpoidNamedLayerTensorIndexTest {
     @Test
     fun preparesAllNineNamedLayerWeightsAndBiasesForTheNativeBoundary() {
         val index = S5MegpoidNamedLayerTensorIndex.build(modelTree(), ::lookupKey)
-        val prepared = index.packAllLayers(TestDecoder()) { _, axis0, axis1, matrices ->
-            FloatArray(axis1 * ((axis0 + 7) / 8 * 8) * matrices)
-        }
+        val prepared = index.packAllLayers(
+            tensorDecoder = TestDecoder(),
+            matrixPacker = { _, axis0, axis1, matrices ->
+                FloatArray(axis1 * ((axis0 + 7) / 8 * 8) * matrices)
+            },
+            biasPacker = { _, axis0, axis1 ->
+                assertEquals(1, axis1)
+                FloatArray((axis0 + 7) / 8 * 8)
+            }
+        )
 
         assertEquals(9, prepared.size)
         assertEquals(S5MegpoidNamedLayer.PRE1, prepared.first().layer)
@@ -94,7 +101,9 @@ class S5MegpoidNamedLayerTensorIndexTest {
         assertEquals(6144, prepared.firstOrNull { it.layer == S5MegpoidNamedLayer.CONV1 }
             ?.packedWeightValues?.size)
         assertEquals(64, prepared.first { it.layer == S5MegpoidNamedLayer.CONV1 }.biasValues.size)
+        assertEquals(64, prepared.first { it.layer == S5MegpoidNamedLayer.CONV1 }.packedBiasValues.size)
         assertEquals(3, prepared.first { it.layer == S5MegpoidNamedLayer.LINEAR }.biasValues.size)
+        assertEquals(8, prepared.first { it.layer == S5MegpoidNamedLayer.LINEAR }.packedBiasValues.size)
     }
 
     @Test
