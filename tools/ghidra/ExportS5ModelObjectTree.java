@@ -77,6 +77,11 @@ public class ExportS5ModelObjectTree extends GhidraScript {
         "18004f2d0", // tensor context/member initializer
         "180056d60", // model decoder context setup
         "1800537e0", // writes a pointer at object offset +0x208
+        "180052f90", // per-entry block parser called by FUN_1800537e0
+        "18005e9b0", // subobject/tensor descriptor loader used by FUN_1800537e0
+        "18005903a", // caller site for FUN_1800537e0 during model-layer traversal
+        "1800c5d50", // active residual depthwise/MLP runtime block
+        "1800c67e0", // depthwise-convolution state/history preparation
         "18005c340", // reads object offset +0x208
         "1800114b0", // writes object offset +0x208
         "180012030", // writes object offset +0x208
@@ -114,7 +119,7 @@ public class ExportS5ModelObjectTree extends GhidraScript {
         "18001a840", // shared field assignment helper
         "18004f2d0", // selects CPU-specific tensor operator function pointers
         "18003cb70", // scalar fallback installed in table slot +0x1e / context +0x208
-        "1800a58b0", // AVX-512 converter installed in table slot +0x1e / context +0x208
+        "1800a58b0", // AVX2/FMA/F16C converter installed in table slot +0x1e / context +0x208
         "1800a58e0", // adjacent AVX-512 table slot +0x1d
         "1800a7e60", // AVX-512 table slot +0x14
         "1800a8e40", // AVX-512 table slot +0x1b
