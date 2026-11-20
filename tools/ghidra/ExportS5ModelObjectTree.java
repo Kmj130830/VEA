@@ -192,6 +192,12 @@ public class ExportS5ModelObjectTree extends GhidraScript {
             dumpBytes(out, "18019b770", 4);
             dumpBytes(out, "18019b778", 4);
             out.println();
+            out.println("## F16 callback target disassembly windows");
+            out.println();
+            dumpWindow(out, toAddr("18003cb70"), 0x20, 0xa0);
+            dumpWindow(out, toAddr("1800a58b0"), 0x20, 0x50);
+            dumpWindow(out, toAddr("1800a58e0"), 0x20, 0x50);
+            out.println();
             out.println("## F16 callback candidate field accesses");
             out.println();
             for (String fieldOffset : new String[] {
