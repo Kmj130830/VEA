@@ -3,6 +3,7 @@ package com.kmj.vea.engine
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.util.zip.ZipInputStream
 
 data class S5ModelArchiveMember(
@@ -11,6 +12,7 @@ data class S5ModelArchiveMember(
     val formatWord: Long,
     val encodedSizeBytes: Int,
     val decodedJsonSizeBytes: Int,
+    val sha256: String,
     val tree: S5ModelObjectTree
 )
 
@@ -20,6 +22,14 @@ data class S5ModelArchive(
     val singerModel: S5ModelArchiveMember
         get() = members[AI_MEGPOID_MODEL]
             ?: throw IllegalStateException("AI Megpoid model member is missing.")
+
+    fun mergedWith(other: S5ModelArchive): S5ModelArchive {
+        val duplicates = members.keys.intersect(other.members.keys)
+        require(duplicates.isEmpty()) {
+            "Model archives contain duplicate members: " + duplicates.sorted().joinToString(", ")
+        }
+        return S5ModelArchive(members + other.members)
+    }
 
     companion object {
         const val AI_MEGPOID_MODEL = "AI_Megpoid.vtb2"
@@ -55,7 +65,7 @@ class S5ModelArchiveReader(
         val formatWord: Long
     )
 
-    fun read(input: InputStream): S5ModelArchive {
+    fun read(input: InputStream, requireSingerModelMember: Boolean = true): S5ModelArchive {
         val loaded = LinkedHashMap<String, S5ModelArchiveMember>()
         var entryCount = 0
         var totalUncompressedBytes = 0L
@@ -117,14 +127,17 @@ class S5ModelArchiveReader(
                         formatWord = header.formatWord,
                         encodedSizeBytes = encoded.size,
                         decodedJsonSizeBytes = decoded.size,
+                        sha256 = sha256Hex(encoded),
                         tree = tree
                     )
                 }
             }
         }
 
-        require(loaded.containsKey(S5ModelArchive.AI_MEGPOID_MODEL)) {
-            "Archive does not contain ${S5ModelArchive.AI_MEGPOID_MODEL}."
+        if (requireSingerModelMember) {
+            require(loaded.containsKey(S5ModelArchive.AI_MEGPOID_MODEL)) {
+                "Archive does not contain ${S5ModelArchive.AI_MEGPOID_MODEL}."
+            }
         }
         return S5ModelArchive(loaded.toMap())
     }
@@ -154,6 +167,11 @@ class S5ModelArchiveReader(
             formatWord = readUInt32Le(bytes, 8)
         )
     }
+
+    private fun sha256Hex(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256")
+            .digest(bytes)
+            .joinToString("") { value -> "%02x".format(value.toInt() and 0xff) }
 
     private fun readUInt32Le(bytes: ByteArray, offset: Int): Long =
         (bytes[offset].toLong() and 0xffL) or

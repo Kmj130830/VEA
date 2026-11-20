@@ -57,7 +57,8 @@ fun ArrangementScreen(
     modelArchiveStatus: String,
     modelLoaded: Boolean,
     isImportingModelArchive: Boolean,
-    onImportModelArchive: () -> Unit,
+    onImportBankArchive: () -> Unit,
+    onImportSharedModelArchive: () -> Unit,
     canUndo: Boolean,
     canRedo: Boolean
 ) {
@@ -92,11 +93,18 @@ fun ArrangementScreen(
                 )
             }
             TextButton(
-                onClick = onImportModelArchive,
+                onClick = onImportBankArchive,
                 enabled = !isImportingModelArchive,
-                contentPadding = PaddingValues(horizontal = 4.dp)
+                contentPadding = PaddingValues(horizontal = 3.dp)
             ) {
-                Text(if (isImportingModelArchive) "LOADING" else "LOAD V7", fontSize = 9.sp)
+                Text(if (isImportingModelArchive) "..." else "BANK ZIP", fontSize = 8.sp)
+            }
+            TextButton(
+                onClick = onImportSharedModelArchive,
+                enabled = !isImportingModelArchive,
+                contentPadding = PaddingValues(horizontal = 3.dp)
+            ) {
+                Text(if (isImportingModelArchive) "..." else "CORE ZIP", fontSize = 8.sp)
             }
             TextButton(onClick = onExportMidi, contentPadding = PaddingValues(horizontal = 5.dp)) {
                 Text("V7 MIDI", fontSize = 10.sp)
@@ -280,9 +288,9 @@ fun ArrangementScreen(
                     }
                     Text(
                         if (modelLoaded) {
-                            "V7 model data is loaded. Neural inference and waveform rendering are still being implemented."
+                            "All five AI Megpoid V7 model files passed SHA-256 checks and are loaded. Neural inference/audio rendering is the next stage."
                         } else {
-                            "Load the AI Megpoid V7 model package to prepare local model data. Singing inference is not available yet."
+                            "Load the AI Megpoid bank ZIP and the shared AI Model ZIP. Both are checked against the supplied model hashes."
                         },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 10.sp
@@ -290,15 +298,18 @@ fun ArrangementScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    onAssignVoice(
-                        targetTrack.id,
-                        voicebank.id,
-                        voicebank.displayName,
-                        selectedVoiceStyleId
-                    )
-                    voicePickerTrack = null
-                }) { Text("ASSIGN VOICE") }
+                TextButton(
+                    enabled = modelLoaded,
+                    onClick = {
+                        onAssignVoice(
+                            targetTrack.id,
+                            voicebank.id,
+                            voicebank.displayName,
+                            selectedVoiceStyleId
+                        )
+                        voicePickerTrack = null
+                    }
+                ) { Text("ASSIGN VOICE") }
             },
             dismissButton = {
                 TextButton(onClick = { voicePickerTrack = null }) { Text("CANCEL") }
