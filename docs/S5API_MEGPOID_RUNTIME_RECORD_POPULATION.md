@@ -207,7 +207,7 @@ and complete singing forward pass remain unfinished.
 - `S5MegpoidRuntimeBlockAssembler` decodes all eight tensor roles, checks
   metadata and element counts, forms the generated expansion matrix and
   affine arrays, and keeps both the source channel-major filter and the
-  `[W][C][H]` native-record permutation.
+  `[C][W][H]` native-record permutation.
 - `S5VoicebankModelPackage.prepareRuntimeBlocks(..., positions)` prepares
   the eight blocks from the loaded voicebank package. It requires the
   caller's actual chunk length.
