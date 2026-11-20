@@ -60,6 +60,25 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
         "180068190", // named model layer loader
         "18008d470", // named-layer model context builder / runtime entry
         "18008d470", // exported model-layer object constructor entry point
+        "180085310", // adjacent named-model object vtable method
+        "180085460", // adjacent named-model object vtable method
+        "1800854e0", // adjacent named-model object vtable method
+        "180085510", // adjacent named-model object vtable method
+        "180085540", // adjacent named-model object vtable method
+        "180085b40", // adjacent named-model object vtable method
+        "180085bf0", // adjacent named-model object vtable method
+        "180085c60", // adjacent named-model object vtable method
+        "180085d10", // adjacent named-model object vtable method
+        "18008d650", // adjacent named-model object vtable method
+        "18008e340", // adjacent named-model object vtable method
+        "18008e350", // adjacent named-model object vtable method
+        "1800914b0", // adjacent named-model object vtable method
+        "1800914f0", // adjacent named-model object vtable method
+        "180091610", // adjacent named-model object vtable method
+        "180092500", // adjacent named-model object vtable method
+        "1800925b0", // adjacent named-model object vtable method
+        "1800925f0", // adjacent named-model object vtable method
+        "180097b60", // adjacent named-model object vtable method
         "180064670", // tensor-to-matrix descriptor loader
         "1800c5d50", // residual depthwise/MLP runtime block
         "1800c67e0", // depthwise history/ring-buffer producer
