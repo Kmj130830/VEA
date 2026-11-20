@@ -98,10 +98,20 @@ class S5MegpoidBlockTensorIndex private constructor(
      * Incomplete or ambiguous groups are omitted rather than guessed.
      */
     fun modelPropertyPairs(): List<S5MegpoidModelPropertyPair> {
+        fun containingLayerPath(tensor: S5MegpoidModelTensorReference): String {
+            // A tensor may be a direct string at the lookup key or nested below
+            // it (for example, <lookup-key>/weight). Strip the lookup-key
+            // segment itself so both layouts resolve to the owning layer object.
+            val lookupSegment = "/${tensor.slot.lookupKey}"
+            val lookupOffset = tensor.objectPath.indexOf(lookupSegment)
+            if (lookupOffset >= 0) return tensor.objectPath.substring(0, lookupOffset)
+            return tensor.objectPath.substringBeforeLast('/', missingDelimiterValue = "")
+        }
+
         val firstByParent = tensors(S5MegpoidBlockLookupSlot.KEY_1)
-            .groupBy { it.objectPath.substringBeforeLast('/', missingDelimiterValue = "") }
+            .groupBy(::containingLayerPath)
         val secondByParent = tensors(S5MegpoidBlockLookupSlot.KEY_2)
-            .groupBy { it.objectPath.substringBeforeLast('/', missingDelimiterValue = "") }
+            .groupBy(::containingLayerPath)
         return firstByParent.keys.intersect(secondByParent.keys).sorted().mapNotNull { parent ->
             val first = firstByParent[parent].orEmpty()
             val second = secondByParent[parent].orEmpty()
