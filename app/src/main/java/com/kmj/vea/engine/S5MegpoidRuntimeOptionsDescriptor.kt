@@ -34,6 +34,38 @@ data class S5MegpoidRuntimeOptionsDescriptor(
         }
     }
 
+    /**
+     * Builds the S5API output-transform input from values loaded by
+     * FUN_1800ced10 plus constructor defaults recovered from FUN_1800bca40.
+     *
+     * The native loader stores param[1] at root +0x04, param[3] at +0x0C
+     * and param[4] at +0x10. FUN_1800d5a00 forwards those as geometry/FFT
+     * size, output sample count, and the descriptor float parameter.
+     *
+     * The model-population body does not overwrite the output-specific
+     * fields at +0x61C, +0x620, +0x1F74, +0x3418 and +0x1F75; they retain
+     * the verified blank-root constructor defaults.
+     */
+    fun buildOutputTransformInputsFromNativeMegpoidDefaults(): S5MegpoidOutputTransformInputs {
+        requireMegpoidV7BlockGrid()
+        require(param1 > 0 && param3 > 0) {
+            "Megpoid runtime options contain invalid output-transform dimensions."
+        }
+        val floatParameter = param4.toFloat()
+        require(floatParameter.isFinite()) {
+            "Megpoid output-transform float parameter is not finite."
+        }
+        return S5MegpoidOutputTransformInputs(
+            outputSamplesAtRoot0C = param3,
+            geometryAndFftSizeAtRoot04 = param1,
+            floatParameterAtRoot10 = floatParameter,
+            frameWindowCoreLengthAtRoot61C = 0,
+            alternatingBinSignAtRoot620 = false,
+            flagAtRoot1F74 = false,
+            frameWindowShapeModeAtRoot3418 = 0,
+            flagAtRoot1F75 = false
+        )
+    }
     /** Number of feature buffers owned by the native render context. */
     val sequenceSlotCount: Int get() = param5
 
