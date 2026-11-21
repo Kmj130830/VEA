@@ -2,7 +2,9 @@ package com.kmj.vea.engine
 
 import com.kmj.vea.data.VeaProject
 import com.kmj.vea.data.VeaTrack
+import java.io.File
 import java.io.OutputStream
+import java.net.URI
 
 data class VoicebankDescriptor(
     val id: String,
@@ -125,6 +127,28 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
         }
     }
 
+    /**
+     * Loads the installed Megpoid VTB2 file through the recovered 16-byte
+     * container transform, then parses its JSON-like tensor object tree.
+     * The returned paths remain opaque until the model graph's parameter-name
+     * mapping is recovered; this method intentionally does not guess that map.
+     */
+    fun loadModelTensorObjects(voicebank: VoicebankDescriptor): S5DecodedModelObjectTree {
+        require(voicebank.id == "ai_megpoid_v7" && voicebank.engineFamily == "VOCALOID7") {
+            "This model loader currently targets the bundled AI Megpoid V7 voicebank."
+        }
+        check(NativeS5TensorBridge.isLoaded) {
+            "The native S5 container and typed-tensor decoder is not loaded."
+        }
+        val directory = File(URI(voicebank.sourceUri))
+        val modelFile = File(directory, "AI_Megpoid.vtb2")
+        val tree = S5ModelPayloadReader.decodeContainerFile(modelFile)
+        require(tree.floatTensorCount > 0) {
+            "The decoded Megpoid model contains no typed floating-point tensors."
+        }
+        return tree
+    }
+
     override suspend fun render(
         project: VeaProject,
         voicebank: VoicebankDescriptor,
@@ -132,9 +156,12 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
     ) {
         val plans = prepareRenderPlans(project, voicebank)
         require(plans.any { !it.isEmpty }) { "There are no notes to synthesize." }
+
+        val modelTree = loadModelTensorObjects(voicebank)
         throw UnsupportedOperationException(
-            "The AI Megpoid model resources are bundled and verified, and the note/pitch render plan is ready. " +
-                "The Android ARM64 acoustic runtime is not complete yet; no WAV was generated."
+            "AI Megpoid VTB2 was decoded and parsed (${modelTree.floatTensorCount} float tensor fields, " +
+                "${modelTree.intTensorCount} integer tensor fields). The neural graph's opaque parameter " +
+                "mapping and acoustic execution are not complete; no WAV was generated."
         )
     }
 }
