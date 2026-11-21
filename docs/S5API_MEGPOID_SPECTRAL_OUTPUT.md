@@ -20,6 +20,50 @@ In `FUN_1800c7ad0`, the second argument is saved as `local_188` and passed to th
 
 The neural render state and its descriptor/workspace arrays are owned by the first argument. The forward network consumes those root-owned tensors and writes a complex-valued spectral frame to the root-owned output-spectrum buffer.
 
+## Input-side periodic/noise excitation generator
+
+The trace of `FUN_18012ad70` shows that the frame passed into the forward transform is generated from pitch and two interpolated gains; it is not simply copied from an external audio buffer.
+
+The excitation-state layout observed from native loads/stores is:
+
+| Byte offset | Type/use |
+|---:|---|
+| +0x00 | frame sample count N |
+| +0x04 | phase sample rate (integer) |
+| +0x08 | period/sample-rate scale (float) |
+| +0x0C | harmonic denominator threshold (float) |
+| +0x10 | phase-wrap flag |
+| +0x14 | previous F0 |
+| +0x18 | previous noise gain |
+| +0x1C | previous harmonic gain |
+| +0x20 | phase accumulator |
+| +0x24 | cached Gaussian-sample state |
+| +0x13AC | random-engine state |
+
+The per-frame call inputs are:
+
+- `param_3`: target F0 in Hz
+- `param_4`: target noise/aperiodic gain
+- `param_5`: target periodic/harmonic gain
+
+For each sample, the native routine linearly interpolates F0 and both gains from their previous-frame values to the current targets. It accumulates phase using `2π * F0 / phaseSampleRate`, optionally wraps phase, and computes a periodic pulse term:
+
+```text
+period = max(1, floor(periodSampleRate / max(F0, 1e-5)))
+shape = (cos(phase/2) - cos((period + 0.5) * phase)) / (2 * sin(phase/2))
+periodic = sqrt(2 / period) * harmonicGain * shape * (F0 > 0)
+noise = gaussianSample * noiseGain
+excitation = periodic + noise
+```
+
+If the absolute denominator is at or below the state threshold, the periodic shape is set to zero. The previous F0/gains and final phase are retained for the next chunk.
+
+`FUN_180127720` supplies a standard-normal sample using a cached-pair polar (Marsaglia) sampler. Its underlying uniform generator `FUN_180026fd0` has a 624-word Mersenne-Twister-family state and uses twist constant `0x9908B0DF`; its tempering parameters are not the default `std::mt19937` constants, and the exact seed/state initialization is still being traced.
+
+At the `FUN_1800c7ad0` call site, the forward-transform wrapper receives the F0 control in XMM2, a render-state float at offset `+0x614` in XMM3, and a stack float constant `0.1` as the fifth argument. This supports the noise-gain and harmonic-gain roles above, but the vendor name for the `+0x614` field is not known.
+
+VEA now has an isolated Kotlin implementation in `S5MegpoidExcitationGenerator.kt`, with an injectable Gaussian source and tests for phase continuity, gain interpolation and cached normal samples. It is not yet wired into the main render path: transform-state constructor values, exact RNG seeding and upstream F0/voicing generation must be connected first.
+
 ## Spectral output conversion
 
 At the end of `FUN_1800c7ad0`, the renderer calls:
