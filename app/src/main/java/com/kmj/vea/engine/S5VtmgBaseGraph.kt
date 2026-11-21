@@ -127,7 +127,7 @@ object S5VtmgGraphTensorCatalog {
         val missing = expectedTensorKeys - actualKeys
         val unexpected = actualKeys - expectedTensorKeys
         require(missing.isEmpty()) {
-            "VTMG base graph is missing expected tensor keys: \${missing.sorted().joinToString()}."
+            "VTMG base graph is missing expected tensor keys: ${missing.sorted().joinToString()}."
         }
         require(unexpected.isEmpty() && matches.size == expectedTensorKeys.size) {
             "VTMG base graph contains unexpected or duplicate tensor fields."
@@ -144,23 +144,23 @@ object S5VtmgGraphTensorCatalog {
 
         val result = layers.map { spec ->
             val weight = requireNotNull(decoded[spec.weightKey]) {
-                "VTMG layer '\${spec.layerName}' is missing its weight tensor."
+                "VTMG layer '${spec.layerName}' is missing its weight tensor."
             }
             val bias = requireNotNull(decoded[spec.biasKey]) {
-                "VTMG layer '\${spec.layerName}' is missing its bias tensor."
+                "VTMG layer '${spec.layerName}' is missing its bias tensor."
             }
             require(weight.kind == S5DecodedTensorKind.FLOAT32 && bias.kind == S5DecodedTensorKind.FLOAT32) {
-                "VTMG layer '\${spec.layerName}' must use float32 weights and bias."
+                "VTMG layer '${spec.layerName}' must use float32 weights and bias."
             }
             val weightValues = requireNotNull(weight.floatValues)
             val biasValues = requireNotNull(bias.floatValues)
             require(weightValues.size == spec.weightElementCount) {
-                "VTMG layer '\${spec.layerName}' weight has \${weightValues.size} values; " +
-                    "expected \${spec.weightElementCount}."
+                "VTMG layer '${spec.layerName}' weight has ${weightValues.size} values; " +
+                    "expected ${spec.weightElementCount}."
             }
             require(biasValues.size == spec.biasElementCount) {
-                "VTMG layer '\${spec.layerName}' bias has \${biasValues.size} values; " +
-                    "expected \${spec.biasElementCount}."
+                "VTMG layer '${spec.layerName}' bias has ${biasValues.size} values; " +
+                    "expected ${spec.biasElementCount}."
             }
             S5VtmgGraphLayerWeights(
                 layerName = spec.layerName,
@@ -189,13 +189,13 @@ object S5VtmgBaseGraphPacker {
         val packed = S5VtmgGraphTensorCatalog.layers.map { spec ->
             val source = graph.requireLayer(spec.layerName)
             require(source.weight.size == spec.weightElementCount) {
-                "VTMG layer '\${spec.layerName}' has an invalid raw weight length."
+                "VTMG layer '${spec.layerName}' has an invalid raw weight length."
             }
             require(source.bias.size == spec.biasElementCount) {
-                "VTMG layer '\${spec.layerName}' has an invalid bias length."
+                "VTMG layer '${spec.layerName}' has an invalid bias length."
             }
             require(source.weight.all { it.isFinite() } && source.bias.all { it.isFinite() }) {
-                "VTMG layer '\${spec.layerName}' contains a non-finite parameter."
+                "VTMG layer '${spec.layerName}' contains a non-finite parameter."
             }
 
             val matrices = packMatrixBank(
@@ -205,10 +205,10 @@ object S5VtmgBaseGraphPacker {
                 spec.matrixCount
             )
             require(matrices.size == spec.packedWeightElementCount) {
-                "S5API packing returned an invalid matrix-bank length for '\${spec.layerName}'."
+                "S5API packing returned an invalid matrix-bank length for '${spec.layerName}'."
             }
             require(matrices.all { it.isFinite() }) {
-                "Packed VTMG layer '\${spec.layerName}' contains a non-finite parameter."
+                "Packed VTMG layer '${spec.layerName}' contains a non-finite parameter."
             }
 
             // FUN_180006a80 allocations are 32-byte aligned and every descriptor
@@ -219,7 +219,7 @@ object S5VtmgBaseGraphPacker {
                         val rowStart = (bank * spec.axis1Count + row) * spec.paddedAxis0Count
                         for (column in spec.axis0Count until spec.paddedAxis0Count) {
                             require(matrices[rowStart + column] == 0.0f) {
-                                "S5API padding is nonzero in VTMG layer '\${spec.layerName}'."
+                                "S5API padding is nonzero in VTMG layer '${spec.layerName}'."
                             }
                         }
                     }
