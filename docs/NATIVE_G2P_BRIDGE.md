@@ -75,13 +75,23 @@ The component strings are copied from the three static pointer tables, not synth
 
 These are **base table components**, not final spoken phonemes. The proprietary context rules change some syllables and markers before the segment strings are assembled. Therefore the language-ready mask remains zero and the renderer remains unavailable.
 
+## Android Kotlin access to base components
+
+The JNI bridge now exposes `vea_g2p_korean_syllable_components` to `NativeG2pBridge.inspectKoreanBaseComponents`. For each precomposed modern Hangul character in the lexically normalized input, the Kotlin method returns:
+
+- the normalized lyric's UTF-16 character index;
+- the original Hangul syllable character;
+- its raw onset, vowel and coda base-table labels.
+
+Non-Hangul characters are omitted from this diagnostic result; their positions remain recoverable through the retained index values. The method name and return type deliberately say *base components*, not *phonemize*: adjacent-syllable rules, marker semantics and final syllable segmentation still have to run before this data could be used as a singing-engine phoneme stream.
+
 ## Files
 
 - `app/src/main/cpp/include/veag2p.h`: stable C ABI, status values, ABI version, language readiness mask, Hangul index lookup and base-component output contracts.
 - `app/src/main/cpp/veag2p_core.cpp`: UTF-8 validation, two code-point canonicalizations, 32 ordered Korean lexical replacements, packed Hangul-index lookup, and base onset/vowel/coda label tables.
-- `app/src/main/cpp/veag2p_jni.cpp`: JNI boundary; converts Java UTF-16 strings without relying on JNI modified UTF-8.
+- `app/src/main/cpp/veag2p_jni.cpp`: JNI boundary; converts Java UTF-16 strings without relying on JNI modified UTF-8 and exposes base-component arrays.
 - `app/src/main/cpp/CMakeLists.txt`: Android shared-library and host-test targets.
-- `app/src/main/java/com/kmj/vea/engine/NativeG2pBridge.kt`: Kotlin facade.
+- `app/src/main/java/com/kmj/vea/engine/NativeG2pBridge.kt`: Kotlin facade, including diagnostic `inspectKoreanBaseComponents`.
 - `app/src/main/cpp/tests/veag2p_core_test.cpp`: host-side tests for UTF-8 validation, all 32 Korean replacements, repeated matches, the full 11,172-syllable packed-index and base-label hashes, and output-buffer sizing.
 
 ## ABI
