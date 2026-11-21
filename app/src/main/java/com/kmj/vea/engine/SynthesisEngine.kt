@@ -152,19 +152,33 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
         val plans = prepareRenderPlans(project, voicebank)
         require(plans.any { !it.isEmpty }) { "There are no notes to synthesize." }
 
-        val resourceScans = scanModelResources(voicebank)
+        val candidateLayout = S5RecurrentLayerLayout(
+            inputFeatures = 1,
+            hiddenFeatures = 1,
+            layerCount = 32,
+            bidirectional = true,
+            hasBias = true
+        )
+        val recurrentCandidateKeys = S5RecurrentParameterLoader
+            .specifications(candidateLayout)
+            .map { it.lookupKey }
+            .toSet()
+        val resourceScans = scanModelResources(voicebank, recurrentCandidateKeys)
         val typedTensorCount = resourceScans.sumOf { it.result.typedTensorStringCount }
         require(typedTensorCount > 0L) {
             "The bundled Megpoid package contains no typed tensor strings."
+        }
+        val recurrentMatches = resourceScans.sumOf { scan ->
+            scan.result.matchedTensorStrings.values.sumOf { it.size.toLong() }
         }
         val resourceSummary = resourceScans.joinToString { scan ->
             "${scan.fileName}: ${scan.result.objectCount} objects / " +
                 "${scan.result.typedTensorStringCount} typed tensors"
         }
         throw UnsupportedOperationException(
-            "The five bundled Megpoid/shared model containers were decoded and streamed ($resourceSummary). " +
-                "The neural graph's opaque parameter mapping and acoustic execution are not complete; " +
-                "no WAV was generated."
+            "The five bundled Megpoid/shared model containers were decoded and streamed ($resourceSummary; " +
+                "$recurrentMatches candidate recurrent objects matched). The neural graph's exact parameter " +
+                "mapping and acoustic execution are not complete; no WAV was generated."
         )
     }
 }
