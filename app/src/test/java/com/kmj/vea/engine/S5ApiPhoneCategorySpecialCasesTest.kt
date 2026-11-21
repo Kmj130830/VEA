@@ -11,7 +11,8 @@ class S5ApiPhoneCategorySpecialCasesTest {
             assertEquals(label, 1, S5ApiPhoneCategorySpecialCases.fixedIndexOrNull(label))
         }
         assertNull(S5ApiPhoneCategorySpecialCases.fixedIndexOrNull("sil"))
-        assertEquals(1, S5ApiPhoneCategorySpecialCases.fixedIndexOrNull("br"))
+        assertNull(S5ApiPhoneCategorySpecialCases.fixedIndexOrNull("br"))
+        assertEquals(1, S5ApiPhoneCategoryMap.resolve("br"))
     }
 
     @Test
