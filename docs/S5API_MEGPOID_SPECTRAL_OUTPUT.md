@@ -58,11 +58,20 @@ excitation = periodic + noise
 
 If the absolute denominator is at or below the state threshold, the periodic shape is set to zero. The previous F0/gains and final phase are retained for the next chunk.
 
-`FUN_180127720` supplies a standard-normal sample using a cached-pair polar (Marsaglia) sampler. Its underlying uniform generator `FUN_180026fd0` has a 624-word Mersenne-Twister-family state and uses twist constant `0x9908B0DF`; its tempering parameters are not the default `std::mt19937` constants, and the exact seed/state initialization is still being traced.
+`FUN_180127720` supplies a standard-normal sample using a cached-pair polar (Marsaglia) sampler. The state is initialized by `FUN_180127a40`, called from the transform-state constructor `FUN_180128c40` with seed `0x2a` (42). A zero seed is also replaced by 42. The 624-word generator state uses the recurrence:
+
+```text
+state[0] = seed
+state[i] = 1812433253 * (state[i-1] xor (state[i-1] >>> 30)) + i
+```
+
+`FUN_180026fd0` uses the MT19937 twist constant `0x9908B0DF` and the standard 397-word period. The decompiler represents the temper operations with pre-shift masks `0xff3a58ad` and `0xffffdf8c`; after the left shifts and 32-bit truncation these are equivalent to the conventional MT19937 masks `0x9d2c5680` and `0xefc60000`. The output-to-uniform conversion discards the low eight bits, multiplies the remaining 24-bit integer by `2^-24`, then maps `[0,1)` to `[-1,1)`.
+
+The polar sampler draws x then y, rejects radius squared >= 1 and zero coordinates, returns x times the normal scale first, and caches y times the same scale for the next call. The very-small-radius path rescales the coordinates before the logarithm and compensates by `ln(4) * exponent`. This reconstruction is covered by deterministic seed-42 vectors and tests across the 624-word twist boundary; it has not yet been compared against a live S5API render.
 
 At the `FUN_1800c7ad0` call site, the forward-transform wrapper receives the F0 control in XMM2, a render-state float at offset `+0x614` in XMM3, and a stack float constant `0.1` as the fifth argument. This supports the noise-gain and harmonic-gain roles above, but the vendor name for the `+0x614` field is not known.
 
-VEA now has an isolated Kotlin implementation in `S5MegpoidExcitationGenerator.kt`, with an injectable Gaussian source and tests for phase continuity, gain interpolation and cached normal samples. It is not yet wired into the main render path: transform-state constructor values, exact RNG seeding and upstream F0/voicing generation must be connected first.
+VEA now has `S5MegpoidNativeMersenneTwister` and a `S5MegpoidGaussianNoise.fromNativeSeed()` factory. `S5MegpoidExcitationGenerator.withRecoveredRandomSource()` connects that deterministic source to the isolated excitation generator. Transform-state scale values, the upstream F0/voicing generation path, and the final spectral/audio path remain unconnected.
 
 ## Spectral output conversion
 
