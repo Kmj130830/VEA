@@ -1,18 +1,11 @@
 package com.kmj.vea.engine
 
 /**
- * Token boundary rules recovered from G2PAManager_KOR.dll FUN_180003310.
- *
- * This is deliberately separate from VsmLyricTokenizer: the Korean G2P
- * parser treats U+0020, U+3000, U+0009 and U+000A as delimiters. It does not
- * split on carriage return, non-breaking space, or the wider Unicode
- * whitespace category. Empty runs are discarded.
- */
-/**
  * The two UTF-16 string fields produced by G2PAManager_KOR.dll
  * FUN_1800034e0 before dispatching an input token to its internal module.
  * The native helper stores the first 30 UTF-16 code units in [prefix30] and
- * the remaining code units in [remainder].
+ * the remaining code units in [remainder]. The boundary is a code-unit
+ * boundary, so a surrogate pair may be split between these two fields.
  */
 data class KoreanG2pTokenFields(
     val prefix30: String,
@@ -21,6 +14,14 @@ data class KoreanG2pTokenFields(
     val combined: String get() = prefix30 + remainder
 }
 
+/**
+ * Token boundary rules recovered from G2PAManager_KOR.dll FUN_180003310.
+ *
+ * This is deliberately separate from VsmLyricTokenizer: the Korean G2P
+ * parser treats U+0020, U+3000, U+0009 and U+000A as delimiters. It does not
+ * split on carriage return, non-breaking space, or the wider Unicode
+ * whitespace category. Empty runs are discarded.
+ */
 object KoreanG2pInputTokenizer {
     /**
      * Applies the Korean manager's confirmed U+30FC/U+2212 normalization
