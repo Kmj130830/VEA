@@ -1,0 +1,66 @@
+name: VEA S5API model container and tensor key trace
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "Editor.zip"
+      - "tools/ghidra/ExportS5ContainerAndHash.java"
+      - ".github/workflows/s5api-container-hash-analysis.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  container-and-hash:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Extract S5API.dll
+        run: python3 tools/inspect_editor_zip.py
+
+      - name: Download and verify Ghidra 12.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive=/tmp/ghidra_12.2_PUBLIC_20261016.zip
+          curl --fail --location --retry 3 "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_12.2_build/ghidra_12.2_PUBLIC_20261016.zip" -o "$archive"
+          echo "2c2cd776db3c1f6a097ba418922378ac3649cadd5e844a6f5f088ae628a7be67  $archive" | sha256sum --check
+          mkdir -p /tmp/ghidra
+          unzip -q "$archive" -d /tmp/ghidra
+          tool="$(find /tmp/ghidra -path '*/support/analyzeHeadless' -type f -print -quit)"
+          test -n "$tool"
+          echo "GHIDRA_HEADLESS=$tool" >> "$GITHUB_ENV"
+
+      - name: Decompile model payload transform, tensor conversion and key derivation
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/s5-container-hash/ghidra build/ghidra-container-hash-projects
+          "$GHIDRA_HEADLESS" "$PWD/build/ghidra-container-hash-projects" VEA_S5_CONTAINER_HASH \
+            -import "$PWD/build/editor-package/modules/S5API.dll" \
+            -scriptPath "$PWD/tools/ghidra" \
+            -postScript ExportS5ContainerAndHash.java "$PWD/build/s5-container-hash/ghidra/S5API_CONTAINER_HASH_TRACE.md" \
+            -analysisTimeoutPerFile 600 -deleteProject
+          test -s build/s5-container-hash/ghidra/S5API_CONTAINER_HASH_TRACE.md
+
+      - name: Record implementation boundary
+        run: |
+          cat > build/s5-container-hash/PORTING_NOTES.md <<'EOF'
+          # S5API container, tensor and lookup-key analysis
+          The report is static disassembly evidence. Do not implement a model decoder or hash scheme from names or constants alone; establish exact byte ranges, transforms, and digest formatting first.
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VEA-S5API-container-hash-analysis
+          path: build/s5-container-hash/
+          if-no-files-found: error
+          retention-days: 30
