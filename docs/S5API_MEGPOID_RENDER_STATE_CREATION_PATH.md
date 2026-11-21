@@ -162,3 +162,22 @@ The render order is Temporal[0], Temporal[1], Temporal[2], Residual row 3,
 then Banked[0]/Residual row 2, Banked[1]/Residual row 1, and
 Banked[2]/Residual row 0. This corrects the earlier five-slot/four-transition
 assumption and is the sequence used by the Android pipeline.
+
+## Focused render-root scalar provenance trace
+
+A separate, focused Ghidra 12.2 report for FUN_1800ced10, FUN_1800bca40
+and FUN_1800d5a00 confirms the output-descriptor scalar sources:
+
+- Runtime-options param[1] is stored at render root +0x04.
+- Runtime-options param[3] is stored at render root +0x0C.
+- Runtime-options param[4] is stored at render root +0x10 and cast to float
+  by FUN_1800d5a00 before it is passed to the output descriptor.
+- The model-population function does not assign the output-specific fields
+  at +0x61C, +0x620, +0x1F74, +0x3418 or +0x1F75. Those retain blank-root
+  constructor defaults from FUN_1800bca40: 0, false, false, 0 and false.
+
+For AI Megpoid V7, this resolves the output-transform inputs to
+outputSamples=320, geometry=fftSize=1024 and floatParameter=32000.0, with
+a full symmetric Hann frame window and both output-window mode flags off.
+The Android runtime-options descriptor now creates the output-transform
+input carrier from these model fields and verified constructor defaults.
