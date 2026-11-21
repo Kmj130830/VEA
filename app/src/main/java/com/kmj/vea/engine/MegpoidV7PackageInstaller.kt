@@ -102,7 +102,8 @@ object MegpoidV7PackageInstaller {
 
     data class InstalledPackage internal constructor(
         val directory: File,
-        val modelFiles: Map<String, File>
+        val modelFiles: Map<String, File>,
+        val componentId: String
     ) {
         fun toVoicebankDescriptor(): VoicebankDescriptor = VoicebankDescriptor(
             id = BANK_ID,
@@ -180,7 +181,7 @@ object MegpoidV7PackageInstaller {
             verifyExistingFile(file, spec)
             files[spec.fileName] = file
         }
-        return InstalledPackage(directory, files.toMap())
+        return InstalledPackage(directory, files.toMap(), COMPONENT_ID)
     }
 
     private fun extractVerifiedMembers(
