@@ -10,6 +10,7 @@ package com.kmj.vea.engine
 object S5MegpoidRuntimeModelPath {
     const val MODEL_CONTEXT_KEY = "5be3f5d6495f68286523e230e2d0d9a4"
     const val RESIDUAL_RUNTIME_CONFIG_KEY = "154c806ba4d274fad9c7484acdc1779e"
+    const val RUNTIME_OPTIONS_KEY = "a4ba655a061e6151f80574e6088492a0"
 }
 
 /**
