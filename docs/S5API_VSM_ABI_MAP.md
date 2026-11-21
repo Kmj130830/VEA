@@ -109,3 +109,42 @@ and relation between the two 0x28-stride uses remain unresolved. The current
 Android implementation therefore keeps VsmScheduledNote and lyricTokens as
 owned app-side values; it does not manufacture native pointers or claim that
 these records are already a portable S5API input.
+
+## Follow-through into the seven-double note event rows
+
+The full decompilation of Func_417eec3e establishes an additional boundary
+that is useful for the Android port:
+
+1. The 0x28-byte caller records are first copied into owned 0x38-byte
+   intermediate rows. The two leading eight-byte fields are copied
+   unchanged; the string at +0x16 is copied into a managed string object;
+   the 32-bit field at +0x20 is retained at intermediate offset +0x30.
+2. Three helper calls (`FUN_180007740`, `FUN_180007a90`, and
+   `FUN_180007ec0`) process that intermediate collection before it is
+   passed to `FUN_18003ab70`.
+3. At the call site, `FUN_18003ab70` receives the intermediate row base
+   and `(end - begin) / 0x38` as its record count.
+4. `FUN_18003ab70` and its callee `FUN_18006c720` read the intermediate
+   rows as 7 consecutive float64 values (0x38 bytes per row). The latter
+   builds a row-major float32 feature matrix with `frameCount * featureCount`
+   values, initialized to zero and populated with a normalized log-domain
+   scalar plus optional state channels and categorical one-hot features.
+
+The 7-double row is therefore a real intermediate feature-input record,
+not the raw 0x28-byte VSM event record. Its producer helpers and the
+meaning/units of each of the seven values are still under active recovery.
+Do not map the values directly from VEA note start, duration, pitch, or
+phoneme text until those helpers prove the field semantics.
+
+`FUN_18006c720` also has two context-dependent paths. Both normalize a
+positive scalar through a logarithmic range and write categorical one-hot
+entries. The feature width depends on the context dimensions at `+0x10`,
+`+0x1c`, `+0x20`, flags at `+0x24/+0x25`, and optional category width at
+`+0x28`. Its parameters include neighbor-window counts and range values.
+Those context values must be read from the active render context rather
+than hard-coded for all banks or languages.
+
+Android currently models the 0x28-stride scheduled event and lyric tokens
+separately; it has not implemented the 0x38-row producer or the seven-double
+feature builder. The next Ghidra pass explicitly decompiles the three row
+producer helpers and `FUN_180074a50`, which supplies the category index.
