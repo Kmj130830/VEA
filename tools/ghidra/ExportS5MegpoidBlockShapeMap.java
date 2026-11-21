@@ -69,6 +69,9 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
         "180083c50", // integer-to-string component used by RNN name builder
         "1800873a0", // high-level VSM model/configuration initializer
         "1800af170", // parent constructor that populates the render-state root
+        "1800b8f60", // converts the model property passed into the runtime-root builder
+        "1800af230", // follow-up runtime-root configuration called after model population
+        "1800dc4b0", // cleanup/finalization adjacent to runtime-root model population
         "180012240", // related embedded runtime-state constructor
         "180126940", // public wrapper constructing a render-state root
         "180127220", // high-level model initializer writes model values into a render-state object
