@@ -16,8 +16,8 @@ import kotlin.math.sqrt
  * dimensions.
  */
 internal class S5MegpoidExcitationGenerator(
-    private val phaseSampleRate: Float,
-    private val periodSampleRate: Float,
+    private val phaseScale: Float,
+    private val periodScale: Float,
     private val sineDenominatorThreshold: Float,
     private val wrapPhase: Boolean,
     private val gaussianNoise: () -> Float
@@ -28,8 +28,8 @@ internal class S5MegpoidExcitationGenerator(
     private var phase = 0f
 
     init {
-        require(phaseSampleRate > 0f)
-        require(periodSampleRate > 0f)
+        require(phaseScale > 0f)
+        require(periodScale > 0f)
         require(sineDenominatorThreshold >= 0f)
     }
 
@@ -52,7 +52,7 @@ internal class S5MegpoidExcitationGenerator(
         val oldF0 = previousF0
         val oldNoiseGain = previousNoiseGain
         val oldHarmonicGain = previousHarmonicGain
-        val phaseStepScale = TWO_PI / phaseSampleRate
+        val phaseStepScale = TWO_PI / phaseScale
         val phases = FloatArray(sampleCount)
 
         var nextPhase = phase
@@ -75,7 +75,7 @@ internal class S5MegpoidExcitationGenerator(
             val alpha = i * inverseCount
             val f0 = i * f0Step + oldF0
             val safeF0 = max(f0, MIN_F0)
-            var period = floor(periodSampleRate / safeF0)
+            var period = floor(periodScale / safeF0)
             if (period <= 1f) period = 1f
 
             val currentPhase = phases[i]
