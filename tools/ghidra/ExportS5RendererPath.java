@@ -82,7 +82,11 @@ public class ExportS5RendererPath extends GhidraScript {
                 "180007740", "180007a90", "180007ec0", "180007330",
                 "180007cb0", "18006a860", "1800782e0", "180078590",
                 "180001010", "1800066f0", "180010990", "180008a60",
-                "180014230", "180006920", "1800148b0"
+                "180014230", "180006920", "1800148b0",
+                // Trace construction of the per-render phone-category map.
+                "180012b40", "1800591d0", "1800290f0", "18005b9a0",
+                "18005c890", "18005cba0", "18004f9d0", "1800522f0",
+                "18000adc0", "18000b100", "180026f60", "18007abf0"
             };
             out.println("## Explicit internal call targets");
             out.println();
@@ -137,6 +141,46 @@ public class ExportS5RendererPath extends GhidraScript {
                 }
             }
             if (inputCallerCount == 0) out.println("- No direct references recovered at the exact entry address.");
+            out.println();
+
+            out.println("## Direct callers of phone-event adapter");
+            out.println();
+            Address phoneAdapterTarget = toAddr("18003ab70");
+            ReferenceIterator phoneAdapterRefs =
+                currentProgram.getReferenceManager().getReferencesTo(phoneAdapterTarget);
+            int phoneAdapterCallerCount = 0;
+            while (phoneAdapterRefs.hasNext()) {
+                Reference ref = phoneAdapterRefs.next();
+                Function caller = currentProgram.getFunctionManager()
+                    .getFunctionContaining(ref.getFromAddress());
+                if (caller == null) continue;
+                phoneAdapterCallerCount++;
+                out.printf("- %s at %s, call site %s%n",
+                    caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+            }
+            if (phoneAdapterCallerCount == 0) {
+                out.println("- No direct references recovered at the exact entry address.");
+            }
+            out.println();
+
+            out.println("## Direct callers of S5API runtime-context allocator");
+            out.println();
+            Address allocatorTarget = toAddr("180012b40");
+            ReferenceIterator allocatorRefs =
+                currentProgram.getReferenceManager().getReferencesTo(allocatorTarget);
+            int allocatorCallerCount = 0;
+            while (allocatorRefs.hasNext()) {
+                Reference ref = allocatorRefs.next();
+                Function caller = currentProgram.getFunctionManager()
+                    .getFunctionContaining(ref.getFromAddress());
+                if (caller == null) continue;
+                allocatorCallerCount++;
+                out.printf("- %s at %s, call site %s%n",
+                    caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+            }
+            if (allocatorCallerCount == 0) {
+                out.println("- No direct references recovered at the exact entry address.");
+            }
             out.println();
 
             // The phone-label classifier (FUN_180074a50) searches a global
