@@ -23,11 +23,29 @@ class S5MegpoidCompiledRuntimeBlock internal constructor(
     val projectionBias: FloatArray,
     val residualScale: FloatArray
 ) {
+    /** Every residual block owns an independent temporal history ring. */
+    private val depthwiseHistory = S5MegpoidDepthwiseHistoryState(channels)
+
+    /**
+     * Append a sequential feature chunk and return [channel][7][position].
+     * A chunk-length change resets the ring automatically.
+     */
+    fun buildHistoryWindow(residualInput: FloatArray): FloatArray {
+        require(residualInput.size % channels == 0) {
+            "Residual input length must be divisible by the block channel count."
+        }
+        return depthwiseHistory.appendAndBuildWindow(residualInput)
+    }
+
+    /** Reset temporal state at the beginning of a new utterance. */
+    fun resetHistory() = depthwiseHistory.reset()
+
     /**
      * Executes the isolated reference-kernel path on an already materialized
-     * [channel][7][position] window. This does NOT emulate S5API's stateful
-     * FUN_1800c67e0 ring-buffer/history scheduler; use only for kernel-level
-     * experiments until that temporal state machine is ported.
+     * [channel][7][position] window. For sequential chunks, obtain that
+     * window from [buildHistoryWindow] so this block's own temporal state is
+     * preserved. The native depthwise arithmetic remains a reference kernel;
+     * exact S5API equivalence still requires validation against runtime traces.
      */
     fun runReferenceWindow(
         historyRows: FloatArray,
@@ -71,6 +89,20 @@ class S5MegpoidCompiledRuntimeBlock internal constructor(
             epsilon = epsilon
         )
     }
+}
+
+/**
+ * Runs one sequential feature chunk through this block's private history ring
+ * and the isolated residual-block kernel. This is not a complete voice
+ * synthesis path: callers must supply the actual input features, and upstream
+ * and downstream model layers are still required.
+ */
+fun S5MegpoidCompiledRuntimeBlock.runChunk(
+    residualInput: FloatArray,
+    epsilon: Float = S5MegpoidResidualBlockShape.DEFAULT_EPSILON
+): FloatArray {
+    val window = buildHistoryWindow(residualInput)
+    return runReferenceWindow(window, residualInput, epsilon)
 }
 
 /**
