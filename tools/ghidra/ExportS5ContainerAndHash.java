@@ -43,6 +43,7 @@ public class ExportS5ContainerAndHash extends GhidraScript {
         "180020190", // .weight hashed lookup
         "1800214c0", // .bias hashed lookup
         "180068190", // model layer construction entry
+        "180056d60", // caller/factory for model sub-layers, including the RNN block
         "180056f40", // model-config path that instantiates the RNN block
         "18005ebe0", // recurrent parameter loader
         "180024a90", // indexed/reverse recurrent name builder
@@ -156,7 +157,8 @@ public class ExportS5ContainerAndHash extends GhidraScript {
             out.println("The following contexts preserve register/stack setup before calls that build recurrent names, hash parameter names, or look up typed model values.");
             out.println();
             String[] interestingTargets = {
-                "18005ebe0", "180024a90", "18001b1f0", "18000b100", "180056f40"
+                "18005ebe0", "180024a90", "18001b1f0", "18000b100",
+                "180056d60", "180056f40", "180068190"
             };
             for (Map.Entry<Address, Function> item : selected.entrySet()) {
                 monitor.checkCancelled();
@@ -194,7 +196,7 @@ public class ExportS5ContainerAndHash extends GhidraScript {
                         out.println();
                     }
                     recent.add(instruction);
-                    if (recent.size() > 24) recent.remove(0);
+                    if (recent.size() > 96) recent.remove(0);
                 }
             }
 
