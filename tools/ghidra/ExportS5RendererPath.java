@@ -96,7 +96,11 @@ public class ExportS5RendererPath extends GhidraScript {
                 // The phone-label -> category-index map builder walks the
                 // global grouped phone inventory at DAT_1801c4160/4168.
                 "18006c520", "1800103e0", "180197460",
-                "18004be40", "18004cb90"
+                "18004be40", "18004cb90",
+                // CRT/global constructor that populates DAT_1801c4160,
+                // and the helper calls that materialize grouped phone strings.
+                "180003a90", "180011120", "1800111c0", "180010500",
+                "1800111c0", "18007b370"
             };
             out.println("## Explicit internal call targets");
             out.println();
@@ -190,6 +194,26 @@ public class ExportS5RendererPath extends GhidraScript {
             }
             if (phoneMapCallerCount == 0) {
                 out.println("- No direct references recovered at the exact entry address.");
+            }
+            out.println();
+
+            out.println("## Direct callers of global phone-vocabulary constructor");
+            out.println();
+            Address vocabularyConstructor = toAddr("180003a90");
+            ReferenceIterator constructorRefs =
+                currentProgram.getReferenceManager().getReferencesTo(vocabularyConstructor);
+            int constructorCallerCount = 0;
+            while (constructorRefs.hasNext()) {
+                Reference ref = constructorRefs.next();
+                Function caller = currentProgram.getFunctionManager()
+                    .getFunctionContaining(ref.getFromAddress());
+                if (caller == null) continue;
+                constructorCallerCount++;
+                out.printf("- %s at %s, call site %s%n",
+                    caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+            }
+            if (constructorCallerCount == 0) {
+                out.println("- No direct caller recovered; constructor may be registered through CRT initialization metadata.");
             }
             out.println();
 
