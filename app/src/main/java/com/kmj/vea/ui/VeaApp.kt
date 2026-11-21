@@ -62,11 +62,17 @@ fun VeaApp() {
         mutableStateOf<MegpoidV7PackageInstaller.InstalledPackage?>(null)
     }
     var megpoidInstallCheckComplete by remember { mutableStateOf(false) }
+    var megpoidModelLoadError by remember { mutableStateOf("") }
 
     LaunchedEffect(context) {
-        installedMegpoidPackage = withContext(Dispatchers.IO) {
-            MegpoidV7PackageInstaller.installBundled(context)
+        val result = withContext(Dispatchers.IO) {
+            runCatching {
+                MegpoidV7PackageInstaller.findInstalled(context)
+                    ?: MegpoidV7PackageInstaller.installBundled(context)
+            }
         }
+        result.onSuccess { installedMegpoidPackage = it }
+            .onFailure { megpoidModelLoadError = it.message.orEmpty() }
         megpoidInstallCheckComplete = true
     }
 
