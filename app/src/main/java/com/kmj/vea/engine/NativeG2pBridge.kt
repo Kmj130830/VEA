@@ -48,6 +48,28 @@ object NativeG2pBridge {
         if (loaded) nativeNormalizeKoreanInput(lyric) else lyric
 
     /**
+     * Applies only the two currently ported isolated single-syllable rewrites.
+     *
+     * This is a diagnostic preview after Korean lexical normalization. It
+     * does not execute adjacent-syllable rules, marker propagation, or final
+     * syllable segmentation, so it must not be used as final singing phonemes.
+     */
+    fun applyKoreanSingleSyllableRules(lyric: String): String {
+        if (!loaded) return lyric
+        val normalized = nativeNormalizeKoreanInput(lyric)
+        return buildString(normalized.length) {
+            normalized.forEach { character ->
+                if (character in '\uAC00'..'\uD7A3') {
+                    val transformed = nativeApplyKoreanSingleSyllableRules(character.code)
+                    append(if (transformed in 0xAC00..0xD7A3) transformed.toChar() else character)
+                } else {
+                    append(character)
+                }
+            }
+        }
+    }
+
+    /**
      * Returns the raw onset/vowel/coda table entries for each precomposed
      * modern Hangul syllable in the normalized lyric.
      *
@@ -83,4 +105,5 @@ object NativeG2pBridge {
     private external fun nativeLanguageReady(languageId: Int): Boolean
     private external fun nativeNormalizeKoreanInput(lyric: String): String
     private external fun nativeKoreanBaseComponents(codePoint: Int): Array<String>?
+    private external fun nativeApplyKoreanSingleSyllableRules(codePoint: Int): Int
 }
