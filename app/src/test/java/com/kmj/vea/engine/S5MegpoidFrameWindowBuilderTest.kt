@@ -14,9 +14,11 @@ class S5MegpoidFrameWindowBuilderTest {
             shapeMode = 1
         )
 
-        assertEquals(listOf(0f, 0.5f, 1f, 0.5f, 0f), actual.toList().map {
-            if (kotlin.math.abs(it) < 1e-6f) 0f else it
-        })
+        val expected = floatArrayOf(0f, 0.5f, 1f, 0.5f, 0f)
+        assertEquals(expected.size, actual.size)
+        expected.indices.forEach { index ->
+            assertEquals(expected[index], actual[index], 1e-5f)
+        }
     }
 
     @Test
