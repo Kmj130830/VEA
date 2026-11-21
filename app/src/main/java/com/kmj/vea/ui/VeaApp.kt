@@ -254,6 +254,7 @@ fun VeaApp() {
                         ?.toVoicebankDescriptor()?.sourceUri.orEmpty(),
                     isMegpoidModelInstalled = installedMegpoidPackage != null,
                     isMegpoidInstallCheckComplete = megpoidInstallCheckComplete,
+                    megpoidModelLoadError = megpoidModelLoadError,
                     canUndo = canUndo,
                     canRedo = canRedo
                 )
