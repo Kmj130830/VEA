@@ -137,6 +137,46 @@ Java_com_kmj_vea_engine_NativeG2pBridge_nativeLanguageReady(JNIEnv*, jobject, ji
     return JNI_FALSE;
 }
 
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_com_kmj_vea_engine_NativeG2pBridge_nativeKoreanBaseComponents(
+    JNIEnv* env,
+    jobject,
+    jint code_point) {
+    VeaKoreanPhonemeComponents components{};
+    const VeaG2pStatus status = vea_g2p_korean_syllable_components(
+        static_cast<uint32_t>(code_point), &components);
+    if (status != VEA_G2P_STATUS_OK) {
+        return nullptr;
+    }
+
+    jclass string_class = env->FindClass("java/lang/String");
+    if (string_class == nullptr) {
+        return nullptr;
+    }
+    jobjectArray result = env->NewObjectArray(3, string_class, nullptr);
+    if (result == nullptr) {
+        return nullptr;
+    }
+
+    const char* labels[] = {
+        components.onset,
+        components.vowel,
+        components.coda,
+    };
+    for (jsize index = 0; index < 3; ++index) {
+        jstring label = env->NewStringUTF(labels[index]);
+        if (label == nullptr) {
+            return nullptr;
+        }
+        env->SetObjectArrayElement(result, index, label);
+        env->DeleteLocalRef(label);
+        if (env->ExceptionCheck()) {
+            return nullptr;
+        }
+    }
+    return result;
+}
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_kmj_vea_engine_NativeG2pBridge_nativeNormalizeKoreanInput(JNIEnv* env, jobject, jstring input) {
     std::vector<char> utf8;
