@@ -110,41 +110,39 @@ Android implementation therefore keeps VsmScheduledNote and lyricTokens as
 owned app-side values; it does not manufacture native pointers or claim that
 these records are already a portable S5API input.
 
-## Follow-through into the seven-double note event rows
+## Corrected 0x38-byte note event rows and phoneme classifier
 
-The full decompilation of Func_417eec3e establishes an additional boundary
-that is useful for the Android port:
+The 0x38-byte intermediate row is not seven float64 values. Its confirmed
+layout is interval start at `+0x00`, interval end at `+0x08`, a 32-byte
+MSVC x64 `std::string` at `+0x10`, and a uint32 at `+0x30`.
+`Func_417eec3e` constructs the owned string from the source record's
+NUL-terminated bytes at `+0x16`; it copies the source uint32 from `+0x20`.
 
-1. The 0x28-byte caller records are first copied into owned 0x38-byte
-   intermediate rows. The two leading eight-byte fields are copied
-   unchanged; the string at +0x16 is copied into a managed string object;
-   the 32-bit field at +0x20 is retained at intermediate offset +0x30.
-2. Three helper calls (`FUN_180007740`, `FUN_180007a90`, and
-   `FUN_180007ec0`) process that intermediate collection before it is
-   passed to `FUN_18003ab70`.
-3. At the call site, `FUN_18003ab70` receives the intermediate row base
-   and `(end - begin) / 0x38` as its record count.
-4. `FUN_18003ab70` and its callee `FUN_18006c720` read the intermediate
-   rows as 7 consecutive float64 values (0x38 bytes per row). The latter
-   builds a row-major float32 feature matrix with `frameCount * featureCount`
-   values, initialized to zero and populated with a normalized log-domain
-   scalar plus optional state channels and categorical one-hot features.
+The three preprocessing helpers have these observed behaviors:
 
-The 7-double row is therefore a real intermediate feature-input record,
-not the raw 0x28-byte VSM event record. Its producer helpers and the
-meaning/units of each of the seven values are still under active recovery.
-Do not map the values directly from VEA note start, duration, pitch, or
-phoneme text until those helpers prove the field semantics.
+- `FUN_180007740`: rewrites initial `br` to `sil`; subsequent `br` can
+  extend a preceding `sil` interval.
+- `FUN_180007a90`: removes rows with the exact string `-`.
+- `FUN_180007ec0`: keeps only intervals at least 0.001 seconds long.
 
-`FUN_18006c720` also has two context-dependent paths. Both normalize a
-positive scalar through a logarithmic range and write categorical one-hot
-entries. The feature width depends on the context dimensions at `+0x10`,
-`+0x1c`, `+0x20`, flags at `+0x24/+0x25`, and optional category width at
-`+0x28`. Its parameters include neighbor-window counts and range values.
-Those context values must be read from the active render context rather
-than hard-coded for all banks or languages.
+`FUN_18003ab70` iterates the rows at a 0x38-byte stride. It calculates
+frame coverage from the start/end pair, then calls
+`FUN_180074a50(row + 0x10, context, nullptr)` with the string object.
+`FUN_180074a50` maps the phone label to an internal category index using
+special aliases, canonical string comparisons and a global string/index
+lookup tree. The index is subsequently used in frame-feature construction.
 
-Android currently models the 0x28-stride scheduled event and lyric tokens
-separately; it has not implemented the 0x38-row producer or the seven-double
-feature builder. The next Ghidra pass explicitly decompiles the three row
-producer helpers and `FUN_180074a50`, which supplies the category index.
+The analyzed S5API `.rdata` contains label strings such as `sil`, `br`,
+`a`, `i`, `u`, `e`, `o`, `wo`, `ey`, `aw`, `ay`, `ow`, `oy`, `aa`, `uh`,
+`iy`, `ih`, `ah`, `uw`, `eh`, `ae`, `er`, `ao`, `i_n`, `uei`, `iE_n`,
+`yE_r`, `@N`, `u@N`, `@U`, `ia`, `i@U`, `aI`, `uaI`, `iAN`, `iUN`,
+`n`, `N`, `m`, `ng`, `g`, `d`, `z`, `zh`, `v`, `r`, `l`, `k`, `t`, `p`,
+`s`, `sh`, `h`, `f`, `ch`, `ts`, `cl`, and `junk`, plus variants.
+
+The string inventory is confirmed, but the complete runtime tree initializer
+and its exact string-to-integer assignments are not yet recovered. Do not
+treat the read-only string order as the numeric category-ID order.
+
+This supersedes the earlier seven-double/five-key interpretation. Android
+must represent the upstream event as an interval plus an owned phone-label
+string and separately retain the unexplained uint32/auxiliary source fields.
