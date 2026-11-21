@@ -49,6 +49,19 @@ VeaG2pStatus vea_g2p_korean_hangul_packed_indices(
 );
 
 /*
+ * Reverse lookup for the Korean packed onset/vowel/coda representation.
+ * Mirrors FUN_180008660's lookup behavior for modern Hangul:
+ * - exact packed values map back to their precomposed syllable;
+ * - a requested coda index of zero matches the table's empty-coda entry
+ *   (packed low bits 1).
+ * Returns INVALID_ARGUMENT when no modern Hangul table entry matches.
+ */
+VeaG2pStatus vea_g2p_korean_hangul_from_packed_indices(
+    uint16_t packed_indices,
+    uint32_t* codepoint
+);
+
+/*
  * Base phoneme labels looked up by the Korean manager for a modern Hangul
  * syllable. These are table components before adjacent-syllable rules,
  * marker processing, and syllable-level output assembly.
