@@ -54,8 +54,13 @@ data class S5RecurrentLayerLayout(
 data class S5RecurrentTensorSpec(
     val name: String,
     val rows: Int,
-    val columns: Int
+    val columns: Int,
+    val member: S5ModelTensorKey.Member
 ) {
+    /** Hashed key used by the decoded S5API JSON-like model object. */
+    val lookupKey: String
+        get() = S5ModelTensorKey.derive(name, member)
+
     val elementCount: Int
         get() {
             val count = rows.toLong() * columns.toLong()
@@ -116,18 +121,21 @@ object S5RecurrentParameterLoader {
                 specs += S5RecurrentTensorSpec(
                     parameterName(base, ".weight_ih_l", layer, reverse),
                     layout.gateRows,
-                    inputFeatures
+                    inputFeatures,
+                    S5ModelTensorKey.Member.WEIGHT
                 )
                 specs += S5RecurrentTensorSpec(
                     parameterName(base, ".weight_hh_l", layer, reverse),
                     layout.gateRows,
-                    layout.hiddenFeatures
+                    layout.hiddenFeatures,
+                    S5ModelTensorKey.Member.WEIGHT
                 )
                 if (layout.hasBias) {
                     specs += S5RecurrentTensorSpec(
                         parameterName(base, ".bias_ih_l", layer, reverse),
                         layout.gateRows,
-                        1
+                        1,
+                        S5ModelTensorKey.Member.BIAS
                     )
                     specs += S5RecurrentTensorSpec(
                         parameterName(base, ".bias_hh_l", layer, reverse),
@@ -158,17 +166,20 @@ object S5RecurrentParameterLoader {
                 val inputName = parameterName(base, ".weight_ih_l", layer, reverse)
                 val recurrentName = parameterName(base, ".weight_hh_l", layer, reverse)
                 val inputWeights = requiredTensor(
-                    tensors, inputName, checkedProduct(layout.gateRows, inputFeatures)
+                    tensors, inputName, checkedProduct(layout.gateRows, inputFeatures),
+                    S5ModelTensorKey.Member.WEIGHT
                 )
                 val recurrentWeights = requiredTensor(
                     tensors, recurrentName,
-                    checkedProduct(layout.gateRows, layout.hiddenFeatures)
+                    checkedProduct(layout.gateRows, layout.hiddenFeatures),
+                    S5ModelTensorKey.Member.WEIGHT
                 )
                 val inputBias = if (layout.hasBias) {
                     requiredTensor(
                         tensors,
                         parameterName(base, ".bias_ih_l", layer, reverse),
-                        layout.gateRows
+                        layout.gateRows,
+                        S5ModelTensorKey.Member.BIAS
                     )
                 } else {
                     null
@@ -269,10 +280,12 @@ object S5RecurrentParameterLoader {
     private fun requiredTensor(
         tensors: Map<String, FloatArray>,
         name: String,
-        expectedCount: Int
+        expectedCount: Int,
+        member: S5ModelTensorKey.Member
     ): FloatArray {
-        val values = tensors[name] ?: throw IllegalArgumentException(
-            "Required S5 recurrent tensor '$name' is missing."
+        val lookupKey = S5ModelTensorKey.derive(name, member)
+        val values = tensors[lookupKey] ?: throw IllegalArgumentException(
+            "Required S5 recurrent tensor '$name' (model key '$lookupKey') is missing."
         )
         require(values.size == expectedCount) {
             "S5 recurrent tensor '$name' has ${values.size} values; expected $expectedCount."
