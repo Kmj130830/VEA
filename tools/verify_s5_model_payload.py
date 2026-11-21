@@ -113,6 +113,13 @@ MODEL_STATIC_LOOKUP_KEYS = {
 
 # Numeric descriptor properties resolved in Func_47a12a73 before FUN_1800589d0.
 # The values become FUN_180052f90's dim0 (param_8) and dim1 (param_6) fields.
+MEGPOID_RUNTIME_MODEL_PATH = (
+    "5be3f5d6495f68286523e230e2d0d9a4",
+    "154c806ba4d274fad9c7484acdc1779e",
+)
+MEGPOID_RUNTIME_BLOCK_GROUP_KEY = "43726e4ce752ea6cc300dc2fca3e8372"
+
+
 MODEL_BLOCK_DESCRIPTOR_KEYS = {
     # Func_47a12a73 assigns these to original descriptor slots [0], [1], [5].
     "descriptor_param0": "15bd765152e6fc7b4b901f843d716944",
@@ -834,6 +841,74 @@ def extract_megpoid_factory_keys(report_path: Path) -> list[dict[str, object]]:
     return tables
 
 
+def inspect_megpoid_runtime_config_path(
+    member: str, root: dict, factory_tables: list[dict[str, object]]
+) -> None:
+    """Validate the exact model subtree selected by the S5API render-state initializer."""
+    current: object = root
+    traversed: list[str] = []
+    for key in MEGPOID_RUNTIME_MODEL_PATH:
+        if not isinstance(current, dict) or key not in current:
+            raise SystemExit(
+                "MISSING_MODEL_RUNTIME_CONFIG_PATH "
+                + f"member={member} path=$/{'/'.join((*traversed, key))}"
+            )
+        current = current[key]
+        traversed.append(key)
+
+    if not isinstance(current, dict):
+        raise SystemExit(
+            "INVALID_MODEL_RUNTIME_CONFIG_PATH "
+            + f"member={member} path=$/{'/'.join(traversed)} "
+            + f"kind={json_value_kind(current)}"
+        )
+    block_group = current.get(MEGPOID_RUNTIME_BLOCK_GROUP_KEY)
+    if not isinstance(block_group, dict):
+        raise SystemExit(
+            "MISSING_MODEL_RUNTIME_BLOCK_GROUP "
+            + f"member={member} path=$/{'/'.join(traversed)}/{MEGPOID_RUNTIME_BLOCK_GROUP_KEY}"
+        )
+
+    expected_keys = {
+        str(entry["lookup_key"])
+        for table in factory_tables
+        for entry in table["entries"]
+    }
+    found: dict[str, int] = {}
+    stack: list[object] = [current]
+    while stack:
+        value = stack.pop()
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key in expected_keys:
+                    found[key] = found.get(key, 0) + 1
+                stack.append(child)
+        elif isinstance(value, list):
+            stack.extend(value)
+
+    missing = sorted(expected_keys - found.keys())
+    duplicated = sorted(key for key, count in found.items() if count != 1)
+    if missing or duplicated:
+        raise SystemExit(
+            "MODEL_RUNTIME_CONFIG_KEY_SCOPE_MISMATCH "
+            + f"member={member} expected={len(expected_keys)} "
+            + f"found_unique={len(found)} missing={missing[:8]} "
+            + f"duplicates={duplicated[:8]}"
+        )
+
+    print(
+        "MODEL_RUNTIME_CONFIG_PATH",
+        f"member={member}",
+        f"path=$/{'/'.join(traversed)}",
+        f"node_kind=object",
+        f"direct_keys={len(current)}",
+        f"block_group_key={MEGPOID_RUNTIME_BLOCK_GROUP_KEY}",
+        f"block_group_direct_keys={len(block_group)}",
+        f"runtime_factory_keys={len(expected_keys)}",
+        "all_factory_keys_unique_within_selected_subtree=True",
+    )
+
+
 def inspect_megpoid_dynamic_block_keys(
     member: str, root: dict, factory_tables: list[dict[str, object]]
 ) -> None:
@@ -932,6 +1007,7 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None, factory_ta
                 if item.filename == "AI_Megpoid.vtb2":
                     inspect_megpoid_layer_property_pairs(root, item.filename)
                     if factory_tables is not None:
+                        inspect_megpoid_runtime_config_path(item.filename, root, factory_tables)
                         inspect_megpoid_dynamic_block_keys(item.filename, root, factory_tables)
                 if item.filename.lower().endswith(".vtmg"):
                     inspect_vtmg_typed_root_objects(item.filename, root)
