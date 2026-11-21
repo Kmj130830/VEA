@@ -48,6 +48,20 @@ object KoreanHangulPhoneMapper {
     private const val VOWEL_TRANSFORM_MASK = 0x24881860
 
     /**
+     * Returns the 16-bit syllable key stored in the recovered Korean DLL
+     * record table. Null means the UTF-16 code unit is not a precomposed
+     * Hangul syllable in U+AC00..U+D7A3.
+     */
+    fun internalSyllableCode(character: Char): Int? {
+        val codePoint = character.code
+        if (codePoint !in HANGUL_BASE..HANGUL_LAST) return null
+        val offset = codePoint - HANGUL_BASE
+        val initial = initialId[offset / 588]
+        val vowel = vowelId[(offset % 588) / 28]
+        val final = finalId[offset % 28]
+        return 0x8000 or (initial shl 10) or (vowel shl 5) or final
+    }
+    /**
      * Converts each supported precomposed Hangul syllable into one vendor
      * phone string. ASCII spaces are skipped. A hyphen is emitted only when
      * its corresponding source UTF-16 code-unit flag is 1, matching the
