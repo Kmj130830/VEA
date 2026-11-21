@@ -171,12 +171,13 @@ and +0x92. The disassembly establishes three distinct paths:
    become zero. It divides the original frame window by
    `max(originalFrameWindow, 1e-3)`, overlap-adds the raised-cosine vector,
    and stores the reciprocal overlap sum.
-3. With +0x92 set, that branch takes precedence. It overlap-adds the current
-   frame window itself and stores the reciprocal overlap sum.
+3. With +0x92 set, that branch takes precedence. It first fills the frame
+   window at +0x48 with 1.0, zeroes the output window, overlap-adds this
+   rectangular frame window, and stores the reciprocal overlap sum.
 
 `S5MegpoidOutputWindowBuilder` implements those three paths for the supplied
 Megpoid geometry where `geometry == fftSize`. It returns a frame window
-(possibly updated by the +0x91 path) and the complementary output window.
+(possibly replaced by +0x92 or updated by +0x91) and the complementary output window.
 The two flags remain explicit inputs because the static caller passes
 separate root-state bytes; their semantic product names are not inferred.
 
