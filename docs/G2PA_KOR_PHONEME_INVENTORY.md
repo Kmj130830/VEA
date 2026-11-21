@@ -75,9 +75,12 @@ Observed record fields:
 
 The packed 16-bit field is decoded as:
 
+- constant high flag: bit 15, set in all 11,172 observed records
 - onset index: bits 10..14, `(packed >> 10) & 0x1F`
 - vowel index: bits 5..9, `(packed >> 5) & 0x1F`
 - coda index: bits 0..4, `packed & 0x1F`
+
+The coda index is not simply the Unicode final-consonant index plus one: native coda slot 18 is empty, so the mapping skips from 17 to 19 at the transition from ㅁ to ㅂ.
 
 The three indices select the onset, vowel and coda tables. The G2P code linearly searches this 11,172-entry table by Hangul code unit; a future Android implementation should use a generated direct-index table rather than reproduce the linear scan.
 
