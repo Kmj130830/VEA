@@ -65,3 +65,42 @@ Separately, `FUN_18003b380` loads `S5API.dll` and `FUN_180086750` resolves 28 ob
 1. Decompile the three event conversion helpers and `FUN_180071440` to confirm how the 24-byte records are ordered, normalized and consumed, and to recover the call-argument ownership contract.
 2. Recover the VSM voice-engine interface vtable/thunks and map its methods to the 28 S5API exports.
 3. Trace the first S5API input state populated from note/phoneme/pitch/controller events, then confirm the final sample format and scaling.
+
+
+## Note lyric command construction details — 2026-11-21
+
+The full body of `FUN_18006c6f0` confirms that the ASCII-space tokenizer
+feeds a larger note-scoped command serializer, not a direct phoneme-ID list.
+The following are direct static observations:
+
+- The helper reads the note lyric at object offset `+0xA8`, using the
+  pointer at `+0xA8` when the capacity field at `+0xC0` exceeds the
+  inline-string threshold.
+- It splits on byte `0x20` (ASCII space), stores the non-empty tokens in
+  source order, and retains each token's character sequence.
+- It resolves the owning VSM sequence and MIDI part from the note's
+  object references, then calculates a note-relative time value through
+  `FUN_18005e9c0` using the part/sequence offsets and note offsets
+  `+0x2C` and `+0x30`.
+- When the calculated millisecond value is within the observed 14-bit
+  limit (`<= 16383`), the command stream includes its high and low
+  seven-bit components. This is a time field, not a phoneme code.
+- The stream also reads note-owned bytes/scalars at offsets including
+  `+0x34`, `+0x38`, `+0x3C`, `+0x40`, `+0x44`, `+0x48`, `+0x4C`,
+  `+0x50` and `+0x51`; several integer values are clamped before being
+  serialized. Their vendor parameter names are not established here.
+- Token characters are serialized as ordered character entries with
+  incrementing per-character selectors. The loop is bounded; the observed
+  selector range begins at `0x13` and stops after `0x4D`.
+
+The command stream therefore interleaves note timing, note parameters,
+token-character data and expression controls. The marker bytes such as
+`0x62`, `0x06`, `0x26`, and `0x63` are command-format bytes in this
+serializer. They are not evidence of direct Yamaha phoneme IDs.
+
+Android's `VsmLyricTokenizer` remains a deliberately narrow port of the
+confirmed lexical split. The application preserves the original lyric,
+phoneme string and scheduled note metadata independently; it does not yet
+emit this private command stream. That requires mapping each referenced
+VSM note/part property to a stable VEA project field and recovering the
+receiving parser before serialization can be implemented.
