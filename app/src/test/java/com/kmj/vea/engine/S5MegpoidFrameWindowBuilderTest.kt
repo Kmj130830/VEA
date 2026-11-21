@@ -46,10 +46,10 @@ class S5MegpoidFrameWindowBuilderTest {
         )
 
         assertEquals(0f, actual[0], 0f)
-        assertEquals(0f, actual[1], 0f)
-        assertEquals(0.00006f, actual[2], 1e-5f)
-        assertEquals(0.520575f, actual[3], 1e-5f)
-        assertEquals(0.520575f, actual[4], 1e-5f)
+        assertEquals(0.00006f, actual[1], 1e-5f)
+        assertEquals(0.520575f, actual[2], 1e-5f)
+        assertEquals(0.538095f, actual[3], 1e-5f)
+        assertEquals(0f, actual[4], 0f)
     }
 
     @Test
