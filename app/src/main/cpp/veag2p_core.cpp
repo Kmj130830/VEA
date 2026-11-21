@@ -307,9 +307,21 @@ extern "C" VeaG2pStatus vea_g2p_korean_apply_single_syllable_rules(
 
     const uint32_t onset_index = (packed >> 10U) & 0x1FU;
     const uint32_t vowel_index = (packed >> 5U) & 0x1FU;
+
+    // First per-character pass in FUN_180008730:
+    // onset != 7,13 and packed vowel 12 -> packed vowel 10.
     if (onset_index != 7U && onset_index != 13U && vowel_index == 12U) {
         const uint16_t target = static_cast<uint16_t>(
             (packed & 0xFC00U) | 0x0140U | (packed & 0x001FU));
+        return vea_g2p_korean_hangul_from_packed_indices(
+            target, transformed_codepoint);
+    }
+
+    // The next character-pair pass also applies this local rewrite to its
+    // current syllable: onset != 13 and packed vowel 28 -> packed vowel 29.
+    if (onset_index != 13U && vowel_index == 28U) {
+        const uint16_t target = static_cast<uint16_t>(
+            (packed & 0xFC00U) | 0x03A0U | (packed & 0x001FU));
         return vea_g2p_korean_hangul_from_packed_indices(
             target, transformed_codepoint);
     }
