@@ -184,3 +184,35 @@ The frame-window and output-window builders are now independent components
 that can be composed with `S5MegpoidOverlapAddDescriptorGeometry` and the
 stateful `S5MegpoidSpectralOverlapAdd` executor. The complete transform-plan
 constructor, root scalar provenance, and verified PCM boundary remain open.
+
+## Render-state scalar provenance
+
+The output descriptor wrapper is created in FUN_1800d5a00 through
+FUN_1800b8d20 -> FUN_180127d00 -> FUN_180127dc0. The native callsite supplies
+the following root-relative values:
+
+| Render-state root offset | Constructor argument | Current port field |
+|---:|---|---|
+| +0x0C | argument 2: output sample count | outputSamplesAtRoot0C |
+| +0x04 | arguments 3 and 4: geometry and FFT size | geometryAndFftSizeAtRoot04 |
+| +0x10 | argument 5: float stored at descriptor +0x0C | floatParameterAtRoot10 |
+| +0x61C | argument 6: frame-window core length | frameWindowCoreLengthAtRoot61C |
+| +0x620 | argument 7: descriptor flag +0x90 | alternatingBinSignAtRoot620 |
+| +0x1F74 | argument 8: descriptor flag +0x91 | flagAtRoot1F74 |
+| +0x1F75 | argument 9: frame-window shape mode | frameWindowShapeModeAtRoot1F75 |
+| +0x3418 | argument 10: descriptor flag +0x92 | flagAtRoot3418 |
+
+`S5MegpoidOutputTransformInputs` now preserves these source offsets and
+builds the complete currently ported output path:
+
+```text
+render-state scalar inputs
+  -> output descriptor geometry
+  -> frame window (FUN_18012a9a0)
+  -> output overlap-normalization window (FUN_180127dc0)
+  -> inverse real FFT
+  -> stateful spectral overlap-add
+```
+
+The float input from root +0x10 is retained without assigning an unsupported
+semantic name. Its downstream transform-state consumer remains to be traced.
