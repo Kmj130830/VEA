@@ -57,6 +57,11 @@ public class ExportS5ContainerAndHash extends GhidraScript {
         "180056d60", // caller/factory for model sub-layers, including the RNN block
         "180056f40", // model-config path that instantiates the RNN block
         "18005ebe0", // recurrent parameter loader
+        "180064670", // shared model-layer tensor loader
+        "18008d5b2", // callsite from Func_4cd84bb7 into FUN_180068190
+        "18008ec74", // secondary model factory entry path
+        "18008ec14",
+        "18008ebc9"
         "180024a90", // indexed/reverse recurrent name builder
         "18001b1f0", // hashed JSON/object lookup helper
         "1800103e0", // string copy used before key generation
@@ -169,7 +174,7 @@ public class ExportS5ContainerAndHash extends GhidraScript {
             out.println();
             String[] interestingTargets = {
                 "18005ebe0", "180024a90", "18001b1f0", "18000b100",
-                "180056d60", "180056f40", "180068190"
+                "180056d60", "180056f40", "180068190", "180064670"
             };
             for (Map.Entry<Address, Function> item : selected.entrySet()) {
                 monitor.checkCancelled();
@@ -215,6 +220,7 @@ public class ExportS5ContainerAndHash extends GhidraScript {
             out.println();
             out.println("- Selected functions: " + selected.size());
             out.println("- Includes seed functions, direct callers, and one layer of direct callees.");
+            out.println("- Explicit callsite seeds include the active model-layer loader caller at 0x18008d5b2 and secondary factory path at 0x18008ec74.");
             out.println();
 
             DecompInterface decompiler = new DecompInterface();
