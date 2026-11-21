@@ -27,12 +27,12 @@ class S5MegpoidOverlapAddDescriptorGeometryTest {
     fun usesCeilingDivisionWhenGeometryHalfIsNotAnOutputMultiple() {
         val actual = S5MegpoidOverlapAddDescriptorGeometryBuilder.build(
             outputSamples = 256,
-            geometry = 1536,
+            geometry = 1600,
             fftSize = 1536
         )
 
-        assertEquals(3, actual.windowOffset)
-        assertEquals(5, actual.overlapContributionCount)
+        assertEquals(4, actual.windowOffset)
+        assertEquals(6, actual.overlapContributionCount)
         assertEquals(4, actual.ringSlotCount)
         assertEquals(3, actual.ringMask)
     }
@@ -56,13 +56,37 @@ class S5MegpoidOverlapAddDescriptorGeometryTest {
     fun zeroWindowOffsetStillAllocatesOneRingSlot() {
         val actual = S5MegpoidOverlapAddDescriptorGeometryBuilder.build(
             outputSamples = 1024,
-            geometry = 64,
+            geometry = 1,
             fftSize = 512
         )
 
         assertEquals(1, actual.ringSlotCount)
         assertEquals(0, actual.ringMask)
-        assertEquals(3, actual.overlapContributionCount)
+        assertEquals(0, actual.windowOffset)
+        assertEquals(2, actual.overlapContributionCount)
+    }
+
+    @Test
+    fun createsOlaParametersFromDerivedDescriptorGeometry() {
+        val geometry = S5MegpoidOverlapAddDescriptorGeometryBuilder.build(
+            outputSamples = 4,
+            geometry = 8,
+            fftSize = 8
+        )
+
+        val parameters = geometry.toOverlapAddParameters(
+            alternatingBinSign = true,
+            frameWindow = FloatArray(8) { 1f },
+            outputWindow = FloatArray(4) { 0.5f }
+        )
+
+        assertEquals(4, parameters.outputSamples)
+        assertEquals(8, parameters.geometryParameterAt04)
+        assertEquals(8, parameters.fftSize)
+        assertEquals(1, parameters.windowOffsetAt10)
+        assertEquals(3, parameters.overlapContributionCountAt14)
+        assertEquals(1, parameters.ringMaskAt1C)
+        assertEquals(true, parameters.alternatingBinSignAt90)
     }
 
     @Test
