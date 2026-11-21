@@ -100,7 +100,14 @@ public class ExportS5RendererPath extends GhidraScript {
                 // CRT/global constructor that populates DAT_1801c4160,
                 // and the helper calls that materialize grouped phone strings.
                 "180003a90", "180011120", "1800111c0", "180010500",
-                "1800111c0", "18007b370"
+                "1800111c0", "18007b370",
+                // Explicitly trace the output transform descriptor and its
+                // construction path; do not infer its fields from matching
+                // offsets in unrelated render-state objects.
+                "18012c740", "180040630", "18012b150", "18012ad70",
+                "180128c40", "180129240", "1800bca40", "1800af170",
+                "1800af230", "180126940", "180127220", "180127630",
+                "1800ccafd"
             };
             out.println("## Explicit internal call targets");
             out.println();
@@ -120,6 +127,49 @@ public class ExportS5RendererPath extends GhidraScript {
                     queue.addLast(new Work(f, 0));
                 }
                 out.printf("| %s | %s | %d |%n", hex, f.getName(), f.getBody().getNumAddresses());
+            }
+            out.println();
+
+            out.println("## Spectral output and transform-state construction cross-references");
+            out.println();
+            out.println("| Target address | Recovered target | Direct caller | Call site |");
+            out.println("|---:|---|---|---:|");
+            String[][] spectralTargets = {
+                {"18012c740", "spectral output and overlap-add"},
+                {"180040630", "real FFT wrapper"},
+                {"180128c40", "transform-state constructor"},
+                {"180129240", "transform-state allocator"},
+                {"1800bca40", "render-state root initializer"},
+                {"1800af170", "render-state model configuration loader"},
+                {"1800af230", "render-state option setter"},
+                {"180126940", "public render-state wrapper allocator"}
+            };
+            int spectralReferenceCount = 0;
+            for (String[] target : spectralTargets) {
+                Address targetAddress = toAddr(target[0]);
+                Function targetFunction =
+                    currentProgram.getFunctionManager().getFunctionAt(targetAddress);
+                if (targetFunction == null) {
+                    targetFunction = currentProgram.getFunctionManager()
+                        .getFunctionContaining(targetAddress);
+                }
+                ReferenceIterator targetRefs =
+                    currentProgram.getReferenceManager().getReferencesTo(targetAddress);
+                while (targetRefs.hasNext()) {
+                    Reference ref = targetRefs.next();
+                    if (!ref.getReferenceType().isCall()) continue;
+                    Function caller = currentProgram.getFunctionManager()
+                        .getFunctionContaining(ref.getFromAddress());
+                    if (caller == null) continue;
+                    spectralReferenceCount++;
+                    out.printf("| %s (%s) | %s | %s at %s | %s |%n",
+                        targetAddress,
+                        targetFunction == null ? "not recovered" : targetFunction.getName(),
+                        target[1], caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+                }
+            }
+            if (spectralReferenceCount == 0) {
+                out.println("| - | - | no direct callers recovered | - |");
             }
             out.println();
 
