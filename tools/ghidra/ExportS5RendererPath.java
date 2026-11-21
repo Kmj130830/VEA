@@ -105,6 +105,7 @@ public class ExportS5RendererPath extends GhidraScript {
                 // construction path; do not infer its fields from matching
                 // offsets in unrelated render-state objects.
                 "18012c740", "180040630", "18012b150", "18012ad70",
+                "18012b470", "18012b450", "18012c730", "1800c7ad0",
                 "180128c40", "180129240", "1800bca40", "1800af170",
                 "1800af230", "180126940", "180127220", "180127630",
                 "1800ccafd"
@@ -136,7 +137,12 @@ public class ExportS5RendererPath extends GhidraScript {
             out.println("|---:|---|---|---:|");
             String[][] spectralTargets = {
                 {"18012c740", "spectral output and overlap-add"},
+                {"18012c730", "render-state frame-validity setter"},
                 {"180040630", "real FFT wrapper"},
+                {"1800c7ad0", "S5API render-state forward path"},
+                {"18012b150", "excitation frame forward transform"},
+                {"18012b470", "render-state transform feature copy A"},
+                {"18012b450", "render-state transform feature copy B"},
                 {"180128c40", "transform-state constructor"},
                 {"180129240", "transform-state allocator"},
                 {"1800bca40", "render-state root initializer"},
