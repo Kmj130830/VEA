@@ -598,7 +598,7 @@ int main() {
     assert(vea_s5_decode_container_payload(
         raw_file, kFileBytes, decoded, sizeof(decoded) - 1u, &required_size) ==
         VEA_S5_CONTAINER_STATUS_BUFFER_TOO_SMALL);
-    assert(required_size == 0u);
+    assert(required_size == kDecodedBytes);
 
     VeaS5ContainerHeader invalid_header{};
     const uint8_t invalid_magic[VEA_S5_CONTAINER_PREFIX_SIZE] = {};
