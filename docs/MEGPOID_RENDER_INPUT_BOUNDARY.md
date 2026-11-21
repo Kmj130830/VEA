@@ -330,3 +330,64 @@ nor for ordinary phone labels; those continue through the active context
 tree. Android now exposes these four cases separately in
 `S5ApiPhoneCategorySpecialCases.fixedIndexOrNull()` and leaves all other
 labels unresolved.
+
+## Feature-builder call-site parameter mapping — FUN_18003ab70
+
+The call site in `FUN_18003ab70` passes the following render-context
+fields into `FUN_18006c720`. These are byte offsets in the feature-builder
+descriptor at `param_1`; the meanings below describe how the callee
+actually consumes the values, not guessed vendor property names.
+
+| Feature-builder argument | Source | Observed use |
+|---|---:|---|
+| `param_3` | caller's phone-event array | 0x38-byte / seven-qword event rows |
+| `param_4` | caller's event count | number of event rows and output positions |
+| `param_5` | active render context | passed to `FUN_180074a50` for category lookup |
+| `param_6` | descriptor `+0x10` | category-slot stride / one-hot category width |
+| `param_7` | descriptor `+0x14` | lower duration bound, passed through `logf` |
+| `param_8` | descriptor `+0x18` | upper duration bound, passed through `logf` |
+| `param_9` | descriptor `+0x1C` | one context-window count; its loop advances from the current one-based event cursor |
+| `param_10` | descriptor `+0x20` | other context-window count; its loop starts at cursor minus this count |
+| `param_11` | descriptor `+0x24` | enables two additional per-row flag slots when nonzero |
+| `param_12` | descriptor `+0x25` | selects one of two feature-layout branches |
+| `param_13` | descriptor `+0x26` | forwarded; not read in the recovered function body |
+| `param_14` | caller's `param_8` | optional duration cap/selection value in the nonzero-layout branch |
+
+For the `param_12 == 0` branch, the exact output width per phone row is:
+
+```text
+leftCount  = descriptor[+0x20]
+rightCount = descriptor[+0x1C]
+categoryWidth = descriptor[+0x10]
+flagWidth = (descriptor[+0x24] != 0) ? 2 : 0
+rowWidth = 1 + flagWidth + (leftCount + 1 + rightCount) * categoryWidth
+```
+
+The initial scalar feature is the normalized logarithm of the event
+duration. Given `d = endSeconds - startSeconds`, `lo = param_7`, and
+`hi = param_8`, this branch computes:
+
+```text
+effective = max(lo, d)
+x = 2 * (log(effective) - log(lo)) / (log(hi) - log(lo)) - 1
+durationFeature = clamp(x, -1, +1)
+```
+
+The category slot for the current event is set in the center segment.
+The two context loops clamp their row indexes to `[0, eventCount - 1]`,
+resolve each selected label through `FUN_180074a50`, and set a one-hot
+slot in their respective category segments. This documents the actual
+indexing loops; the exact temporal interpretation of the two context
+counts is retained by source offset until the descriptor's own
+construction path assigns reliable names.
+
+When the two extra flag slots are enabled, the function fills them from
+the optional output of `FUN_180074a50`. The zero/nonzero meaning of that
+byte is not assigned here. The alternate `param_12 != 0` layout has
+different per-row placement and optional duration-capping logic; it must
+not be mixed with the default-branch formula above.
+
+These mappings allow the default feature layout to be described exactly,
+but do not make it model-ready: `categoryWidth`, context counts and mode
+must still come from a correctly initialized render context, and each
+event's numeric category must be resolved through that same context.
