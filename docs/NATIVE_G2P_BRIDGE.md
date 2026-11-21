@@ -52,3 +52,58 @@ The APK packages the shared library only for `arm64-v8a`. The app can load the b
 6. Mark a language ready only after those differential tests pass on Android ARM64.
 
 G2P is only a lyric/phoneme preparation stage. It does not render an AI singing voice. The VOCALOID7 model runtime and audio-render boundary remain separate, unimplemented work.
+
+## Additional Korean-module findings (static only)
+
+The November 2026 Ghidra analysis of the supplied `G2PAManager_KOR.dll` establishes a more detailed internal path than the narrow replacement above. The DLL was not executed; names below are analysis labels for recovered functions, not vendor symbols.
+
+### Per-lyric processing sequence
+
+The Korean helper `FUN_180007210`:
+
+1. Copies the UTF-16 lyric.
+2. Applies 32 ordered substring-replacement passes. Their source/destination tables are in the DLL's read-only data; the exact textual replacement pairs have not yet been decoded.
+3. Calls `FUN_180007390`, `FUN_180008730` and `FUN_180007f80` in that order.
+4. Propagates a nonzero helper result through the manager's error path.
+
+The three stages have distinct observable responsibilities:
+
+- `FUN_180007390` creates a working lyric plus per-character marker arrays. It handles separators and punctuation, applies default-character substitutions for some unsupported input, and performs validation/cleanup passes. It also treats `/`, `-`, spaces and `.` specially. The exact user-facing meaning of every marker value is not yet resolved.
+- `FUN_180008730` maps Hangul syllables through an 11,172-entry lookup table and applies context-sensitive, adjacent-syllable transformations. The table packs three five-bit fields; the code extracts them at bit positions 10–14, 5–9 and 0–4, then consults separate lookup arrays. Its rules alter the working text and marker arrays, so a direct per-code-point substitution would not reproduce this stage.
+- `FUN_180007f80` allocates a result array of wide-string pointers and builds output strings for eligible syllables. It uses separate onset, vowel and coda lookup tables and has additional branches for adjacent-syllable and coda-context cases. The function's result is a sequence of string records, not one flat output string.
+
+### Recovered base output inventory
+
+The DLL's read-only data contains three pointer tables used by `FUN_180007f80`. The following are observed table values, indexed by the packed Hangul fields; they are not asserted to be standard X-SAMPA symbols:
+
+| Component table | Observed non-empty labels |
+|---|---|
+| Onset | `g`, `g'`, `n`, `d`, `d'`, `l`, `m`, `b`, `b'`, `s`, `s'`, `N`, `c`, `c'`, `ch`, `k`, `t`, `p`, `h`, `sh`, `r`, `sh'` |
+| Vowel | `a`, `e`, `ja`, `je`, `7`, `j7`, `o`, `oa`, `ue`, `jo`, `u`, `u7`, `ui`, `ju`, `M`, `Mi`, `i` |
+| Coda | `gp`, `np`, `dp`, `rp`, `mp`, `bp`, `Np` |
+
+Some packed indices intentionally point to empty strings; repeated labels also occur at different indices. Do not replace these with a modern romanization table or assume a one-to-one mapping from a familiar IPA/X-SAMPA inventory.
+
+### Syllable boundary is part of the result contract
+
+The common G2PA interface exposes a `SyllableSegArray` object with separate operations for:
+
+- appending an item using two string arguments;
+- retrieving the `syllable` string by index;
+- retrieving the `phonemes` string by index;
+- querying the array size.
+
+The corresponding wrapper entry points are named `SyllableSegArray_append`, `SyllableSegArray_syllable` and `SyllableSegArray_phonemes`. This is strong evidence that the app-side representation must preserve syllable/phoneme pairs rather than flattening a whole Korean lyric into one phoneme string. It also gives a concrete target shape for a future portable Android result type.
+
+### Porting boundary
+
+This evidence is enough to identify the Korean preprocessing stages and the base output inventory, but not enough to mark Korean G2P ready:
+
+- the 32 substring replacement pairs still need decoding;
+- the full transformation rules and all marker meanings need to be recovered;
+- the relationship between the per-syllable strings and the host's syllable/phoneme pair is not yet fully mapped;
+- dictionary fallback/default phoneme behavior and failure codes need confirmation;
+- differential test vectors from an authorized reference are still required.
+
+Until those conditions are met, keep `nativeLanguageReady(KOR)` false and keep the synthesis renderer unavailable. The static trace does not execute the proprietary code and does not establish a portable ABI.
+
