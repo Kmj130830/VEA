@@ -1,6 +1,7 @@
 package com.kmj.vea.engine
 
 import com.kmj.vea.data.VeaProject
+import com.kmj.vea.data.VeaTrack
 import java.io.OutputStream
 
 data class VoicebankDescriptor(
@@ -10,6 +11,33 @@ data class VoicebankDescriptor(
     val sourceUri: String,
     val languages: List<String> = emptyList()
 )
+
+/**
+ * Reconstructs the persisted voicebank binding for a track.
+ *
+ * The returned descriptor only identifies the installed package. Renderer
+ * availability must still be checked by the selected SynthesisEngine.
+ */
+fun VeaTrack.voicebankDescriptorOrNull(): VoicebankDescriptor? {
+    if (singerId.isBlank() || singerSourceUri.isBlank()) return null
+
+    val languages = when (singerId) {
+        "ai_megpoid_v7" -> listOf("Japanese", "English", "Chinese")
+        else -> emptyList()
+    }
+    val engineFamily = when (singerId) {
+        "ai_megpoid_v7" -> "VOCALOID7"
+        else -> "unknown"
+    }
+
+    return VoicebankDescriptor(
+        id = singerId,
+        displayName = singerName,
+        engineFamily = engineFamily,
+        sourceUri = singerSourceUri,
+        languages = languages
+    )
+}
 
 data class EngineStatus(
     val engineName: String,
