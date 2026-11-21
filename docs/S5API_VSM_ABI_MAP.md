@@ -158,3 +158,35 @@ because its label was `-`. `FUN_180007ec0` then removes rows whose resulting
 duration is below the native `0.001f` threshold.
 
 Android's `VsmPhoneEventPreprocessor` mirrors that order and endpoint rule.
+
+### Exact read-only alias tables used by `FUN_180074a50`
+
+The two pointer tables are stored in `.data` and are iterated as NUL-terminated
+label aliases before the global string/index tree lookup. Their contents can
+be read directly from the supplied S5API PE image:
+
+**Alias table A — 55 entries (`0x1801C3080` through `0x1801C3237`)**
+
+```text
+i_n, uei, iE_n, yE_r, @N, u@N, @U, ia, i`, @`, i\, i@U, aI, uaI,
+y_n, 7, iN, iE_r, ua_n, iUN, AN, ei, AU, uAN, a_n, iAN, y{_n,
+u@_n, @_n, uo, UN, iAU, ua,
+ia+0, iE_r+0, yE_r+0, ua+0, uo+0, iAU+0, i@U+0, uaI+0, uei+0,
+iAN+0, iUN+0, iE_n+0, y{_n+0, u@N+0, u@_n+0, ua_n+0, uAN+0,
+y|CH, a|CH, i|CH, u|CH, o|CH
+```
+
+**Alias table B — 29 entries (`0x1801C3240` through `0x1801C3327`)**
+
+```text
+p_h, ts\, s\, ts`, k_h, z`, t_h, ts_h, ts`_h, ts\_h, x, s`,
+ia+1, iE_r+1, yE_r+1, ua+1, uo+1, iAU+1, i@U+1, uaI+1, uei+1,
+iAN+1, iUN+1, iE_n+1, y{_n+1, u@N+1, u@_n+1, ua_n+1, uAN+1
+```
+
+`FUN_180074a50` compares incoming labels against these arrays before
+falling through to its normalized-string and global tree logic. The suffixes
+and separators are preserved exactly; they are not stripped by this alias
+scan. The arrays establish special lexical aliases but do not establish a
+numeric phoneme-ID sequence. Runtime ID assignment remains a separate
+global-tree initialization question.
