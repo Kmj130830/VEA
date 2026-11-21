@@ -115,6 +115,8 @@ public class ExportS5RendererPath extends GhidraScript {
                 "180127d00", "180127dc0", "1800ad9d0", "1800ada20",
                 // Explicit frame-window generator and its math helpers.
                 "18012a9a0", "180082db0", "18007b870",
+                // FFT plan creation used by the output transform descriptor.
+                "18004e580", "180040630", "18000fc20",
                 "1800ccafd"
             };
             out.println("## Explicit internal call targets");
@@ -150,6 +152,7 @@ public class ExportS5RendererPath extends GhidraScript {
                 {"18012b150", "excitation frame forward transform"},
                 {"18012b470", "render-state transform feature copy A"},
                 {"18012b450", "render-state transform feature copy B"},
+                {"18004e580", "FFT plan builder"},
                 {"180128c40", "transform-state constructor"},
                 {"180129240", "transform-state allocator"},
                 {"1800bca40", "render-state root initializer"},
