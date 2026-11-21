@@ -133,8 +133,8 @@ internal class S5MegpoidExcitationGenerator(
 
 /**
  * Marsaglia polar normal sampler matching the native cached-pair strategy.
- * The underlying uniform PRNG is injectable so the renderer can later replace
- * java.util.Random with the exact native MT19937 seed/state contract.
+ * The injectable constructor keeps deterministic test inputs possible;
+ * fromNativeSeed() supplies the recovered MT19937 stream for synthesis.
  */
 internal class S5MegpoidGaussianNoise(
     private val nextUniformMinusOneToOne: () -> Float
