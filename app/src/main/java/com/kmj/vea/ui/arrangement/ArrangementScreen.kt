@@ -57,6 +57,7 @@ fun ArrangementScreen(
     megpoidVoicebankSourceUri: String,
     isMegpoidModelInstalled: Boolean,
     isMegpoidInstallCheckComplete: Boolean,
+    megpoidModelLoadError: String,
     canUndo: Boolean,
     canRedo: Boolean
 ) {
@@ -281,10 +282,13 @@ fun ArrangementScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        if (isMegpoidModelInstalled) {
-                            "AI Megpoid V7 weights are bundled with the app and verified in private storage."
-                        } else {
-                            "Bundled AI Megpoid model resources are unavailable. Rebuild the app with the model archives at the repository root."
+                        when {
+                            isMegpoidModelInstalled ->
+                                "AI Megpoid V7 model files are bundled with the app and verified in private storage."
+                            megpoidModelLoadError.isNotBlank() ->
+                                "Megpoid model load failed: ${megpoidModelLoadError.take(120)}"
+                            else ->
+                                "Waiting for bundled AI Megpoid model verification."
                         },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 10.sp
