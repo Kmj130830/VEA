@@ -49,6 +49,25 @@ VeaG2pStatus vea_g2p_korean_hangul_packed_indices(
 );
 
 /*
+ * Base phoneme labels looked up by the Korean manager for a modern Hangul
+ * syllable. These are table components before adjacent-syllable rules,
+ * marker processing, and syllable-level output assembly.
+ *
+ * The strings are null-terminated ASCII labels from the supplied DLL tables;
+ * they are not asserted to be standard X-SAMPA or final spoken phonemes.
+ */
+typedef struct VeaKoreanPhonemeComponents {
+    char onset[4];
+    char vowel[3];
+    char coda[3];
+} VeaKoreanPhonemeComponents;
+
+VeaG2pStatus vea_g2p_korean_syllable_components(
+    uint32_t codepoint,
+    VeaKoreanPhonemeComponents* components
+);
+
+/*
  * Applies the recovered Korean input-preprocessing subset:
  * - U+30FC and U+2212 are replaced with U+002D.
  * - 32 ordered, length-preserving Korean lexical replacements are applied.
