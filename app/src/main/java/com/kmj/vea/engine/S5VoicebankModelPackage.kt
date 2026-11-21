@@ -70,6 +70,18 @@ data class S5VoicebankModelPackage(
     }
 
     /**
+     * Builds the sequence-major residual-block invocation plan recovered
+     * from FUN_1800c7ad0. sequenceCount includes the terminal sequence slot;
+     * the native loop executes sequenceCount - 1 positions.
+     *
+     * This produces call ordering and workspace ownership only. The
+     * neighboring preprocessing and feature-generation operators are not
+     * represented as executable stages yet.
+     */
+    fun buildResidualBlockSchedule(sequenceCount: Int): S5MegpoidResidualBlockSchedule =
+        S5MegpoidResidualBlockSchedule.megpoidV7(sequenceCount)
+
+    /**
      * Lazily indexes the nine named neural layers in the shared VOCALOID7.vtmg.
      * This resolves actual model tensors but does not yet execute their network.
      */
