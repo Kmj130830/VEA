@@ -19,9 +19,9 @@ data class VeaTrack(
     val singerId: String = "",
     val singerName: String = "",
     val singerStyleId: String = "",
-    val singerSourceUri: String = "",
     val color: Long = 0xFF8DBF4A,
-    val clips: List<VeaClip> = emptyList()
+    val clips: List<VeaClip> = emptyList(),
+    val singerSourceUri: String = ""
 )
 
 data class VeaClip(
