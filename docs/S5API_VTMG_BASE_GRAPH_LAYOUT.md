@@ -46,7 +46,7 @@ and keeps the other formatter unchanged for its existing callers.
 | conv3 | 64 | 32 | 3 | 6,144 | 64 |
 | cond3 | 64 | 26 | 1 | 1,664 | 64 |
 | linear | 3 | 32 | 1 | 96 | 3 |
-| **Total** | | | | **27,104** | **515** |
+| **Total** | | | | **27,168** | **451** |
 
 The total raw parameter count is 27,619 float32 values.
 
