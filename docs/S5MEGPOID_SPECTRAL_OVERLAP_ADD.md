@@ -289,3 +289,17 @@ This closes the render-state scalar provenance for the Megpoid output
 transform. It does not establish vendor FFT plan bit-exact numerical parity,
 connect the neural forward graph to the spectral buffer, or complete
 PCM/WAV export.
+
+## Prepared spectral output session
+
+`PreparedMegpoidRuntime.createSpectralOutputSession()` now exposes the
+model-spectrum destination and final output stage as one render-scoped object.
+It validates every incoming interleaved spectrum against the recovered
+`fftSize / 2 + 1` complex-bin contract before calling the stateful inverse
+FFT/overlap-add processor. Each accepted model frame produces one
+`outputSamples` block, and the overlap history is retained across consecutive
+calls. `reset()` clears the ring and frame counter at an utterance boundary.
+
+The session does not manufacture spectral values, perform sample-rate
+conversion, or write WAV data. The future neural forward pass must fill the
+model-spectrum frame and submit it in chronological frame order.

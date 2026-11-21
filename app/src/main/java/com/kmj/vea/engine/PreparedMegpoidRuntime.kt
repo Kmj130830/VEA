@@ -56,6 +56,20 @@ data class PreparedMegpoidRuntime(
     fun createSpectralOverlapAdd(): S5MegpoidSpectralOverlapAdd =
         outputTransformInputs.createSpectralOverlapAdd()
 
+    /**
+     * Creates a checked output session that accepts one model-produced
+     * interleaved complex spectrum per frame and preserves overlap history
+     * until reset or utterance completion.
+     */
+    fun createSpectralOutputSession(): PreparedMegpoidSpectralOutputSession {
+        val transformInputs = outputTransformInputs
+        return PreparedMegpoidSpectralOutputSession(
+            spectrumShape = spectrumOutputShape,
+            outputSamples = transformInputs.outputSamplesAtRoot0C,
+            overlapAdd = transformInputs.createSpectralOverlapAdd()
+        )
+    }
+
     val scheduledNotes: List<VsmScheduledNote>
         get() = inputSchedules.flatMap { schedule ->
             schedule.chunks.flatMap { chunk -> chunk.noteStarts }
