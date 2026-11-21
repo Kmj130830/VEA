@@ -232,6 +232,65 @@ extern "C" VeaG2pStatus vea_g2p_korean_hangul_packed_indices(
     return VEA_G2P_STATUS_OK;
 }
 
+extern "C" VeaG2pStatus vea_g2p_korean_hangul_from_packed_indices(
+    uint16_t packed_indices,
+    uint32_t* codepoint) {
+    if (codepoint == nullptr) {
+        return VEA_G2P_STATUS_INVALID_ARGUMENT;
+    }
+
+    const uint32_t onset_index = (packed_indices >> 10U) & 0x1FU;
+    const uint32_t vowel_index = (packed_indices >> 5U) & 0x1FU;
+    uint32_t coda_index = packed_indices & 0x1FU;
+
+    if ((packed_indices & 0x8000U) == 0U) {
+        return VEA_G2P_STATUS_INVALID_ARGUMENT;
+    }
+    if (coda_index == 0U) {
+        // FUN_180008660 treats table coda indices 1, 30 and 31 as the
+        // empty-coda variant when the requested low five bits are zero.
+        // The modern-Hangul table has coda index 1 for the empty-coda row.
+        coda_index = 1U;
+    }
+
+    if (onset_index < 2U || onset_index > 20U) {
+        return VEA_G2P_STATUS_INVALID_ARGUMENT;
+    }
+
+    uint32_t medial_index = 0U;
+    bool found_vowel = false;
+    for (uint32_t index = 0; index < 21U; ++index) {
+        if (kKoreanVowelIndices[index] == vowel_index) {
+            medial_index = index;
+            found_vowel = true;
+            break;
+        }
+    }
+    if (!found_vowel) {
+        return VEA_G2P_STATUS_INVALID_ARGUMENT;
+    }
+
+    uint32_t final_index = 0U;
+    bool found_coda = false;
+    for (uint32_t index = 0; index < 28U; ++index) {
+        if (kKoreanCodaIndices[index] == coda_index) {
+            final_index = index;
+            found_coda = true;
+            break;
+        }
+    }
+    if (!found_coda) {
+        return VEA_G2P_STATUS_INVALID_ARGUMENT;
+    }
+
+    const uint32_t initial_index = onset_index - 2U;
+    *codepoint = 0xAC00U + initial_index * 588U + medial_index * 28U + final_index;
+    if (*codepoint > 0xD7A3U) {
+        return VEA_G2P_STATUS_INVALID_ARGUMENT;
+    }
+    return VEA_G2P_STATUS_OK;
+}
+
 extern "C" VeaG2pStatus vea_g2p_korean_syllable_components(
     uint32_t codepoint,
     VeaKoreanPhonemeComponents* components) {
