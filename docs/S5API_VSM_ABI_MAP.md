@@ -146,3 +146,15 @@ treat the read-only string order as the numeric category-ID order.
 This supersedes the earlier seven-double/five-key interpretation. Android
 must represent the upstream event as an interval plus an owned phone-label
 string and separately retain the unexplained uint32/auxiliary source fields.
+
+### Exact endpoint propagation in the `-` removal pass
+
+The compaction in `FUN_180007a90` has a specific boundary rule: after
+removing rows whose label is exactly `-`, each retained row's end field
+(offset `+0x08`) is overwritten with the **next retained row's start**
+(offset `+0x00`). The final retained row keeps the endpoint from the last
+row in the pre-filter list, even when that final source row was removed
+because its label was `-`. `FUN_180007ec0` then removes rows whose resulting
+duration is below the native `0.001f` threshold.
+
+Android's `VsmPhoneEventPreprocessor` mirrors that order and endpoint rule.
