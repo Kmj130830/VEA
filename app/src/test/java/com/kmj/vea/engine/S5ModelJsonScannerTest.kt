@@ -114,6 +114,56 @@ class S5ModelJsonScannerTest {
     }
 
     @Test
+    fun scansNumericAndBooleanConfigFieldsUnderSelectedHashedObject() {
+        val configKey = "fedcba9876543210fedcba9876543210"
+        val json = """
+            {
+              "layers": {
+                "$configKey": {
+                  "input_width": 418,
+                  "hidden_width": 9,
+                  "enabled": true,
+                  "optional": null,
+                  "nested": { "scale": 0.25 }
+                },
+                "unrelated": { "input_width": 99 }
+              }
+            }
+        """.trimIndent()
+
+        val result = S5ModelJsonScanner.scanForObjectKeys(
+            StringReader(json),
+            setOf(configKey)
+        )
+        val values = result.matchedValues.getValue(configKey)
+
+        assertEquals(5, values.size)
+        assertEquals(
+            listOf("input_width", "hidden_width", "enabled", "optional", "scale"),
+            values.map { it.fieldKey }
+        )
+        assertEquals(
+            listOf("418", "9", "true", null, "0.25"),
+            values.map { it.value }
+        )
+        assertEquals(
+            listOf(
+                S5JsonScalarKind.NUMBER,
+                S5JsonScalarKind.NUMBER,
+                S5JsonScalarKind.BOOLEAN,
+                S5JsonScalarKind.NULL,
+                S5JsonScalarKind.NUMBER
+            ),
+            values.map { it.kind }
+        )
+        assertEquals(
+            "$.layers.$configKey.nested.scale",
+            values.last().valuePath
+        )
+        assertEquals(0, result.matchedValues.size - 1)
+    }
+
+    @Test
     fun visitorReceivesKeysAndScalarValuesWithoutBuildingTree() {
         val keys = mutableListOf<String>()
         val values = mutableListOf<Pair<String?, String?>>()
