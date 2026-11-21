@@ -6,13 +6,13 @@ import org.junit.Test
 
 class S5ApiPhoneCategorySpecialCasesTest {
     @Test
-    fun mapsExactSilenceSpellingsToZero() {
-        assertEquals(0, S5ApiPhoneCategorySpecialCases.fixedIndexOrNull("Sil"))
+    fun mapsOnlyExactUppercaseSILToZero() {
         assertEquals(0, S5ApiPhoneCategorySpecialCases.fixedIndexOrNull("SIL"))
+        assertEquals(1, S5ApiPhoneCategorySpecialCases.fixedIndexOrNull("Sil"))
     }
 
     @Test
-    fun mapsExactBreakSpellingsToOne() {
+    fun mapsExactTitleAndUppercaseBreakToOne() {
         assertEquals(1, S5ApiPhoneCategorySpecialCases.fixedIndexOrNull("Br"))
         assertEquals(1, S5ApiPhoneCategorySpecialCases.fixedIndexOrNull("BR"))
     }
