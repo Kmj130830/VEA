@@ -87,8 +87,8 @@ sourceEnd   = max(0, H + min(Q, (1 - r) * O))
 The destination begins at:
 
 ```text
-outputStart = 0                    when sourceEnd <= O
-              O - sourceEnd        otherwise
+outputStart = O - sourceEnd        when sourceEnd <= O
+              0                    otherwise
 ```
 
 It copies sourceEnd - sourceStart samples from the selected ring slot,
