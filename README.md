@@ -120,6 +120,17 @@ The CI prepares only allow-listed artwork from megpoidV7.zip:
 
 The app can select the AI Megpoid identity and Voice Type metadata. This does not imply that singing synthesis is already available.
 
+## Verified AI Megpoid V7 model import
+
+The Android app now includes a private-storage importer for the two user-selected source archives:
+
+- `megpoidV7.zip`: imports `AI_Megpoid.vtb2` and `AI_Megpoid.vpit`.
+- `AI Model.zip`: imports `COMMON7.vpit`, `VOCALOID7.vhnv`, and `VOCALOID7.vtmg`.
+
+`MegpoidV7PackageInstaller.install(context, bankZipUri, modelZipUri)` must be called from an I/O dispatcher. It streams the archives, extracts only those five allow-listed files, validates each file's catalog SHA-256 and 136-byte outer header, and activates the new package only after both archives pass verification. Unrelated files are not installed. `findInstalled(context)` rechecks the installed files, and the returned package can provide a `VoicebankDescriptor` whose source URI points to the app-private model directory.
+
+This is the first real model-resource connection step, not a completed synthesizer. The importer does not decode or transform the proprietary model payloads, bypass authorization, execute Windows DLLs, or mark the engine as available. VDM database integration, the complete S5API model execution graph, Yamaha G2P, and the Android ARM64 singing renderer are still required before Megpoid WAV rendering can be enabled.
+
 ## Playback and pitch preview
 
 - The piano roll offers DRAW, SELECT, and PITCH tools, bounded zoom (65–230%), and note resizing.
