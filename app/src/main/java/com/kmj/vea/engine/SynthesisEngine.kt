@@ -102,13 +102,39 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
         )
     }
 
+    /**
+     * Converts the selected track's editable notes into the stable acoustic
+     * renderer request format. This is also the entry point used by future
+     * voicebank adapters; it does not synthesize audio by itself.
+     */
+    fun prepareRenderPlans(
+        project: VeaProject,
+        voicebank: VoicebankDescriptor,
+        sampleRate: Int = VocalRenderPlanBuilder.DEFAULT_SAMPLE_RATE
+    ): List<VocalRenderPlan> {
+        val tracks = project.tracks.filter { track ->
+            track.kind != "AUDIO" &&
+                track.singerId == voicebank.id &&
+                track.singerSourceUri == voicebank.sourceUri
+        }
+        require(tracks.isNotEmpty()) {
+            "The project has no vocal track bound to ${voicebank.displayName}."
+        }
+        return tracks.map { track ->
+            VocalRenderPlanBuilder.build(project, track, sampleRate)
+        }
+    }
+
     override suspend fun render(
         project: VeaProject,
         voicebank: VoicebankDescriptor,
         output: OutputStream
     ) {
+        val plans = prepareRenderPlans(project, voicebank)
+        require(plans.any { !it.isEmpty }) { "There are no notes to synthesize." }
         throw UnsupportedOperationException(
-            "On-device VOCALOID AI synthesis is unavailable until the native G2P and singing renderer are implemented and verified."
+            "The AI Megpoid model resources are bundled and verified, and the note/pitch render plan is ready. " +
+                "The Android ARM64 acoustic runtime is not complete yet; no WAV was generated."
         )
     }
 }
