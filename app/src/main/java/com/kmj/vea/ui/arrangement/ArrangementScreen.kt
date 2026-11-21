@@ -53,7 +53,8 @@ fun ArrangementScreen(
     onRedo: () -> Unit,
     onPlay: () -> Unit,
     onStop: () -> Unit,
-    onAssignVoice: (String, String, String, String) -> Unit,
+    onAssignVoice: (String, String, String, String, String) -> Unit,
+    megpoidVoicebankSourceUri: String,
     isMegpoidModelInstalled: Boolean,
     isMegpoidInstallCheckComplete: Boolean,
     onImportMegpoidModel: () -> Unit,
@@ -295,12 +296,15 @@ fun ArrangementScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(
+                    enabled = isMegpoidModelInstalled && megpoidVoicebankSourceUri.isNotBlank(),
+                    onClick = {
                     onAssignVoice(
                         targetTrack.id,
                         voicebank.id,
                         voicebank.displayName,
-                        selectedVoiceStyleId
+                        selectedVoiceStyleId,
+                        megpoidVoicebankSourceUri
                     )
                     voicePickerTrack = null
                 }) { Text("LOAD VOICE") }
