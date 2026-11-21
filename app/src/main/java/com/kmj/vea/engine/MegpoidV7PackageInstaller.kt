@@ -160,6 +160,47 @@ object MegpoidV7PackageInstaller {
     }
 
     /**
+     * Installs the five model resources bundled into the APK by the Gradle
+     * prepareMegpoidModelAssets task. No archive picker or network is required.
+     *
+     * Call from an I/O dispatcher. The source assets are verified before the
+     * active installation is replaced.
+     */
+    @Throws(IOException::class)
+    fun installBundled(context: Context): InstalledPackage {
+        val appContext = context.applicationContext
+        val parent = File(appContext.filesDir, "voicebanks")
+        if (!parent.exists() && !parent.mkdirs()) {
+            throw IOException("Cannot create the private voicebank directory.")
+        }
+
+        val staging = File(parent, ".$BANK_ID.bundled-stage-${UUID.randomUUID()}")
+        if (!staging.mkdir()) throw IOException("Cannot create a temporary voicebank directory.")
+
+        try {
+            val allSpecs = bankArchiveSpecs + sharedModelArchiveSpecs
+            for (spec in allSpecs) {
+                val assetPath = "megpoid-models/${spec.fileName}"
+                val outputFile = File(staging, spec.fileName)
+                appContext.assets.open(assetPath).use { input ->
+                    FileOutputStream(outputFile, false).use { output ->
+                        input.copyTo(output, 64 * 1024)
+                        output.fd.sync()
+                    }
+                }
+                verifyExistingFile(outputFile, spec)
+            }
+
+            val active = File(parent, BANK_ID)
+            replaceDirectoryAtomically(staging, active)
+            return packageAt(active, allSpecs)
+        } catch (error: Exception) {
+            staging.deleteRecursively()
+            throw error
+        }
+    }
+
+    /**
      * Returns the existing installation only when all five files still match
      * the catalog hashes and their container headers.
      */
