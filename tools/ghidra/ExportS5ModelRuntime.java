@@ -15,7 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class ExportS5ModelRuntime extends GhidraScript {
-    private static final int MAX_FUNCTIONS = 100;
+    private static final int MAX_FUNCTIONS = 140;
     private static final int MAX_DEPTH = 1;
 
     private static final class Work {
@@ -37,7 +37,11 @@ public class ExportS5ModelRuntime extends GhidraScript {
             "180047900", "1800c7ad0", "1800c1a30", "1800ccdb0",
             "1800c5260", "1800c3740", "1800c1060", "1800c1210",
             "1800df720", "1800c0ee0", "18012d350", "18012e0d0",
-            "180130b70", "18012d460", "18012f280", "180130ce0"
+            "180130b70", "18012d460", "18012f280", "180130ce0",
+            // Caller of the shared VTMG graph loader (FUN_180068190).
+            "18008d5b2",
+            // Adjacent 0x2e8-byte model-context builder with a separate typed-JSON path.
+            "18008d650"
         };
 
         LinkedHashMap<Address, Function> selected = new LinkedHashMap<>();

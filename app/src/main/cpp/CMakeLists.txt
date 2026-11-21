@@ -27,12 +27,15 @@ add_library(veas5tensor SHARED
     vea_s5_stats.cpp
     vea_s5_dwconv.cpp
     vea_s5_gru_names.cpp
+    vea_s5_parameter_key.cpp
     vea_s5_residual.cpp
     vea_s5_gelu.cpp
     vea_s5_normalization.cpp
     vea_s5_gemm.cpp
     vea_s5_banked_linear.cpp
     vea_s5_block.cpp
+    vea_s5_rnn_layout.cpp
+    vea_s5_named_layer_set.cpp
 )
 target_include_directories(veas5tensor PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_definitions(veas5tensor PRIVATE VEA_S5_TENSOR_BUILD)

@@ -1,12 +1,58 @@
 package com.kmj.vea.engine
 
+data class S5MegpoidNativeLayerShape(
+    val axis0Count: Int,
+    val axis1Count: Int,
+    val paddedAxis0Count: Int,
+    val matrixCount: Int
+)
+
+/**
+ * Owner of persistent native BlockMatrix descriptor pairs for the nine
+ * VOCALOID7.vtmg layers. Always close this handle when the voicebank is removed.
+ */
+class S5MegpoidNativeParameterSet internal constructor(
+    private var nativeHandle: Long
+) : AutoCloseable {
+    val isClosed: Boolean
+        @Synchronized get() = nativeHandle == 0L
+
+    @Synchronized
+    fun layerShape(layer: S5MegpoidNamedLayer): S5MegpoidNativeLayerShape {
+        check(nativeHandle != 0L) { "Native Megpoid parameter set is closed." }
+        return NativeS5TensorBridge.getNamedLayerParameterShape(nativeHandle, layer.ordinal)
+    }
+
+    @Synchronized
+    override fun close() {
+        val handle = nativeHandle
+        nativeHandle = 0L
+        NativeS5TensorBridge.destroyNamedLayerParameterSet(handle)
+    }
+}
+
+data class S5RnnDirectionLayout(
+    val layerIndex: Int,
+    val directionIndex: Int,
+    val inputFeatures: Int,
+    val hiddenFeatures: Int,
+    val gateFeatures: Int,
+    val directionCount: Int,
+    val weightIhElements: Long,
+    val weightHhElements: Long,
+    val biasIhElements: Long,
+    val biasHhElements: Long
+)
+
 data class S5ContainerHeaderInfo(
     val kind: String,
-    val declaredSpan: Long,
-    val formatWord: Long,
-    val transformSeed: Long,
+    val payloadSize: Long,
+    val formatWord: Long
+) {
+    /** Compatibility field used by the editor's original 16-byte prefix scanner. */
     val decodedPayloadSize: Long
-)
+        get() = payloadSize
+}
 
 /**
  * Native implementation of the recovered S5API tensor and container boundary.
@@ -26,41 +72,73 @@ object NativeS5TensorBridge {
     val abiVersion: Int
         get() = if (loaded) nativeAbiVersion() else 0
 
-    /** Parses the 16-byte S5API prefix: magic, declared span, format word, and transform seed. */
+    /**
+     * Parses either the editor's historical 16-byte transform prefix or the
+     * complete 136-byte S5 package envelope. The 16-byte form preserves the
+     * recovered S5API size calculation used by S5ModelJsonScanner:
+     * min(totalFileSize, declaredSpan + 8) - 16.
+     */
     fun parseContainerHeader(header: ByteArray, totalFileSize: Long): S5ContainerHeaderInfo? {
+        if (header.size == 16) {
+            require(totalFileSize >= 16L)
+            val magic = String(header, 0, 4, Charsets.US_ASCII)
+            if (magic !in setOf("VTMB", "VTBR", "VTMG", "VPIT", "VNPV", "VHNV")) {
+                return null
+            }
+            val declaredSpan = readUInt32Le(header, 4)
+            val endOffset = declaredSpan + 8L
+            val clampedEnd = if (endOffset < 16L || totalFileSize < endOffset) {
+                totalFileSize
+            } else {
+                endOffset
+            }
+            return S5ContainerHeaderInfo(
+                kind = magic,
+                payloadSize = clampedEnd - 16L,
+                formatWord = readUInt32Le(header, 8)
+            )
+        }
+
         check(loaded) { "Native S5 tensor library is not loaded." }
-        require(header.size == 16) { "The S5API container prefix is exactly 16 bytes." }
-        require(totalFileSize >= 16L)
+        require(header.size == 136) { "The V7 container header is exactly 136 bytes." }
+        require(totalFileSize >= 136L)
         val fields = nativeParseContainerHeader(header, totalFileSize) ?: return null
-        if (fields.size != 5) return null
+        if (fields.size != 3) return null
         val kind = when (fields[0].toInt()) {
-            1 -> "VTMB"
-            2 -> "VTBR"
-            3 -> "VTMG"
-            4 -> "VPIT"
-            5 -> "VNPV"
-            6 -> "VHNV"
+            1 -> "VTBR"
+            2 -> "VPIT"
+            3 -> "VHNV"
+            4 -> "VTMG"
             else -> return null
         }
-        return S5ContainerHeaderInfo(
-            kind = kind,
-            declaredSpan = fields[1],
-            formatWord = fields[2],
-            transformSeed = fields[3],
-            decodedPayloadSize = fields[4]
-        )
+        return S5ContainerHeaderInfo(kind, fields[1], fields[2])
     }
 
+    private fun readUInt32Le(bytes: ByteArray, offset: Int): Long =
+        (bytes[offset].toLong() and 0xffL) or
+            ((bytes[offset + 1].toLong() and 0xffL) shl 8) or
+            ((bytes[offset + 2].toLong() and 0xffL) shl 16) or
+            ((bytes[offset + 3].toLong() and 0xffL) shl 24)
+
     /**
-     * Applies the S5API FUN_18002aa90 byte transform to a complete V7 container.
-     * The result contains only the decoded body. It is not yet parsed into the
-     * JSON-like object tree or converted into model tensors.
+     * Applies the recovered S5API FUN_18002aa90 model-payload preparation step.
+     *
+     * Known VTBR/VPIT/VHNV/VTMG assets are decoded with the recovered seeded
+     * word stream; the native fallback copies unknown 16-byte-or-longer input.
+     * This is a container payload transform, not an activation or licensing
+     * operation. The decoded bytes are expected to contain a JSON object.
      */
-    fun decodeContainerPayload(fileBytes: ByteArray): ByteArray {
+    /** Backwards-compatible name used by the editor's existing container scanner. */
+    fun decodeContainerPayload(encodedContainer: ByteArray): ByteArray =
+        decodeModelPayload(encodedContainer)
+
+    fun decodeModelPayload(input: ByteArray): ByteArray {
         check(loaded) { "Native S5 tensor library is not loaded." }
-        require(fileBytes.size >= 16) { "The V7 container is shorter than its 16-byte prefix." }
-        return nativeDecodeContainerPayload(fileBytes)
-            ?: throw IllegalArgumentException("Unsupported or malformed S5 container payload.")
+        require(input.size <= 128 * 1024 * 1024) {
+            "S5 model payload exceeds the 128 MiB safety limit."
+        }
+        return nativeDecodeModelPayload(input)
+            ?: throw IllegalArgumentException("S5 model payload decoding failed.")
     }
 
     /**
@@ -130,6 +208,34 @@ object NativeS5TensorBridge {
 
 
     /**
+     * Computes the recovered flattened parameter sizes for one recurrent layer/direction.
+     * This describes model storage only; it does not execute the recurrent network.
+     */
+    fun rnnDirectionLayout(
+        inputSize: Int,
+        hiddenSize: Int,
+        numLayers: Int,
+        hasBias: Boolean,
+        bidirectional: Boolean,
+        layerIndex: Int,
+        directionIndex: Int
+    ): S5RnnDirectionLayout {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(inputSize > 0 && hiddenSize > 0 && numLayers > 0)
+        require(layerIndex in 0 until numLayers)
+        val directions = if (bidirectional) 2 else 1
+        require(directionIndex in 0 until directions)
+        val values = nativeRnnDirectionLayout(
+            inputSize, hiddenSize, numLayers, hasBias, bidirectional, layerIndex, directionIndex
+        ) ?: throw IllegalArgumentException("Invalid or overflowing S5 RNN parameter layout.")
+        require(values.size == 10)
+        return S5RnnDirectionLayout(
+            values[0].toInt(), values[1].toInt(), values[2].toInt(), values[3].toInt(),
+            values[4].toInt(), values[5].toInt(), values[6], values[7], values[8], values[9]
+        )
+    }
+
+    /**
      * Builds an S5API recurrent parameter key such as rnn.weight_ih_l0_reverse.
      * The member suffix must include its leading dot.
      */
@@ -148,6 +254,35 @@ object NativeS5TensorBridge {
             ?: throw IllegalArgumentException("Could not build S5 recurrent parameter name.")
     }
 
+
+    /**
+     * Hashes a full S5API model-object property name into its salted MD5 lookup key.
+     * The result is the 16 digest bytes serialized as 32 lowercase hex characters,
+     * matching the property-name keys stored in the model JSON object tree.
+     */
+    fun hashParameterLookupKey(parameterName: String): String {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        val nameBytes = parameterName.toByteArray(Charsets.UTF_8)
+        require(nameBytes.size <= 1 shl 20) { "Parameter name is unreasonably large." }
+        return nativeHashParameterKey(nameBytes)
+            ?: throw IllegalArgumentException("Could not hash S5 parameter lookup key.")
+    }
+
+    /**
+     * Builds then hashes one recurrent tensor property name, e.g.
+     * rnn.weight_ih_l0_reverse -> its 32-character object-tree key.
+     */
+    fun buildRecurrentParameterLookupKey(
+        base: String,
+        memberSuffix: String,
+        layerIndex: Int,
+        reverseDirection: Boolean = false
+    ): String {
+        val propertyName = buildRecurrentParameterName(
+            base, memberSuffix, layerIndex, reverseDirection
+        )
+        return hashParameterLookupKey(propertyName)
+    }
 
     /**
      * Runs the recovered residual depthwise/MLP block from FUN_1800c5d50.
@@ -171,15 +306,26 @@ object NativeS5TensorBridge {
         epsilon: Float
     ): FloatArray {
         check(loaded) { "Native S5 tensor library is not loaded." }
-        require(channels > 0 && positions >= 7 && expandedFeatures > 0)
-        require(historyRows.size == channels * 7 * positions)
-        require(depthwiseWeights.size == channels * 49)
-        require(expandWeights.size == expandedFeatures * channels)
-        require(expandedBiasA.size >= expandedFeatures && expandedBiasB.size >= expandedFeatures)
-        require(projectWeights.size == channels * expandedFeatures)
-        require(residualInput.size == channels * positions && residualScale.size >= channels)
-        require(residualBias == null || residualBias.size >= channels)
-        require(epsilon.isFinite() && epsilon >= 0.0f)
+        require(channels > 0 && expandedFeatures > 0 && expandedFeatures % channels == 0) {
+            "Expanded feature count must be a positive multiple of channels."
+        }
+        val shape = S5MegpoidResidualBlockShape(
+            channels = channels,
+            expansionMultiplier = expandedFeatures / channels,
+            positions = positions
+        )
+        shape.validateInputs(
+            historyRows = historyRows,
+            depthwiseWeights = depthwiseWeights,
+            expandWeights = expandWeights,
+            expandedBiasA = expandedBiasA,
+            expandedBiasB = expandedBiasB,
+            projectWeights = projectWeights,
+            residualInput = residualInput,
+            residualScale = residualScale,
+            residualBias = residualBias,
+            epsilon = epsilon
+        )
         return nativeRunResidualDwMlpBlock(
             historyRows, depthwiseWeights, expandWeights, expandedBiasA, expandedBiasB,
             projectWeights, residualInput, residualScale, residualBias,
@@ -321,6 +467,56 @@ object NativeS5TensorBridge {
         return result[0] to result[1]
     }
 
+    /**
+     * Creates a persistent native copy of all nine named-layer weight/bias
+     * descriptor pairs. The returned handle owns its arena until close().
+     */
+    fun createNamedLayerParameterSet(
+        weights: Array<FloatArray>,
+        biases: Array<FloatArray>,
+        axis0Counts: IntArray,
+        axis1Counts: IntArray,
+        matrixCounts: IntArray,
+        descriptorPairOffsets: IntArray
+    ): S5MegpoidNativeParameterSet {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        val count = S5MegpoidNamedLayer.entries.size
+        require(weights.size == count && biases.size == count &&
+            axis0Counts.size == count && axis1Counts.size == count &&
+            matrixCounts.size == count && descriptorPairOffsets.size == count) {
+            "Exactly $count named-layer weight/bias pairs are required."
+        }
+        val handle = nativeCreateNamedLayerParameterSet(
+            weights, biases, axis0Counts, axis1Counts, matrixCounts, descriptorPairOffsets
+        )
+        check(handle != 0L) {
+            "Native S5 named-layer descriptor preparation failed."
+        }
+        return S5MegpoidNativeParameterSet(handle)
+    }
+
+    internal fun getNamedLayerParameterShape(
+        handle: Long,
+        layerIndex: Int
+    ): S5MegpoidNativeLayerShape {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(handle != 0L)
+        require(layerIndex in S5MegpoidNamedLayer.entries.indices)
+        val values = nativeGetNamedLayerParameterShape(handle, layerIndex)
+            ?: throw IllegalStateException("Could not read native named-layer descriptor pair.")
+        check(values.size == 4)
+        return S5MegpoidNativeLayerShape(
+            axis0Count = values[0],
+            axis1Count = values[1],
+            paddedAxis0Count = values[2],
+            matrixCount = values[3]
+        )
+    }
+
+    internal fun destroyNamedLayerParameterSet(handle: Long) {
+        if (handle != 0L && loaded) nativeDestroyNamedLayerParameterSet(handle)
+    }
+
     private external fun nativeRunResidualDwMlpBlock(
         historyRows: FloatArray, depthwiseWeights: FloatArray,
         expandWeights: FloatArray, expandedBiasA: FloatArray, expandedBiasB: FloatArray,
@@ -337,12 +533,27 @@ object NativeS5TensorBridge {
         a: FloatArray, b: FloatArray, c: FloatArray,
         m: Int, n: Int, k: Int, alpha: Float, lda: Int, ldb: Int, beta: Float, ldc: Int
     ): FloatArray?
+    private external fun nativeRnnDirectionLayout(
+        inputSize: Int, hiddenSize: Int, numLayers: Int, hasBias: Boolean,
+        bidirectional: Boolean, layerIndex: Int, directionIndex: Int
+    ): LongArray?
     private external fun nativeBuildRecurrentParameterName(base: String, memberSuffix: String, layerIndex: Int, reverseDirection: Boolean): String?
+    private external fun nativeHashParameterKey(nameBytes: ByteArray): String?
     private external fun nativeResidualAffineAdd(dst: FloatArray, residual: FloatArray, scale: Float, bias: Float): FloatArray?
     private external fun nativeDepthwiseConv7x7Reflect(inputRows: FloatArray, weights: FloatArray, width: Int): FloatArray?
     private external fun nativeApplyGelu(values: FloatArray, scale: Float, bias: Float): FloatArray?
     private external fun nativeComputeMeanInvStd(sum: Float, sumSquares: Float, count: Int, epsilon: Float): FloatArray?
     private external fun nativeReduceSumAndSquares(values: FloatArray): FloatArray?
+    private external fun nativeCreateNamedLayerParameterSet(
+        weights: Array<FloatArray>,
+        biases: Array<FloatArray>,
+        axis0Counts: IntArray,
+        axis1Counts: IntArray,
+        matrixCounts: IntArray,
+        descriptorPairOffsets: IntArray
+    ): Long
+    private external fun nativeGetNamedLayerParameterShape(handle: Long, layerIndex: Int): IntArray?
+    private external fun nativeDestroyNamedLayerParameterSet(handle: Long)
     private external fun nativeApplyGatedActivation(planes: FloatArray, count: Int, mode: Int): FloatArray?
     private external fun nativeDecodeTypedFloatArray(encoded: ByteArray): FloatArray?
     private external fun nativeDecodeTypedInt32Array(encoded: ByteArray): IntArray?
@@ -393,5 +604,5 @@ object NativeS5TensorBridge {
         header: ByteArray,
         totalFileSize: Long
     ): LongArray?
-    private external fun nativeDecodeContainerPayload(fileBytes: ByteArray): ByteArray?
+    private external fun nativeDecodeModelPayload(input: ByteArray): ByteArray?
 }

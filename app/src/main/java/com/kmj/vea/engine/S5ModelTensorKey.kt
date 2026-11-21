@@ -57,14 +57,13 @@ object S5ModelTensorKey {
         val digest = MessageDigest.getInstance("MD5").digest(input)
         check(digest.size == 16) { "Unexpected MD5 digest size." }
 
+        // The VTMG tree stores the 16 MD5 digest bytes in canonical byte order.
+        // Formatting each little-endian MD5 state word as an integer reverses
+        // its four bytes and fails to match real keys such as pre1.weight.
         return buildString(32) {
-            for (wordOffset in 0 until 16 step 4) {
-                val word =
-                    (digest[wordOffset].toLong() and 0xffL) or
-                    ((digest[wordOffset + 1].toLong() and 0xffL) shl 8) or
-                    ((digest[wordOffset + 2].toLong() and 0xffL) shl 16) or
-                    ((digest[wordOffset + 3].toLong() and 0xffL) shl 24)
-                append(word.toString(16).padStart(8, '0'))
+            for (byte in digest) {
+                append(((byte.toInt() ushr 4) and 0x0f).toString(16))
+                append((byte.toInt() and 0x0f).toString(16))
             }
         }
     }

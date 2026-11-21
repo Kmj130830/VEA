@@ -7,7 +7,7 @@ class S5ModelTensorKeyTest {
     @Test
     fun derivesWeightKeyUsingRecoveredSaltAndWordOrder() {
         assertEquals(
-            "e61604f9a121a50ca2f75c53d228d415",
+            "f90416e60ca521a1535cf7a215d428d2",
             S5ModelTensorKey.derive(
                 "rnn.weight_ih_l0",
                 S5ModelTensorKey.Member.WEIGHT
@@ -18,14 +18,14 @@ class S5ModelTensorKeyTest {
     @Test
     fun derivesReverseDirectionAndBiasKeys() {
         assertEquals(
-            "fab038cc06f083806164c6fbf0a4c706",
+            "cc38b0fa8083f006fbc6646106c7a4f0",
             S5ModelTensorKey.derive(
                 "rnn.weight_hh_l0_reverse",
                 S5ModelTensorKey.Member.WEIGHT
             )
         )
         assertEquals(
-            "1d4ac294326dc49e5865349f6cfe149c",
+            "94c24a1d9ec46d329f3465589c14fe6c",
             S5ModelTensorKey.derive(
                 "rnn.bias_ih_l0",
                 S5ModelTensorKey.Member.BIAS
@@ -36,11 +36,11 @@ class S5ModelTensorKeyTest {
     @Test
     fun hashesCompleteRecurrentParameterNameWithoutAppendingWeightSuffix() {
         assertEquals(
-            "2377051edb208e4b1b07a052125310ad",
+            "1e0577234b8e20db52a0071bad105312",
             S5ModelTensorKey.deriveParameterName("rnn.weight_ih_l0")
         )
         assertEquals(
-            "afbc925af67d30584adec6ddfe38c30e",
+            "5a92bcaf58307df6ddc6de4a0ec338fe",
             S5ModelTensorKey.deriveParameterName("rnn.bias_hh_l0")
         )
     }
@@ -48,11 +48,11 @@ class S5ModelTensorKeyTest {
     @Test
     fun appendsParameterSuffixBeforeBinaryDigestSuffix() {
         assertEquals(
-            "705ab1f8b850fee93480e528630c5835",
+            "f8b15a70e9fe50b828e5803435580c63",
             S5ModelTensorKey.derive("pre1", S5ModelTensorKey.Member.WEIGHT)
         )
         assertEquals(
-            "8eb01fbf20abfb8f1290bb5d56e86504",
+            "bf1fb08e8ffbab205dbb90120465e856",
             S5ModelTensorKey.derive("conv1", S5ModelTensorKey.Member.BIAS)
         )
     }
@@ -60,11 +60,11 @@ class S5ModelTensorKeyTest {
     @Test
     fun derivesCompleteRecurrentNamesWithoutAppendingAnotherMemberSuffix() {
         assertEquals(
-            "2377051edb208e4b1b07a052125310ad",
+            "1e0577234b8e20db52a0071bad105312",
             S5ModelTensorKey.deriveParameterName("rnn.weight_ih_l0")
         )
         assertEquals(
-            "a78e70c38488a9cc282736f4835fb38f",
+            "c3708ea7cca98884f43627288fb35f83",
             S5ModelTensorKey.deriveParameterName("rnn.weight_hh_l0_reverse")
         )
     }

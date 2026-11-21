@@ -117,6 +117,78 @@ public class ExportVsmAnalysis extends GhidraScript {
             }
             out.println();
 
+            out.println("## Direct callers of the S5API module and function-table initializers");
+            out.println();
+            out.println("| Target | Caller | Caller entry | Reference site |");
+            out.println("|---|---|---:|---:|");
+            String[][] loaderTargets = {
+                {"18003b380", "S5API module loader"},
+                {"180086750", "S5API export-table resolver"},
+                {"18003b8a0", "VOCALOID7 model-path initializer"},
+                {"18003b6a0", "VSM cache-path initializer"}
+            };
+            int loaderCallerCount = 0;
+            for (String[] target : loaderTargets) {
+                Address targetAddress = toAddr(target[0]);
+                Function targetFunction = currentProgram.getFunctionManager().getFunctionAt(targetAddress);
+                if (targetFunction == null) {
+                    targetFunction = currentProgram.getFunctionManager().getFunctionContaining(targetAddress);
+                }
+                ReferenceIterator refs = currentProgram.getReferenceManager().getReferencesTo(targetAddress);
+                while (refs.hasNext()) {
+                    monitor.checkCancelled();
+                    Reference ref = refs.next();
+                    if (!ref.getReferenceType().isCall()) continue;
+                    Function caller = currentProgram.getFunctionManager().getFunctionContaining(ref.getFromAddress());
+                    if (caller == null) continue;
+                    loaderCallerCount++;
+                    if (!selected.containsKey(caller.getEntryPoint()) && selected.size() < MAX_FUNCTIONS) {
+                        selected.put(caller.getEntryPoint(), caller);
+                        queue.addLast(new Work(caller, 0));
+                    }
+                    out.printf("| %s at %s | %s | %s | %s |%n",
+                        target[1], targetAddress, caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+                }
+            }
+            if (loaderCallerCount == 0) {
+                out.println("| - | no direct call references recovered | - | - |");
+            }
+            out.println();
+
+            out.println("## Instructions using S5API export-table owner offsets");
+            out.println();
+            out.println("The module handle is stored at owner +0x238; the export table begins at owner +0x150. Func_4cd84bb7 occupies table slot +0x08 / owner +0x158.");
+            out.println();
+            out.println("| Function | Entry | Instruction |");
+            out.println("|---|---:|---|");
+            int slotUseCount = 0;
+            ghidra.program.model.listing.Listing listing = currentProgram.getListing();
+            ghidra.program.model.address.AddressSetView memory = currentProgram.getMemory().getAllInitializedAddressSet();
+            InstructionIterator allInstructions = listing.getInstructions(memory, true);
+            while (allInstructions.hasNext()) {
+                monitor.checkCancelled();
+                Instruction instruction = allInstructions.next();
+                boolean slotUse = false;
+                for (int operand = 0; operand < instruction.getNumOperands(); operand++) {
+                    for (Object operandObject : instruction.getOpObjects(operand)) {
+                        if (operandObject instanceof ghidra.program.model.scalar.Scalar) {
+                            long value = ((ghidra.program.model.scalar.Scalar) operandObject).getUnsignedValue();
+                            if (value == 0x150L || value == 0x158L || value == 0x238L) slotUse = true;
+                        }
+                    }
+                }
+                if (!slotUse) continue;
+                Function owner = currentProgram.getFunctionManager().getFunctionContaining(instruction.getAddress());
+                if (owner == null) continue;
+                slotUseCount++;
+                out.printf("| %s | %s | %s |%n", owner.getName(), owner.getEntryPoint(), instruction.toString());
+                if (!selected.containsKey(owner.getEntryPoint()) && selected.size() < MAX_FUNCTIONS) {
+                    selected.put(owner.getEntryPoint(), owner);
+                    queue.addLast(new Work(owner, 0));
+                }
+            }
+            if (slotUseCount == 0) out.println("| - | - | no immediate slot-offset uses found |");
+            out.println();
             while (!queue.isEmpty() && selected.size() < MAX_FUNCTIONS) {
                 monitor.checkCancelled();
                 Work w = queue.removeFirst();

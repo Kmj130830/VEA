@@ -64,7 +64,10 @@ interface SynthesisEngine {
  * only a recovered Korean-input canonicalization primitive; no Yamaha G2P
  * phoneme engine or VOCALOID singing renderer is available yet.
  */
-class VocaloidAiEngineAdapter : SynthesisEngine {
+class VocaloidAiEngineAdapter(
+    private val packageRegistry: VoicebankModelPackageRegistry =
+        VoicebankModelPackageRegistry.withMegpoidV7()
+) : SynthesisEngine {
     override fun status(): EngineStatus {
         val vsmMessage = if (NativeVsmCallbackBridge.isLoaded) {
             "VSM callback bridge loaded (ABI 0x%08X, %d Hz transport). ".format(
@@ -128,6 +131,57 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
     }
 
     /**
+     * Loads the package through the registry. Additional voicebank families can
+     * be added by registering another VoicebankModelPackageLoader; the S5
+     * Megpoid implementation does not become a hard-coded editor-wide format.
+     */
+    fun loadVoicebankModelPackage(voicebank: VoicebankDescriptor): VoicebankModelPackage =
+        packageRegistry.load(voicebank)
+
+    /**
+     * Prepares the real Megpoid model weights and the portable note event
+     * schedule. This creates reusable inference state only; it does not claim
+     * to produce acoustic frames or PCM audio.
+     */
+    fun prepareMegpoidRuntime(
+        project: VeaProject,
+        voicebank: VoicebankDescriptor
+    ): PreparedMegpoidRuntime {
+        val plans = prepareRenderPlans(project, voicebank)
+        require(plans.any { !it.isEmpty }) { "There are no notes to synthesize." }
+
+        val modelPackage = loadVoicebankModelPackage(voicebank) as? S5VoicebankModelPackage
+            ?: throw IllegalStateException("The selected voicebank loader did not return an S5 package.")
+
+        val tracks = project.tracks.filter { track ->
+            track.kind != "AUDIO" &&
+                track.singerId == voicebank.id &&
+                track.singerSourceUri == voicebank.sourceUri
+        }
+        val schedules = tracks.map { track ->
+            VsmMidiInputScheduler.schedule(project, track)
+        }
+
+        val namedLayers = modelPackage.prepareNamedLayerParameters()
+        val residualBlocks = modelPackage.prepareRuntimeBlocks()
+        require(namedLayers.size == S5MegpoidNamedLayer.entries.size) {
+            "Megpoid shared neural base graph did not provide all nine named layers."
+        }
+        require(residualBlocks.size == S5MegpoidRuntimeBlockFactoryKeys.BLOCK_ROWS *
+            S5MegpoidRuntimeBlockFactoryKeys.BLOCK_COLUMNS) {
+            "Megpoid runtime did not provide all eight residual blocks."
+        }
+
+        return PreparedMegpoidRuntime(
+            modelPackage = modelPackage,
+            namedLayerParameters = namedLayers,
+            residualBlocks = residualBlocks,
+            runtimeOptions = modelPackage.runtimeOptionsDescriptor,
+            inputSchedules = schedules
+        )
+    }
+
+    /**
      * Scans the installed Megpoid VTB2 model without materializing a giant
      * JSONObject tree or decoding unrelated tensors. The scanner reports the
      * opaque JSON key namespace and typed tensor-string count; parameter-to-
@@ -162,47 +216,21 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
         voicebank: VoicebankDescriptor,
         output: OutputStream
     ) {
-        val plans = prepareRenderPlans(project, voicebank)
-        require(plans.any { !it.isEmpty }) { "There are no notes to synthesize." }
-
-        require(voicebank.id == "ai_megpoid_v7" && voicebank.engineFamily == "VOCALOID7") {
-            "This acoustic preflight currently targets the built-in AI Megpoid V7 voicebank."
-        }
-        val modelDirectory = File(URI(voicebank.sourceUri))
-        val vtb2File = File(modelDirectory, "AI_Megpoid.vtb2")
-        val featureScan = S5ModelContainerScanner.scanVtb2ForObjectKeys(
-            vtb2File,
-            setOf(
-                S5ModelFeatureFlagReader.RECURRENT_BRANCH_KEY,
-                S5ModelFeatureFlagReader.PAIRED_OBJECT_KEY
-            )
-        )
-        val modelFeatures = S5ModelFeatureFlagReader.decode(featureScan)
-
-        // VTMG supplies the shared S5 base graph. It is independent of the
-        // optional RNN feature branch stored in the bank's VTB2 object.
-        val baseGraph = loadSharedVtmgBaseGraph(voicebank)
-        require(baseGraph.layers.size == S5VtmgGraphTensorCatalog.layers.size) {
-            "The shared VTMG base graph is incomplete."
-        }
-
-        val recurrentStatus = if (modelFeatures.recurrentBranch) {
-            "The optional VTB2 RNN branch is enabled but its model-object mapping and execution are not ported."
-        } else {
-            "The optional VTB2 RNN branch is disabled for this Megpoid model."
-        }
-        val pairedStatus = if (modelFeatures.pairedOptionalObjects) {
-            "Paired optional VTB2 objects are enabled but not yet integrated."
-        } else {
-            "Paired optional VTB2 objects are disabled."
-        }
+        val prepared = prepareMegpoidRuntime(project, voicebank)
+        val scheduledNotes = prepared.scheduledNoteCount
+        val blocks = prepared.residualBlocks.size
+        val layers = prepared.namedLayerParameters.size
 
         throw UnsupportedOperationException(
-            "Loaded and validated the shared VOCALOID7.vtmg base graph: ${baseGraph.layers.size} layers, " +
-                "${baseGraph.totalFloatCount} float parameters (pre1/pre2, conv1/cond1, conv2/cond2, " +
-                "conv3/cond3, linear). $recurrentStatus $pairedStatus The base-graph forward operators, " +
-                "voicebank-specific VTB2 conditioning, Yamaha G2P, and acoustic waveform decoder are not " +
-                "complete; no WAV was generated."
+            "AI Megpoid V7 preparation succeeded: five verified model members, " +
+                "$layers shared neural layers, $blocks compiled residual blocks, and " +
+                "$scheduledNotes note events scheduled on the 44.1 kHz / 256-sample input grid. " +
+                "The Android reference output stage now includes recovered descriptor geometry, " +
+                "frame/output window construction, inverse real FFT, and stateful overlap-add. " +
+                "It is not yet connected to a complete note/phoneme feature-conditioning path or " +
+                "the full neural forward pass that produces model spectra. The native FFT plan " +
+                "parity, sample-rate conversion, and verified PCM/WAV export boundary also remain " +
+                "incomplete. No audio was written."
         )
     }
 }
