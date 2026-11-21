@@ -12,38 +12,47 @@ import java.util.LinkedHashMap
 import java.util.UUID
 import java.util.zip.ZipInputStream
 
-private const val V7_CONTAINER_HEADER_SIZE = 136
+private const val V7_CONTAINER_PREFIX_SIZE = 16
+private const val V7_CONTAINER_CATALOG_OVERHEAD = 136
 private const val MAX_V7_ARCHIVE_ENTRY_BYTES = 512L * 1024L * 1024L
 private const val MAX_V7_ARCHIVE_EXPANDED_BYTES = 1024L * 1024L * 1024L
 
 /**
- * Verifies the fixed outer header used by the supplied VOCALOID7 model containers.
+ * Verifies the 16-byte S5API prefix used by the supplied VOCALOID7 model files.
  *
- * Only the four-byte kind and the declared payload length are interpreted here.
- * The remaining header bytes are intentionally left opaque.
+ * The vendor transform reads the seed at +0x0c and computes its body end as
+ * declaredSpan(+0x04) + 8, clamped to the file size. For the five checked-in
+ * Megpoid/shared model assets, declaredSpan == fileSize - 136: 16 prefix bytes
+ * plus a 128-byte untouched trailer.
  */
-internal fun validateV7ContainerHeader(
-    header: ByteArray,
+internal fun validateV7ContainerPrefix(
+    prefix: ByteArray,
     totalFileSize: Long,
     expectedMagic: String
 ) {
-    require(header.size == V7_CONTAINER_HEADER_SIZE) { "A V7 container header must be 136 bytes." }
-    require(expectedMagic.length == 4) { "The expected container magic must contain four ASCII characters." }
-    require(totalFileSize >= V7_CONTAINER_HEADER_SIZE.toLong()) { "The container is shorter than its header." }
+    require(prefix.size == V7_CONTAINER_PREFIX_SIZE) {
+        "An S5API container prefix must be 16 bytes."
+    }
+    require(expectedMagic.length == 4) {
+        "The expected container magic must contain four ASCII characters."
+    }
+    require(totalFileSize >= V7_CONTAINER_CATALOG_OVERHEAD.toLong()) {
+        "The model container is shorter than the known prefix/trailer envelope."
+    }
 
-    val actualMagic = String(header, 0, 4, Charsets.US_ASCII)
+    val actualMagic = String(prefix, 0, 4, Charsets.US_ASCII)
     require(actualMagic == expectedMagic) {
         "Unexpected model container type: expected $expectedMagic, found $actualMagic."
     }
 
-    val declaredPayloadSize =
-        (header[4].toLong() and 0xffL) or
-            ((header[5].toLong() and 0xffL) shl 8) or
-            ((header[6].toLong() and 0xffL) shl 16) or
-            ((header[7].toLong() and 0xffL) shl 24)
-    val actualPayloadSize = totalFileSize - V7_CONTAINER_HEADER_SIZE
-    require(actualPayloadSize <= 0xffff_ffffL && declaredPayloadSize == actualPayloadSize) {
-        "The model container payload length does not match its header."
+    val declaredSpan =
+        (prefix[4].toLong() and 0xffL) or
+            ((prefix[5].toLong() and 0xffL) shl 8) or
+            ((prefix[6].toLong() and 0xffL) shl 16) or
+            ((prefix[7].toLong() and 0xffL) shl 24)
+    val expectedSpan = totalFileSize - V7_CONTAINER_CATALOG_OVERHEAD
+    require(expectedSpan <= 0xffff_ffffL && declaredSpan == expectedSpan) {
+        "The model container declared span does not match its known file envelope."
     }
 }
 
@@ -269,7 +278,7 @@ object MegpoidV7PackageInstaller {
 
                 val outputFile = File(destination, spec.fileName)
                 val digest = MessageDigest.getInstance("SHA-256")
-                val header = ByteArray(V7_CONTAINER_HEADER_SIZE)
+                val header = ByteArray(V7_CONTAINER_PREFIX_SIZE)
                 var headerBytes = 0
                 var fileBytes = 0L
 
@@ -296,10 +305,10 @@ object MegpoidV7PackageInstaller {
                 zip.closeEntry()
 
                 if (headerBytes != V7_CONTAINER_HEADER_SIZE) {
-                    throw IOException("$baseName is shorter than the 136-byte model header.")
+                    throw IOException("$baseName is shorter than the 16-byte S5API prefix.")
                 }
                 try {
-                    validateV7ContainerHeader(header, fileBytes, spec.magic)
+                    validateV7ContainerPrefix(header, fileBytes, spec.magic)
                 } catch (error: IllegalArgumentException) {
                     throw IOException("Invalid $baseName container header.", error)
                 }
