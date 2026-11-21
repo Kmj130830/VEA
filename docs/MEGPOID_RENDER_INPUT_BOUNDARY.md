@@ -80,35 +80,65 @@ remain unresolved.
    Normalization -> Temporal -> Residual pipeline only after their
    dimensions and ordering are confirmed.
 
-## Confirmed semantics of the seven-double row: interval + five category keys
+## Corrected 0x38-byte event-row layout and phoneme lookup
 
-The decompiled callers now support a narrower interpretation of the 0x38-byte
-intermediate record passed to `FUN_18003ab70`:
+The latest Ghidra decompilation corrects the earlier seven-double reading.
+The row stride is 0x38 bytes, but the row is a structured record, not an
+array of seven doubles:
 
-- `row[0]` is the interval start position.
-- `row[1]` is the interval end position.
-- `row[2..6]` is a five-value categorical key consumed by
-  `FUN_180074a50(row + 2, context, ...)`.
+| Offset | Size | Confirmed field |
+|---:|---:|---|
+| `+0x00` | 8 bytes | interval start, consumed as float64 |
+| `+0x08` | 8 bytes | interval end, consumed as float64 |
+| `+0x10` | 0x20 bytes | owned MSVC x64 `std::string` object |
+| `+0x30` | 4 bytes | copied source integer; its semantic role is not yet named |
 
-`FUN_18003ab70` calculates the frame count from the final row's `row[1]`
-divided by the context time step at `context + 0x30`. For every row it
-computes `ceil(row[1] / timeStep)` as the ending frame index, then fills
-the frame coverage array for that interval. It also calculates the
-interval duration as `row[1] - row[0]`.
+`Func_417eec3e` builds this row by copying the two leading 8-byte fields,
+deep-copying the NUL-terminated source string from the 0x28-byte input
+record's `+0x16` field into the string object at `+0x10`, and copying the
+source uint32 at `+0x20` to row `+0x30`. The string object occupies 32 bytes;
+its inline buffer/pointer, length and capacity are not five numeric feature
+values.
 
-`FUN_18006c720` independently confirms that same interval interpretation:
-it reads the first two doubles as start/end, takes their difference,
-applies a logarithm and normalizes the result against the configured
-range (`param_7`, `param_8`) into `[-1, +1]`. That duration feature is
-followed by optional state channels and one-hot categorical entries.
+### Confirmed preprocessing of the string-bearing rows
 
-The five values at `row[2..6]` are not yet individually named. They are
-passed together to `FUN_180074a50`, which returns an integer category index.
-The helper is now an explicit Ghidra seed so its comparison/mapping table
-can be recovered next.
+Before `FUN_18003ab70`, three helpers transform the 0x38-byte row list:
 
-Android should therefore preserve event interval start/end separately from
-the categorical key. It should not fill the five category values from
-pitch, phoneme, lyric, or style until `FUN_180007740` / `FUN_180007a90` /
-`FUN_180007ec0` and `FUN_180074a50` confirm which source fields and units
-they represent.
+- `FUN_180007740` handles the special token `br`: an initial `br` row is
+  rewritten to `sil`; a later `br` can extend a preceding `sil` interval.
+- `FUN_180007a90` removes rows whose token string is exactly `-` and
+  preserves the final interval endpoint during compaction.
+- `FUN_180007ec0` discards rows shorter than 0.001 seconds.
+
+`FUN_18003ab70` then reads the first two fields as the interval. It calls
+`FUN_180074a50(row + 0x10, context, nullptr)` on the string object to obtain
+a phoneme/category index. That index affects the per-frame auxiliary value;
+it is not a five-double key. `FUN_18006c720` separately constructs the
+feature matrix using the interval and render-context dimensions.
+
+### Phoneme label classification
+
+`FUN_180074a50` is a string-to-category lookup. It checks special aliases
+and canonical labels, applies a limited character filter for fallback
+matching, and searches a global string/index map. The S5API read-only data
+contains labels including `sil`, `br`, `a`, `i`, `u`, `e`, `o`, `wo`,
+`ey`, `aw`, `ay`, `ow`, `oy`, `aa`, `uh`, `iy`, `ih`, `ah`, `uw`, `eh`,
+`ae`, `er`, `ao`, `i_n`, `uei`, `iE_n`, `yE_r`, `@N`, `u@N`, `@U`,
+`ia`, `i@U`, `aI`, `uaI`, `iAN`, `iUN`, `n`, `N`, `m`, `ng`, `g`, `d`,
+`z`, `zh`, `v`, `r`, `l`, `k`, `t`, `p`, `s`, `sh`, `h`, `f`, `ch`,
+`ts`, `cl` and `junk`, plus positional variants.
+
+The table establishes the vocabulary family, but the current report does
+not yet establish every runtime integer index or the initialization path
+for the global lookup tree. Do not assume that the read-only string order
+equals the classifier's numeric ID order.
+
+### Android consequence
+
+VEA should model each event as `(startSeconds, endSeconds, phoneLabel,
+sourceFlags)` rather than seven doubles. The existing `VsmEventInterval`
+already covers the first two values. The next implementation step is to
+connect a verified phone-label string to the classifier's numeric map and
+recover the meaning of the source uint32 and auxiliary 0x28-record fields.
+Until then, do not serialize a private 0x38/0x58 record or claim a
+model-ready phoneme index.
