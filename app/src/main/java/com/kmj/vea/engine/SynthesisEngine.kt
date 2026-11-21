@@ -56,8 +56,8 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
         }
 
         val bridgeMessage = if (NativeG2pBridge.isLoaded) {
-            "Android ARM64 JNI bridge loaded (ABI 0x%08X). Korean lexical preprocessing and base syllable-label lookup are available, " +
-                "but contextual phonological rules, final G2PA syllable output, and the VOCALOID7 singing renderer are not ported yet."
+            "Android ARM64 JNI bridge loaded (ABI 0x%08X). Korean lexical preprocessing, base syllable-label lookup, and two isolated syllable rewrites are available, " +
+                "but adjacent-syllable rules, final G2PA syllable output, and the VOCALOID7 singing renderer are not ported yet."
         } else {
             "Android ARM64 JNI bridge is not loaded. The G2P phoneme engine and VOCALOID7 singing renderer " +
                 "are not ported yet."
