@@ -20,7 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class ExportS5RendererPath extends GhidraScript {
-    private static final int MAX_FUNCTIONS = 150;
+    private static final int MAX_FUNCTIONS = 190;
     private static final int MAX_DEPTH = 3;
     private static final class Work {
         final Function function;
@@ -66,10 +66,16 @@ public class ExportS5RendererPath extends GhidraScript {
                 }
             }
 
+            // Explicitly retain the upstream note/event feature path and
+            // its frame/history helpers. These are easy to lose when the
+            // generic call closure reaches its function cap.
             String[] internalSeeds = {
                 "1801361f0", "180131fa0", "1801269f0", "1801270a0",
                 "1801272b0", "180127120", "180127330", "180126c20",
-                "180126e30", "180126d40", "1801271a0"
+                "180126e30", "180126d40", "1801271a0",
+                "18006c720", "180076080", "180077520", "180028cf0",
+                "180039ae0", "18003ab70", "18006fdb0", "18006b8b0",
+                "18006eb60", "18003e540", "180040d50"
             };
             out.println("## Explicit internal call targets");
             out.println();
@@ -107,6 +113,23 @@ public class ExportS5RendererPath extends GhidraScript {
                 }
             }
             if (callerCount == 0) out.println("- No direct references recovered at the exact entry address.");
+            out.println();
+
+            out.println("## Direct callers of note/event feature builder");
+            out.println();
+            Address inputTarget = toAddr("18006c720");
+            ReferenceIterator inputRefs = currentProgram.getReferenceManager().getReferencesTo(inputTarget);
+            int inputCallerCount = 0;
+            while (inputRefs.hasNext()) {
+                Reference ref = inputRefs.next();
+                Function caller = currentProgram.getFunctionManager().getFunctionContaining(ref.getFromAddress());
+                if (caller != null) {
+                    inputCallerCount++;
+                    out.printf("- %s at %s, call site %s%n",
+                        caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+                }
+            }
+            if (inputCallerCount == 0) out.println("- No direct references recovered at the exact entry address.");
             out.println();
 
             while (!queue.isEmpty() && selected.size() < MAX_FUNCTIONS) {
