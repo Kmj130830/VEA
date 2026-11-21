@@ -127,6 +127,29 @@ MODEL_BLOCK_DESCRIPTOR_KEYS = {
     "descriptor_param5": "d7226a031351dcf206e02f41499ed9b6",
 }
 
+# Exact S5API render-context option keys recovered from FUN_1800ced10.
+# These are offset-based labels: semantic interpretations are not assumed.
+# The first seven qword pairs are split into four uint32 words in memory order,
+# matching FUN_18001acc0's four-word, zero-padded hexadecimal formatter.
+S5_CONTEXT_OPTION_KEYS = {
+    "context_param_0": "c1ae30c6c9eb0e4246a26be169bd4729",
+    "context_param_1": "ef68f87945291185d8e560e8b34ec81c",
+    "context_param_2": "32bb5ec4ed08a982d8ab95a84c8876c5",
+    "context_param_3": "591a7b0ec57fd6f02c56b9f281cd5484",
+    "context_param_4": "3ddd265ebb678e8eb166c668d192730c",
+    "context_param_5": "dc077a67cada0b3a08bcf186cf933f04",
+    "context_param_6": "e24517240ee66c01234cb4511909ebe6",
+    "context_param_0x13": "fde4054ae9d99cb5ab3cec9c8464d465",
+    "context_param_0x14": "75301487ab3961391c636424e32a15bb",
+    "context_param_0x15": "f9b7a6e841213ce00a270fa9f706b2e9",
+    "context_param_0xd00": "f4e011d914c8e2b43b6001d3b1b25d61",
+    "context_param_0xd01": "39561207bf2c0e5bb99f01061030745f",
+    "context_param_0xd02": "10f093ece4ee4d12f3ffcc1c7dfeade9",
+    "context_param_0xd03": "0aa79e92bcffa1a3a8b54fed33e6d511",
+    "context_param_0xd04": "c93358e17f2fe6605677e96149ca3b9c",
+    "context_param_0xd05": "d3767e0b7af5dfd6cb065658fd38853a",
+}
+
 
 S5_KEY_SUFFIX = bytes.fromhex(
     "69 23 33 65 2e 63 5a 54 25 35 6b 39 6a 32 64 2c 32 5a 72 53 2f 2b 2f 32"
@@ -658,6 +681,39 @@ def inspect_megpoid_block_descriptor_fields(
         )
 
 
+def inspect_s5_context_option_fields(member: str, root: dict) -> None:
+    """Report scalar S5API render-context options by their exact VTB2 lookup keys.
+
+    Keys are reconstructed from the native formatter's four uint32 words in
+    memory order. Values are reported as scalar metadata, never tensor bytes.
+    """
+    occurrences_by_key: dict[str, list[tuple[str, object]]] = {
+        key: [] for key in S5_CONTEXT_OPTION_KEYS.values()
+    }
+    stack: list[tuple[object, str]] = [(root, "$")]
+    while stack:
+        current, path = stack.pop()
+        if isinstance(current, dict):
+            for key, child in current.items():
+                if key in occurrences_by_key:
+                    occurrences_by_key[key].append((path + "/" + key, child))
+                stack.append((child, path + "/" + key))
+        elif isinstance(current, list):
+            for index, child in enumerate(current):
+                stack.append((child, f"{path}[{index}]"))
+
+    for label, lookup_key in S5_CONTEXT_OPTION_KEYS.items():
+        matches = occurrences_by_key[lookup_key]
+        print(
+            "S5_CONTEXT_OPTION_FIELD",
+            f"member={member}",
+            f"slot={label}",
+            f"lookup_key={lookup_key}",
+            f"occurrences={len(matches)}",
+            f"values_and_paths={[(path, describe_value(value)) for path, value in matches]}",
+        )
+
+
 def inspect_megpoid_layer_property_pairs(root: dict, member: str) -> None:
     """Find objects that contain both layer-property keys and report only lengths."""
     first_key = MODEL_STATIC_LOOKUP_KEYS["fun_1800537e0_key_1"]
@@ -1018,6 +1074,7 @@ def inspect_archive(path: Path, native_decoder: NativeDecoder | None, factory_ta
                 print("TREE_SUMMARY", f"member={item.filename}", counts)
                 inspect_megpoid_block_descriptor_fields(item.filename, root, key_values)
                 if item.filename == "AI_Megpoid.vtb2":
+                    inspect_s5_context_option_fields(item.filename, root)
                     inspect_megpoid_layer_property_pairs(root, item.filename)
                     if factory_tables is not None:
                         inspect_megpoid_runtime_config_path(item.filename, root, factory_tables)
