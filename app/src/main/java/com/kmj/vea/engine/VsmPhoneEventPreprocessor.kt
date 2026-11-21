@@ -45,14 +45,14 @@ object VsmPhoneEventPreprocessor {
         val originalFinalEnd = breakNormalized.last().endSeconds
 
         // FUN_180007a90 removes exact "-" labels, then assigns each retained
-        // event the end position of the next retained event. The last retained
+        // event the start position of the next retained event. The last retained
         // event inherits the end of the final pre-filter row.
         val withoutRestMarkers = breakNormalized.filterNot { it.phoneLabel == "-" }
         if (withoutRestMarkers.isEmpty()) return emptyList()
 
         val endpointAdjusted = withoutRestMarkers.mapIndexed { index, event ->
             val nextEnd = withoutRestMarkers.getOrNull(index + 1)
-                ?.endSeconds
+                ?.startSeconds
                 ?: originalFinalEnd
             event.copy(
                 endSeconds = nextEnd
