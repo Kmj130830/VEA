@@ -113,11 +113,11 @@ public class ExportS5ContainerAndHash extends GhidraScript {
                     Reference reference = references.next();
                     Function caller = currentProgram.getFunctionManager()
                         .getFunctionContaining(reference.getFromAddress());
-                    if (caller == null) continue;
-                    out.println("- " + caller.getName() + " at " + reference.getFromAddress() +
+                    String owner = caller == null ? "<data-or-unmapped>" : caller.getName();
+                    out.println("- " + owner + " at " + reference.getFromAddress() +
                         " (" + reference.getReferenceType() + ")");
                     count++;
-                    if (!selected.containsKey(caller.getEntryPoint()) &&
+                    if (caller != null && !selected.containsKey(caller.getEntryPoint()) &&
                             selected.size() < MAX_FUNCTIONS) {
                         selected.put(caller.getEntryPoint(), caller);
                         depth.put(caller.getEntryPoint(), 1);
