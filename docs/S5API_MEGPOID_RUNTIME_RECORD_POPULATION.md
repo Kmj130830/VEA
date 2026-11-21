@@ -226,3 +226,36 @@ and complete singing forward pass remain unfinished.
   have not yet been established.
 - `SynthesisEngine.render` remains unimplemented. No end-to-end vocal
   synthesis or WAV/PCM output is claimed.
+
+
+## Sequence-to-residual call order correction
+
+The instruction-level loop in `FUN_1800c7ad0` confirms that the residual
+record array is indexed by both sequence row and block column, not as one flat
+eight-block stack repeated for every sequence. The loop visits sequence rows
+from `param_1[5] - 1` down to zero and, within each row, calls the
+`param_1[6]` records in ascending column order:
+
+```text
+recordIndex = (param_1[5] - outerSequenceIndex - 1) * param_1[6] + column
+```
+
+The selected input/output workspace descriptors are the pair for that
+sequence row. The dispatcher swaps their three pointer fields after each
+residual-block call; the next sequence row selects a different pair. Before
+the outer loop, it copies the terminal input feature buffer into the last
+sequence row's first workspace. For rows before that terminal row, the
+preceding temporal-transition operator prepares the row's input workspace.
+
+The factory-key inventory contains eight populated records at rows 0..3 and
+columns 0..1. One forward-dispatch pass therefore calls exactly eight residual
+records in order `(3,0), (3,1), (2,0), (2,1), (1,0), (1,1), (0,0), (0,1)`.
+This replaces the earlier over-broad interpretation that all eight records
+were executed once per sequence row.
+
+Android now exposes the four-row input boundary through
+`S5MegpoidResidualBlockExecutor.runSequenceFeatures()`. The method expects
+upstream-prepared feature tensors for each row, uses a separate workspace pair
+per row, and keeps each block's own history state. The feature-generation and
+transition stages that create those four tensors remain unconnected to notes
+and phonemes.

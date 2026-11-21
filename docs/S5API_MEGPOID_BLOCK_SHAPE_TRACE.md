@@ -404,27 +404,38 @@ not yet connected to note/phoneme feature generation.
 
 ### Android residual-loop schedule representation
 
-The Android port now represents the confirmed inner/outer loop and workspace
-ping-pong as `S5MegpoidResidualBlockSchedule`:
+A closer read of the instruction-level loop in `FUN_1800c7ad0` corrects the
+initial schedule interpretation. The native dispatcher does **not** run all
+eight records once for every sequence row. Its loop is:
 
-- Sequence count is validated as at least one; the number of outer iterations
-  is `sequenceCount - 1`, matching the recovered loop condition.
-- Each outer iteration visits block records in their append order.
-- The eight VTB2-backed records are ordered row-major from the nested loader
-  loops: `(row 0,column 0)`, `(0,1)`, then `(1,0)`, through
-  `(3,1)`.
-- Each scheduled call reads one workspace slot and writes the other; the
-  two slot identities are exchanged after each block.
-- The plan can be obtained from
-  `S5VoicebankModelPackage.buildResidualBlockSchedule(sequenceCount)`.
+- The outer index visits all `param_1[5]` sequence rows.
+- For each outer index, the record row is
+  `param_1[5] - outerIndex - 1`, so the rows are visited in descending order.
+- The inner loop visits only `param_1[6]` block columns in that selected row.
+- The record index is
+  `(param_1[5] - outerIndex - 1) * param_1[6] + column`.
+- The workspace descriptor pair is selected by the same sequence-row index,
+  and its two descriptor contents are swapped after each block call. A new
+  row starts with its own pair; it does not inherit the previous row's pair.
 
-The schedule object is deliberately declarative. It does not execute the
-preceding dense projection, global normalization, temporal projection, or
-banked-linear stages because their model descriptors and feature buffers are
-not yet linked to note/phoneme features. It also does not claim that the
-model input/output workspace memory has been reconstructed. Tests
-verify sequence-major ordering, eight-block row-major order, and alternating
-workspace ownership.
+The VTB2 factory-key audit identifies a 4×2 record grid: rows 0..3 and
+columns 0..1. Consequently one dispatcher pass executes eight residual calls
+total, in this order:
+`(3,0), (3,1), (2,0), (2,1), (1,0), (1,1), (0,0), (0,1)`.
+
+The corrected Android implementation is
+`S5MegpoidResidualBlockSchedule` plus
+`S5MegpoidResidualBlockExecutor.runSequenceFeatures()`. The executor
+accepts the four feature tensors already prepared for the sequence rows,
+keeps a separate FIRST/SECOND workspace pair for each row, and returns the
+four outputs in their original row order. Its tests verify reverse-row
+execution, two calls per row, independent row buffers, and workspace ping-pong.
+
+The schedule remains the residual section only. It does not execute the
+preceding dense projection, global normalization, temporal transition, or
+banked-linear stages, and it does not create the feature tensors from notes
+or phonemes. Those descriptor-to-model mappings and input preparation are
+still separate prerequisites for a full renderer.
 
 ## Render-state root descriptor layout
 

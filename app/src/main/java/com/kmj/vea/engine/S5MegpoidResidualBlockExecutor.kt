@@ -1,9 +1,8 @@
 package com.kmj.vea.engine
 
 /**
- * Minimal contract for one stateful residual block in the 4x2 Megpoid stack.
- * The production adapter delegates to S5MegpoidCompiledRuntimeBlock; the
- * interface also permits deterministic orchestration tests without JNI.
+ * One stateful residual block from the 4x2 AI Megpoid V7 VTB2 grid.
+ * The production adapter delegates to S5MegpoidCompiledRuntimeBlock.
  */
 interface S5MegpoidResidualBlockNode {
     val row: Int
@@ -18,17 +17,17 @@ interface S5MegpoidResidualBlockNode {
 }
 
 /**
- * Executes the recovered sequence-major residual-block loop.
+ * Executes the residual section of FUN_1800c7ad0.
  *
- * One call processes one feature chunk through sequenceCount - 1 iterations,
- * with the eight model blocks invoked in row-major 4x2 order per iteration.
- * The block output becomes the next input workspace by reference assignment:
- * this layer does not copy an intermediate FloatArray between adjacent blocks.
+ * Input is a list of four already-prepared sequence feature tensors, indexed
+ * by model row. The native dispatcher processes row 3, 2, 1, then 0. Within
+ * each row it calls only columns 0 and 1, swapping that row's private pair of
+ * workspace descriptors after each block. The two workspace pairs belonging
+ * to different sequence rows are independent.
  *
- * Each block owns its own seven-slot history ring. Keep this executor alive
- * across sequential chunks; call resetHistory() only when a new utterance
- * begins. This is an isolated residual-stack runner, not a complete
- * VOCALOID/Megpoid singing renderer.
+ * The returned list preserves the caller's original row order (0..3).
+ * This executes the residual part only; upstream note/phoneme feature
+ * generation and the dense/normalization/transition stages are not included.
  */
 class S5MegpoidResidualBlockExecutor(
     nodes: List<S5MegpoidResidualBlockNode>,
@@ -69,61 +68,70 @@ class S5MegpoidResidualBlockExecutor(
     }
 
     /**
-     * Runs one sequential feature chunk through the residual stack.
+     * Run four sequence rows in native reverse-row order.
      *
-     * [sequenceCount] follows the native loop convention: the loop invokes
-     * each of the eight blocks sequenceCount - 1 times. The input is copied
-     * once into the initial workspace; subsequent block outputs are handed
-     * directly to the alternate workspace without an intermediate copy.
+     * Each input is copied once into that row's initial workspace. Subsequent
+     * block outputs are passed by reference to the other workspace; this
+     * executor does not make an extra copy between adjacent blocks. Different
+     * sequence rows have independent workspace pairs and may have different
+     * position counts after the upstream stride-2 transition stage.
      *
-     * History is retained between calls as long as the chunk position count
-     * stays constant. The block history implementation resets itself when
-     * that count changes, matching its current recovered shape-change rule.
+     * Keep this executor alive across audio chunks so each compiled block's
+     * private seven-slot history persists. Call resetHistory() only when a
+     * new utterance starts.
      */
     @Synchronized
-    fun runChunk(
-        initialFeatures: FloatArray,
-        sequenceCount: Int,
+    fun runSequenceFeatures(
+        sequenceFeatures: List<FloatArray>,
         epsilon: Float = S5MegpoidResidualBlockShape.DEFAULT_EPSILON
-    ): FloatArray {
-        require(initialFeatures.isNotEmpty() && initialFeatures.size % channels == 0) {
-            "Input features must contain a non-empty, whole number of channel rows."
+    ): List<FloatArray> {
+        require(sequenceFeatures.size == S5MegpoidRuntimeBlockFactoryKeys.BLOCK_ROWS) {
+            "Exactly four sequence feature tensors are required for AI Megpoid V7."
         }
         require(epsilon.isFinite() && epsilon >= 0.0f) {
             "Epsilon must be finite and non-negative."
         }
-
-        val positions = initialFeatures.size / channels
-        require(sequenceCount == 1 || positions >= S5MegpoidResidualBlockShape.KERNEL_WIDTH) {
-            "Residual execution requires at least " +
-                "${S5MegpoidResidualBlockShape.KERNEL_WIDTH} positions per chunk."
+        sequenceFeatures.forEachIndexed { row, features ->
+            require(features.isNotEmpty() && features.size % channels == 0) {
+                "Sequence row $row must contain a non-empty, whole number of channel rows."
+            }
+            val positions = features.size / channels
+            require(positions >= S5MegpoidResidualBlockShape.KERNEL_WIDTH) {
+                "Sequence row $row requires at least " +
+                    "${S5MegpoidResidualBlockShape.KERNEL_WIDTH} positions."
+            }
         }
-
-        var firstWorkspace: FloatArray? = null
-        var secondWorkspace: FloatArray? = null
-        when (firstInputWorkspace) {
-            S5MegpoidWorkspaceSlot.FIRST -> firstWorkspace = initialFeatures.copyOf()
-            S5MegpoidWorkspaceSlot.SECOND -> secondWorkspace = initialFeatures.copyOf()
-        }
-
-        fun workspace(slot: S5MegpoidWorkspaceSlot): FloatArray =
-            when (slot) {
-                S5MegpoidWorkspaceSlot.FIRST -> firstWorkspace
-                S5MegpoidWorkspaceSlot.SECOND -> secondWorkspace
-            } ?: error("Residual schedule attempted to read an uninitialized workspace: $slot")
 
         val schedule = S5MegpoidResidualBlockSchedule.megpoidV7(
-            sequenceCount = sequenceCount,
+            sequenceCount = sequenceFeatures.size,
             firstInputWorkspace = firstInputWorkspace
         )
-        var activeInputWorkspace = firstInputWorkspace
+        val firstWorkspaces = arrayOfNulls<FloatArray>(sequenceFeatures.size)
+        val secondWorkspaces = arrayOfNulls<FloatArray>(sequenceFeatures.size)
+        val finalSlots = Array(sequenceFeatures.size) { firstInputWorkspace }
+
+        for (row in sequenceFeatures.indices) {
+            when (firstInputWorkspace) {
+                S5MegpoidWorkspaceSlot.FIRST ->
+                    firstWorkspaces[row] = sequenceFeatures[row].copyOf()
+                S5MegpoidWorkspaceSlot.SECOND ->
+                    secondWorkspaces[row] = sequenceFeatures[row].copyOf()
+            }
+        }
+
+        fun workspace(row: Int, slot: S5MegpoidWorkspaceSlot): FloatArray =
+            when (slot) {
+                S5MegpoidWorkspaceSlot.FIRST -> firstWorkspaces[row]
+                S5MegpoidWorkspaceSlot.SECOND -> secondWorkspaces[row]
+            } ?: error("Sequence row $row has no initialized workspace in slot $slot.")
 
         for (step in schedule.steps) {
-            check(step.inputWorkspace == activeInputWorkspace) {
-                "Residual schedule input workspace is discontinuous at step ${step.blockOrdinal}."
+            val row = step.sequenceIndex
+            check(step.inputWorkspace == finalSlots[row]) {
+                "Residual workspace sequence is discontinuous at row $row, block ${step.blockOrdinal}."
             }
 
-            val input = workspace(step.inputWorkspace)
+            val input = workspace(row, step.inputWorkspace)
             val block = nodesByPosition.getValue(step.block)
             val output = block.runChunk(input, epsilon)
 
@@ -136,13 +144,13 @@ class S5MegpoidResidualBlockExecutor(
             }
 
             when (step.outputWorkspace) {
-                S5MegpoidWorkspaceSlot.FIRST -> firstWorkspace = output
-                S5MegpoidWorkspaceSlot.SECOND -> secondWorkspace = output
+                S5MegpoidWorkspaceSlot.FIRST -> firstWorkspaces[row] = output
+                S5MegpoidWorkspaceSlot.SECOND -> secondWorkspaces[row] = output
             }
-            activeInputWorkspace = step.outputWorkspace
+            finalSlots[row] = step.outputWorkspace
         }
 
-        return workspace(activeInputWorkspace)
+        return sequenceFeatures.indices.map { row -> workspace(row, finalSlots[row]) }
     }
 
     /** Reset all eight block histories at the beginning of a new utterance. */

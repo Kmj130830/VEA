@@ -41,75 +41,78 @@ class S5MegpoidResidualBlockExecutorTest {
         }
     }
 
-    private val canonicalOrder = (0 until 4).flatMap { row ->
-        (0 until 2).map { column -> row to column }
-    }
+    private val expectedCallOrder = listOf(
+        3 to 0, 3 to 1,
+        2 to 0, 2 to 1,
+        1 to 0, 1 to 1,
+        0 to 0, 0 to 1
+    )
+
+    private fun sequenceInputs(): List<FloatArray> =
+        (0 until 4).map { row -> FloatArray(7) { (row * 10).toFloat() } }
 
     @Test
-    fun executesEightBlocksInRecoveredRowMajorOrderAndPassesWorkspaceOutputForward() {
+    fun executesEightRecordsOnceInReverseRowOrderAndKeepsRowsIndependent() {
         val events = mutableListOf<Pair<Int, Int>>()
         val nodes = fakeNodes(events)
         val executor = S5MegpoidResidualBlockExecutor(nodes)
-        val input = FloatArray(7) { it.toFloat() }
+        val inputs = sequenceInputs()
 
-        val output = executor.runChunk(input, sequenceCount = 2)
+        val outputs = executor.runSequenceFeatures(inputs)
 
-        assertEquals(canonicalOrder, events)
-        assertEquals(input.indices.map { input[it] + 36.0f }, output.toList())
-        assertEquals((0..6).map(Int::toFloat), input.toList())
-        assertNotSame(input, output)
+        assertEquals(expectedCallOrder, events)
+        assertEquals(
+            listOf(3f, 17f, 31f, 45f),
+            outputs.map { it.first() }
+        )
+        assertEquals(listOf(0f, 10f, 20f, 30f), inputs.map { it.first() })
+        assertEquals(4, outputs.size)
+        outputs.indices.forEach { assertNotSame(inputs[it], outputs[it]) }
         nodes.forEach { assertEquals(1, it.invocationCount) }
     }
 
     @Test
-    fun executesEveryBlockForEachSequenceIterationWithoutResettingBetweenIterations() {
+    fun usesTheTwoStagePingPongPairIndependentlyForEverySequenceRow() {
         val events = mutableListOf<Pair<Int, Int>>()
         val nodes = fakeNodes(events)
         val executor = S5MegpoidResidualBlockExecutor(nodes)
-        val input = FloatArray(8) { 1.0f }
+        val inputs = sequenceInputs()
 
-        val output = executor.runChunk(input, sequenceCount = 3)
+        val outputs = executor.runSequenceFeatures(inputs)
 
-        assertEquals(canonicalOrder + canonicalOrder, events)
-        assertEquals(List(8) { 73.0f }, output.toList())
-        nodes.forEach { assertEquals(2, it.invocationCount) }
+        // Each row gets only its own two block increments: (2r+1) + (2r+2).
+        outputs.forEachIndexed { row, values ->
+            assertEquals(7, values.size)
+            values.forEach { assertEquals(row * 10.0f + row * 4.0f + 3.0f, it, 0.0001f) }
+        }
     }
 
     @Test
-    fun supportsSecondWorkspaceAsTheInitialInput() {
+    fun supportsSecondWorkspaceAsEachRowsInitialInput() {
         val events = mutableListOf<Pair<Int, Int>>()
         val executor = S5MegpoidResidualBlockExecutor(
             nodes = fakeNodes(events),
             firstInputWorkspace = S5MegpoidWorkspaceSlot.SECOND
         )
 
-        val output = executor.runChunk(FloatArray(7) { 2.0f }, sequenceCount = 2)
+        val outputs = executor.runSequenceFeatures(sequenceInputs())
 
-        assertEquals(canonicalOrder, events)
-        assertEquals(List(7) { 38.0f }, output.toList())
+        assertEquals(expectedCallOrder, events)
+        assertEquals(listOf(3f, 17f, 31f, 45f), outputs.map { it.first() })
     }
 
     @Test
-    fun sequenceCountOneReturnsAnOwnedCopyWithoutInvokingBlocks() {
-        val events = mutableListOf<Pair<Int, Int>>()
-        val executor = S5MegpoidResidualBlockExecutor(fakeNodes(events))
-        val input = FloatArray(3) { it.toFloat() }
-
-        val output = executor.runChunk(input, sequenceCount = 1)
-
-        assertEquals(emptyList<Pair<Int, Int>>(), events)
-        assertEquals(input.toList(), output.toList())
-        assertNotSame(input, output)
-    }
-
-    @Test
-    fun resetHistoryResetsEveryBlockAndOnlyWhenRequested() {
+    fun retainsEveryBlockHistoryAcrossCallsAndResetsOnlyOnRequest() {
         val events = mutableListOf<Pair<Int, Int>>()
         val nodes = fakeNodes(events)
         val executor = S5MegpoidResidualBlockExecutor(nodes)
+        val inputs = sequenceInputs()
 
-        executor.runChunk(FloatArray(7), sequenceCount = 2)
+        executor.runSequenceFeatures(inputs)
         nodes.forEach { assertEquals(0, it.resetCount) }
+
+        executor.runSequenceFeatures(inputs)
+        nodes.forEach { assertEquals(2, it.invocationCount) }
 
         executor.resetHistory()
         nodes.forEach { assertEquals(1, it.resetCount) }
@@ -135,15 +138,21 @@ class S5MegpoidResidualBlockExecutorTest {
     }
 
     @Test
-    fun rejectsInvalidChunkShapeAndTooShortChunkBeforeCallingAnyBlock() {
+    fun rejectsInvalidSequenceShapesAndEpsilonBeforeAnyBlockCall() {
         val events = mutableListOf<Pair<Int, Int>>()
         val executor = S5MegpoidResidualBlockExecutor(fakeNodes(events))
+        val valid = sequenceInputs().toMutableList()
 
         assertThrows(IllegalArgumentException::class.java) {
-            executor.runChunk(FloatArray(6), sequenceCount = 2)
+            executor.runSequenceFeatures(valid.dropLast(1))
         }
+        valid[2] = FloatArray(6)
         assertThrows(IllegalArgumentException::class.java) {
-            executor.runChunk(FloatArray(6), sequenceCount = 2, epsilon = Float.NaN)
+            executor.runSequenceFeatures(valid)
+        }
+        valid[2] = FloatArray(7)
+        assertThrows(IllegalArgumentException::class.java) {
+            executor.runSequenceFeatures(valid, epsilon = Float.NaN)
         }
         assertEquals(emptyList<Pair<Int, Int>>(), events)
     }
@@ -152,7 +161,7 @@ class S5MegpoidResidualBlockExecutorTest {
     fun rejectsBlockOutputThatAliasesItsInput() {
         val events = mutableListOf<Pair<Int, Int>>()
         val aliasingNodes = fakeNodes(events).mapIndexed { index, node ->
-            if (index == 0) object : S5MegpoidResidualBlockNode {
+            if (index == 7) object : S5MegpoidResidualBlockNode {
                 override val row = node.row
                 override val column = node.column
                 override val channels = node.channels
@@ -164,7 +173,7 @@ class S5MegpoidResidualBlockExecutorTest {
 
         val executor = S5MegpoidResidualBlockExecutor(aliasingNodes)
         assertThrows(IllegalArgumentException::class.java) {
-            executor.runChunk(FloatArray(7), sequenceCount = 2)
+            executor.runSequenceFeatures(sequenceInputs())
         }
     }
 }

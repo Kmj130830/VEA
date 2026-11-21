@@ -6,73 +6,86 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class S5MegpoidResidualBlockScheduleTest {
-    @Test
-    fun buildsSequenceMajorEightBlockOrderWithAlternatingWorkspaces() {
-        val schedule = S5MegpoidResidualBlockSchedule.megpoidV7(sequenceCount = 3)
-
-        assertEquals(2, schedule.sequenceIterations)
-        assertEquals(16, schedule.steps.size)
-        assertEquals(
-            (0..3).flatMap { row -> (0..1).map { column -> row to column } },
-            schedule.blockPositions.map { it.row to it.column }
-        )
-
-        val firstSequence = schedule.steps.take(8)
-        assertEquals(List(8) { 0 }, firstSequence.map { it.sequenceIndex })
-        assertEquals((0..7).toList(), firstSequence.map { it.blockOrdinal })
-        assertEquals(
-            listOf(
-                S5MegpoidWorkspaceSlot.FIRST to S5MegpoidWorkspaceSlot.SECOND,
-                S5MegpoidWorkspaceSlot.SECOND to S5MegpoidWorkspaceSlot.FIRST
-            ).let { pair -> List(8) { pair[it % 2] } },
-            firstSequence.map { it.inputWorkspace to it.outputWorkspace }
-        )
-
-        val secondSequence = schedule.steps.drop(8)
-        assertEquals(List(8) { 1 }, secondSequence.map { it.sequenceIndex })
-        assertEquals(firstSequence.last().outputWorkspace, secondSequence.first().inputWorkspace)
+    private val rowMajorPositions = (0 until 4).flatMap { row ->
+        (0 until 2).map { column -> S5MegpoidBlockPosition(row, column) }
     }
 
     @Test
-    fun sequenceCountOneProducesNoResidualInvocations() {
-        val schedule = S5MegpoidResidualBlockSchedule.megpoidV7(sequenceCount = 1)
+    fun schedulesRowsInReverseOrderAndColumnsInAscendingOrder() {
+        val schedule = S5MegpoidResidualBlockSchedule.megpoidV7()
 
-        assertEquals(0, schedule.sequenceIterations)
-        assertEquals(0, schedule.steps.size)
+        assertEquals(4, schedule.sequenceIterations)
+        assertEquals(8, schedule.steps.size)
+        assertEquals(rowMajorPositions, schedule.blockPositions)
+        assertEquals(
+            listOf(3, 3, 2, 2, 1, 1, 0, 0),
+            schedule.steps.map { it.sequenceIndex }
+        )
+        assertEquals(
+            listOf(0, 1, 0, 1, 0, 1, 0, 1),
+            schedule.steps.map { it.block.column }
+        )
     }
 
     @Test
-    fun supportsTheOtherInitialWorkspaceWithoutChangingBlockOrder() {
+    fun eachSequenceRowGetsAnIndependentWorkspacePair() {
+        val schedule = S5MegpoidResidualBlockSchedule.megpoidV7()
+        for (row in 0 until 4) {
+            val rowSteps = schedule.steps.filter { it.sequenceIndex == row }
+            assertEquals(2, rowSteps.size)
+            assertEquals(S5MegpoidWorkspaceSlot.FIRST, rowSteps[0].inputWorkspace)
+            assertEquals(S5MegpoidWorkspaceSlot.SECOND, rowSteps[0].outputWorkspace)
+            assertEquals(S5MegpoidWorkspaceSlot.SECOND, rowSteps[1].inputWorkspace)
+            assertEquals(S5MegpoidWorkspaceSlot.FIRST, rowSteps[1].outputWorkspace)
+        }
+    }
+
+    @Test
+    fun supportsSecondWorkspaceAsTheInitialInputForEveryRow() {
         val schedule = S5MegpoidResidualBlockSchedule.megpoidV7(
-            sequenceCount = 2,
             firstInputWorkspace = S5MegpoidWorkspaceSlot.SECOND
         )
-
-        assertEquals(S5MegpoidWorkspaceSlot.SECOND, schedule.steps.first().inputWorkspace)
-        assertEquals(S5MegpoidWorkspaceSlot.FIRST, schedule.steps.first().outputWorkspace)
-        assertEquals((0..7).toList(), schedule.steps.map { it.blockOrdinal })
+        schedule.steps.groupBy { it.sequenceIndex }.values.forEach { rowSteps ->
+            assertEquals(S5MegpoidWorkspaceSlot.SECOND, rowSteps.first().inputWorkspace)
+            assertEquals(S5MegpoidWorkspaceSlot.FIRST, rowSteps.first().outputWorkspace)
+            assertEquals(S5MegpoidWorkspaceSlot.FIRST, rowSteps.last().outputWorkspace)
+        }
     }
 
     @Test
-    fun rejectsInvalidSequenceCountsAndDuplicateBlockPositions() {
+    fun genericBuilderRejectsMissingRowsOrNonContiguousColumns() {
         assertThrows(IllegalArgumentException::class.java) {
-            S5MegpoidResidualBlockSchedule.megpoidV7(sequenceCount = 0)
+            S5MegpoidResidualBlockSchedule.build(
+                sequenceCount = 4,
+                blockPositions = rowMajorPositions.dropLast(1)
+            )
         }
         assertThrows(IllegalArgumentException::class.java) {
             S5MegpoidResidualBlockSchedule.build(
-                sequenceCount = 2,
-                blockPositions = listOf(
-                    S5MegpoidBlockPosition(0, 0),
-                    S5MegpoidBlockPosition(0, 0)
-                )
+                sequenceCount = 4,
+                blockPositions = rowMajorPositions.map {
+                    if (it.column == 1) S5MegpoidBlockPosition(it.row, 2) else it
+                }
             )
         }
     }
 
     @Test
-    fun eachStepUsesDifferentWorkspaceSlots() {
-        val steps = S5MegpoidResidualBlockSchedule.megpoidV7(sequenceCount = 4).steps
-        steps.forEach { step ->
+    fun rejectsDuplicatePositionsAndWrongV7SequenceCount() {
+        assertThrows(IllegalArgumentException::class.java) {
+            S5MegpoidResidualBlockSchedule.build(
+                sequenceCount = 4,
+                blockPositions = rowMajorPositions + rowMajorPositions.first()
+            )
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            S5MegpoidResidualBlockSchedule.megpoidV7(sequenceCount = 3)
+        }
+    }
+
+    @Test
+    fun noStepWritesToItsCurrentInputWorkspace() {
+        S5MegpoidResidualBlockSchedule.megpoidV7().steps.forEach { step ->
             assertNotEquals(step.inputWorkspace, step.outputWorkspace)
         }
     }
