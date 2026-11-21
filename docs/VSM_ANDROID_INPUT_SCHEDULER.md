@@ -86,3 +86,15 @@ the receiver-side decoding are not yet established. In particular, the
 observed command marker bytes must not be treated as phoneme IDs. The Android
 implementation does not create the private pointer-bearing 24-byte records
 and does not yet call the VSM/S5API render boundary.
+
+## Portable note interval view
+
+`VsmScheduledNote.interval` now exposes the scheduled sample range as
+`VsmEventInterval(startSeconds, endSeconds)`. Both endpoints are derived
+from the already-rounded sample positions and the active render sample rate;
+they are not recomputed from ticks or BPM. At 44.1 kHz, for example, a note
+at sample 88,200 with 22,050 samples of duration maps to `[2.0, 2.5]` seconds.
+
+This is the app-owned temporal pair needed by the next feature-input stage.
+It is intentionally not treated as a complete S5API 0x38-byte event row:
+the five categorical key values following the interval are not yet mapped.
