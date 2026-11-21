@@ -282,6 +282,15 @@ data class S5VoicebankModelPackage(
             tensorDecoder = tensorDecoder
         )
 
+    fun preparePreResidualDenseNormalizationStageForInputFeatures(
+        inputFeatures: Int,
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidDenseNormalizationStage =
+        preResidualTensorIndex.buildDenseNormalizationStageForInputFeatures(
+            inputFeatures = inputFeatures,
+            tensorDecoder = tensorDecoder
+        )
+
     /**
      * Builds the sequence-major residual-block invocation plan recovered
      * from FUN_1800c7ad0. AI Megpoid V7 has four sequence slots, three

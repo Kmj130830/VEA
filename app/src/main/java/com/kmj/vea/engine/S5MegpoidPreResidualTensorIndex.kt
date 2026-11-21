@@ -37,11 +37,51 @@ class S5MegpoidPreResidualTensorReference internal constructor(
  * called by FUN_1800c7ad0. Per-sequence Temporal and Banked properties are
  * indexed separately by S5MegpoidSequenceOperatorTensorIndex.
  */
+data class S5MegpoidDenseProjectionDimensions(
+    val inputFeatures: Int,
+    val outputFeatures: Int
+) {
+    init {
+        require(inputFeatures > 0 && outputFeatures > 0)
+    }
+}
+
 class S5MegpoidPreResidualTensorIndex private constructor(
     val denseProjectionWeights: S5MegpoidPreResidualTensorReference,
     val normalizationScale: S5MegpoidPreResidualTensorReference,
     val normalizationBias: S5MegpoidPreResidualTensorReference
 ) {
+    /**
+     * Resolve output width from the actual normalization vectors, then verify
+     * that the model's Dense weight count is exactly input * output.
+     */
+    fun resolveDenseProjectionDimensions(
+        inputFeatures: Int
+    ): S5MegpoidDenseProjectionDimensions {
+        require(inputFeatures > 0) { "Dense input feature width must be positive." }
+        val outputFeatures = normalizationScale.elementCount
+        require(outputFeatures > 0) { "Dense normalization scale is empty." }
+        require(normalizationBias.elementCount == outputFeatures) {
+            "Dense normalization scale and bias have different feature counts."
+        }
+        require(denseProjectionWeights.elementCount.toLong() ==
+            inputFeatures.toLong() * outputFeatures.toLong()) {
+            "Dense tensor element count does not match input and normalization feature dimensions."
+        }
+        return S5MegpoidDenseProjectionDimensions(inputFeatures, outputFeatures)
+    }
+
+    fun buildDenseNormalizationStageForInputFeatures(
+        inputFeatures: Int,
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidDenseNormalizationStage {
+        val dimensions = resolveDenseProjectionDimensions(inputFeatures)
+        return buildDenseNormalizationStage(
+            inputFeatures = dimensions.inputFeatures,
+            outputFeatures = dimensions.outputFeatures,
+            tensorDecoder = tensorDecoder
+        )
+    }
     /**
      * Builds the model-backed dense + global-normalization stage.
      * Feature dimensions must be supplied from the active render descriptor.
