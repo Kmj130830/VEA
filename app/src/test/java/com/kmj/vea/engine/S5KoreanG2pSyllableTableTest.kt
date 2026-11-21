@@ -11,6 +11,10 @@ class S5KoreanG2pSyllableTableTest {
         assertEquals(S5KoreanG2pSyllable(2, 3, 2), S5KoreanG2pSyllableTable.decompose('각'.code))
         assertEquals(S5KoreanG2pSyllable(20, 3, 5), S5KoreanG2pSyllableTable.decompose('한'.code))
         assertEquals(S5KoreanG2pSyllable(2, 27, 9), S5KoreanG2pSyllableTable.decompose('글'.code))
+        assertEquals(19, S5KoreanG2pSyllableTable.decompose('갑'.code)?.codaIndex)
+        assertEquals(20, S5KoreanG2pSyllableTable.decompose('값'.code)?.codaIndex)
+        assertEquals(23, S5KoreanG2pSyllableTable.decompose('강'.code)?.codaIndex)
+        assertEquals(29, S5KoreanG2pSyllableTable.decompose('힣'.code)?.codaIndex)
     }
 
     @Test
