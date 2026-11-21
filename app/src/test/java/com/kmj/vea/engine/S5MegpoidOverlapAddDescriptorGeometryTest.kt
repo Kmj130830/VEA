@@ -102,6 +102,52 @@ class S5MegpoidOverlapAddDescriptorGeometryTest {
     }
 
     @Test
+    fun buildsAndRunsCompleteMegpoidSpectralOverlapAddDescriptor() {
+        val geometry = S5MegpoidOverlapAddDescriptorGeometryBuilder.build(
+            outputSamples = 4,
+            geometry = 8,
+            fftSize = 8
+        )
+
+        val overlap = geometry.createSpectralOverlapAdd(
+            coreWindowLength = 8,
+            frameWindowShapeMode = 0,
+            alternatingBinSign = false
+        )
+
+        val spectrum = FloatArray(10)
+        spectrum[0] = 16f
+        val output = overlap.processSpectrum(spectrum)
+
+        assertEquals(4, output.size)
+        assertTrue(output.all { it.isFinite() })
+    }
+
+    @Test
+    fun buildParametersCanSelectBothNativeWindowFlags() {
+        val geometry = S5MegpoidOverlapAddDescriptorGeometryBuilder.build(4, 8, 8)
+
+        val raisedCosine = geometry.buildOverlapAddParameters(
+            coreWindowLength = 8,
+            frameWindowShapeMode = 0,
+            alternatingBinSign = true,
+            flagAt91 = true
+        )
+        val directFrame = geometry.buildOverlapAddParameters(
+            coreWindowLength = 8,
+            frameWindowShapeMode = 0,
+            alternatingBinSign = false,
+            flagAt92 = true
+        )
+
+        assertTrue(raisedCosine.frameWindow.indices.any { index ->
+            kotlin.math.abs(raisedCosine.frameWindow[index] - directFrame.frameWindow[index]) > 1e-5f
+        })
+        assertEquals(4, raisedCosine.outputWindow.size)
+        assertEquals(4, directFrame.outputWindow.size)
+    }
+
+    @Test
     fun rejectsInvalidDimensionsAndAcceptsLargestPositiveGeometry() {
         assertThrows(IllegalArgumentException::class.java) {
             S5MegpoidOverlapAddDescriptorGeometryBuilder.build(0, 512, 512)
