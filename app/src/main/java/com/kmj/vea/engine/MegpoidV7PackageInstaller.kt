@@ -61,7 +61,7 @@ internal fun validateV7ContainerPrefix(
  *
  * Source archives are read through Android's content resolver. Only five required
  * model files are written; unrelated archive members are streamed and discarded.
- * Every imported file must match its recorded SHA-256 and outer container header.
+ * Every imported file must match its recorded SHA-256 and S5API container prefix.
  *
  * This installs and validates model resources. It does not decode proprietary
  * model payloads, create an inference graph, or make the VOCALOID renderer available.
@@ -211,7 +211,7 @@ object MegpoidV7PackageInstaller {
 
     /**
      * Returns the existing installation only when all five files still match
-     * the catalog hashes and their container headers.
+     * the catalog hashes and their container prefixes.
      */
     fun findInstalled(context: Context): InstalledPackage? {
         val directory = File(context.applicationContext.filesDir, "voicebanks/$BANK_ID")
@@ -304,7 +304,7 @@ object MegpoidV7PackageInstaller {
                 }
                 zip.closeEntry()
 
-                if (headerBytes != V7_CONTAINER_HEADER_SIZE) {
+                if (headerBytes != V7_CONTAINER_PREFIX_SIZE) {
                     throw IOException("$baseName is shorter than the 16-byte S5API prefix.")
                 }
                 try {
@@ -335,11 +335,11 @@ object MegpoidV7PackageInstaller {
     }
 
     private fun verifyExistingFile(file: File, spec: ModelSpec) {
-        if (!file.isFile || file.length() < V7_CONTAINER_HEADER_SIZE) {
+        if (!file.isFile || file.length() < V7_CONTAINER_PREFIX_SIZE) {
             throw IOException("Missing or truncated model file: ${spec.fileName}.")
         }
 
-        val header = ByteArray(V7_CONTAINER_HEADER_SIZE)
+        val header = ByteArray(V7_CONTAINER_PREFIX_SIZE)
         val digest = MessageDigest.getInstance("SHA-256")
         FileInputStream(file).buffered().use { input ->
             var headerBytes = 0
@@ -356,7 +356,7 @@ object MegpoidV7PackageInstaller {
             }
         }
 
-        validateV7ContainerHeader(header, file.length(), spec.magic)
+        validateV7ContainerPrefix(header, file.length(), spec.magic)
         if (!digest.digest().toHexString().equals(spec.sha256, ignoreCase = true)) {
             throw IOException("SHA-256 mismatch for installed ${spec.fileName}.")
         }
