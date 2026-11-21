@@ -36,7 +36,7 @@ class VocalRenderPlanTest {
         assertEquals(2.25, rendered.startSeconds, 0.000001)
         assertEquals(0.5, rendered.durationSeconds, 0.000001)
         assertEquals(440.0, rendered.baseFrequencyHz, 0.000001)
-        assertEquals(0.5, plan.totalDurationSeconds, 0.000001)
+        assertEquals(2.75, plan.totalDurationSeconds, 0.000001)
         assertEquals(listOf(0.0, 0.5), rendered.pitchCurve.map { it.offsetSeconds })
         assertEquals("ai_megpoid_v7", plan.singerId)
     }
