@@ -74,6 +74,29 @@ class S5MegpoidOutputTransformInputsTest {
     }
 
     @Test
+    fun mapsRoot3418ToWindowShapeAndRoot1f75ToFlag92() {
+        val blackmanHarris = inputs(
+            coreWindowLength = 5,
+            shapeMode = S5MegpoidFrameWindowBuilder.BLACKMAN_HARRIS_MODE,
+            flagAt92 = false
+        ).buildOverlapAddParameters()
+
+        val expected = S5MegpoidFrameWindowBuilder.build(
+            totalLength = 8,
+            coreLength = 5,
+            shapeMode = S5MegpoidFrameWindowBuilder.BLACKMAN_HARRIS_MODE
+        )
+        assertEquals(expected.toList(), blackmanHarris.frameWindow.toList())
+
+        val rectangular = inputs(
+            coreWindowLength = 5,
+            shapeMode = S5MegpoidFrameWindowBuilder.BLACKMAN_HARRIS_MODE,
+            flagAt92 = true
+        ).buildOverlapAddParameters()
+        rectangular.frameWindow.forEach { assertEquals(1f, it, 0f) }
+    }
+
+    @Test
     fun retainsUnusedFloatDescriptorParameterWithoutInferringItsMeaning() {
         val input = inputs(floatParameter = 0.125f)
         assertEquals(0.125f, input.floatParameterAtRoot10, 0f)
