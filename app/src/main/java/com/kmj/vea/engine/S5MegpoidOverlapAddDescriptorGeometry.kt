@@ -27,6 +27,60 @@ data class S5MegpoidOverlapAddDescriptorGeometry(
     }
 
     /**
+     * Builds frame and output windows from the native descriptor inputs, then
+     * returns the complete parameter object consumed by the spectral OLA
+     * executor. This is the supported Megpoid V7 path where geometry == fftSize.
+     */
+    fun buildOverlapAddParameters(
+        coreWindowLength: Int,
+        frameWindowShapeMode: Int,
+        alternatingBinSign: Boolean,
+        flagAt91: Boolean = false,
+        flagAt92: Boolean = false
+    ): S5MegpoidOverlapAddParameters {
+        require(geometry == fftSize) {
+            "The current Megpoid V7 overlap-add integration requires geometry == fftSize."
+        }
+        val baseFrameWindow = S5MegpoidFrameWindowBuilder.build(
+            totalLength = geometry,
+            coreLength = coreWindowLength,
+            shapeMode = frameWindowShapeMode
+        )
+        val windows = S5MegpoidOutputWindowBuilder.build(
+            frameWindow = baseFrameWindow,
+            outputSamples = outputSamples,
+            geometry = geometry,
+            fftSize = fftSize,
+            windowOffset = windowOffset,
+            overlapContributionCount = overlapContributionCount,
+            flagAt91 = flagAt91,
+            flagAt92 = flagAt92
+        )
+        return toOverlapAddParameters(
+            alternatingBinSign = alternatingBinSign,
+            frameWindow = windows.frameWindow,
+            outputWindow = windows.outputWindow
+        )
+    }
+
+    fun createSpectralOverlapAdd(
+        coreWindowLength: Int,
+        frameWindowShapeMode: Int,
+        alternatingBinSign: Boolean,
+        flagAt91: Boolean = false,
+        flagAt92: Boolean = false
+    ): S5MegpoidSpectralOverlapAdd =
+        S5MegpoidSpectralOverlapAdd(
+            buildOverlapAddParameters(
+                coreWindowLength = coreWindowLength,
+                frameWindowShapeMode = frameWindowShapeMode,
+                alternatingBinSign = alternatingBinSign,
+                flagAt91 = flagAt91,
+                flagAt92 = flagAt92
+            )
+        )
+
+    /**
      * Builds the parameter carrier consumed by the Android overlap-add
      * reference, using these descriptor-derived scalars and supplied windows.
      */
