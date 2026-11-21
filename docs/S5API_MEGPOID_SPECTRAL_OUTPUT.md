@@ -108,7 +108,9 @@ The added Ghidra trace of `FUN_180040630` shows that it calls the core transform
 
 This confirms the output transform direction; it is no longer merely inferred from the surrounding dataflow.
 
-Inside `FUN_1800c7ad0`, the transform calls are made using the root-owned transform object at `renderState + 0xF0` (word index `0x1e`). The forward-frame transform writes its spectrum to the root-owned pointer at `+0x110` (word index `0x22`). Two further transform-state arrays are copied by `FUN_18012b470` and `FUN_18012b450` into root-owned pointers at `+0x140` and `+0x170` (word indices `0x28` and `0x2e`). Their exact feature semantics are still under investigation.
+At the `FUN_1800c7ad0` callsites, the excitation path uses the root-owned state wrapper at `renderState + 0x78`. `FUN_18012b150` receives this state and the root-owned frame/spectrum buffer pointer at `+0x88`; `FUN_18012b470` and `FUN_18012b450` receive the same state with buffer pointers at `+0xA0` and `+0xB8`. `FUN_18012b150` uses its own nested transform plan/workspace inside the excitation-state object. These fields are separate from the final inverse-output descriptor.
+
+The final inverse transform/overlap-add call passes the wrapper pointer at `renderState + 0x80` as the first argument, the model-produced complex spectrum at `renderState + 0x4F8` as the second argument, and the caller's float output buffer as the third argument. `FUN_18012c740` dereferences the first argument to obtain its descriptor. The descriptor-relative offsets listed below must not be confused with offsets in the render-state root. The root fields at `+0xF0` and `+0x110` are used by a separate conditional processing branch and are not the `FUN_18012c740` output descriptor.
 
 The higher-level render path also calls `FUN_180127330`, which forwards a per-frame 32-bit value to `FUN_1800aeea0`. That setter writes the value to render-state offset `+0x3678`. The caller sets it to `1.0f` when the rounded frame index is out of range or the selected frame entry is zero, otherwise `0.0f`. This is a verified frame-validity gate value; its vendor field name is unknown.
 
@@ -145,7 +147,7 @@ These names are descriptive observations, not vendor ABI field names. The constr
 ## Remaining work
 
 1. Decompile `FUN_180040630` and its selected backend implementation to establish transform direction, scaling and data layout.
-2. Trace the constructor/population sites for the transform descriptor at render-state root +0x20.
+2. Trace the constructor/population sites for the output/overlap descriptor wrapper at render-state root +0x80 and the descriptor object it references.
 3. Trace the root-owned neural input feature buffers and the upstream note/phoneme-to-feature path. The output argument is now excluded from that search.
 4. Verify the sample-rate and final PCM/WAV boundary in the higher-level VSM caller.
 
