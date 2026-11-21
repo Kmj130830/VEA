@@ -1,6 +1,5 @@
 package com.kmj.vea.engine
 
-import kotlin.math.PI
 import kotlin.math.cos
 
 /**
@@ -24,40 +23,41 @@ object S5MegpoidFrameWindowBuilder {
         if (coreLength > 0 && coreLength < totalLength) {
             val leftPadding = (totalLength - coreLength) / 2
             for (index in 0 until coreLength) {
-                val phase = TWO_PI * index.toDouble() / coreLength.toDouble()
+                val phase = (index.toFloat() * TWO_PI) / coreLength.toFloat()
                 output[leftPadding + index] = when (shapeMode) {
                     BLACKMAN_HARRIS_MODE -> blackmanHarris(phase)
                     else -> periodicHann(phase)
                 }
             }
         } else {
-            val denominator = (totalLength - 1).toDouble()
+            val denominator = (totalLength - 1).toFloat()
             for (index in 0 until totalLength) {
-                val phase = TWO_PI * index.toDouble() / denominator
-                output[index] = symmetricHann(phase)
+                val phase = (index.toFloat() * TWO_PI) / denominator
+                output[index] = hann(phase)
             }
         }
         return output
     }
 
-    private fun periodicHann(phase: Double): Float =
-        (0.5 - 0.5 * cos(phase)).toFloat()
+    private fun periodicHann(phase: Float): Float = hann(phase)
 
-    private fun symmetricHann(phase: Double): Float =
-        (0.5 - 0.5 * cos(phase)).toFloat()
+    private fun hann(phase: Float): Float =
+        0.5f - 0.5f * cos(phase.toDouble()).toFloat()
 
-    private fun blackmanHarris(phase: Double): Float {
-        val value = BLACKMAN_HARRIS_A0 -
-            BLACKMAN_HARRIS_A1 * cos(phase) +
-            BLACKMAN_HARRIS_A2 * cos(2.0 * phase) -
-            BLACKMAN_HARRIS_A3 * cos(3.0 * phase)
-        return value.toFloat()
+    private fun blackmanHarris(phase: Float): Float {
+        val cos1 = cos(phase.toDouble()).toFloat()
+        val cos2 = cos((phase * 2f).toDouble()).toFloat()
+        val cos3 = cos((phase * 3f).toDouble()).toFloat()
+        var value = BLACKMAN_HARRIS_A2 * cos2
+        value += BLACKMAN_HARRIS_A0 - BLACKMAN_HARRIS_A1 * cos1
+        value -= BLACKMAN_HARRIS_A3 * cos3
+        return value
     }
 
     const val BLACKMAN_HARRIS_MODE = 1
-    private const val TWO_PI = 6.2831855
-    private const val BLACKMAN_HARRIS_A0 = 0.35875
-    private const val BLACKMAN_HARRIS_A1 = 0.48829
-    private const val BLACKMAN_HARRIS_A2 = 0.14128
-    private const val BLACKMAN_HARRIS_A3 = 0.01168
+    private const val TWO_PI = 6.2831855f
+    private const val BLACKMAN_HARRIS_A0 = 0.35875f
+    private const val BLACKMAN_HARRIS_A1 = 0.48829f
+    private const val BLACKMAN_HARRIS_A2 = 0.14128f
+    private const val BLACKMAN_HARRIS_A3 = 0.01168f
 }
