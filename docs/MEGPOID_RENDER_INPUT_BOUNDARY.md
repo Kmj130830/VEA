@@ -319,15 +319,16 @@ confirms these exact strings:
 
 | Exact prepared label | Returned category index |
 |---|---:|
-| `Sil` | 0 |
 | `SIL` | 0 |
+| `Sil` | 1 |
 | `Br` | 1 |
 | `BR` | 1 |
 
 These are case-sensitive comparisons after the helper's alias/fallback
-preparation. They do not establish fixed IDs for lowercase `sil` or `br`,
-nor for ordinary phone labels; those continue through the active context
-tree. Android now exposes these four cases separately in
+preparation. In particular, `SIL` and `Sil` are different: only uppercase
+`SIL` returns 0, while title-case `Sil` returns 1. They do not establish
+fixed IDs for lowercase `sil` or `br`, nor for ordinary phone labels; those
+continue through the active context tree. Android now exposes these four cases separately in
 `S5ApiPhoneCategorySpecialCases.fixedIndexOrNull()` and leaves all other
 labels unresolved.
 
