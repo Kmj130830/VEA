@@ -34,6 +34,15 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
         "180060270", // optional feature-operator configuration path
         "180064cc0", // typed descriptor copy helper
         "180068190", // nine named-layer descriptor loader
+        "1800114b0", // initializes the 0x40..0x230 vector-bearing subobject
+        "180011900", // initializes a related vector-bearing subobject
+        "180012030", // initializes the adjacent subobject and its fields
+        "180013c00", // initializes the larger render/voice engine object
+        "180014940", // destroys embedded vector subobjects
+        "180015d10", // destroys vectors at +0x1f0, +0x208 and +0x220
+        "180016dc0", // destroys the vector at +0x240 and nested +0x1f8 object
+        "180016a80", // nested object cleanup invoked by FUN_180016dc0
+        "18007af10", // nested object cleanup invoked at +0x1f8
         "180063ca0", // primary typed matrix-array loader
         "180064e90", // secondary property loader/consumer
         "180064670", // matrix descriptor and numeric tensor packer
@@ -236,7 +245,7 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
 
             out.println("## Raw instruction listing for tensor-loader ABI");
             out.println();
-            for (String hex : new String[] { "180010260", "1800812a0", "180081e20", "180010740", "180010540", "1800103e0", "18001acc0", "180083610", "180014f70", "180083c50", "180024a90", "18005ebe0", "18008d470", "18008d470", "180052f90", "1800537e0", "1800589d0", "18005e9b0", "180056f40", "18005df50", "180065510", "1800656e0", "180060270", "180064cc0", "180068190", "180063ca0", "180064e90", "1800c4730", "1800ccce0", "1800ced10", "1800d4bf0", "1800bc5e0", "1800c0a40", "1800b6a20", "1800c0960", "1800dc260", "1800adca0", "1800d5970", "1800b8a40", "1800d4a90", "1800d4610", "1800c0320", "1800e63b0", "1800f1110", "180114660", "18011b770", "180106440", "18010d550", "1800f8220", "1800ff330", "1800ea000", "1800b3130", "1800b28a0", "1800bc0c0", "1800b0b30", "1800b36d0", "1800d3f00", "1800d3f6d", "1800cdbb0", "1800d5a00", "1800bbcc0", "1800afab0", "1800aff50", "1800b0110", "1800d9580", "1800d9830", "1800d9700", "1800b4410", "1800c7ad0", "1800c72d0", "1800c5260", "1800c5440", "1800c7920", "1800c5d50", "1800c67e0", "1800afc30", "1800af720", "1800b3bd0", "1800c3740", "1800aec40", "180126c20", "180126d40", "1800aed70", "1800aea60", "1800ae770", "1800ae950", "1800aeea0", "180126e30", "180127120", "1801271a0", "180127330" }) {
+            for (String hex : new String[] { "180010260", "1800812a0", "180081e20", "180010740", "180010540", "1800103e0", "18001acc0", "180083610", "180014f70", "180083c50", "180024a90", "18005ebe0", "18008d470", "18008d470", "180052f90", "1800537e0", "1800589d0", "18005e9b0", "180056f40", "18005df50", "180065510", "1800656e0", "180060270", "180064cc0", "180068190", "1800114b0", "180011900", "180012030", "180013c00", "180014940", "180015d10", "180016dc0", "180016a80", "18007af10", "180063ca0", "180064e90", "1800c4730", "1800ccce0", "1800ced10", "1800d4bf0", "1800bc5e0", "1800c0a40", "1800b6a20", "1800c0960", "1800dc260", "1800adca0", "1800d5970", "1800b8a40", "1800d4a90", "1800d4610", "1800c0320", "1800e63b0", "1800f1110", "180114660", "18011b770", "180106440", "18010d550", "1800f8220", "1800ff330", "1800ea000", "1800b3130", "1800b28a0", "1800bc0c0", "1800b0b30", "1800b36d0", "1800d3f00", "1800d3f6d", "1800cdbb0", "1800d5a00", "1800bbcc0", "1800afab0", "1800aff50", "1800b0110", "1800d9580", "1800d9830", "1800d9700", "1800b4410", "1800c7ad0", "1800c72d0", "1800c5260", "1800c5440", "1800c7920", "1800c5d50", "1800c67e0", "1800afc30", "1800af720", "1800b3bd0", "1800c3740", "1800aec40", "180126c20", "180126d40", "1800aed70", "1800aea60", "1800ae770", "1800ae950", "1800aeea0", "180126e30", "180127120", "1801271a0", "180127330" }) {
                 monitor.checkCancelled();
                 Address address = toAddr(hex);
                 Function f = currentProgram.getFunctionManager().getFunctionAt(address);
@@ -255,20 +264,21 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
                 out.println();
             }
 
-            out.println("## Global runtime descriptor pointer-offset scan");
+            out.println("## Global engine-object field-reference candidate scan");
             out.println();
-            out.println("> Candidate non-stack references for sequence-operator descriptors, banked-linear descriptors, and residual record arrays used by FUN_1800c7ad0.");
-            out.println("> An offset match is only a candidate; it does not by itself prove descriptor ownership or model-key provenance.");
+            out.println("> Candidate non-stack references to engine-object fields observed near FUN_1800c7ad0 and related constructors/destructors.");
+            out.println("> These are member-offset candidates, not direct tensor/weight descriptors. Constructor, destructor and callsite dataflow must be checked before assigning a semantic role.");
+            out.println("> Confirmed vector triples include [begin,end,capacity] at +0x1f0/+0x1f8/+0x200 and +0x220/+0x228/+0x230 in FUN_180015d10, plus +0x240/+0x248/+0x250 in FUN_180016dc0.");
             out.println();
             String[] watchedOffsets = {
-                    "0x1f8]", // initial dense projection descriptor (param_1 + 0x7e)
-                    "0x228]", // global feature normalization descriptor (param_1 + 0x8a)
-                    "0x250]", // temporal stride-2 projection descriptor array (param_1 + 0x94)
-                    "0x268]", // temporal projection workspace descriptor array (param_1 + 0x9a)
-                    "0x280]", // banked-linear descriptor array (param_1 + 0xa0)
-                    "0x2b0]", // alternate banked operator descriptor array (param_1 + 0xac)
-                    "0x2e0]", // 0x100-byte residual block-data vector
-                    "0x2f8]"  // 0x88-byte residual block-state vector
+                    "0x1f8]", // confirmed vector end pointer for the vector beginning at +0x1f0 (capacity at +0x200)
+                    "0x228]", // confirmed vector end pointer for the vector beginning at +0x220 (capacity at +0x230)
+                    "0x250]", // confirmed vector end pointer for the vector beginning at +0x240 in FUN_180016dc0
+                    "0x268]", // candidate member field; semantic role not established by offset scan
+                    "0x280]", // candidate member field; semantic role not established by offset scan
+                    "0x2b0]", // candidate member field; semantic role not established by offset scan
+                    "0x2e0]", // residual block-data vector field identified at FUN_1800c7ad0
+                    "0x2f8]"  // residual block-state vector field identified at FUN_1800c7ad0
             };
             LinkedHashMap<Address, Function> recordOffsetFunctions = new LinkedHashMap<>();
             LinkedHashMap<String, Integer> offsetHitCounts = new LinkedHashMap<>();
