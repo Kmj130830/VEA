@@ -58,7 +58,7 @@ class S5MegpoidExcitationGeneratorTest {
 
     @Test
     fun gaussianSamplerCachesTheSecondPolarSample() {
-        val values = ArrayDeque(listOf(0.5f, 0f))
+        val values = ArrayDeque(listOf(0.5f, 0.25f))
         var calls = 0
         val sampler = S5MegpoidGaussianNoise {
             calls++
