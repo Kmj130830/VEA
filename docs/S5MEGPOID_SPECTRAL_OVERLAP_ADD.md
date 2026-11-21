@@ -136,3 +136,22 @@ This creates a verified bridge between render-state scalar inputs and the
 scalar geometry fields required by S5MegpoidSpectralOverlapAdd. The frame and
 output window coefficients, transform-plan setup, and provenance of the
 render-state scalar inputs remain separate tasks.
+
+## Frame-window generator
+
+Static disassembly of FUN_18012a9a0 recovers the following branch behavior:
+
+- If `0 < coreLength < totalLength`, the destination remains zero outside a
+  centered segment of `coreLength` values. The segment phase is
+  `2*pi*index/coreLength`.
+- With shape mode 1, the segment uses the four-term Blackman-Harris formula
+  `0.35875 - 0.48829*cos(x) + 0.14128*cos(2*x) - 0.01168*cos(3*x)`.
+- Other shape-mode values use periodic Hann, `0.5 - 0.5*cos(x)`.
+- If coreLength is zero, negative, or at least totalLength, the function
+  creates a full symmetric Hann window with denominator `totalLength - 1`.
+
+`S5MegpoidFrameWindowBuilder` implements this isolated frame-window routine.
+It does not infer the descriptor's coreLength or shapeMode: those remain
+inputs supplied by the output-state constructor. The separate output window
+at descriptor +0x60 is still being traced and is not substituted with this
+frame window.
