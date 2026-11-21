@@ -29,9 +29,9 @@ class S5ModelJsonScannerTest {
             setOf(tensorKey)
         )
 
-        assertEquals(3L, result.objectCount)
+        assertEquals(4L, result.objectCount)
         assertEquals(1L, result.arrayCount)
-        assertEquals(5L, result.objectKeyCount)
+        assertEquals(7L, result.objectKeyCount)
         assertEquals(1L, result.hexadecimalKeyCount)
         assertEquals(4L, result.stringValueCount)
         assertEquals(2L, result.numberCount)
