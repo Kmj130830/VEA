@@ -51,6 +51,25 @@ internal object S5KoreanG2pSyllableTable {
         )
     }
 
+    /**
+     * Reverse lookup equivalent to the native packed-index search in
+     * FUN_180008660. Intermediate coda indices 0, 30 and 31 are treated
+     * as the no-coda form, matching the native mask rule.
+     */
+    fun compose(syllable: S5KoreanG2pSyllable): Int? {
+        val initial = syllable.onsetIndex - 2
+        if (initial !in 0 until 19) return null
+        val medial = nativeVowelIndices.indexOf(syllable.vowelIndex)
+        if (medial < 0) return null
+        val final = when (syllable.codaIndex) {
+            0, 1, 30, 31 -> 0
+            in 2..29 -> syllable.codaIndex - 1
+            else -> return null
+        }
+        if (final !in 0 until 28) return null
+        return 0xAC00 + (initial * 21 + medial) * 28 + final
+    }
+
     fun onsetAlias(index: Int): String? = onsetAliases.getOrNull(index)
     fun vowelAlias(index: Int): String? = vowelAliases.getOrNull(index)
     fun codaAlias(index: Int): String? = codaAliases.getOrNull(index)
