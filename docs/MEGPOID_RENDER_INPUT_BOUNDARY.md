@@ -311,3 +311,22 @@ recovered. The current trace shows `FUN_1800591d0` calling
 analysis explicitly seeds that initializer and its adjacent subobject
 constructors. Until that population path is recovered, no numeric phone
 IDs are hardcoded in Android.
+
+### Exact fixed-category exceptions
+
+A byte-level check of the four constants compared by `FUN_180074a50`
+confirms these exact strings:
+
+| Exact prepared label | Returned category index |
+|---|---:|
+| `Sil` | 0 |
+| `SIL` | 0 |
+| `Br` | 1 |
+| `BR` | 1 |
+
+These are case-sensitive comparisons after the helper's alias/fallback
+preparation. They do not establish fixed IDs for lowercase `sil` or `br`,
+nor for ordinary phone labels; those continue through the active context
+tree. Android now exposes these four cases separately in
+`S5ApiPhoneCategorySpecialCases.fixedIndexOrNull()` and leaves all other
+labels unresolved.
