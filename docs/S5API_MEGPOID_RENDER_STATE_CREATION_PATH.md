@@ -27,23 +27,27 @@ The separate public copy path `FUN_1801269F0` calls `FUN_1800ccce0`. The latter 
 
 The public wrapper `FUN_180127220(root, value)` packages its two arguments and calls `FUN_1800af170`.
 
-The recovered body of `FUN_1800af170` shows this sequence:
+The decompilation of `FUN_1800b8f60` now identifies the conversion more precisely: it treats the value passed by the wrapper as a NUL-terminated string, rejects an empty string with a JSON-parse error, and calls `FUN_1800b9200` to parse the text into S5API's typed object/value tree. It then transfers the parsed value into the destination object initialized at `param_1` through `FUN_1800e06f0`. In the observed caller, the parser flags are `1, 0, 0`.
+
+The complete observed sequence in `FUN_1800af170` is therefore:
 
 ```c
-FUN_1800b8f60(parsed_value, value, temporary_state, 1, 0, 0);
-FUN_1800ced10(root, parsed_value);
-FUN_1800dc4b0(temporary_state, parsed_value);
+FUN_1800b8f60(parsed_tree, json_text, temporary_state, 1, 0, 0);
+FUN_1800ced10(root, parsed_tree);
+FUN_1800dc4b0(parsed_tree, parsed_tree.type_tag);
 ```
 
-The pseudocode's concrete local argument order is preserved in the Ghidra report. This establishes that the value supplied to `FUN_180127220` is first passed through `FUN_1800b8f60`, and the resulting temporary configuration is then passed to `FUN_1800ced10`, the routine already traced as the builder of the render-root residual-block records and associated workspaces.
+This establishes that the value supplied to `FUN_180127220` is JSON text, not an already-materialized model tree. `FUN_1800ced10` consumes the parsed tree to populate the root's residual-block records and associated workspaces. `FUN_1800dc4b0` is the recursive typed-value cleanup routine: it walks allocated object/array contents and frees the dynamic string/container storage according to the node type tag. It is cleanup after population, not a second model conversion.
 
-The exact conversion performed by `FUN_1800b8f60`, the ownership/cleanup semantics of `FUN_1800dc4b0`, and the full model-property provenance for every render descriptor are not yet established by this call-chain note.
+The precise hashed property name that supplies the JSON text in `Func_47a12a73` is still unresolved. The Android model loader already has a general UTF-8 JSON parser, but it must first locate this particular VTB2 value and feed its string contents into the same typed-tree parser contract before it can reproduce this specific S5API path.
 
 ## Follow-up configuration
 
 `FUN_180127630(root, value)` is a thin wrapper which forwards the root and 32-bit value to `FUN_1800af230`. In the high-level initialization branch above, the supplied value is zero.
 
-The semantic effect of `FUN_1800af230` still requires its dedicated decompilation and dataflow review. It is intentionally not labelled as a completed render-state finalizer until its field accesses and call targets are reconciled with the root-relative descriptor map.
+The decompilation of `FUN_1800af230` shows that it writes a boolean at root-relative offset `+0x618`, setting it to `(value != 0)`. When root field `+0x78` is non-null, it creates a replacement object through `FUN_180129240`, passing values read from root offsets `+0x0C`, `+0x04` (twice), `+0x10`, `+0x618`, `+0x61C`, `+0x620`, and `+0x3418`; it then releases the previous object via `FUN_180129A50` and frees its allocation. The semantic names of these fields and the object returned by `FUN_180129240` are not established yet.
+
+Thus the observed `FUN_180127630(root, 0)` call sets the root flag at `+0x618` to false and conditionally refreshes the object at `+0x78`. It is not safe to describe the routine as a generic finalizer without further field/consumer tracing.
 
 ## Relationship to the forward path
 
