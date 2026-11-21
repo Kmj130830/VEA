@@ -26,7 +26,7 @@ class S5MegpoidPreResidualTensorReference internal constructor(
     ): FloatArray {
         val decoded = encodedValue.asFloatArray(tensorDecoder)
         check(decoded.size == elementCount) {
-            "Decoded pre-residual tensor '\${propertyName}' has an unexpected element count."
+            "Decoded pre-residual tensor '${propertyName}' has an unexpected element count."
         }
         return decoded
     }
@@ -54,7 +54,7 @@ class S5MegpoidPreResidualTensorIndex private constructor(
         require(inputFeatures > 0 && outputFeatures > 0)
         val weightCount = checkedProduct(inputFeatures, outputFeatures)
         require(denseProjectionWeights.elementCount == weightCount) {
-            "Dense tensor has \${denseProjectionWeights.elementCount} values; descriptor dimensions require \${weightCount}."
+            "Dense tensor has ${denseProjectionWeights.elementCount} values; descriptor dimensions require ${weightCount}."
         }
         require(normalizationScale.elementCount == outputFeatures) {
             "Normalization scale must contain one value per dense output feature."
@@ -87,28 +87,28 @@ class S5MegpoidPreResidualTensorIndex private constructor(
             ): S5MegpoidPreResidualTensorReference {
                 val match = modelTree.findUniqueByLookupKeyRecursive(lookupKey)
                     ?: throw IllegalArgumentException(
-                        "Pre-residual property '\${propertyName}' (key \${lookupKey}) is missing."
+                        "Pre-residual property '${propertyName}' (key ${lookupKey}) is missing."
                     )
                 val value = match.value as? S5ModelValue.StringValue
                     ?: throw IllegalArgumentException(
-                        "Pre-residual property '\${propertyName}' at \${match.path} is not a typed string."
+                        "Pre-residual property '${propertyName}' at ${match.path} is not a typed string."
                     )
                 val marker = value.value.take(4)
                 require(marker == "*F32" || marker == "*F16") {
-                    "Pre-residual property '\${propertyName}' is not an *F32 or *F16 tensor."
+                    "Pre-residual property '${propertyName}' is not an *F32 or *F16 tensor."
                 }
                 val payload = value.value.substring(4)
                 val byteCount = try {
                     Base64.getDecoder().decode(payload).size
                 } catch (error: IllegalArgumentException) {
                     throw IllegalArgumentException(
-                        "Pre-residual property '\${propertyName}' has malformed Base64 data.",
+                        "Pre-residual property '${propertyName}' has malformed Base64 data.",
                         error
                     )
                 }
                 val scalarBytes = if (marker == "*F16") 2 else 4
                 require(byteCount > 0 && byteCount % scalarBytes == 0) {
-                    "Pre-residual property '\${propertyName}' is empty or misaligned."
+                    "Pre-residual property '${propertyName}' is empty or misaligned."
                 }
                 return S5MegpoidPreResidualTensorReference(
                     propertyName = propertyName,

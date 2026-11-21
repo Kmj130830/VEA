@@ -33,17 +33,17 @@ class S5MegpoidPreResidualTensorIndexTest {
         val scaleEncoded = encoded(scale, 2)
         val biasEncoded = encoded(bias, 3)
         val fields = mutableListOf<String>()
-        fields += "\"\${S5MegpoidPreResidualTensorKeys.DENSE_PROJECTION_WEIGHTS}\":\"\${denseEncoded}\""
+        fields += "\"${S5MegpoidPreResidualTensorKeys.DENSE_PROJECTION_WEIGHTS}\":\"${denseEncoded}\""
         if (includeAllKeys) {
-            fields += "\"\${S5MegpoidPreResidualTensorKeys.NORMALIZATION_SCALE}\":\"\${scaleEncoded}\""
-            fields += "\"\${S5MegpoidPreResidualTensorKeys.NORMALIZATION_BIAS}\":\"\${biasEncoded}\""
+            fields += "\"${S5MegpoidPreResidualTensorKeys.NORMALIZATION_SCALE}\":\"${scaleEncoded}\""
+            fields += "\"${S5MegpoidPreResidualTensorKeys.NORMALIZATION_BIAS}\":\"${biasEncoded}\""
         }
         val nested = fields.joinToString(",")
         val duplicate = if (duplicateDenseKey) {
-            ",\"sibling\":{\"\${S5MegpoidPreResidualTensorKeys.DENSE_PROJECTION_WEIGHTS}\":\"\${denseEncoded}\"}"
+            ",\"sibling\":{\"${S5MegpoidPreResidualTensorKeys.DENSE_PROJECTION_WEIGHTS}\":\"${denseEncoded}\"}"
         } else ""
         return Fixture(
-            S5ModelObjectTree.parseUtf8("{\"selected\":{\${nested}}\${duplicate}}"),
+            S5ModelObjectTree.parseUtf8("{\"selected\":{${nested}}${duplicate}}"),
             FakeTensorDecoder(mapOf(
                 denseEncoded to dense,
                 scaleEncoded to scale,
@@ -57,7 +57,7 @@ class S5MegpoidPreResidualTensorIndexTest {
         val fixture = fixture()
         val index = S5MegpoidPreResidualTensorIndex.build(fixture.tree)
         assertEquals(
-            "$/selected/\${S5MegpoidPreResidualTensorKeys.DENSE_PROJECTION_WEIGHTS}",
+            "$/selected/${S5MegpoidPreResidualTensorKeys.DENSE_PROJECTION_WEIGHTS}",
             index.denseProjectionWeights.objectPath
         )
         assertEquals(4, index.denseProjectionWeights.elementCount)
