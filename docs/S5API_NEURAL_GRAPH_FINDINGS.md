@@ -92,3 +92,43 @@ The complete decompiler trace of `FUN_1800c5d50` clarifies the block order: dept
 The GELU dispatcher `FUN_18012cb50` selects AVX `FUN_18012cff0`, vector `FUN_18012cbc0`, or scalar `FUN_18012ca50`. The scalar body performs `x = scale * input + bias`, then `x / (1 + exp(-((x*x*x*0.044715 + x)*1.5957692)))`. This is a GELU approximation, not the two-plane ACT gate.
 
 VEA has added the scalar GELU implementation `vea_s5_apply_gelu_f32` and Kotlin/JNI entrypoint `NativeS5TensorBridge.applyGelu`. The residual affine merge remains a separate kernel with `dst = (dst + bias) * scale + residual`. See `docs/S5API_NORMALIZATION_PORT.md`.
+
+
+## 10. Temporal stride-2 projection in the sequence dispatcher
+
+The caller trace for `FUN_1800c7ad0` shows one `FUN_1800c5440` call
+for each adjacent sequence pair, before the residual-block loop. The four
+arguments are the current layer descriptor, current sequence input descriptor,
+next sequence output descriptor, and a per-sequence workspace descriptor.
+
+The function's descriptor fields are used as:
+
+- `param_1[0]`: input feature count;
+- `param_1[1]`: output feature count;
+- `param_1[2]`: temporal kernel width;
+- `param_1[3]`: optional-bias enable flag;
+- pointer pair at `param_1 + 4`: row-major output-by-flattened-input weights;
+- pointer pair at `param_1 + 8`: output-feature bias vector.
+
+The routine derives its output position count as
+`floor((N + 2*floor(K/2) - K) / 2) + 1`. For each input feature and
+temporal kernel tap, it materializes a stride-2 window with zero padding at
+the sequence boundaries. The column matrix is laid out as
+`[inputFeature * kernelTap][outputPosition]`, then passed to the existing
+linear operator with GEMM dimensions
+`M=outputFeatures`, `N=outputPositions`, and
+`K=inputFeatures*kernelWidth`. Optional bias is broadcast over all output
+positions. The specialized kernel-width-3 branch and the generic branch build
+the same logical window matrix.
+
+VEA now contains `S5MegpoidTemporalStridedConvolution`, which implements
+that shape/indexing contract and reuses the native row-major GEMM bridge.
+Scalar reference tests cover stride, zero-padding, multi-feature flattening,
+and bias broadcast. See
+`docs/S5API_TEMPORAL_STRIDED_PROJECTION.md` for the detailed callsite and
+tensor-layout evidence.
+
+This is an isolated generic operator port. The actual runtime descriptor's
+weights have not yet been proven to be any specific named layer in
+`VOCALOID7.vtmg`; the new primitive is not yet wired into a full model
+forward pass. It does not produce PCM audio by itself.
