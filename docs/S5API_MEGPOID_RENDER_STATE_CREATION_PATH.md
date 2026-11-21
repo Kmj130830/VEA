@@ -115,3 +115,20 @@ epsilon is float32 \`1.0e-6\`. Android now indexes these exact VTB2 keys and
 can construct the Dense + Global-Normalization stage when supplied with the
 active render-state feature dimensions. Temporal and banked-linear per-index
 property keys remain unresolved.
+
+
+## Sequence-indexed model tensor tables
+
+The six factory initializers provide sixteen keys each. Temporal weights are
+returned by \`FUN_1800e8620\` and temporal optional bias by
+\`FUN_1800e76c0\`. Standard banked-linear weights are returned by
+\`FUN_1801256a0\` and optional bias by \`FUN_180122880\`. The alternate path
+uses \`FUN_180124740\` for weights and \`FUN_1801237e0\` for bias. Android
+indexes these keys recursively in the selected VTB2 render subtree.
+
+The standard banked source tensor is stored as
+\`[inputFeature][outputFeature][bank]\`. The native descriptor constructor
+transposes it into per-bank row-major matrices; Android reproduces that
+permutation before calling the native projection kernel. Active sequence
+count, feature dimensions, kernel/bank counts and bias flags remain
+runtime descriptor metadata and are not inferred from the key tables.

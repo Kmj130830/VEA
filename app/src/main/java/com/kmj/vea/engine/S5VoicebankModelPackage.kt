@@ -68,6 +68,13 @@ data class S5VoicebankModelPackage(
         S5MegpoidPreResidualTensorIndex.build(residualRuntimeConfigTree)
     }
 
+    /** Exact sequence-indexed Temporal/Banked factory tables populated by FUN_1800ced10. */
+    val sequenceOperatorTensorIndex: S5MegpoidSequenceOperatorTensorIndex by lazy(
+        LazyThreadSafetyMode.PUBLICATION
+    ) {
+        S5MegpoidSequenceOperatorTensorIndex.build(residualRuntimeConfigTree)
+    }
+
     /**
      * Lazily indexes the eight FUN_1800ced10 model-property families for
      * the four-by-two block grid, scoped to the exact subtree selected by
@@ -121,6 +128,54 @@ data class S5VoicebankModelPackage(
             blocks = prepareRuntimeBlocks(tensorDecoder),
             firstInputWorkspace = firstInputWorkspace
         )
+
+    fun prepareTemporalProjection(
+        sequenceIndex: Int,
+        inputFeatures: Int,
+        outputFeatures: Int,
+        kernelSize: Int,
+        biasEnabled: Boolean,
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidTemporalStridedConvolution =
+        sequenceOperatorTensorIndex.buildTemporalProjection(
+            sequenceIndex, inputFeatures, outputFeatures, kernelSize, biasEnabled, tensorDecoder
+        )
+
+    fun prepareBankedLinearProjection(
+        sequenceIndex: Int,
+        inputFeatures: Int,
+        outputFeatures: Int,
+        banks: Int,
+        biasEnabled: Boolean,
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidBankedLinearProjection =
+        sequenceOperatorTensorIndex.buildBankedLinearProjection(
+            sequenceIndex, inputFeatures, outputFeatures, banks, biasEnabled, tensorDecoder
+        )
+
+    fun alternateTransitionTensors(
+        sequenceIndex: Int
+    ): S5MegpoidAlternateTransitionTensorPair? =
+        sequenceOperatorTensorIndex.alternateTransitionPairOrNull(sequenceIndex)
+
+    fun prepareSequenceProjectionStage(
+        sequenceIndex: Int,
+        denseInputFeatures: Int,
+        denseOutputFeatures: Int,
+        temporalOutputFeatures: Int,
+        temporalKernelSize: Int,
+        temporalBiasEnabled: Boolean,
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidSequenceProjectionStage {
+        val dense = preparePreResidualDenseNormalizationStage(
+            denseInputFeatures, denseOutputFeatures, tensorDecoder
+        )
+        val temporal = prepareTemporalProjection(
+            sequenceIndex, denseOutputFeatures, temporalOutputFeatures,
+            temporalKernelSize, temporalBiasEnabled, tensorDecoder
+        )
+        return S5MegpoidSequenceProjectionStage(dense, temporal)
+    }
 
     /**
      * Creates the model-backed dense projection + global normalization stage.

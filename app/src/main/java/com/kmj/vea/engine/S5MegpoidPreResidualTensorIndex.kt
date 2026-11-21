@@ -34,8 +34,8 @@ class S5MegpoidPreResidualTensorReference internal constructor(
 
 /**
  * Exact model tensors feeding the dense projection and global normalizer
- * called by FUN_1800c7ad0. Temporal and banked-linear properties are handled
- * separately until their indexed key factories are recovered.
+ * called by FUN_1800c7ad0. Per-sequence Temporal and Banked properties are
+ * indexed separately by S5MegpoidSequenceOperatorTensorIndex.
  */
 class S5MegpoidPreResidualTensorIndex private constructor(
     val denseProjectionWeights: S5MegpoidPreResidualTensorReference,

@@ -150,14 +150,43 @@ complete feature-position tensor. The Android index preserves these exact
 roles and constructs the dense/normalization stage from these three VTB2
 properties when the caller supplies the active descriptor dimensions.
 
-## Still-unresolved per-sequence operator keys
+## Per-sequence Temporal and Banked property provenance
 
-The temporal projection descriptors are populated through the indexed key
-factories \`FUN_1800e76c0(sequenceIndex)\` and
-\`FUN_1800e8620(sequenceIndex)\`. The banked-linear descriptors use
-\`FUN_180122880(sequenceIndex)\` and \`FUN_1801256a0(sequenceIndex)\`;
-the alternate dispatch branch uses \`FUN_1801237e0\` and
-\`FUN_180124740\`. Their generated key tables are not yet mapped to actual
-VTB2 paths. The Android code must not infer those links from element counts
-or substitute the nine named VTMG layer tensors without an explicit data-flow
-match.
+The six key factories each return a 16-entry table indexed by adjacent-sequence
+index. All table values have now been extracted from their static initializers
+and added to \`S5MegpoidSequenceOperatorTensorIndex\`.
+
+| Native factory | Model property role | Consumer / descriptor path |
+|---|---|---|
+| \`FUN_1800e8620(i)\` | Temporal projection weights | \`FUN_1800d44b0\` -> descriptor +0x10 -> \`FUN_1800c5440\` |
+| \`FUN_1800e76c0(i)\` | Temporal optional bias | \`FUN_1800d44b0\` -> descriptor +0x20 when enabled |
+| \`FUN_1801256a0(i)\` | Standard banked-linear weights | \`FUN_1800d47c0\` -> per-bank matrices -> \`FUN_1800c6390\` |
+| \`FUN_180122880(i)\` | Standard banked-linear optional bias | \`FUN_1800d47c0\` -> output-feature bias when enabled |
+| \`FUN_180124740(i)\` | Alternate transition weights | alternate descriptor +0x08 -> \`FUN_1800c72d0\` |
+| \`FUN_1801237e0(i)\` | Alternate transition bias | alternate descriptor +0x18 -> \`FUN_1800c72d0\` |
+
+The temporal constructor call is
+\`FUN_1800d44b0(descriptor, temporalWeights, temporalBias)\`. The operator
+reads weights from descriptor +0x10 and optional bias from +0x20. The native
+initializer uses indices from zero to \`param_1[5] - 2\`; the static factory
+table has sixteen entries. Android requires the exact weight key for the
+requested index and resolves bias only when the render descriptor's
+bias-enable flag is true.
+
+The standard banked-linear constructor call is
+\`FUN_1800d47c0(descriptor, bankedWeights, bankedBias)\`. Its source tensor is
+\`[inputFeature][outputFeature][bank]\`; the native initializer transposes it
+to \`[bank][outputFeature][inputFeature]\`. Android performs the same
+permutation before calling the existing native banked-linear operator, which
+returns \`[outputFeature][position][bank]\`. Bias has one value per output
+feature and is broadcast across positions and banks when enabled.
+
+The alternate branch stores its weight and bias references at different
+offsets and uses \`FUN_1800c72d0\`. Android indexes those two tensor families,
+but does not conflate their interpolation/operator layout with standard
+banked-linear execution.
+
+All key constants are extracted from native factory initializers, not
+inferred from tensor sizes. Active sequence count, feature dimensions,
+kernel size, bank count and optional-bias flags still come from render
+descriptor metadata and are not guessed by this index.
