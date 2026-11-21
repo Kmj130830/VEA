@@ -27,7 +27,8 @@ class S5MegpoidResidualTransitionRowTest {
         val input = FloatArray(7) { 10f }
         val output = executor.runTransitionRow(2, input)
         assertEquals(listOf(2 to 0, 2 to 1), calls)
-        assertEquals(List(7) { 15f }, output.toList())
+        // Row 2 column 0 adds 5; column 1 adds 6.
+        assertEquals(List(7) { 21f }, output.toList())
         assertEquals(List(7) { 10f }, input.toList())
     }
 }
