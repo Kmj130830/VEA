@@ -21,4 +21,11 @@ object S5ApiPhoneCategorySpecialCases {
         "Sil", "Br", "BR" -> 1
         else -> null
     }
+
+    /**
+     * Resolves only the fixed exception after applying the recovered
+     * alias-to-canonical string mapping. Ordinary phones remain unresolved.
+     */
+    fun fixedIndexOrNull(event: VsmPhoneEvent): Int? =
+        fixedIndexOrNull(event.canonicalPhoneLabel)
 }
