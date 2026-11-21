@@ -100,6 +100,20 @@ data class S5VoicebankModelPackage(
     }
 
     /**
+     * Creates a stateful executor from the eight compiled AI_Megpoid.vtb2
+     * residual blocks. Keep the returned instance across sequential chunks;
+     * call resetHistory() when starting a new utterance.
+     */
+    fun createResidualBlockExecutor(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder,
+        firstInputWorkspace: S5MegpoidWorkspaceSlot = S5MegpoidWorkspaceSlot.FIRST
+    ): S5MegpoidResidualBlockExecutor =
+        S5MegpoidResidualBlockExecutor.fromCompiledBlocks(
+            blocks = prepareRuntimeBlocks(tensorDecoder),
+            firstInputWorkspace = firstInputWorkspace
+        )
+
+    /**
      * Builds the sequence-major residual-block invocation plan recovered
      * from FUN_1800c7ad0. sequenceCount includes the terminal sequence slot;
      * the native loop executes sequenceCount - 1 positions.
