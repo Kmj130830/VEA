@@ -29,8 +29,8 @@ The excitation-state layout observed from native loads/stores is:
 | Byte offset | Type/use |
 |---:|---|
 | +0x00 | frame sample count N |
-| +0x04 | phase sample rate (integer) |
-| +0x08 | period/sample-rate scale (float) |
+| +0x04 | phase increment denominator/scale (integer; physical unit unconfirmed) |
+| +0x08 | period scale (float; physical unit unconfirmed) |
 | +0x0C | harmonic denominator threshold (float) |
 | +0x10 | phase-wrap flag |
 | +0x14 | previous F0 |
@@ -42,14 +42,14 @@ The excitation-state layout observed from native loads/stores is:
 
 The per-frame call inputs are:
 
-- `param_3`: target F0 in Hz
+- `param_3`: target F0/frequency control (unit and normalization unconfirmed)
 - `param_4`: target noise/aperiodic gain
 - `param_5`: target periodic/harmonic gain
 
-For each sample, the native routine linearly interpolates F0 and both gains from their previous-frame values to the current targets. It accumulates phase using `2π * F0 / phaseSampleRate`, optionally wraps phase, and computes a periodic pulse term:
+For each sample, the native routine linearly interpolates F0 and both gains from their previous-frame values to the current targets. It accumulates phase using `2π * F0 / phaseScale`, optionally wraps phase, and computes a periodic pulse term:
 
 ```text
-period = max(1, floor(periodSampleRate / max(F0, 1e-5)))
+period = max(1, floor(periodScale / max(F0, 1e-5)))
 shape = (cos(phase/2) - cos((period + 0.5) * phase)) / (2 * sin(phase/2))
 periodic = sqrt(2 / period) * harmonicGain * shape * (F0 > 0)
 noise = gaussianSample * noiseGain
