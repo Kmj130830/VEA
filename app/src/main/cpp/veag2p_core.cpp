@@ -139,6 +139,19 @@ void NormalizeKoreanCodepoints(std::vector<char32_t>* codepoints) {
     ApplyKoreanReplacementRules(codepoints);
 }
 
+// The Korean DLL's 11,172-entry Hangul table is a packed composition
+// table. Its fields are determined by the modern Hangul L/V/T indices:
+// onset = L + 2; vowel and coda use the DLL's sparse index spaces.
+constexpr uint8_t kKoreanVowelIndices[21] = {
+    3, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15,
+    18, 19, 20, 21, 22, 23, 26, 27, 28, 29,
+};
+
+constexpr uint8_t kKoreanCodaIndices[28] = {
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
+    15, 16, 17, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+};
+
 size_t EncodedSize(char32_t value) {
     if (value <= 0x7F) return 1;
     if (value <= 0x7FF) return 2;
@@ -173,6 +186,27 @@ extern "C" uint32_t vea_g2p_bridge_abi_version(void) {
 extern "C" uint32_t vea_g2p_supported_language_mask(void) {
     // No Yamaha-compatible language phonemizer is implemented yet.
     return 0;
+}
+
+extern "C" VeaG2pStatus vea_g2p_korean_hangul_packed_indices(
+    uint32_t codepoint,
+    uint16_t* packed_indices) {
+    if (packed_indices == nullptr || codepoint < 0xAC00U || codepoint > 0xD7A3U) {
+        return VEA_G2P_STATUS_INVALID_ARGUMENT;
+    }
+
+    const uint32_t syllable_index = codepoint - 0xAC00U;
+    const uint32_t initial_index = syllable_index / 588U;
+    const uint32_t medial_index = (syllable_index % 588U) / 28U;
+    const uint32_t final_index = syllable_index % 28U;
+
+    const uint32_t onset = initial_index + 2U;
+    const uint32_t vowel = kKoreanVowelIndices[medial_index];
+    const uint32_t coda = kKoreanCodaIndices[final_index];
+
+    *packed_indices = static_cast<uint16_t>(
+        0x8000U | (onset << 10U) | (vowel << 5U) | coda);
+    return VEA_G2P_STATUS_OK;
 }
 
 extern "C" VeaG2pStatus vea_g2p_normalize_korean_input_utf8(
