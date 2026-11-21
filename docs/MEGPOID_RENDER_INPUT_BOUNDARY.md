@@ -391,3 +391,17 @@ These mappings allow the default feature layout to be described exactly,
 but do not make it model-ready: `categoryWidth`, context counts and mode
 must still come from a correctly initialized render context, and each
 event's numeric category must be resolved through that same context.
+
+## Android implementation: isolated duration feature
+
+`S5ApiPhoneDurationFeature.encode()` now ports the `param_12 == 0`
+duration scalar from `FUN_18006c720`. It preserves the native float32
+narrowing after the double endpoint subtraction, `logf`-style arithmetic
+order, lower-bound floor and final [-1,+1] clamp. The encoder is
+independent of the per-context phone category map and can be tested
+without a voicebank render context.
+
+Unit tests cover the minimum, geometric-mean midpoint, maximum, below-minimum
+and above-maximum durations, plus invalid intervals and log ranges.
+This is one scalar of the feature row only; no phone category or neighbor
+one-hot slots are fabricated by this class.
