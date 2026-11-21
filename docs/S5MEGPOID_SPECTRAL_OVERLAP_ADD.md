@@ -219,3 +219,31 @@ render-state scalar inputs
 
 The float input from root +0x10 is retained without assigning an unsupported
 semantic name. Its downstream transform-state consumer remains to be traced.
+
+## FFT execution-plan factory boundary
+
+The completed static decompilation of FUN_18004e580 establishes the factory
+contract used by the output descriptor at descriptor +0x28:
+
+1. Both requested transform lengths must independently be powers of two;
+   otherwise the factory throws the message `DFT length must be power of two.`
+2. FUN_18004e620 initializes the stage-table member at plan-wrapper +0x08
+   using the third length argument.
+3. FUN_18002ace0 initializes the remaining wrapper state.
+4. The factory allocates a 0x20-byte execution-plan object and calls
+   FUN_180010110 with the two lengths plus wrapper state at +0x10.
+5. It stores the returned execution-plan pointer in wrapper +0x00 and marks
+   the wrapper initialized with the byte at +0x18.
+
+The output descriptor invokes this factory with `fftSize` for both length
+arguments. FUN_180040630 later selects a stage-table record using the result
+of FUN_18007a000(fftSize), then passes the record's two pointer fields, the
+plan object, the transform direction and the packed float workspace into
+FUN_180082a30. The decompiled output path selects direction -1 for inverse
+and +1 for forward transforms.
+
+This is sufficient to identify the plan object's role and required
+subroutines, but not yet to reproduce the internal stage-table layout or
+the 0x20-byte plan's twiddle/bit-reversal data. The Android
+S5MegpoidInverseRealFft remains an independent mathematical reference and
+must not be described as a bit-exact implementation of this native plan.
