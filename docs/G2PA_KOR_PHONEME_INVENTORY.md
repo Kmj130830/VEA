@@ -81,6 +81,25 @@ The packed 16-bit field is decoded as:
 
 The three indices select the onset, vowel and coda tables. The G2P code linearly searches this 11,172-entry table by Hangul code unit; a future Android implementation should use a generated direct-index table rather than reproduce the linear scan.
 
+## Android decomposition implementation
+
+VEA now implements the equivalent arithmetic decomposition for modern precomposed Hangul syllables:
+
+```text
+offset = codePoint - 0xAC00
+initial = offset / (21 * 28)
+medial = (offset % (21 * 28)) / 28
+final = offset % 28
+
+nativeOnsetIndex = initial + 2
+nativeVowelIndex = [3,4,5,6,7,10,11,12,13,14,15,18,19,20,21,22,23,26,27,28,29][medial]
+nativeCodaIndex = final + 1
+```
+
+The reverse lookup uses the same 19×21×28 Hangul composition grid. Native intermediate coda indices 0, 30 and 31 are normalized to the no-coda form, matching the mask behavior in `FUN_180008660`.
+
+The Kotlin tests round-trip all 11,172 modern Hangul syllables through the recovered native indices. This verifies the decomposition table independently of the still-unported contextual sound-change passes.
+
 ## Exact raw phoneme aliases
 
 The three UTF-16 pointer tables used by `FUN_180007f80` are:
