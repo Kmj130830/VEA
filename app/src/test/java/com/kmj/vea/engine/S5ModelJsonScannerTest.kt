@@ -17,9 +17,9 @@ class S5ModelJsonScannerTest {
                 "$tensorKey": "*F32AQID",
                 "meta": {
                   "tag": "*F16AA==",
-                  "description": "line\\nfeed"
+                  "description": "line\nfeed"
                 },
-                "values": [1, -2.5e+2, true, false, null, {"escape": "quote: \\"A\\""}]
+                "values": [1, -2.5e+2, true, false, null, {"escape": "quote: \"A\""}]
               }
             }
         """.trimIndent()
@@ -76,7 +76,7 @@ class S5ModelJsonScannerTest {
     @Test
     fun acceptsUtf8BomAndUnicodeEscapes() {
         val result = S5ModelJsonScanner.scan(
-            StringReader("\uFEFF{\\"name\\":\\"\\uAC00\\uB098\\"}")
+            StringReader("\uFEFF{\"name\":\"\\uAC00\\uB098\"}")
         )
         assertEquals(1L, result.objectCount)
         assertEquals(1L, result.stringValueCount)
@@ -102,7 +102,7 @@ class S5ModelJsonScannerTest {
 
     @Test(expected = IllegalArgumentException::class)
     fun rejectsInvalidEscape() {
-        S5ModelJsonScanner.scan(StringReader("""{"a":"\\q"}"""))
+        S5ModelJsonScanner.scan(StringReader("""{"a":"\q"}"""))
     }
 
     @Test(expected = IllegalArgumentException::class)
