@@ -110,7 +110,7 @@ class S5MegpoidSpectralOverlapAddTest {
     @Test
     fun rejectsFrameAndGeometryBoundsViolations() {
         val overlap = S5MegpoidSpectralOverlapAdd(
-            parameters(outputSamples = 2, geometry = 16, windowOffset = 1, overlapCount = 1)
+            parameters(outputSamples = 8, geometry = 16, windowOffset = 0, overlapCount = 1, ringMask = 0)
         )
         assertThrows(IllegalArgumentException::class.java) {
             overlap.processFrame(FloatArray(8))
