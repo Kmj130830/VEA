@@ -1,7 +1,5 @@
 package com.kmj.vea.engine
 
-import com.kmj.vea.data.VeaClip
-import com.kmj.vea.data.VeaNote
 import com.kmj.vea.data.VeaProject
 import com.kmj.vea.data.VeaTrack
 import kotlin.math.floor
@@ -185,8 +183,7 @@ object VsmMidiInputScheduler {
             )
         }
 
-        val chunkCountLong = (totalSampleCount + format.chunkSamples - 1L) /
-            format.chunkSamples.toLong()
+        val chunkCountLong = (totalSampleCount - 1L) / format.chunkSamples.toLong() + 1L
         require(chunkCountLong <= MAX_CHUNKS.toLong()) {
             "Render schedule exceeds the $MAX_CHUNKS-chunk safety limit."
         }
