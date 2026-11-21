@@ -80,3 +80,27 @@ This is only a verified text-preparation primitive. It does not assign
 phonemes, syllable boundaries, phone durations or model category IDs. The
 vendor's subsequent token-to-internal-module conversion and note-container
 update path remain to be ported and differentially tested.
+
+## Table-driven Hangul syllable phone mapping
+
+Static analysis of G2PAManager_KOR.dll FUN_180007f80 and its read-only data
+recovers six 32-entry UTF-16 lookup tables: initial consonant validity and
+phone labels, vowel validity and phone labels, and final consonant validity
+and phone labels. The 11,172-entry syllable map at RVA 0xF1E2 was checked
+against every precomposed Hangul code point U+AC00..U+D7A3. Every record
+matches the arithmetic decomposition into 19 initial, 21 medial and 28
+final positions, with the DLL's exact internal table-index mappings.
+
+`KoreanHangulPhoneMapper` now ports these static lookup tables and the
+recoverable contextual rules in FUN_180007f80, including sibilant-vowel
+substitution, the open-syllable liquid rule, the U+0020 boundary rule, and
+the two explicitly consumed per-code-unit flags for hyphen / null-onset
+cases. Tests include all 11,172 Hangul syllables and focused context cases.
+
+This is an isolated syllable-to-phone component, not a complete Korean G2P
+manager port. The actual manager calls it after `FUN_180007390` and
+`FUN_180008730`, which prepare a transformed lyric and two per-code-unit
+flag arrays. Those upstream functions and their lexical rewrite tables are
+not yet fully ported. The production bridge still reports Korean G2P as
+not ready until that pipeline, syllable/note association and reference
+outputs are verified.
