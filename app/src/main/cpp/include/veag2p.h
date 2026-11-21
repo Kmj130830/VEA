@@ -62,6 +62,19 @@ VeaG2pStatus vea_g2p_korean_hangul_from_packed_indices(
 );
 
 /*
+ * Applies only the first recovered single-syllable rewrite from
+ * FUN_180008730: packed vowel index 12 is rewritten to 10 unless the onset
+ * index is 7 or 13. Other syllables are returned unchanged.
+ *
+ * This is one verified sub-rule, not the complete context-sensitive Korean
+ * G2P transformation.
+ */
+VeaG2pStatus vea_g2p_korean_apply_single_syllable_rules(
+    uint32_t codepoint,
+    uint32_t* transformed_codepoint
+);
+
+/*
  * Base phoneme labels looked up by the Korean manager for a modern Hangul
  * syllable. These are table components before adjacent-syllable rules,
  * marker processing, and syllable-level output assembly.
