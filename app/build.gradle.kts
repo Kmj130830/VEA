@@ -4,6 +4,51 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+
+val generatedMegpoidAssets = layout.buildDirectory.dir("generated/megpoidAssets")
+val prepareMegpoidModelAssets by tasks.registering {
+    val bankArchive = rootProject.file("megpoidV7.zip")
+    val sharedArchive = rootProject.file("AI Model.zip")
+    inputs.files(bankArchive, sharedArchive)
+    outputs.dir(generatedMegpoidAssets)
+
+    doLast {
+        check(bankArchive.isFile) { "Required bundled archive is missing: ${bankArchive.absolutePath}" }
+        check(sharedArchive.isFile) { "Required bundled archive is missing: ${sharedArchive.absolutePath}" }
+
+        val outputDir = generatedMegpoidAssets.get().dir("megpoid-models").asFile
+        outputDir.deleteRecursively()
+        check(outputDir.mkdirs()) { "Could not create generated Megpoid model asset directory." }
+
+        copy {
+            from(zipTree(bankArchive))
+            include("**/AI_Megpoid.vtb2", "**/AI_Megpoid.vpit")
+            eachFile { path = name }
+            includeEmptyDirs = false
+            into(outputDir)
+        }
+        copy {
+            from(zipTree(sharedArchive))
+            include("**/COMMON7.vpit", "**/VOCALOID7.vhnv", "**/VOCALOID7.vtmg")
+            eachFile { path = name }
+            includeEmptyDirs = false
+            into(outputDir)
+        }
+
+        val required = listOf(
+            "AI_Megpoid.vtb2", "AI_Megpoid.vpit", "COMMON7.vpit",
+            "VOCALOID7.vhnv", "VOCALOID7.vtmg"
+        )
+        val missing = required.filterNot { File(outputDir, it).isFile }
+        check(missing.isEmpty()) { "Megpoid model archives are missing required members: ${missing.joinToString()}" }
+    }
+}
+
+android.sourceSets.getByName("main").assets.srcDir(generatedMegpoidAssets)
+tasks.named("preBuild").configure {
+    dependsOn(prepareMegpoidModelAssets)
+}
+
 android {
     namespace = "com.kmj.vea"
     compileSdk = 36
