@@ -190,3 +190,69 @@ and separators are preserved exactly; they are not stripped by this alias
 scan. The arrays establish special lexical aliases but do not establish a
 numeric phoneme-ID sequence. Runtime ID assignment remains a separate
 global-tree initialization question.
+
+### Exact alias-to-canonical phone map created by `FUN_180001010`
+
+Direct disassembly of `FUN_180001010` shows 43 calls to
+`FUN_1800066f0(destination, keyString, canonicalString)`, followed by
+`FUN_180010990(&DAT_1801c4140, records)`. `FUN_1800066f0` constructs the
+two owned string fields of each 0x40-byte pair record; `FUN_180010990`
+inserts those key/value pairs into the global ordered tree at
+`DAT_1801c4140`. `FUN_180074a50` consults that tree only to canonicalize
+the special alias forms listed above. The exact mappings recovered from
+the call-site pointers are:
+
+| Alias key | Canonical phone label |
+|---|---|
+| `ts`_h` | `ts` |
+| `ts\\_h` | `ts` |
+| `x` | `h` |
+| `s`` | `sh` |
+| `ia+0` | `y` |
+| `iE_r+0` | `y` |
+| `yE_r+0` | `y` |
+| `ua+0` | `w` |
+| `uo+0` | `w` |
+| `iAU+0` | `y` |
+| `i@U+0` | `y` |
+| `uaI+0` | `w` |
+| `uei+0` | `w` |
+| `iAN+0` | `y` |
+| `iUN+0` | `y` |
+| `iE_n+0` | `y` |
+| `y{_n+0` | `y` |
+| `u@N+0` | `w` |
+| `u@_n+0` | `w` |
+| `ua_n+0` | `w` |
+| `uAN+0` | `w` |
+| `ia+1` | `ah` |
+| `iE_r+1` | `eh` |
+| `yE_r+1` | `y` |
+| `ua+1` | `ah` |
+| `uo+1` | `aa` |
+| `iAU+1` | `aw` |
+| `i@U+1` | `ow` |
+| `uaI+1` | `ay` |
+| `uei+1` | `ay` |
+| `iAN+1` | `aw` |
+| `iUN+1` | `uw` |
+| `iE_n+1` | `aw` |
+| `y{_n+1` | `aw` |
+| `u@N+1` | `ow` |
+| `u@_n+1` | `w` |
+| `ua_n+1` | `aw` |
+| `uAN+1` | `aw` |
+| `y|CH` | `i` |
+| `a|CH` | `a` |
+| `i|CH` | `i` |
+| `u|CH` | `u` |
+| `o|CH` | `o` |
+
+**Important separation:** `DAT_1801c4140` is the global alias-to-canonical
+string tree. It is not, by itself, the render-context phone-code table.
+After an alias is rewritten, `FUN_180074a50` performs a second lookup
+against the context map passed in its `param_2` argument. The returned
+32-bit one-hot slot is read from the first four bytes of that context
+map's value string. Thus neither the 43-row alias list nor its string
+order supplies numeric category IDs. The context map's construction and
+its encoded value strings remain the next reverse-engineering target.
