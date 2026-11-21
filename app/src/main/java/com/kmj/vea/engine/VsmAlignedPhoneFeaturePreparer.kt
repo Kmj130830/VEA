@@ -1,25 +1,16 @@
 package com.kmj.vea.engine
 
-/**
- * Phone-event features that are independently supported by the recovered
- * S5API preprocessing path. A null fixedCategoryIndex means the active
- * render-context phone-category table is still required.
- */
 data class VsmAlignedPhoneFeature(
     val event: VsmPhoneEvent,
     val normalizedDuration: Float,
+    val categoryIndex: Int
+) {
+    /** Compatibility view for code displaying only the four explicit overrides. */
     val fixedCategoryIndex: Int?
-)
+        get() = S5ApiPhoneCategorySpecialCases.fixedIndexOrNull(event)
+}
 
-/**
- * Prepares already aligned phone events for the known portion of the S5API
- * default feature row.
- *
- * Input must already be per-phone and time-aligned. This class deliberately
- * does not split VeaNote.phoneme strings, invoke G2P, or guess per-phone
- * boundaries. It returns the duration scalar and only the fixed category
- * exceptions whose numeric IDs were recovered exactly.
- */
+/** Prepares already aligned phones; it never invents per-phone timing. */
 object VsmAlignedPhoneFeaturePreparer {
     fun prepare(
         source: List<VsmPhoneEvent>,
@@ -28,7 +19,6 @@ object VsmAlignedPhoneFeaturePreparer {
     ): List<VsmAlignedPhoneFeature> {
         val preprocessed = VsmPhoneEventPreprocessor.preprocess(source)
         val canonical = VsmPhoneLabelCanonicalizer.canonicalize(preprocessed)
-
         return canonical.map { event ->
             VsmAlignedPhoneFeature(
                 event = event,
@@ -37,7 +27,7 @@ object VsmAlignedPhoneFeaturePreparer {
                     minimumSeconds = minimumPhoneSeconds,
                     maximumSeconds = maximumPhoneSeconds
                 ),
-                fixedCategoryIndex = S5ApiPhoneCategorySpecialCases.fixedIndexOrNull(event)
+                categoryIndex = S5ApiPhoneCategoryMap.resolve(event.phoneLabel)
             )
         }
     }

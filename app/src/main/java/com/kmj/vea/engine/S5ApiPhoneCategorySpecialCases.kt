@@ -1,31 +1,13 @@
 package com.kmj.vea.engine
 
-/**
- * Context-independent phone-category cases recovered from S5API
- * FUN_180074a50 after its alias/fallback-string preparation.
- *
- * This deliberately handles only the four exact spellings present in the
- * native comparisons. Every other label needs the active render-context
- * label-to-category map and must not be assigned a guessed numeric ID.
- */
+/** Exact category overrides recovered from FUN_180074a50. */
 object S5ApiPhoneCategorySpecialCases {
-    /**
-     * Returns a recovered fixed category index, or null when the label must
-     * be resolved through the active S5API render-context map.
-     *
-     * Matching is exact and case-sensitive. In particular, lowercase "sil"
-     * and "br" are not folded here.
-     */
+    // SIL and Sil are also stored in group 0; these four native comparisons override to 1.
     fun fixedIndexOrNull(phoneLabel: String): Int? = when (phoneLabel) {
-        "SIL" -> 0
-        "Sil", "Br", "BR" -> 1
+        "SIL", "Sil", "Br", "BR" -> 1
         else -> null
     }
 
-    /**
-     * Resolves only the fixed exception after applying the recovered
-     * alias-to-canonical string mapping. Ordinary phones remain unresolved.
-     */
     fun fixedIndexOrNull(event: VsmPhoneEvent): Int? =
         fixedIndexOrNull(event.canonicalPhoneLabel)
 }
