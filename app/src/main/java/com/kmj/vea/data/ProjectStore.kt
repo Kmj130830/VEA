@@ -27,6 +27,7 @@ object ProjectStore {
                     .put("singerId", track.singerId)
                     .put("singerName", track.singerName)
                     .put("singerStyleId", track.singerStyleId)
+                    .put("singerSourceUri", track.singerSourceUri)
                     .put("color", track.color)
 
                 val clips = JSONArray()
@@ -121,6 +122,7 @@ object ProjectStore {
                         singerId = trackJson.optString("singerId", ""),
                         singerName = trackJson.optString("singerName", ""),
                         singerStyleId = trackJson.optString("singerStyleId", ""),
+                        singerSourceUri = trackJson.optString("singerSourceUri", ""),
                         color = trackJson.optLong("color", 0xFF8DBF4A),
                         clips = clips
                     ))
