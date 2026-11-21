@@ -19,8 +19,9 @@ interface S5MegpoidResidualBlockNode {
 /**
  * Executes the residual section of FUN_1800c7ad0.
  *
- * Input is a list of four already-prepared sequence feature tensors, indexed
- * by model row. The native dispatcher processes row 3, 2, 1, then 0. Within
+ * Input is a list of four already-prepared residual-transition tensors
+ * (outputs of banked projections), indexed by model row. Use runTransitionRow()
+ * for the feedback-linked native loop; this batch helper treats rows independently. Within
  * each row it calls only columns 0 and 1, swapping that row's private pair of
  * workspace descriptors after each block. The two workspace pairs belonging
  * to different sequence rows are independent.
@@ -68,7 +69,7 @@ class S5MegpoidResidualBlockExecutor(
     }
 
     /**
-     * Run four sequence rows in native reverse-row order.
+     * Run four independent residual-transition rows in native row order.
      *
      * Each input is copied once into that row's initial workspace. Subsequent
      * block outputs are passed by reference to the other workspace; this
@@ -86,7 +87,7 @@ class S5MegpoidResidualBlockExecutor(
         epsilon: Float = S5MegpoidResidualBlockShape.DEFAULT_EPSILON
     ): List<FloatArray> {
         require(sequenceFeatures.size == S5MegpoidRuntimeBlockFactoryKeys.BLOCK_ROWS) {
-            "Exactly four sequence feature tensors are required for AI Megpoid V7."
+            "Exactly four independent residual-transition tensors are required for AI Megpoid V7."
         }
         require(epsilon.isFinite() && epsilon >= 0.0f) {
             "Epsilon must be finite and non-negative."
@@ -151,6 +152,58 @@ class S5MegpoidResidualBlockExecutor(
         }
 
         return sequenceFeatures.indices.map { row -> workspace(row, finalSlots[row]) }
+    }
+
+    /**
+     * Execute the two columns belonging to one native transition row.
+     * The caller feeds this row's result to the next banked projection.
+     */
+    @Synchronized
+    fun runTransitionRow(
+        transitionRow: Int,
+        residualInput: FloatArray,
+        epsilon: Float = S5MegpoidResidualBlockShape.DEFAULT_EPSILON
+    ): FloatArray {
+        require(transitionRow in 0 until S5MegpoidRuntimeBlockFactoryKeys.BLOCK_ROWS)
+        require(residualInput.isNotEmpty() && residualInput.size % channels == 0)
+        require(residualInput.size / channels >= S5MegpoidResidualBlockShape.KERNEL_WIDTH)
+        require(epsilon.isFinite() && epsilon >= 0.0f)
+
+        var firstWorkspace: FloatArray? = null
+        var secondWorkspace: FloatArray? = null
+        var activeSlot = firstInputWorkspace
+        when (firstInputWorkspace) {
+            S5MegpoidWorkspaceSlot.FIRST -> firstWorkspace = residualInput.copyOf()
+            S5MegpoidWorkspaceSlot.SECOND -> secondWorkspace = residualInput.copyOf()
+        }
+        fun read(slot: S5MegpoidWorkspaceSlot): FloatArray =
+            when (slot) {
+                S5MegpoidWorkspaceSlot.FIRST -> firstWorkspace
+                S5MegpoidWorkspaceSlot.SECOND -> secondWorkspace
+            } ?: error("Residual row " + transitionRow + " read uninitialized workspace " + slot + ".")
+        fun write(slot: S5MegpoidWorkspaceSlot, values: FloatArray) {
+            when (slot) {
+                S5MegpoidWorkspaceSlot.FIRST -> firstWorkspace = values
+                S5MegpoidWorkspaceSlot.SECOND -> secondWorkspace = values
+            }
+        }
+
+        for (column in 0 until S5MegpoidRuntimeBlockFactoryKeys.BLOCK_COLUMNS) {
+            val input = read(activeSlot)
+            val output = nodesByPosition.getValue(S5MegpoidBlockPosition(transitionRow, column))
+                .runChunk(input, epsilon)
+            require(output.size == input.size) {
+                "Residual block [" + transitionRow + "," + column + "] returned " +
+                    output.size + "; expected " + input.size + "."
+            }
+            require(output !== input) {
+                "Residual block [" + transitionRow + "," + column + "] must return a distinct output buffer."
+            }
+            val outputSlot = activeSlot.other()
+            write(outputSlot, output)
+            activeSlot = outputSlot
+        }
+        return read(activeSlot)
     }
 
     /** Reset all eight block histories at the beginning of a new utterance. */

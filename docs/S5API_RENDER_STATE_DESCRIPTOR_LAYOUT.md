@@ -190,3 +190,33 @@ All key constants are extracted from native factory initializers, not
 inferred from tensor sizes. Active sequence count, feature dimensions,
 kernel size, bank count and optional-bias flags still come from render
 descriptor metadata and are not guessed by this index.
+
+
+## Full sequence transition ordering
+
+The dispatcher has five sequence-feature slots but only four adjacent
+transitions. Temporal factory indices 0, 1, 2, 3 materialize slots 1 through
+4 from the preceding slot. The reverse loop then uses banked factory indices
+0 through 3:
+
+| Banked factory index | Source slot | Target slot | Residual row |
+|---:|---:|---:|---:|
+| 0 | 4 | 3 | 3 |
+| 1 | 3 | 2 | 2 |
+| 2 | 2 | 1 | 1 |
+| 3 | 1 | 0 | 0 |
+
+Banked projection and residual execution are interleaved. The residual result
+written to a target slot is the input to the next banked projection. This is
+a feedback chain, not four independent banked outputs followed by a batch
+residual pass.
+
+Android represents this path with \`S5MegpoidSequenceTransitionPipeline\`.
+It applies Dense + Global Normalization once, runs Temporal projections in
+ascending factory order, then interleaves Banked projection \`i\` with
+residual row \`3-i\`. Each banked output is \`[feature][position][bank]\`;
+because bank is the innermost axis, it is passed as contiguous extended
+positions \`position * bankCount\` to the residual row.
+
+The pipeline starts at an already prepared feature tensor. Note/phoneme
+feature generation and final post-residual decoding remain outside this code.

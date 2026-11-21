@@ -158,6 +158,85 @@ data class S5VoicebankModelPackage(
     ): S5MegpoidAlternateTransitionTensorPair? =
         sequenceOperatorTensorIndex.alternateTransitionPairOrNull(sequenceIndex)
 
+    /**
+     * Builds Dense -> four forward Temporal stages -> reverse
+     * Banked[0..3]/Residual[row 3..0] feedback execution.
+     * Feature dimensions, kernel sizes, bank counts and bias flags come from
+     * the active render descriptor.
+     */
+    fun createSequenceTransitionPipeline(
+        denseInputFeatures: Int,
+        denseOutputFeatures: Int,
+        temporalOutputFeatures: IntArray,
+        temporalKernelSizes: IntArray,
+        temporalBiasEnabled: BooleanArray,
+        bankCounts: IntArray,
+        bankedBiasEnabled: BooleanArray,
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder,
+        firstInputWorkspace: S5MegpoidWorkspaceSlot = S5MegpoidWorkspaceSlot.FIRST
+    ): S5MegpoidSequenceTransitionPipeline {
+        val transitionCount = S5MegpoidRuntimeBlockFactoryKeys.BLOCK_ROWS
+        require(
+            temporalOutputFeatures.size == transitionCount &&
+                temporalKernelSizes.size == transitionCount &&
+                temporalBiasEnabled.size == transitionCount &&
+                bankCounts.size == transitionCount &&
+                bankedBiasEnabled.size == transitionCount
+        ) {
+            "Four temporal and four banked descriptor entries are required."
+        }
+
+        val dense = preparePreResidualDenseNormalizationStage(
+            denseInputFeatures, denseOutputFeatures, tensorDecoder
+        )
+        var temporalInputFeatures = denseOutputFeatures
+        val temporalStages = buildList {
+            for (index in 0 until transitionCount) {
+                val outputFeatures = temporalOutputFeatures[index]
+                add(
+                    prepareTemporalProjection(
+                        sequenceIndex = index,
+                        inputFeatures = temporalInputFeatures,
+                        outputFeatures = outputFeatures,
+                        kernelSize = temporalKernelSizes[index],
+                        biasEnabled = temporalBiasEnabled[index],
+                        tensorDecoder = tensorDecoder
+                    )
+                )
+                temporalInputFeatures = outputFeatures
+            }
+        }
+
+        val residualExecutor = createResidualBlockExecutor(
+            tensorDecoder = tensorDecoder,
+            firstInputWorkspace = firstInputWorkspace
+        )
+        val residualChannels = residualExecutor.channels
+        val bankedStages = buildList {
+            for (index in 0 until transitionCount) {
+                val inputFeatures = if (index == 0) temporalOutputFeatures.last()
+                    else residualChannels
+                add(
+                    prepareBankedLinearProjection(
+                        sequenceIndex = index,
+                        inputFeatures = inputFeatures,
+                        outputFeatures = residualChannels,
+                        banks = bankCounts[index],
+                        biasEnabled = bankedBiasEnabled[index],
+                        tensorDecoder = tensorDecoder
+                    )
+                )
+            }
+        }
+
+        return S5MegpoidSequenceTransitionPipeline.fromModelStages(
+            denseStage = dense,
+            temporalStages = temporalStages,
+            bankedStages = bankedStages,
+            residualExecutor = residualExecutor
+        )
+    }
+
     fun prepareSequenceProjectionStage(
         sequenceIndex: Int,
         denseInputFeatures: Int,
@@ -194,11 +273,12 @@ data class S5VoicebankModelPackage(
 
     /**
      * Builds the sequence-major residual-block invocation plan recovered
-     * from FUN_1800c7ad0. AI Megpoid V7 has four sequence rows, visited in
-     * reverse row order; each row invokes its two block columns once.
+     * from FUN_1800c7ad0. AI Megpoid V7 has five feature slots and four
+     * transitions; residual rows are visited 3, 2, 1, 0, with two columns each.
      *
-     * This produces call ordering and workspace ownership only. The
-     * neighboring temporal and banked-linear stages remain separate.
+     * This produces residual call ordering and workspace ownership only.
+     * createSequenceTransitionPipeline() connects Temporal, Banked and
+     * Residual stages in native feedback order.
      */
     fun buildResidualBlockSchedule(sequenceCount: Int): S5MegpoidResidualBlockSchedule =
         S5MegpoidResidualBlockSchedule.megpoidV7(sequenceCount)

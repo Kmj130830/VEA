@@ -132,3 +132,20 @@ transposes it into per-bank row-major matrices; Android reproduces that
 permutation before calling the native projection kernel. Active sequence
 count, feature dimensions, kernel/bank counts and bias flags remain
 runtime descriptor metadata and are not inferred from the key tables.
+
+
+## Five sequence slots and reverse feedback sweep
+
+The dispatcher uses five sequence-feature slots and four transitions.
+Temporal factories 0..3 run in ascending order to produce the four following
+slots. The reverse pass uses banked factory 0 on slot 4 and writes slot 3;
+its residual row 3 output becomes the input to banked factory 1, which writes
+slot 2. The same pattern continues through rows 2, 1, and 0.
+
+The Android \`S5MegpoidSequenceTransitionPipeline\` mirrors this feedback
+order: Dense + normalization runs once, Temporal runs forward, and each
+Banked projection is immediately followed by its matching residual row.
+Bank count is folded into the contiguous position axis because the native
+banked result is \`[feature][position][bank]\`. This pipeline still starts
+from prepared features; it does not synthesize features from note/phoneme
+input.
