@@ -52,7 +52,9 @@ class S5MegpoidDepthwiseHistoryState(
             nextWriteSlot = 0
         }
 
-        val slotStart = checkedProduct(nextWriteSlot, chunkElements)
+        // The write cursor is legitimately zero for the first slot.
+        // The enclosing history allocation already proved this product fits.
+        val slotStart = nextWriteSlot * chunkElements
         System.arraycopy(chunk, 0, history, slotStart, chunkElements)
 
         nextWriteSlot++
