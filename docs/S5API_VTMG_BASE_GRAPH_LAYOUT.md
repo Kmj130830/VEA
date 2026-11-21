@@ -72,7 +72,7 @@ destination[(matrix * axis1Count + axis1) * paddedAxis0Count + axis0]
 
 The destination allocation is 32-byte aligned. Columns between
 \`axis0Count\` and \`paddedAxis0Count - 1\` are zero-filled. The total packed
-weight count is 27,264 floats: the linear layer's axis0 width of 3 pads to 8,
+weight count is 27,328 floats: the linear layer's axis0 width of 3 pads to 8,
 adding 160 zero values. Including the 515 bias values, the packed graph
 contains 27,779 float values.
 
