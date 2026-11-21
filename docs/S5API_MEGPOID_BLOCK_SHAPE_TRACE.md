@@ -374,6 +374,34 @@ Inside `FUN_1800c7ad0`, the residual stage is an explicit nested loop:
 - Each iteration calls `FUN_1800c5d50` with that block-data entry, the current input/output workspace descriptors, and its companion state entry. The two workspace descriptors are then swapped for the next block.
 - The dispatcher also calls `FUN_1800c5260`, `FUN_1800c5440`, and either `FUN_1800c6390` or `FUN_1800c72d0` around the residual loop. These are separate preprocessing/transition stages and should not be folded into the residual block's tensor bundle without a field-level data-flow trace.
 
+### Pre-residual sequence operators
+
+The expanded callsite decompilation establishes this preceding sequence path:
+
+1. `FUN_1800c5260` performs a dense projection from `[K,N]` to
+   `[M,N]`, followed by optional per-output-feature bias broadcast.
+2. `FUN_1800c7920` computes mean and variance over the entire
+   `C*N` input tensor, adds descriptor epsilon, then applies one scale and
+   one bias value per feature across all positions.
+3. The dispatcher gathers/reorders per-sequence feature buffers and calls
+   `FUN_1800c5440` for each adjacent sequence pair. This operator builds
+   stride-2, zero-padded temporal windows, lays them out as
+   `[inputFeature*kernelTap][outputPosition]`, then applies a dense
+   projection and optional bias.
+4. The resulting sequence buffers proceed to either
+   `FUN_1800c6390` or `FUN_1800c72d0`, depending on the dispatch flag,
+   before the residual-block loop.
+
+Android now has generic primitives for the first three operators:
+`S5MegpoidDenseProjection`,
+`S5MegpoidGlobalFeatureNormalization`, and
+`S5MegpoidTemporalStridedConvolution`. The banked-linear path
+`FUN_1800c6390` is documented separately. These implementations preserve
+each operator's tensor contract, but their weight descriptors are not yet
+linked to specific VTMG named layers or exact model-tree properties. The
+dispatcher’s sequence-buffer gathering and the complete operator chain are
+not yet connected to note/phoneme feature generation.
+
 ### Android residual-loop schedule representation
 
 The Android port now represents the confirmed inner/outer loop and workspace
@@ -391,10 +419,10 @@ ping-pong as `S5MegpoidResidualBlockSchedule`:
   `S5VoicebankModelPackage.buildResidualBlockSchedule(sequenceCount)`.
 
 The schedule object is deliberately declarative. It does not execute the
-neighboring `FUN_1800c5260`, `FUN_1800c5440`,
-`FUN_1800c6390`, or `FUN_1800c72d0` stages because their buffer contracts
-are not yet completely linked to note/phoneme features. It also does not claim
-that the model input/output workspace memory has been reconstructed. Tests
+preceding dense projection, global normalization, temporal projection, or
+banked-linear stages because their model descriptors and feature buffers are
+not yet linked to note/phoneme features. It also does not claim that the
+model input/output workspace memory has been reconstructed. Tests
 verify sequence-major ordering, eight-block row-major order, and alternating
 workspace ownership.
 
