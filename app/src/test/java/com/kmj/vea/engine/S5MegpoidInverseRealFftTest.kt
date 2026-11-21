@@ -146,9 +146,9 @@ class S5MegpoidInverseRealFftTest {
             )
 
             for (sample in 0 until size) {
-                var sum = spectrum[0]
+                var sum = spectrum[0].toDouble()
                 val nyquistSign = if (sample % 2 == 0) 1.0 else -1.0
-                sum += spectrum[size] * nyquistSign
+                sum += spectrum[size].toDouble() * nyquistSign
                 for (bin in 1 until size / 2) {
                     val sign = if (useAlternatingSign && bin % 2 == 1) -1.0 else 1.0
                     val real = spectrum[bin * 2] * sign
