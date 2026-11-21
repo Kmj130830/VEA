@@ -1,8 +1,10 @@
 #include "veag2p.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -66,6 +68,77 @@ bool DecodeUtf8(const char* input, size_t size, std::vector<char32_t>* codepoint
     return true;
 }
 
+struct KoreanReplacementRule {
+    std::u32string_view source;
+    std::u32string_view target;
+};
+
+// Ordered source/target pairs recovered from the Korean manager's 32
+// sequential wcsstr/memcpy replacement passes. Keep order: later rules see
+// the output of earlier rules, matching the observed desktop control flow.
+constexpr KoreanReplacementRule kKoreanReplacementRules[] = {
+    {U"\uB514\uADFF\uC774", U"\uB514\uADF8\uC2DC"},
+    {U"\uB514\uADFF\uC744", U"\uB514\uADF8\uC2AC"},
+    {U"\uB514\uADFF\uC5D0", U"\uB514\uADF8\uC138"},
+    {U"\uC9C0\uC752\uC774", U"\uC9C0\uC73C\uC2DC"},
+    {U"\uC9C0\uC752\uC744", U"\uC9C0\uC73C\uC2AC"},
+    {U"\uC9C0\uC752\uC5D0", U"\uC9C0\uC73C\uC138"},
+    {U"\uCE58\uC753\uC774", U"\uCE58\uC73C\uC2DC"},
+    {U"\uCE58\uC753\uC744", U"\uCE58\uC73C\uC2AC"},
+    {U"\uCE58\uC753\uC5D0", U"\uCE58\uC73C\uC138"},
+    {U"\uD0A4\uC754\uC774", U"\uD0A4\uC73C\uAE30"},
+    {U"\uD0A4\uC754\uC744", U"\uD0A4\uC73C\uAE00"},
+    {U"\uD0A4\uC754\uC5D0", U"\uD0A4\uC73C\uAC8C"},
+    {U"\uD2F0\uC755\uC774", U"\uD2F0\uC73C\uC2DC"},
+    {U"\uD2F0\uC755\uC744", U"\uD2F0\uC73C\uC2AC"},
+    {U"\uD2F0\uC755\uC5D0", U"\uD2F0\uC73C\uC138"},
+    {U"\uD53C\uC756\uC774", U"\uD53C\uC73C\uBE44"},
+    {U"\uD53C\uC756\uC744", U"\uD53C\uC73C\uBE14"},
+    {U"\uD53C\uC756\uC5D0", U"\uD53C\uC73C\uBCA0"},
+    {U"\uD788\uC757\uC774", U"\uD788\uC73C\uC2DC"},
+    {U"\uD788\uC757\uC744", U"\uD788\uC73C\uC2AC"},
+    {U"\uD788\uC757\uC5D0", U"\uD788\uC73C\uC138"},
+    {U"\uC758\uACAC\uB780", U"\uC758\uACAC\uB09C"},
+    {U"\uC784\uC9C4\uB780", U"\uC784\uC9C4\uB09C"},
+    {U"\uC0DD\uC0B0\uB7C9", U"\uC0DD\uC0B0\uB0E5"},
+    {U"\uACB0\uB2E8\uB825", U"\uACB0\uB534\uB141"},
+    {U"\uACF5\uAD8C\uB825", U"\uACF5\uAFD8\uB141"},
+    {U"\uB3D9\uC6D0\uB839", U"\uB3D9\uC6D0\uB155"},
+    {U"\uC0C1\uACAC\uB840", U"\uC0C1\uACAC\uB15C"},
+    {U"\uD6A1\uB2E8\uB85C", U"\uD6A1\uB2E8\uB178"},
+    {U"\uC774\uC6D0\uB860", U"\uC774\uC6D0\uB17C"},
+    {U"\uC785\uC6D0\uB8CC", U"\uC774\uBDA0\uB1E8"},
+    {U"\uAD6C\uADFC\uB958", U"\uAD6C\uADFC\uB274"},
+};
+
+void ApplyKoreanReplacementRules(std::vector<char32_t>* codepoints) {
+    if (codepoints == nullptr || codepoints->empty()) return;
+
+    for (const KoreanReplacementRule& rule : kKoreanReplacementRules) {
+        if (rule.source.empty() || rule.source.size() != rule.target.size()) continue;
+
+        // The desktop loop searches from the start again after each match.
+        // Repeating std::search from begin preserves that behavior, including
+        // any overlapping occurrence exposed by an earlier replacement.
+        while (true) {
+            const auto match = std::search(
+                codepoints->begin(), codepoints->end(),
+                rule.source.begin(), rule.source.end());
+            if (match == codepoints->end()) break;
+            std::copy(rule.target.begin(), rule.target.end(), match);
+        }
+    }
+}
+
+void NormalizeKoreanCodepoints(std::vector<char32_t>* codepoints) {
+    for (char32_t& codepoint : *codepoints) {
+        if (codepoint == 0x30FC || codepoint == 0x2212) {
+            codepoint = 0x002D;
+        }
+    }
+    ApplyKoreanReplacementRules(codepoints);
+}
+
 size_t EncodedSize(char32_t value) {
     if (value <= 0x7F) return 1;
     if (value <= 0x7FF) return 2;
@@ -116,16 +189,15 @@ extern "C" VeaG2pStatus vea_g2p_normalize_korean_input_utf8(
         return VEA_G2P_STATUS_INVALID_UTF8;
     }
 
+    NormalizeKoreanCodepoints(&codepoints);
+
     size_t required = 0;
     for (char32_t codepoint : codepoints) {
-        if (codepoint == 0x30FC || codepoint == 0x2212) {
-            codepoint = 0x002D;
-        }
-        const size_t next = EncodedSize(codepoint);
-        if (next > std::numeric_limits<size_t>::max() - required) {
+        const size_t encoded_size = EncodedSize(codepoint);
+        if (encoded_size > std::numeric_limits<size_t>::max() - required) {
             return VEA_G2P_STATUS_INVALID_ARGUMENT;
         }
-        required += next;
+        required += encoded_size;
     }
 
     const size_t capacity = *output_size;
@@ -136,9 +208,6 @@ extern "C" VeaG2pStatus vea_g2p_normalize_korean_input_utf8(
 
     size_t offset = 0;
     for (char32_t codepoint : codepoints) {
-        if (codepoint == 0x30FC || codepoint == 0x2212) {
-            codepoint = 0x002D;
-        }
         EncodeUtf8(codepoint, output, &offset);
     }
     *output_size = offset;
