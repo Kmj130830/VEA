@@ -6,7 +6,7 @@ import org.junit.Test
 
 class VsmPhoneEventPreprocessorTest {
     private fun event(start: Double, end: Double, label: String, flags: Int = 0) =
-        VsmPhoneEvent(VsmEventInterval(start, end), label, flags)
+        VsmPhoneEvent(start, end, label, flags)
 
     @Test
     fun rewritesLeadingBreakToSilence() {
@@ -16,8 +16,8 @@ class VsmPhoneEventPreprocessorTest {
 
         assertEquals(1, output.size)
         assertEquals("sil", output.single().phoneLabel)
-        assertEquals(0.0, output.single().interval.startSeconds, 1e-9)
-        assertEquals(0.04, output.single().interval.endSeconds, 1e-9)
+        assertEquals(0.0, output.single().startSeconds, 1e-9)
+        assertEquals(0.04, output.single().endSeconds, 1e-9)
         assertEquals(7, output.single().opaqueSourceU32)
     }
 
@@ -32,7 +32,7 @@ class VsmPhoneEventPreprocessorTest {
         val output = VsmPhoneEventPreprocessor.preprocess(input)
 
         assertEquals(listOf("sil", "a"), output.map { it.phoneLabel })
-        assertEquals(0.08, output[0].interval.endSeconds, 1e-9)
+        assertEquals(0.08, output[0].endSeconds, 1e-9)
         assertEquals(10, output[0].opaqueSourceU32)
     }
 
@@ -60,9 +60,9 @@ class VsmPhoneEventPreprocessorTest {
         val output = VsmPhoneEventPreprocessor.preprocess(input)
 
         assertEquals(listOf("a", "i", "u"), output.map { it.phoneLabel })
-        assertEquals(0.15, output[0].interval.endSeconds, 1e-9)
-        assertEquals(0.20, output[1].interval.endSeconds, 1e-9)
-        assertEquals(0.20, output[2].interval.endSeconds, 1e-9)
+        assertEquals(0.15, output[0].endSeconds, 1e-9)
+        assertEquals(0.20, output[1].endSeconds, 1e-9)
+        assertEquals(0.20, output[2].endSeconds, 1e-9)
         assertEquals(listOf(1, 3, 4), output.map { it.opaqueSourceU32 })
     }
 
@@ -76,7 +76,7 @@ class VsmPhoneEventPreprocessorTest {
         val output = VsmPhoneEventPreprocessor.preprocess(input)
 
         assertEquals(1, output.size)
-        assertEquals(0.08, output.single().interval.endSeconds, 1e-9)
+        assertEquals(0.08, output.single().endSeconds, 1e-9)
     }
 
     @Test
@@ -98,6 +98,15 @@ class VsmPhoneEventPreprocessorTest {
         val output = VsmPhoneEventPreprocessor.preprocess(input)
 
         assertEquals(listOf("BR", "- "), output.map { it.phoneLabel })
+    }
+
+    @Test
+    fun dropsReversedIntervalsInsteadOfRejectingTheWholeBatch() {
+        val input = listOf(event(0.10, 0.05, "invalid"))
+
+        val output = VsmPhoneEventPreprocessor.preprocess(input)
+
+        assertTrue(output.isEmpty())
     }
 
     @Test
