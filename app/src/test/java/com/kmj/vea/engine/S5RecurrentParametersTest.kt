@@ -8,6 +8,30 @@ import org.junit.Test
 
 class S5RecurrentParametersTest {
     @Test
+    fun exposesMegpoidCallsiteDimensionsForBothDirections() {
+        val layout = S5RecurrentLayerLayout(
+            inputFeatures = 418,
+            hiddenFeatures = 9,
+            layerCount = 1,
+            bidirectional = true,
+            hasBias = true
+        )
+
+        val specs = S5RecurrentParameterLoader.specifications(layout)
+
+        assertEquals(8, specs.size)
+        assertEquals(listOf(27, 418), listOf(specs[0].rows, specs[0].columns))
+        assertEquals(listOf(27, 9), listOf(specs[1].rows, specs[1].columns))
+        assertEquals(27, specs[2].elementCount)
+        assertEquals(27, specs[3].elementCount)
+        assertEquals("rnn.weight_ih_l0_reverse", specs[4].name)
+        assertEquals(listOf(27, 418), listOf(specs[4].rows, specs[4].columns))
+        assertEquals(listOf(27, 9), listOf(specs[5].rows, specs[5].columns))
+        assertEquals(27, specs[6].elementCount)
+        assertEquals(27, specs[7].elementCount)
+    }
+
+    @Test
     fun exposesRecoveredThreeGateMatrixShapes() {
         val layout = S5RecurrentLayerLayout(
             inputFeatures = 5,
