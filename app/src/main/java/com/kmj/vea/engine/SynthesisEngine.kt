@@ -133,16 +133,15 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
      * opaque JSON key namespace and typed tensor-string count; parameter-to-
      * object mapping remains an explicit unresolved stage.
      */
-    fun scanModelJson(
+    fun scanModelResources(
         voicebank: VoicebankDescriptor,
         targetTensorKeys: Set<String> = emptySet()
-    ): S5ModelJsonScanResult {
+    ): List<S5ModelResourceScan> {
         require(voicebank.id == "ai_megpoid_v7" && voicebank.engineFamily == "VOCALOID7") {
             "This model scanner currently targets the bundled AI Megpoid V7 voicebank."
         }
         val directory = File(URI(voicebank.sourceUri))
-        val modelFile = File(directory, "AI_Megpoid.vtb2")
-        return S5ModelContainerScanner.scanVtb2(modelFile, targetTensorKeys)
+        return S5ModelContainerScanner.scanMegpoidPackage(directory, targetTensorKeys)
     }
 
     override suspend fun render(
@@ -153,14 +152,19 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
         val plans = prepareRenderPlans(project, voicebank)
         require(plans.any { !it.isEmpty }) { "There are no notes to synthesize." }
 
-        val modelScan = scanModelJson(voicebank)
-        require(modelScan.typedTensorStringCount > 0L) {
-            "The decoded Megpoid model contains no typed tensor strings."
+        val resourceScans = scanModelResources(voicebank)
+        val typedTensorCount = resourceScans.sumOf { it.result.typedTensorStringCount }
+        require(typedTensorCount > 0L) {
+            "The bundled Megpoid package contains no typed tensor strings."
+        }
+        val resourceSummary = resourceScans.joinToString { scan ->
+            "${scan.fileName}: ${scan.result.objectCount} objects / " +
+                "${scan.result.typedTensorStringCount} typed tensors"
         }
         throw UnsupportedOperationException(
-            "AI Megpoid VTB2 was decoded and streamed (${modelScan.objectCount} objects, " +
-                "${modelScan.typedTensorStringCount} typed tensor strings). The neural graph's opaque " +
-                "parameter mapping and acoustic execution are not complete; no WAV was generated."
+            "The five bundled Megpoid/shared model containers were decoded and streamed ($resourceSummary). " +
+                "The neural graph's opaque parameter mapping and acoustic execution are not complete; " +
+                "no WAV was generated."
         )
     }
 }
