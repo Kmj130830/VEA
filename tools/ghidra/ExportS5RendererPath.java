@@ -69,7 +69,10 @@ public class ExportS5RendererPath extends GhidraScript {
             String[] internalSeeds = {
                 "1801361f0", "180131fa0", "1801269f0", "1801270a0",
                 "1801272b0", "180127120", "180127330", "180126c20",
-                "180126e30", "180126d40", "1801271a0"
+                "180126e30", "180126d40", "1801271a0",
+                // S5 neural layers called by the render-state frame loop.
+                "1800c5d50", "1800c67e0", "1800c6390", "1800c3740",
+                "1800c5440", "1800c72d0"
             };
             out.println("## Explicit internal call targets");
             out.println();
