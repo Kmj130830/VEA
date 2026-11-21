@@ -26,8 +26,8 @@ class KoreanHangulPhoneMapperTest {
     @Test
     fun skipsUnsupportedCharactersAndAsciiSpaceLikeTheNativeStage() {
         assertEquals(
-            listOf("g a", "g a gp"),
-            KoreanHangulPhoneMapper.phonemizeSyllables("가 ! 각")
+            listOf("g a", "r a"),
+            KoreanHangulPhoneMapper.phonemizeSyllables("가 ! 라")
         )
     }
 
@@ -47,7 +47,7 @@ class KoreanHangulPhoneMapperTest {
     @Test
     fun handlesFlaggedHyphensAndNullOnsetFlagTwo() {
         assertEquals(listOf("-"), KoreanHangulPhoneMapper.phonemizeSyllables("-", intArrayOf(1)))
-        assertEquals(listOf("gp"), KoreanHangulPhoneMapper.phonemizeSyllables("악", intArrayOf(0, 2)))
+        assertEquals(listOf("gp"), KoreanHangulPhoneMapper.phonemizeSyllables("악", intArrayOf(2)))
     }
 
     @Test
