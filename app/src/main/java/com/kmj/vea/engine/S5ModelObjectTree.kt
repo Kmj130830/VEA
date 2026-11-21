@@ -29,6 +29,24 @@ class S5ModelObjectTree private constructor(val root: S5ModelValue.ObjectValue) 
 
     fun findByLookupKey(key: String): S5ModelValue? = root.fields[key]
 
+    /**
+     * Returns an object subtree rooted at the value reached by the supplied
+     * sequence of object keys. A missing key or a non-object path segment
+     * returns null; it never falls back to a recursive match.
+     */
+    fun subtreeAtPath(vararg keys: String): S5ModelObjectTree? {
+        require(keys.isNotEmpty()) { "Subtree path must contain at least one key." }
+        require(keys.all { it.isNotEmpty() }) { "Subtree path keys must not be empty." }
+
+        var current: S5ModelValue = root
+        for (key in keys) {
+            val fields = (current as? S5ModelValue.ObjectValue)?.fields ?: return null
+            current = fields[key] ?: return null
+        }
+        val objectRoot = current as? S5ModelValue.ObjectValue ?: return null
+        return S5ModelObjectTree(objectRoot)
+    }
+
     data class LookupMatch(
         val path: String,
         val value: S5ModelValue
