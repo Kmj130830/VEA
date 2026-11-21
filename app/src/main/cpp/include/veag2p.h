@@ -31,6 +31,24 @@ uint32_t vea_g2p_bridge_abi_version(void);
 uint32_t vea_g2p_supported_language_mask(void);
 
 /*
+ * Looks up the packed onset/vowel/coda indices used by the Korean manager
+ * for one precomposed modern Hangul syllable (U+AC00..U+D7A3).
+ *
+ * The 16-bit result uses:
+ *   bits 10..14: onset table index
+ *   bits  5.. 9: vowel table index
+ *   bits  0.. 4: coda table index
+ *   bit      15: valid Hangul-table marker
+ *
+ * This is an exact intermediate lookup primitive, not a phoneme converter.
+ * Returns INVALID_ARGUMENT for non-Hangul input or a null output pointer.
+ */
+VeaG2pStatus vea_g2p_korean_hangul_packed_indices(
+    uint32_t codepoint,
+    uint16_t* packed_indices
+);
+
+/*
  * Applies the recovered Korean input-preprocessing subset:
  * - U+30FC and U+2212 are replaced with U+002D.
  * - 32 ordered, length-preserving Korean lexical replacements are applied.
