@@ -85,7 +85,7 @@ class S5MegpoidOverlapAddDescriptorGeometryTest {
         assertEquals(8, parameters.fftSize)
         assertEquals(1, parameters.windowOffsetAt10)
         assertEquals(3, parameters.overlapContributionCountAt14)
-        assertEquals(1, parameters.ringMaskAt1C)
+        assertEquals(0, parameters.ringMaskAt1C)
         assertEquals(true, parameters.alternatingBinSignAt90)
     }
 
@@ -102,7 +102,7 @@ class S5MegpoidOverlapAddDescriptorGeometryTest {
     }
 
     @Test
-    fun rejectsInvalidDimensionsAndIntegerOverflow() {
+    fun rejectsInvalidDimensionsAndAcceptsLargestPositiveGeometry() {
         assertThrows(IllegalArgumentException::class.java) {
             S5MegpoidOverlapAddDescriptorGeometryBuilder.build(0, 512, 512)
         }
@@ -112,12 +112,13 @@ class S5MegpoidOverlapAddDescriptorGeometryTest {
         assertThrows(IllegalArgumentException::class.java) {
             S5MegpoidOverlapAddDescriptorGeometryBuilder.build(256, 512, 0)
         }
-        assertThrows(IllegalArgumentException::class.java) {
-            S5MegpoidOverlapAddDescriptorGeometryBuilder.build(
-                outputSamples = 1,
-                geometry = Int.MAX_VALUE,
-                fftSize = 2048
-            )
-        }
+
+        val largest = S5MegpoidOverlapAddDescriptorGeometryBuilder.build(
+            outputSamples = 1,
+            geometry = Int.MAX_VALUE,
+            fftSize = 2048
+        )
+        assertEquals(1 shl 30, largest.ringSlotCount)
+        assertEquals((1 shl 30) - 1, largest.ringMask)
     }
 }
