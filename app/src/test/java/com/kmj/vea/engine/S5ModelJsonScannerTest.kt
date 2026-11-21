@@ -38,8 +38,40 @@ class S5ModelJsonScannerTest {
         assertEquals(2L, result.booleanCount)
         assertEquals(1L, result.nullCount)
         assertEquals(2L, result.typedTensorStringCount)
-        assertEquals("*F32", result.matchedTensorStrings[tensorKey]?.typeTag)
-        assertEquals("*F32AQID", result.matchedTensorStrings[tensorKey]?.encodedValue)
+        assertEquals("*F32", result.matchedTensorStrings[tensorKey]?.single()?.typeTag)
+        assertEquals("*F32AQID", result.matchedTensorStrings[tensorKey]?.single()?.encodedValue)
+        assertEquals("$.root.$tensorKey", result.matchedTensorStrings[tensorKey]?.single()?.valuePath)
+    }
+
+    @Test
+    fun capturesTypedFieldsNestedUnderMatchedOpaqueObjectKey() {
+        val json = """{
+            "root": {
+                "$tensorKey": {
+                    "weights": {
+                        "input": "*F32AQID",
+                        "recurrent": "*F16AA=="
+                    }
+                }
+            }
+        }"""
+
+        val result = S5ModelJsonScanner.scanForTensorKeys(
+            StringReader(json),
+            setOf(tensorKey)
+        )
+        val matches = result.matchedTensorStrings.getValue(tensorKey)
+
+        assertEquals(2, matches.size)
+        assertEquals(
+            listOf(
+                "$.root.$tensorKey.weights.input",
+                "$.root.$tensorKey.weights.recurrent"
+            ),
+            matches.map { it.valuePath }
+        )
+        assertEquals(listOf("input", "recurrent"), matches.map { it.fieldKey })
+        assertEquals(listOf("*F32", "*F16"), matches.map { it.typeTag })
     }
 
     @Test
