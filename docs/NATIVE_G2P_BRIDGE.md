@@ -83,7 +83,7 @@ The November 2026 Ghidra analysis of the supplied `G2PAManager_KOR.dll` establis
 The Korean helper `FUN_180007210`:
 
 1. Copies the UTF-16 lyric.
-2. Applies 32 ordered substring-replacement passes. Their source/destination tables are in the DLL's read-only data; the exact textual replacement pairs have not yet been decoded.
+2. Applies 32 ordered substring-replacement passes. Their exact source/destination pairs were recovered from the DLL's read-only data and are now ported in `veag2p_core.cpp` with the original ordering and repeated-match behavior.
 3. Calls `FUN_180007390`, `FUN_180008730` and `FUN_180007f80` in that order.
 4. Propagates a nonzero helper result through the manager's error path.
 
@@ -120,8 +120,7 @@ The corresponding wrapper entry points are named `SyllableSegArray_append`, `Syl
 
 This evidence is enough to identify the Korean preprocessing stages and the base output inventory, but not enough to mark Korean G2P ready:
 
-- the 32 substring replacement pairs still need decoding;
-- the full transformation rules and all marker meanings need to be recovered;
+- the context-sensitive Hangul transformation rules and all per-character marker meanings still need to be recovered;
 - the relationship between the per-syllable strings and the host's syllable/phoneme pair is not yet fully mapped;
 - dictionary fallback/default phoneme behavior and failure codes need confirmation;
 - differential test vectors from an authorized reference are still required.
