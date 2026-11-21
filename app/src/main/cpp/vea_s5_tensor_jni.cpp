@@ -184,16 +184,16 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeParseContainerHeader(
     jobject,
     jbyteArray header_array,
     jlong total_file_size) {
-    if (header_array == nullptr || total_file_size < static_cast<jlong>(VEA_S5_CONTAINER_HEADER_SIZE)) {
+    if (header_array == nullptr || total_file_size < static_cast<jlong>(VEA_S5_CONTAINER_PREFIX_SIZE)) {
         return nullptr;
     }
-    if (env->GetArrayLength(header_array) != static_cast<jsize>(VEA_S5_CONTAINER_HEADER_SIZE)) {
+    if (env->GetArrayLength(header_array) != static_cast<jsize>(VEA_S5_CONTAINER_PREFIX_SIZE)) {
         return nullptr;
     }
 
-    uint8_t header_bytes[VEA_S5_CONTAINER_HEADER_SIZE] = {};
+    uint8_t header_bytes[VEA_S5_CONTAINER_PREFIX_SIZE] = {};
     env->GetByteArrayRegion(
-        header_array, 0, static_cast<jsize>(VEA_S5_CONTAINER_HEADER_SIZE),
+        header_array, 0, static_cast<jsize>(VEA_S5_CONTAINER_PREFIX_SIZE),
         reinterpret_cast<jbyte*>(header_bytes));
     if (env->ExceptionCheck()) return nullptr;
 
@@ -202,14 +202,64 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeParseContainerHeader(
         header_bytes, static_cast<uint64_t>(total_file_size), &parsed);
     if (status != VEA_S5_CONTAINER_STATUS_OK) return nullptr;
 
-    const jlong values[3] = {
+    const jlong values[5] = {
         static_cast<jlong>(parsed.kind),
-        static_cast<jlong>(parsed.payload_size),
-        static_cast<jlong>(parsed.format_word)
+        static_cast<jlong>(parsed.declared_span),
+        static_cast<jlong>(parsed.format_word),
+        static_cast<jlong>(parsed.transform_seed),
+        static_cast<jlong>(parsed.decoded_payload_size)
     };
-    jlongArray result = env->NewLongArray(3);
-    if (result != nullptr) env->SetLongArrayRegion(result, 0, 3, values);
+    jlongArray result = env->NewLongArray(5);
+    if (result != nullptr) env->SetLongArrayRegion(result, 0, 5, values);
     return env->ExceptionCheck() ? nullptr : result;
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeDecodeContainerPayload(
+    JNIEnv* env,
+    jobject,
+    jbyteArray file_array) {
+    if (file_array == nullptr) return nullptr;
+    const jsize input_length = env->GetArrayLength(file_array);
+    if (input_length < static_cast<jsize>(VEA_S5_CONTAINER_PREFIX_SIZE)) return nullptr;
+
+    try {
+        std::vector<uint8_t> input(static_cast<size_t>(input_length));
+        env->GetByteArrayRegion(
+            file_array, 0, input_length, reinterpret_cast<jbyte*>(input.data()));
+        if (env->ExceptionCheck()) return nullptr;
+
+        VeaS5ContainerHeader parsed{};
+        const VeaS5ContainerStatus parse_status = vea_s5_parse_container_header(
+            input.data(), input.size(), &parsed);
+        if (parse_status != VEA_S5_CONTAINER_STATUS_OK ||
+            parsed.decoded_payload_size > static_cast<uint64_t>(std::numeric_limits<jsize>::max())) {
+            return nullptr;
+        }
+
+        std::vector<uint8_t> output(static_cast<size_t>(parsed.decoded_payload_size));
+        uint64_t written = 0;
+        const VeaS5ContainerStatus status = vea_s5_decode_container_payload(
+            input.data(), input.size(),
+            output.empty() ? nullptr : output.data(),
+            output.size(), &written);
+        if (status != VEA_S5_CONTAINER_STATUS_OK ||
+            written != parsed.decoded_payload_size) {
+            return nullptr;
+        }
+
+        jbyteArray result = env->NewByteArray(static_cast<jsize>(written));
+        if (result != nullptr && written != 0) {
+            env->SetByteArrayRegion(
+                result, 0, static_cast<jsize>(written),
+                reinterpret_cast<const jbyte*>(output.data()));
+        }
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
 }
 
 extern "C" JNIEXPORT jfloatArray JNICALL
