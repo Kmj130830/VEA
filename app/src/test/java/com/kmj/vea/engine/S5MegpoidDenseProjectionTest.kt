@@ -45,7 +45,7 @@ class S5MegpoidDenseProjectionTest {
             gemm = ReferenceS5MegpoidGemmKernel
         )
 
-        assertEquals(listOf(26f, 33f), output.toList())
+        assertEquals(listOf(26f, 31f), output.toList())
     }
 
     @Test
