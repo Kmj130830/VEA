@@ -53,8 +53,7 @@ class MegpoidV7PackageInstallerTest {
             singerSourceUri = "file:///data/user/0/com.kmj.vea/files/voicebanks/ai_megpoid_v7/"
         )
 
-        val descriptor = track.voicebankDescriptorOrNull()
-        requireNotNull(descriptor)
+        val descriptor = requireNotNull(track.voicebankDescriptorOrNull())
         assertEquals("ai_megpoid_v7", descriptor.id)
         assertEquals("AI Megpoid", descriptor.displayName)
         assertEquals("VOCALOID7", descriptor.engineFamily)
