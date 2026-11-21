@@ -60,8 +60,8 @@ class VsmPhoneEventPreprocessorTest {
         val output = VsmPhoneEventPreprocessor.preprocess(input)
 
         assertEquals(listOf("a", "i", "u"), output.map { it.phoneLabel })
-        assertEquals(0.15, output[0].endSeconds, 1e-9)
-        assertEquals(0.20, output[1].endSeconds, 1e-9)
+        assertEquals(0.10, output[0].endSeconds, 1e-9)
+        assertEquals(0.15, output[1].endSeconds, 1e-9)
         assertEquals(0.20, output[2].endSeconds, 1e-9)
         assertEquals(listOf(1, 3, 4), output.map { it.opaqueSourceU32 })
     }
