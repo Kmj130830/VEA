@@ -25,6 +25,27 @@ data class S5MegpoidOverlapAddDescriptorGeometry(
         }
         require(ringMask == ringSlotCount - 1)
     }
+
+    /**
+     * Builds the parameter carrier consumed by the Android overlap-add
+     * reference, using these descriptor-derived scalars and supplied windows.
+     */
+    fun toOverlapAddParameters(
+        alternatingBinSign: Boolean,
+        frameWindow: FloatArray,
+        outputWindow: FloatArray
+    ): S5MegpoidOverlapAddParameters =
+        S5MegpoidOverlapAddParameters(
+            outputSamples = outputSamples,
+            geometryParameterAt04 = geometry,
+            fftSize = fftSize,
+            windowOffsetAt10 = windowOffset,
+            overlapContributionCountAt14 = overlapContributionCount,
+            ringMaskAt1C = ringMask,
+            alternatingBinSignAt90 = alternatingBinSign,
+            frameWindow = frameWindow,
+            outputWindow = outputWindow
+        )
 }
 
 /**
@@ -68,29 +89,6 @@ object S5MegpoidOverlapAddDescriptorGeometryBuilder {
             ringMask = ringSlots - 1
         )
     }
-
-    /**
-     * Builds the exact parameter carrier consumed by the Android overlap-add
-     * reference, using the descriptor-derived scalar geometry and caller-
-     * supplied windows/flags.
-     */
-    fun toOverlapAddParameters(
-        alternatingBinSign: Boolean,
-        frameWindow: FloatArray,
-        outputWindow: FloatArray
-    ): S5MegpoidOverlapAddParameters =
-        S5MegpoidOverlapAddParameters(
-            outputSamples = outputSamples,
-            geometryParameterAt04 = geometry,
-            fftSize = fftSize,
-            windowOffsetAt10 = windowOffset,
-            overlapContributionCountAt14 = overlapContributionCount,
-            ringMaskAt1C = ringMask,
-            alternatingBinSignAt90 = alternatingBinSign,
-            frameWindow = frameWindow,
-            outputWindow = outputWindow
-        )
-}
 
     private fun nextPowerOfTwo(value: Int): Int {
         if (value <= 1) return 1
