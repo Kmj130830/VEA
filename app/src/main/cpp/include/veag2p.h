@@ -31,9 +31,12 @@ uint32_t vea_g2p_bridge_abi_version(void);
 uint32_t vea_g2p_supported_language_mask(void);
 
 /*
- * Applies the input canonicalization observed in the VOCALOID Korean manager:
- * U+30FC (KATAKANA-HIRAGANA PROLONGED SOUND MARK) and U+2212 (MINUS SIGN)
- * are replaced with U+002D (HYPHEN-MINUS).
+ * Applies the recovered Korean input-preprocessing subset:
+ * - U+30FC and U+2212 are replaced with U+002D.
+ * - 32 ordered, length-preserving Korean lexical replacements are applied.
+ *
+ * This does not implement the Hangul phonological transformation or G2P
+ * syllable/phoneme generation stages.
  *
  * Input and output are standard UTF-8 byte sequences. output_size is an
  * in/out parameter: supply the output capacity; on BUFFER_TOO_SMALL it is set
