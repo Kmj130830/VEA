@@ -29,16 +29,31 @@ data class S5VoicebankModelPackage(
     }
 
     /**
+     * The exact nested VTB2 object selected by the high-level S5API
+     * render-state initializer before it constructs residual-block records.
+     * This is a model-data view, not an executable renderer.
+     */
+    val residualRuntimeConfigTree: S5ModelObjectTree by lazy(
+        LazyThreadSafetyMode.PUBLICATION
+    ) {
+        singerModel.tree.subtreeAtPath(
+            S5MegpoidRuntimeModelPath.MODEL_CONTEXT_KEY,
+            S5MegpoidRuntimeModelPath.RESIDUAL_RUNTIME_CONFIG_KEY
+        ) ?: throw IllegalStateException(
+            "AI_Megpoid.vtb2 is missing the S5API residual runtime configuration path."
+        )
+    }
+
+    /**
      * Lazily indexes the eight FUN_1800ced10 model-property families for
-     * the four-by-two block grid confirmed in AI_Megpoid.vtb2.
-     * The exact keys were recovered from S5API's static factory initializers
-     * and matched against the supplied bank's model tree.
+     * the four-by-two block grid, scoped to the exact subtree selected by
+     * the high-level native initializer.
      */
     val runtimeBlockTensorIndex: S5MegpoidRuntimeBlockTensorIndex by lazy(
         LazyThreadSafetyMode.PUBLICATION
     ) {
         S5MegpoidRuntimeBlockTensorIndex.build(
-            singerModel.tree,
+            residualRuntimeConfigTree,
             S5MegpoidRuntimeBlockFactoryKeys.ALL
         )
     }
