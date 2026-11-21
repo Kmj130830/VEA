@@ -210,6 +210,54 @@ public class ExportS5RendererPath extends GhidraScript {
             }
             out.println();
 
+            out.println("## Native callsite instructions for transform-state factories");
+            out.println();
+            Function descriptorOwner =
+                currentProgram.getFunctionManager().getFunctionAt(toAddr("1800d5a00"));
+            if (descriptorOwner == null) {
+                out.println("- FUN_1800d5a00 was not recovered.");
+            } else {
+                String[] factoryTargets = {"1800b8d20", "1800b8e00"};
+                for (String targetHex : factoryTargets) {
+                    Address targetAddress = toAddr(targetHex);
+                    out.println("### Call to " + targetAddress);
+                    out.println();
+                    InstructionIterator ownerInstructions =
+                        currentProgram.getListing().getInstructions(descriptorOwner.getBody(), true);
+                    ArrayDeque<Instruction> preceding = new ArrayDeque<>();
+                    int matchingCalls = 0;
+                    while (ownerInstructions.hasNext()) {
+                        monitor.checkCancelled();
+                        Instruction ins = ownerInstructions.next();
+                        boolean match = false;
+                        for (Reference ref : ins.getReferencesFrom()) {
+                            if (ref.getReferenceType().isCall() &&
+                                ref.getToAddress().equals(targetAddress)) {
+                                match = true;
+                                break;
+                            }
+                        }
+                        if (match) {
+                            matchingCalls++;
+                            out.println("Callsite: " + ins.getAddress());
+                            out.println("~~~asm");
+                            for (Instruction prior : preceding) {
+                                out.println(prior.getAddress() + "  " + prior.toString());
+                            }
+                            out.println(ins.getAddress() + "  " + ins.toString());
+                            out.println("~~~");
+                            out.println();
+                        }
+                        preceding.addLast(ins);
+                        while (preceding.size() > 48) preceding.removeFirst();
+                    }
+                    if (matchingCalls == 0) {
+                        out.println("- No direct call instruction found in FUN_1800d5a00.");
+                    }
+                    out.println();
+                }
+            }
+
             out.println("## Output overlap descriptor construction callsites");
             out.println();
             out.println("| Target address | Function | Direct caller | Call site |");
