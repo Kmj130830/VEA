@@ -4,7 +4,13 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
+
+static std::string Utf8(std::u8string_view value) {
+    return std::string(reinterpret_cast<const char*>(value.data()), value.size());
+}
 
 static std::string Normalize(const std::string& input) {
     size_t required = 0;
@@ -29,6 +35,46 @@ int main() {
     assert(Normalize("\xE3\x82\xAB\xE3\x83\xBC") == "\xE3\x82\xAB-");
     assert(Normalize("minus\xE2\x88\x92sign") == "minus-sign");
     assert(Normalize("keep\xE2\x80\x94" "dash") == "keep\xE2\x80\x94" "dash");
+
+    const std::vector<std::pair<std::string, std::string>> korean_replacements = {
+        {Utf8(u8"\uB514\uADFF\uC774"), Utf8(u8"\uB514\uADF8\uC2DC")},
+        {Utf8(u8"\uB514\uADFF\uC744"), Utf8(u8"\uB514\uADF8\uC2AC")},
+        {Utf8(u8"\uB514\uADFF\uC5D0"), Utf8(u8"\uB514\uADF8\uC138")},
+        {Utf8(u8"\uC9C0\uC752\uC774"), Utf8(u8"\uC9C0\uC73C\uC2DC")},
+        {Utf8(u8"\uC9C0\uC752\uC744"), Utf8(u8"\uC9C0\uC73C\uC2AC")},
+        {Utf8(u8"\uC9C0\uC752\uC5D0"), Utf8(u8"\uC9C0\uC73C\uC138")},
+        {Utf8(u8"\uCE58\uC753\uC774"), Utf8(u8"\uCE58\uC73C\uC2DC")},
+        {Utf8(u8"\uCE58\uC753\uC744"), Utf8(u8"\uCE58\uC73C\uC2AC")},
+        {Utf8(u8"\uCE58\uC753\uC5D0"), Utf8(u8"\uCE58\uC73C\uC138")},
+        {Utf8(u8"\uD0A4\uC754\uC774"), Utf8(u8"\uD0A4\uC73C\uAE30")},
+        {Utf8(u8"\uD0A4\uC754\uC744"), Utf8(u8"\uD0A4\uC73C\uAE00")},
+        {Utf8(u8"\uD0A4\uC754\uC5D0"), Utf8(u8"\uD0A4\uC73C\uAC8C")},
+        {Utf8(u8"\uD2F0\uC755\uC774"), Utf8(u8"\uD2F0\uC73C\uC2DC")},
+        {Utf8(u8"\uD2F0\uC755\uC744"), Utf8(u8"\uD2F0\uC73C\uC2AC")},
+        {Utf8(u8"\uD2F0\uC755\uC5D0"), Utf8(u8"\uD2F0\uC73C\uC138")},
+        {Utf8(u8"\uD53C\uC756\uC774"), Utf8(u8"\uD53C\uC73C\uBE44")},
+        {Utf8(u8"\uD53C\uC756\uC744"), Utf8(u8"\uD53C\uC73C\uBE14")},
+        {Utf8(u8"\uD53C\uC756\uC5D0"), Utf8(u8"\uD53C\uC73C\uBCA0")},
+        {Utf8(u8"\uD788\uC757\uC774"), Utf8(u8"\uD788\uC73C\uC2DC")},
+        {Utf8(u8"\uD788\uC757\uC744"), Utf8(u8"\uD788\uC73C\uC2AC")},
+        {Utf8(u8"\uD788\uC757\uC5D0"), Utf8(u8"\uD788\uC73C\uC138")},
+        {Utf8(u8"\uC758\uACAC\uB780"), Utf8(u8"\uC758\uACAC\uB09C")},
+        {Utf8(u8"\uC784\uC9C4\uB780"), Utf8(u8"\uC784\uC9C4\uB09C")},
+        {Utf8(u8"\uC0DD\uC0B0\uB7C9"), Utf8(u8"\uC0DD\uC0B0\uB0E5")},
+        {Utf8(u8"\uACB0\uB2E8\uB825"), Utf8(u8"\uACB0\uB534\uB141")},
+        {Utf8(u8"\uACF5\uAD8C\uB825"), Utf8(u8"\uACF5\uAFD8\uB141")},
+        {Utf8(u8"\uB3D9\uC6D0\uB839"), Utf8(u8"\uB3D9\uC6D0\uB155")},
+        {Utf8(u8"\uC0C1\uACAC\uB840"), Utf8(u8"\uC0C1\uACAC\uB15C")},
+        {Utf8(u8"\uD6A1\uB2E8\uB85C"), Utf8(u8"\uD6A1\uB2E8\uB178")},
+        {Utf8(u8"\uC774\uC6D0\uB860"), Utf8(u8"\uC774\uC6D0\uB17C")},
+        {Utf8(u8"\uC785\uC6D0\uB8CC"), Utf8(u8"\uC774\uBDA0\uB1E8")},
+        {Utf8(u8"\uAD6C\uADFC\uB958"), Utf8(u8"\uAD6C\uADFC\uB274")},
+    };
+    for (const auto& rule : korean_replacements) {
+        assert(Normalize(rule.first) == rule.second);
+    }
+    assert(Normalize(Utf8(u8"\uB514\uADFF\uC774 / \uC758\uACAC\uB780 / \uB514\uADFF\uC774")) ==
+           Utf8(u8"\uB514\uADF8\uC2DC / \uC758\uACAC\uB09C / \uB514\uADF8\uC2DC"));
 
     const char invalid_utf8[] = {static_cast<char>(0xC0), static_cast<char>(0xAF)};
     size_t out_size = 0;
