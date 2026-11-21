@@ -32,6 +32,58 @@ class S5RecurrentParametersTest {
     }
 
     @Test
+    fun buildsOneBidirectionalLayerLookupKeysWithoutFeatureSizes() {
+        val keys = S5RecurrentParameterLoader.lookupKeys(
+            layerCount = 1,
+            bidirectional = true,
+            includeBias = true
+        )
+
+        assertEquals(8, keys.size)
+        assertEquals(
+            setOf(
+                S5ModelTensorKey.deriveParameterName("rnn.weight_ih_l0"),
+                S5ModelTensorKey.deriveParameterName("rnn.weight_hh_l0"),
+                S5ModelTensorKey.deriveParameterName("rnn.bias_ih_l0"),
+                S5ModelTensorKey.deriveParameterName("rnn.bias_hh_l0"),
+                S5ModelTensorKey.deriveParameterName("rnn.weight_ih_l0_reverse"),
+                S5ModelTensorKey.deriveParameterName("rnn.weight_hh_l0_reverse"),
+                S5ModelTensorKey.deriveParameterName("rnn.bias_ih_l0_reverse"),
+                S5ModelTensorKey.deriveParameterName("rnn.bias_hh_l0_reverse")
+            ),
+            keys
+        )
+    }
+
+    @Test
+    fun lookupKeysRespectLayerCountDirectionAndBiasOptions() {
+        assertEquals(
+            2,
+            S5RecurrentParameterLoader.lookupKeys(
+                layerCount = 1,
+                bidirectional = false,
+                includeBias = false
+            ).size
+        )
+        assertEquals(
+            8,
+            S5RecurrentParameterLoader.lookupKeys(
+                layerCount = 2,
+                bidirectional = false,
+                includeBias = true
+            ).size
+        )
+        assertEquals(
+            16,
+            S5RecurrentParameterLoader.lookupKeys(
+                layerCount = 2,
+                bidirectional = true,
+                includeBias = true
+            ).size
+        )
+    }
+
+    @Test
     fun exposesRecoveredThreeGateMatrixShapes() {
         val layout = S5RecurrentLayerLayout(
             inputFeatures = 5,
