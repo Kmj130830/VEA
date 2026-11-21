@@ -88,9 +88,8 @@ object KoreanHangulPhoneMapper {
 
             val codePoint = character.code
             if (codePoint !in HANGUL_BASE..HANGUL_LAST) {
-                previousWasSpace = false
-                previousHadFinal = false
-                previousWasOpenSyllable = false
+                // FUN_180007f80 ignores an unmapped character without changing
+                // the cross-syllable context flags.
                 continue
             }
 
