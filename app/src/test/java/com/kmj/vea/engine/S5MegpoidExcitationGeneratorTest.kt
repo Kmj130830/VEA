@@ -8,8 +8,8 @@ class S5MegpoidExcitationGeneratorTest {
     @Test
     fun zeroF0WithZeroNoiseProducesSilenceAndRetainsFrameState() {
         val generator = S5MegpoidExcitationGenerator(
-            phaseSampleRate = 32_000f,
-            periodSampleRate = 32_000f,
+            phaseScale = 32_000f,
+            periodScale = 32_000f,
             sineDenominatorThreshold = 0.1f,
             wrapPhase = true,
             gaussianNoise = { 0f }
@@ -24,8 +24,8 @@ class S5MegpoidExcitationGeneratorTest {
     @Test
     fun noiseGainIsInterpolatedAcrossTheFrame() {
         val generator = S5MegpoidExcitationGenerator(
-            phaseSampleRate = 32_000f,
-            periodSampleRate = 32_000f,
+            phaseScale = 32_000f,
+            periodScale = 32_000f,
             sineDenominatorThreshold = 0.1f,
             wrapPhase = true,
             gaussianNoise = { 1f }
@@ -42,8 +42,8 @@ class S5MegpoidExcitationGeneratorTest {
     @Test
     fun phaseAccumulatesContinuouslyAcrossFrames() {
         val generator = S5MegpoidExcitationGenerator(
-            phaseSampleRate = 32_000f,
-            periodSampleRate = 32_000f,
+            phaseScale = 32_000f,
+            periodScale = 32_000f,
             sineDenominatorThreshold = 0.1f,
             wrapPhase = false,
             gaussianNoise = { 0f }
