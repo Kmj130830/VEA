@@ -60,7 +60,7 @@ class S5VoicebankModelPackageAssemblerTest {
             """
             {
               "sibling": {"unrelated": true},
-              "${S5MegpoidRuntimeModelPath.MODEL_CONTEXT_KEY": {
+              "${S5MegpoidRuntimeModelPath.MODEL_CONTEXT_KEY}": {
                 "${S5MegpoidRuntimeModelPath.RESIDUAL_RUNTIME_CONFIG_KEY}": {
                   "43726e4ce752ea6cc300dc2fca3e8372": {"setting": 32}
                 }
