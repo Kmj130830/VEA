@@ -17,8 +17,8 @@ object S5ApiPhoneCategorySpecialCases {
      * and "br" are not folded here.
      */
     fun fixedIndexOrNull(phoneLabel: String): Int? = when (phoneLabel) {
-        "Sil", "SIL" -> 0
-        "Br", "BR" -> 1
+        "SIL" -> 0
+        "Sil", "Br", "BR" -> 1
         else -> null
     }
 }
