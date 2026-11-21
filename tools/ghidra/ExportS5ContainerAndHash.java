@@ -41,7 +41,13 @@ public class ExportS5ContainerAndHash extends GhidraScript {
         "180006b10", // descriptor allocation
         "180020190", // .weight hashed lookup
         "1800214c0", // .bias hashed lookup
-        "180068190"  // model layer construction entry
+        "180068190", // model layer construction entry
+        "180056f40", // model-config path that instantiates the RNN block
+        "18005ebe0", // recurrent parameter loader
+        "180024a90", // indexed/reverse recurrent name builder
+        "18001b1f0", // hashed JSON/object lookup helper
+        "1800103e0", // string copy used before key generation
+        "18000b100"   // typed model object key lookup
     };
 
     @Override
