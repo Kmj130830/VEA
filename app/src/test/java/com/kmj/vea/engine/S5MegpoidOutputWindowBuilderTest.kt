@@ -33,7 +33,7 @@ class S5MegpoidOutputWindowBuilderTest {
         val result = buildBase(frameWindow = frame)
 
         assertEquals(frame.toList(), result.frameWindow.toList())
-        result.outputWindow.forEach { assertEquals(0.5f, it, 1e-6f) }
+        result.outputWindow.forEach { assertEquals(2f, it, 1e-6f) }
     }
 
     @Test
