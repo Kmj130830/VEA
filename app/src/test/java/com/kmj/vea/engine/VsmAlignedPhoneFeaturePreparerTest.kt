@@ -6,22 +6,24 @@ import org.junit.Test
 
 class VsmAlignedPhoneFeaturePreparerTest {
     @Test
-    fun preparesDurationAndExactCategoryFields() {
+    fun preparesDurationCategoryAndLeadingBangFlag() {
         val input = listOf(
             VsmPhoneEvent(0.00, 0.08, "a", 10),
             VsmPhoneEvent(0.08, 0.12, "-", 11),
             VsmPhoneEvent(0.12, 0.20, "SIL", 12),
             VsmPhoneEvent(0.20, 0.30, "Br", 13),
-            VsmPhoneEvent(0.30, 0.40, "ia+1", 14)
+            VsmPhoneEvent(0.30, 0.40, "ia+1", 14),
+            VsmPhoneEvent(0.40, 0.50, "!sh", 15)
         )
         val prepared = VsmAlignedPhoneFeaturePreparer.prepare(
             input, minimumPhoneSeconds = 0.001f, maximumPhoneSeconds = 0.1f
         )
-        assertEquals(listOf("a", "SIL", "Br", "ah"), prepared.map { it.event.phoneLabel })
-        assertEquals(listOf(2, 1, 1, 2), prepared.map { it.categoryIndex })
+        assertEquals(listOf("a", "SIL", "Br", "ah", "!sh"), prepared.map { it.event.phoneLabel })
+        assertEquals(listOf(2, 1, 1, 2, 10), prepared.map { it.categoryIndex })
+        assertEquals(listOf(false, false, false, false, true), prepared.map { it.hasLeadingBang })
         assertEquals(1, prepared[1].fixedCategoryIndex)
         assertEquals(1, prepared[2].fixedCategoryIndex)
-        assertEquals(listOf(10, 12, 13, 14), prepared.map { it.event.opaqueSourceU32 })
+        assertEquals(listOf(10, 12, 13, 14, 15), prepared.map { it.event.opaqueSourceU32 })
         assertTrue(prepared.all { it.normalizedDuration in -1.0f..1.0f })
     }
 

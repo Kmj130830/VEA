@@ -3,7 +3,8 @@ package com.kmj.vea.engine
 data class VsmAlignedPhoneFeature(
     val event: VsmPhoneEvent,
     val normalizedDuration: Float,
-    val categoryIndex: Int
+    val categoryIndex: Int,
+    val hasLeadingBang: Boolean
 ) {
     /** Compatibility view for code displaying only the four explicit overrides. */
     val fixedCategoryIndex: Int?
@@ -27,7 +28,8 @@ object VsmAlignedPhoneFeaturePreparer {
                     minimumSeconds = minimumPhoneSeconds,
                     maximumSeconds = maximumPhoneSeconds
                 ),
-                categoryIndex = S5ApiPhoneCategoryMap.resolve(event.phoneLabel)
+                categoryIndex = S5ApiPhoneCategoryMap.resolve(event.phoneLabel),
+                hasLeadingBang = event.phoneLabel.firstOrNull() == '!'
             )
         }
     }
