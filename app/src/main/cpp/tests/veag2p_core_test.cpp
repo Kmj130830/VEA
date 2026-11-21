@@ -66,6 +66,56 @@ int main() {
     }
     assert(packed_table_hash == 0x7AE6C4656323F3C6ULL);
 
+    // Base labels are table lookups only; context-sensitive G2P rules are
+    // applied in later stages and are deliberately not inferred here.
+    VeaKoreanPhonemeComponents components{};
+    assert(vea_g2p_korean_syllable_components(0xAC00U, &components) ==
+           VEA_G2P_STATUS_OK);
+    assert(std::strcmp(components.onset, "g") == 0);
+    assert(std::strcmp(components.vowel, "a") == 0);
+    assert(std::strcmp(components.coda, "") == 0);
+
+    assert(vea_g2p_korean_syllable_components(0xAC01U, &components) ==
+           VEA_G2P_STATUS_OK);
+    assert(std::strcmp(components.onset, "g") == 0);
+    assert(std::strcmp(components.vowel, "a") == 0);
+    assert(std::strcmp(components.coda, "gp") == 0);
+
+    assert(vea_g2p_korean_syllable_components(0xAC11U, &components) ==
+           VEA_G2P_STATUS_OK);
+    assert(std::strcmp(components.coda, "bp") == 0);
+
+    assert(vea_g2p_korean_syllable_components(0xD7A3U, &components) ==
+           VEA_G2P_STATUS_OK);
+    assert(std::strcmp(components.onset, "h") == 0);
+    assert(std::strcmp(components.vowel, "i") == 0);
+    assert(std::strcmp(components.coda, "dp") == 0);
+    assert(vea_g2p_korean_syllable_components(0x0041U, &components) ==
+           VEA_G2P_STATUS_INVALID_ARGUMENT);
+
+    // Hash the complete base-label output in Unicode syllable order, using
+    // the three pointer tables recovered from the Korean DLL's .rdata.
+    uint64_t base_label_hash = 14695981039346656037ULL;
+    for (uint32_t codepoint = 0xAC00U; codepoint <= 0xD7A3U; ++codepoint) {
+        components = {};
+        assert(vea_g2p_korean_syllable_components(codepoint, &components) ==
+               VEA_G2P_STATUS_OK);
+        const char* labels[] = {
+            components.onset, components.vowel, components.coda,
+        };
+        for (const char* label : labels) {
+            for (const unsigned char* byte =
+                     reinterpret_cast<const unsigned char*>(label);
+                 *byte != 0; ++byte) {
+                base_label_hash ^= *byte;
+                base_label_hash *= 1099511628211ULL;
+            }
+            base_label_hash ^= 0;
+            base_label_hash *= 1099511628211ULL;
+        }
+    }
+    assert(base_label_hash == 0xF00557BADDC04EFEULL);
+
     assert(Normalize("Hangul: \xEA\xB0\x80\xEB\x82\x98") ==
            "Hangul: \xEA\xB0\x80\xEB\x82\x98");
     assert(Normalize("\xE3\x82\xAB\xE3\x83\xBC") == "\xE3\x82\xAB-");
