@@ -405,3 +405,20 @@ Unit tests cover the minimum, geometric-mean midpoint, maximum, below-minimum
 and above-maximum durations, plus invalid intervals and log ranges.
 This is one scalar of the feature row only; no phone category or neighbor
 one-hot slots are fabricated by this class.
+
+### Android implementation: default row layout descriptor
+
+`S5ApiDefaultPhoneFeatureLayout` now represents the verified
+`param_12 == 0` row width without assigning guessed left/right names to
+the two context-count fields. It preserves the originating render-context
+offsets (`+0x10`, `+0x1C`, `+0x20`, `+0x24`) and computes:
+
+```text
+rowWidth = 1 + (includeFlagPair ? 2 : 0)
+              + (contextCountAt1C + 1 + contextCountAt20) * categoryWidth
+```
+
+It exposes the duration scalar, optional two-flag region and category
+segment offsets for this layout. It does not populate category values or
+choose context-event ordering; those still require the recovered live
+render-context phone map and fully named descriptor construction.
