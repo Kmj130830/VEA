@@ -24,6 +24,26 @@ data class VsmRenderFormat(
 }
 
 /**
+ * A portable VEA note interval expressed in seconds.
+ *
+ * This mirrors only the recovered temporal pair boundary. It is not the
+ * vendor's seven-double feature row, because the five category-key fields
+ * and their source mapping are still being traced.
+ */
+data class VsmEventInterval(
+    val startSeconds: Double,
+    val endSeconds: Double
+) {
+    init {
+        require(startSeconds.isFinite() && endSeconds.isFinite())
+        require(startSeconds >= 0.0 && endSeconds > startSeconds)
+    }
+
+    val durationSeconds: Double
+        get() = endSeconds - startSeconds
+}
+
+/**
  * A note-start event in VEA's portable event model.
  *
  * This is not the VSM native staging-record layout. Lyric and phoneme strings
@@ -39,6 +59,7 @@ data class VsmScheduledNote(
     val frameOffsetInChunk: Int,
     val pitch: Int,
     val durationSamples: Long,
+    val sampleRate: Int,
     val lyric: String,
     val phoneme: String
 ) {
@@ -49,6 +70,14 @@ data class VsmScheduledNote(
     val lyricTokens: List<String>
         get() = VsmLyricTokenizer.tokenize(lyric)
 
+    /** App-owned interval in seconds, derived from the scheduled sample range. */
+    val interval: VsmEventInterval
+        get() {
+            val start = absoluteStartSample.toDouble() / sampleRate.toDouble()
+            val end = (absoluteStartSample + durationSamples).toDouble() / sampleRate.toDouble()
+            return VsmEventInterval(start, end)
+        }
+
     init {
         require(absoluteStartTick >= 0L)
         require(durationTicks > 0L)
@@ -56,6 +85,8 @@ data class VsmScheduledNote(
         require(frameOffsetInChunk >= 0)
         require(pitch in 0..127)
         require(durationSamples > 0L)
+        require(sampleRate in 8_000..192_000)
+        require(absoluteStartSample <= Long.MAX_VALUE - durationSamples)
     }
 }
 
@@ -178,6 +209,7 @@ object VsmMidiInputScheduler {
                         frameOffsetInChunk = frameOffset,
                         pitch = note.pitch,
                         durationSamples = durationSamples,
+                        sampleRate = format.sampleRate,
                         lyric = note.lyric,
                         phoneme = note.phoneme
                     ),
