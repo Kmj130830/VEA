@@ -90,7 +90,7 @@ class S5RecurrentParametersTest {
         assertEquals(6, parsed[1].inputBias?.size)
         assertEquals(6, parsed[1].recurrentBias?.size)
 
-        source[S5ModelTensorKey.derive("rnn.weight_ih_l0", S5ModelTensorKey.Member.WEIGHT)]!![0] = 99.0f
+        source[S5ModelTensorKey.deriveParameterName("rnn.weight_ih_l0")]!![0] = 99.0f
         assertEquals(0.0f, parsed[0].inputWeights[0])
     }
 
@@ -136,7 +136,7 @@ class S5RecurrentParametersTest {
         )
         val source = S5RecurrentParameterLoader.specifications(layout)
             .associate { it.lookupKey to FloatArray(it.elementCount) }
-        source[S5ModelTensorKey.derive("rnn.weight_hh_l0", S5ModelTensorKey.Member.WEIGHT)]!![0] = Float.NaN
+        source[S5ModelTensorKey.deriveParameterName("rnn.weight_hh_l0")]!![0] = Float.NaN
 
         S5RecurrentParameterLoader.validate(source, layout)
     }
