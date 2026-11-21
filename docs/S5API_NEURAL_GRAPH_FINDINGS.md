@@ -132,3 +132,31 @@ This is an isolated generic operator port. The actual runtime descriptor's
 weights have not yet been proven to be any specific named layer in
 `VOCALOID7.vtmg`; the new primitive is not yet wired into a full model
 forward pass. It does not produce PCM audio by itself.
+
+
+## 11. Global feature normalization after the initial projection
+
+The expanded Ghidra trace identifies `FUN_1800c7920` as the operator called
+immediately after `FUN_1800c5260` in `FUN_1800c7ad0`. It reduces the full
+input tensor, with shape `C x N`, to global sum and sum-of-squares, computes
+mean and population variance, clamps negative variance, adds epsilon, and
+calculates inverse standard deviation.
+
+It then applies one scale and one bias value per feature across every
+position:
+
+```text
+scaleFactor[c] = inverseStd * scale[c]
+offset[c] = bias[c] - scaleFactor[c] * mean
+output[c,n] = scaleFactor[c] * input[c,n] + offset[c]
+```
+
+VEA now has `S5MegpoidGlobalFeatureNormalization`, reusing the existing
+native sum/sum-square and mean/inverse-standard-deviation primitives. The
+per-feature affine pass preserves the decompiled float32 expression order.
+Tests cover global statistics, feature-specific affine values and epsilon
+handling.
+
+This is an arithmetic/operator match only. The descriptor's two feature
+vectors have not yet been tied to a specific named VTMG layer or model key,
+so no named-layer mapping or complete forward pass is claimed.
