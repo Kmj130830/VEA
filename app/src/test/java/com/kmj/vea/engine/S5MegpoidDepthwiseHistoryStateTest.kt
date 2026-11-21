@@ -36,7 +36,7 @@ class S5MegpoidDepthwiseHistoryStateTest {
         }
 
         assertEquals(1, state.nextWriteIndex)
-        assertEquals(2, window.size / 2)
+        assertEquals(6, window.size)
         assertEquals(listOf(20f, 21f, 30f, 31f, 40f, 41f), window.toList())
     }
 
@@ -49,8 +49,16 @@ class S5MegpoidDepthwiseHistoryStateTest {
         assertEquals(6, state.currentPositions)
         assertEquals(1, state.nextWriteIndex)
         assertEquals(2 * 3 * 6, window.size)
-        assertTrue(window.take(2 * 6 * 2).all { it == 0.0f })
-        assertTrue(window.takeLast(2 * 6).all { it == 9.0f })
+        for (channel in 0 until 2) {
+            for (row in 0 until 2) {
+                val offset = (channel * 3 + row) * 6
+                assertTrue(window.copyOfRange(offset, offset + 6).all { it == 0.0f })
+            }
+            val newestOffset = (channel * 3 + 2) * 6
+            assertTrue(
+                window.copyOfRange(newestOffset, newestOffset + 6).all { it == 9.0f }
+            )
+        }
     }
 
     @Test
