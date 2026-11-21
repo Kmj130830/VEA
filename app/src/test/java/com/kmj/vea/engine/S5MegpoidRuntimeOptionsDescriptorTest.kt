@@ -63,6 +63,27 @@ class S5MegpoidRuntimeOptionsDescriptorTest {
     }
 
     @Test
+    fun derivesMegpoidOutputTransformInputsFromModelOptionsAndNativeRootDefaults() {
+        val options = S5MegpoidRuntimeOptionsDescriptor.from(tree())
+        val inputs = options.buildOutputTransformInputsFromNativeMegpoidDefaults()
+
+        assertEquals(320, inputs.outputSamplesAtRoot0C)
+        assertEquals(1024, inputs.geometryAndFftSizeAtRoot04)
+        assertEquals(32000f, inputs.floatParameterAtRoot10, 0f)
+        assertEquals(0, inputs.frameWindowCoreLengthAtRoot61C)
+        assertFalse(inputs.alternatingBinSignAtRoot620)
+        assertFalse(inputs.flagAtRoot1F74)
+        assertEquals(0, inputs.frameWindowShapeModeAtRoot3418)
+        assertFalse(inputs.flagAtRoot1F75)
+
+        val parameters = inputs.buildOverlapAddParameters()
+        assertEquals(1024, parameters.fftSize)
+        assertEquals(320, parameters.outputSamples)
+        assertEquals(2, parameters.windowOffsetAt10)
+        assertEquals(4, parameters.overlapContributionCountAt14)
+        assertEquals(1, parameters.ringMaskAt1C)
+    }
+    @Test
     fun rejectsMissingFieldsAndWrongJsonValueTypes() {
         val missing = S5ModelObjectTree.parseUtf8("{}")
         assertThrows(IllegalArgumentException::class.java) {
