@@ -48,7 +48,11 @@ data class S5ContainerHeaderInfo(
     val kind: String,
     val payloadSize: Long,
     val formatWord: Long
-)
+) {
+    /** Compatibility field used by the editor's original 16-byte prefix scanner. */
+    val decodedPayloadSize: Long
+        get() = payloadSize
+}
 
 /**
  * Native implementation of the recovered S5API tensor and container boundary.
@@ -68,8 +72,33 @@ object NativeS5TensorBridge {
     val abiVersion: Int
         get() = if (loaded) nativeAbiVersion() else 0
 
-    /** Parses exactly the first 136 bytes; the opaque header bytes are preserved natively but not interpreted. */
+    /**
+     * Parses either the editor's historical 16-byte transform prefix or the
+     * complete 136-byte S5 package envelope. The 16-byte form preserves the
+     * recovered S5API size calculation used by S5ModelJsonScanner:
+     * min(totalFileSize, declaredSpan + 8) - 16.
+     */
     fun parseContainerHeader(header: ByteArray, totalFileSize: Long): S5ContainerHeaderInfo? {
+        if (header.size == 16) {
+            require(totalFileSize >= 16L)
+            val magic = String(header, 0, 4, Charsets.US_ASCII)
+            if (magic !in setOf("VTMB", "VTBR", "VTMG", "VPIT", "VNPV", "VHNV")) {
+                return null
+            }
+            val declaredSpan = readUInt32Le(header, 4)
+            val endOffset = declaredSpan + 8L
+            val clampedEnd = if (endOffset < 16L || totalFileSize < endOffset) {
+                totalFileSize
+            } else {
+                endOffset
+            }
+            return S5ContainerHeaderInfo(
+                kind = magic,
+                payloadSize = clampedEnd - 16L,
+                formatWord = readUInt32Le(header, 8)
+            )
+        }
+
         check(loaded) { "Native S5 tensor library is not loaded." }
         require(header.size == 136) { "The V7 container header is exactly 136 bytes." }
         require(totalFileSize >= 136L)
@@ -84,6 +113,12 @@ object NativeS5TensorBridge {
         }
         return S5ContainerHeaderInfo(kind, fields[1], fields[2])
     }
+
+    private fun readUInt32Le(bytes: ByteArray, offset: Int): Long =
+        (bytes[offset].toLong() and 0xffL) or
+            ((bytes[offset + 1].toLong() and 0xffL) shl 8) or
+            ((bytes[offset + 2].toLong() and 0xffL) shl 16) or
+            ((bytes[offset + 3].toLong() and 0xffL) shl 24)
 
     /**
      * Applies the recovered S5API FUN_18002aa90 model-payload preparation step.
