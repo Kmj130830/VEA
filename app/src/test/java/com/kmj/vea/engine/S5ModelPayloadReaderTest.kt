@@ -44,13 +44,13 @@ class S5ModelPayloadReaderTest {
 
         assertEquals(3, tree.objects.size)
         val first = tree.requireUniqueObject("$.root.layerA")
-        assertArrayEquals(floatArrayOf(1.0f, 2.0f), first.fields.getValue("data").floatValues, 0.0f)
+        assertArrayEquals(floatArrayOf(1.0f, 2.0f), requireNotNull(first.fields.getValue("data").floatValues), 0.0f)
         assertArrayEquals(intArrayOf(2, 1), first.fields.getValue("shape").intValues)
         assertEquals(S5TensorEncoding.FLOAT32, first.fields.getValue("data").encoding)
         assertEquals(S5TensorEncoding.INT32, first.fields.getValue("shape").encoding)
 
         val second = tree.requireUniqueObject("$.root.layerB")
-        assertArrayEquals(floatArrayOf(3.0f), second.fields.getValue("data").floatValues, 0.0f)
+        assertArrayEquals(floatArrayOf(3.0f), requireNotNull(second.fields.getValue("data").floatValues), 0.0f)
         assertEquals(S5TensorEncoding.FLOAT16, second.fields.getValue("data").encoding)
 
         val repeated = tree.objectsContaining("data")
@@ -69,7 +69,7 @@ class S5ModelPayloadReaderTest {
 
         assertArrayEquals(
             floatArrayOf(9.0f),
-            tree.requireUniqueObject("$.weights").fields.getValue("values").floatValues,
+            requireNotNull(tree.requireUniqueObject("$.weights").fields.getValue("values").floatValues),
             0.0f
         )
     }
