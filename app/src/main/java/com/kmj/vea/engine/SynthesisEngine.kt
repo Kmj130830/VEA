@@ -157,6 +157,17 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
         return S5VtmgBaseGraphLoader.load(File(modelDirectory, "VOCALOID7.vtmg"))
     }
 
+    /**
+     * Loads the shared VTMG tensors and converts every layer to the padded
+     * matrix-bank descriptors used by S5API FUN_180064670.
+     */
+    fun prepareSharedVtmgBaseGraph(
+        voicebank: VoicebankDescriptor
+    ): S5VtmgPackedBaseGraphWeights {
+        val rawGraph = loadSharedVtmgBaseGraph(voicebank)
+        return S5VtmgBaseGraphPacker.pack(rawGraph)
+    }
+
     override suspend fun render(
         project: VeaProject,
         voicebank: VoicebankDescriptor,
@@ -181,7 +192,7 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
 
         // VTMG supplies the shared S5 base graph. It is independent of the
         // optional RNN feature branch stored in the bank's VTB2 object.
-        val baseGraph = loadSharedVtmgBaseGraph(voicebank)
+        val baseGraph = prepareSharedVtmgBaseGraph(voicebank)
         require(baseGraph.layers.size == S5VtmgGraphTensorCatalog.layers.size) {
             "The shared VTMG base graph is incomplete."
         }
@@ -198,9 +209,10 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
         }
 
         throw UnsupportedOperationException(
-            "Loaded and validated the shared VOCALOID7.vtmg base graph: ${baseGraph.layers.size} layers, " +
-                "${baseGraph.totalFloatCount} float parameters (pre1/pre2, conv1/cond1, conv2/cond2, " +
-                "conv3/cond3, linear). $recurrentStatus $pairedStatus The base-graph forward operators, " +
+            "Loaded and packed the shared VOCALOID7.vtmg base graph: ${baseGraph.layers.size} layers, " +
+                "${baseGraph.totalFloatCount} packed float parameters in S5API matrix-bank layout " +
+                "(pre1/pre2, conv1/cond1, conv2/cond2, conv3/cond3, linear). " +
+                "$recurrentStatus $pairedStatus The base-graph forward operators, " +
                 "voicebank-specific VTB2 conditioning, Yamaha G2P, and acoustic waveform decoder are not " +
                 "complete; no WAV was generated."
         )
