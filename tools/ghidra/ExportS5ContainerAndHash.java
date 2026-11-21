@@ -26,9 +26,15 @@ public class ExportS5ContainerAndHash extends GhidraScript {
         "180010260", // MD5/key digest
         "180010740", // string append helper
         "180010540", // string composition helper
+        "180081a20", // input string length
+        "1800812a0", // MD5 update/finalization core
+        "180081e20", // hexadecimal stream manipulator
+        "180081940", // typed-object key lookup
+        "18001af30", // object member lookup
         "180083c50", // string/integer conversion helper
         "180083610", // stream-to-string helper
         "18001acc0", // four-word hexadecimal formatting
+        "180006780", // integer/string formatting helper
         "180006c80", // numeric array conversion
         "1800656e0", // typed tensor conversion
         "180006a80", // aligned float allocation
