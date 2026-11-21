@@ -140,7 +140,8 @@ object S5RecurrentParameterLoader {
                     specs += S5RecurrentTensorSpec(
                         parameterName(base, ".bias_hh_l", layer, reverse),
                         layout.gateRows,
-                        1
+                        1,
+                        S5ModelTensorKey.Member.BIAS
                     )
                 }
             }
