@@ -105,8 +105,9 @@ class S5MegpoidSequenceTransitionPipeline(
         gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel,
         statistics: S5MegpoidStatisticsKernel = NativeS5MegpoidStatisticsKernel
     ): S5MegpoidSequenceTransitionOutput {
-        require(phoneMatrix.rowCount > 0) {
-            "A phone feature matrix must contain at least one position."
+        require(phoneMatrix.rowCount >= S5MegpoidResidualBlockShape.KERNEL_WIDTH) {
+            "Megpoid's 7x7 residual history requires at least " +
+                S5MegpoidResidualBlockShape.KERNEL_WIDTH + " phone positions."
         }
         require(phoneMatrix.rowWidth == denseStage.inputFeatures) {
             "S5API phone row width " + phoneMatrix.rowWidth +

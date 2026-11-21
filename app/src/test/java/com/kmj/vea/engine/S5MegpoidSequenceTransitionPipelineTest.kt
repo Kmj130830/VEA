@@ -108,14 +108,34 @@ class S5MegpoidSequenceTransitionPipelineTest {
         calls.clear()
         bankedInputs.clear()
         val matrix = S5ApiDefaultPhoneFeatureMatrix(
-            rowCount = 3,
+            rowCount = 7,
             rowWidth = 2,
-            values = floatArrayOf(1f, 100f, 2f, 200f, 3f, 300f)
+            values = floatArrayOf(
+                1f, 100f,
+                2f, 200f,
+                3f, 300f,
+                4f, 400f,
+                5f, 500f,
+                6f, 600f,
+                7f, 700f
+            )
         )
         val result = makePipeline(inputFeatures = 2).runPhoneFeatureMatrix(matrix)
         assertEquals(44f, result.features.first(), 0.0001f)
         assertEquals(1, result.channels)
-        assertEquals(3, result.positions)
+        assertEquals(7, result.positions)
+    }
+
+    @Test
+    fun rejectsPhoneMatricesShorterThanTheResidualHistoryWindow() {
+        val matrix = S5ApiDefaultPhoneFeatureMatrix(
+            rowCount = 6,
+            rowWidth = 2,
+            values = FloatArray(12)
+        )
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            makePipeline(inputFeatures = 2).runPhoneFeatureMatrix(matrix)
+        }
     }
 
     @Test
