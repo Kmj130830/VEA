@@ -1,6 +1,8 @@
 package com.kmj.vea.engine
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
@@ -13,6 +15,24 @@ class KoreanHangulPhoneMapperTest {
         assertEquals(listOf("a Np"), KoreanHangulPhoneMapper.phonemizeSyllables("앙"))
     }
 
+    @Test
+    fun exposesRecoveredInternalSyllableKeys() {
+        assertEquals(0x8861, KoreanHangulPhoneMapper.internalSyllableCode('가'))
+        assertEquals(0x8862, KoreanHangulPhoneMapper.internalSyllableCode('각'))
+        assertEquals(null, KoreanHangulPhoneMapper.internalSyllableCode('A'))
+    }
+
+    @Test
+    fun internalKeyFieldsCoverEveryPrecomposedHangulSyllable() {
+        for (codePoint in 0xAC00..0xD7A3) {
+            val key = KoreanHangulPhoneMapper.internalSyllableCode(codePoint.toChar())
+            assertNotNull(key)
+            assertEquals(0x8000, key!! and 0x8000)
+            assertTrue(((key ushr 10) and 0x1f) in 2..20)
+            assertTrue(((key ushr 5) and 0x1f) in setOf(3, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15, 18, 19, 20, 21, 22, 23, 26, 27, 28, 29))
+            assertTrue((key and 0x1f) in (1..17).toSet() + (19..29).toSet())
+        }
+    }
     @Test
     fun mapsAllStandardHangulVowelAndFinalIndices() {
         val text = buildString {
