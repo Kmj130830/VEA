@@ -426,6 +426,43 @@ model input/output workspace memory has been reconstructed. Tests
 verify sequence-major ordering, eight-block row-major order, and alternating
 workspace ownership.
 
+## Render-state root descriptor layout
+
+A direct comparison of the forward dispatcher, state copier and state
+destructor now resolves the owner-relative field layout:
+
+- `FUN_1800c5260` receives the dense descriptor embedded at root
+  `+0x1F8`. Its two feature dimensions are at `+0x1F8/+0x1FC`,
+  optional-bias flag at `+0x200`, weight descriptor at `+0x208`,
+  and bias descriptor at `+0x218`.
+- `FUN_1800c7920` receives the global-normalization descriptor at root
+  `+0x228`. Epsilon is at `+0x22C`; scale and bias vector descriptors
+  are at `+0x230` and `+0x240`.
+- Temporal projection descriptors are an array at root `+0x250`
+  (element stride `0x30)); temporal workspace descriptors are at
+  `+0x268` (stride `0x18`).
+- Banked-linear descriptors are at root `+0x280` (stride `0x30`)
+  with workspaces at `+0x298` (stride `0x18`). The alternate operator
+  branch uses descriptors at `+0x2B0` (stride `0x28`) and workspaces
+  at `+0x2C8` (stride `0x18`).
+- Residual data and state arrays remain at root `+0x2E0` / stride
+  `0x100` and `+0x2F8` / stride `0x88`.
+
+The root copy path `FUN_1800cdbb0` copies the dense/normalization
+subobjects, then the temporal, banked-linear, alternate-operator and residual
+arrays with their element strides. The state-copy path
+`FUN_1800c47a0` copies the 0x18-stride workspace vectors and the 0x88-stride
+residual-state records. Root cleanup `FUN_1800becd0` dispatches to the
+corresponding embedded-subobject and vector destructors.
+
+This also resolves the earlier numeric-offset ambiguity: the values
+`+0x1F8`, `+0x228`, and `+0x250` appear as vector end pointers when
+measured from the this-pointer of other nested object types. They are not the
+same base as the render-state root. Global instruction scans are therefore
+candidate discovery only; the root-relative call, copy and cleanup paths
+establish the layout. Full implementation detail is in
+`docs/S5API_RENDER_STATE_DESCRIPTOR_LAYOUT.md`.
+
 ## Runtime record-array ownership and copy paths
 
 A whole-image instruction scan for the non-stack offsets used by
