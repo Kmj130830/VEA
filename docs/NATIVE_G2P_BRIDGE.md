@@ -104,3 +104,18 @@ flag arrays. Those upstream functions and their lexical rewrite tables are
 not yet fully ported. The production bridge still reports Korean G2P as
 not ready until that pipeline, syllable/note association and reference
 outputs are verified.
+
+## Korean lexical pronunciation rewrite table
+
+`FUN_180007210` in the Korean manager applies a fixed 32-entry literal
+replacement table to its UTF-16 working string before calling the later
+syllable/token preprocessing functions. The table includes consonant-name
+inflections (for example, `디귿이` -> `디그시`) and listed lexical
+assimilation exceptions (for example, `의견란` -> `의견난`).
+
+`KoreanG2pLexicalNormalizer` ports these 32 exact source/replacement pairs
+in table order using literal, case-sensitive replacement. It leaves all
+unlisted text, whitespace and punctuation unchanged. The function is kept
+separate from `KoreanG2pInputTokenizer` and
+`KoreanHangulPhoneMapper`: the former handles input token boundaries, while
+the latter two model later string and syllable stages.
