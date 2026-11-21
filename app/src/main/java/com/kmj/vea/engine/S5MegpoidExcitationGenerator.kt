@@ -104,6 +104,28 @@ internal class S5MegpoidExcitationGenerator(
         get() = phase
 
     internal companion object {
+        /**
+         * Creates an excitation source using the recovered S5API MT19937 /
+         * cached-pair Gaussian path. Phase and period scales remain explicit
+         * because their values belong to the transform-state constructor.
+         */
+        fun withRecoveredRandomSource(
+            phaseScale: Float,
+            periodScale: Float,
+            sineDenominatorThreshold: Float,
+            wrapPhase: Boolean,
+            randomSeed: Int = S5MegpoidNativeMersenneTwister.DEFAULT_SEED
+        ): S5MegpoidExcitationGenerator {
+            val noise = S5MegpoidGaussianNoise.fromNativeSeed(randomSeed)
+            return S5MegpoidExcitationGenerator(
+                phaseScale = phaseScale,
+                periodScale = periodScale,
+                sineDenominatorThreshold = sineDenominatorThreshold,
+                wrapPhase = wrapPhase,
+                gaussianNoise = noise::nextSample
+            )
+        }
+
         const val TWO_PI = 6.2831855f
         const val MIN_F0 = 1e-5f
     }
@@ -135,9 +157,35 @@ internal class S5MegpoidGaussianNoise(
             radiusSquared = x * x + y * y
         } while (radiusSquared >= 1f || radiusSquared == 0f || x == 0f || y == 0f)
 
-        val scale = sqrt((-2f * kotlin.math.ln(radiusSquared)) / radiusSquared)
-        cachedSample = y * scale
+        // The native routine rescales exceptionally small radii before logf
+        // to avoid precision loss, then compensates the logarithm by ln(4)*e.
+        var sampleX = x
+        var sampleY = y
+        var normalizationRadiusSquared = radiusSquared
+        var logRadiusSquared = kotlin.math.ln(radiusSquared)
+        if (radiusSquared <= 0.0001f) {
+            val exponent = Math.getExponent(radiusSquared)
+            sampleX = Math.scalb(x, -exponent)
+            sampleY = Math.scalb(y, -exponent)
+            normalizationRadiusSquared = sampleX * sampleX + sampleY * sampleY
+            logRadiusSquared = kotlin.math.ln(normalizationRadiusSquared) +
+                exponent.toFloat() * 1.3862944f
+        }
+
+        val scale = sqrt((-2f * logRadiusSquared) / normalizationRadiusSquared)
+        cachedSample = sampleY * scale
         hasCachedSample = true
-        return x * scale
+        return sampleX * scale
+    }
+
+    companion object {
+        /**
+         * S5API constructs this stream with seed 0x2a (42). A zero seed is
+         * replaced by the native default in FUN_180127a40.
+         */
+        fun fromNativeSeed(seed: Int = S5MegpoidNativeMersenneTwister.DEFAULT_SEED): S5MegpoidGaussianNoise {
+            val random = S5MegpoidNativeMersenneTwister(seed)
+            return S5MegpoidGaussianNoise(random::nextUniformMinusOneToOne)
+        }
     }
 }
