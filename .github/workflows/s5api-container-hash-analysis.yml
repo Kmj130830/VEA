@@ -5,6 +5,8 @@ on:
   push:
     paths:
       - "Editor.zip"
+      - "tools/inspect_s5_model_payload.py"
+      - "app/src/main/cpp/vea_s5_container.cpp"
       - "tools/ghidra/ExportS5ContainerAndHash.java"
       - ".github/workflows/s5api-container-hash-analysis.yml"
 
