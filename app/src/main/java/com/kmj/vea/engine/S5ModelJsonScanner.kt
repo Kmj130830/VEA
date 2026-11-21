@@ -42,7 +42,7 @@ data class S5ModelJsonScanResult(
  * document plus a second in-memory object graph. Callbacks receive object keys
  * and scalar values as the parser consumes the stream.
  *
- * Typed *F32/*F16/*S32 payloads are recognized as ordinary JSON strings;
+ * F32, F16, and S32 typed payload strings are recognized as ordinary JSON values;
  * tensor data is decoded by NativeS5TensorBridge in a separate stage.
  */
 object S5ModelJsonScanner {
