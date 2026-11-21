@@ -374,6 +374,30 @@ Inside `FUN_1800c7ad0`, the residual stage is an explicit nested loop:
 - Each iteration calls `FUN_1800c5d50` with that block-data entry, the current input/output workspace descriptors, and its companion state entry. The two workspace descriptors are then swapped for the next block.
 - The dispatcher also calls `FUN_1800c5260`, `FUN_1800c5440`, and either `FUN_1800c6390` or `FUN_1800c72d0` around the residual loop. These are separate preprocessing/transition stages and should not be folded into the residual block's tensor bundle without a field-level data-flow trace.
 
+### Android residual-loop schedule representation
+
+The Android port now represents the confirmed inner/outer loop and workspace
+ping-pong as `S5MegpoidResidualBlockSchedule`:
+
+- Sequence count is validated as at least one; the number of outer iterations
+  is `sequenceCount - 1`, matching the recovered loop condition.
+- Each outer iteration visits block records in their append order.
+- The eight VTB2-backed records are ordered row-major from the nested loader
+  loops: `(row 0,column 0)`, `(0,1)`, then `(1,0)`, through
+  `(3,1)`.
+- Each scheduled call reads one workspace slot and writes the other; the
+  two slot identities are exchanged after each block.
+- The plan can be obtained from
+  `S5VoicebankModelPackage.buildResidualBlockSchedule(sequenceCount)`.
+
+The schedule object is deliberately declarative. It does not execute the
+neighboring `FUN_1800c5260`, `FUN_1800c5440`,
+`FUN_1800c6390`, or `FUN_1800c72d0` stages because their buffer contracts
+are not yet completely linked to note/phoneme features. It also does not claim
+that the model input/output workspace memory has been reconstructed. Tests
+verify sequence-major ordering, eight-block row-major order, and alternating
+workspace ownership.
+
 ## Runtime record-array ownership and copy paths
 
 A whole-image instruction scan for the non-stack offsets used by
