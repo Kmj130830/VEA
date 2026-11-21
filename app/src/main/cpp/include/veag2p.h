@@ -31,9 +31,76 @@ uint32_t vea_g2p_bridge_abi_version(void);
 uint32_t vea_g2p_supported_language_mask(void);
 
 /*
- * Applies the input canonicalization observed in the VOCALOID Korean manager:
- * U+30FC (KATAKANA-HIRAGANA PROLONGED SOUND MARK) and U+2212 (MINUS SIGN)
- * are replaced with U+002D (HYPHEN-MINUS).
+ * Looks up the packed onset/vowel/coda indices used by the Korean manager
+ * for one precomposed modern Hangul syllable (U+AC00..U+D7A3).
+ *
+ * The 16-bit result uses:
+ *   bits 10..14: onset table index
+ *   bits  5.. 9: vowel table index
+ *   bits  0.. 4: coda table index
+ *   bit      15: valid Hangul-table marker
+ *
+ * This is an exact intermediate lookup primitive, not a phoneme converter.
+ * Returns INVALID_ARGUMENT for non-Hangul input or a null output pointer.
+ */
+VeaG2pStatus vea_g2p_korean_hangul_packed_indices(
+    uint32_t codepoint,
+    uint16_t* packed_indices
+);
+
+/*
+ * Reverse lookup for the Korean packed onset/vowel/coda representation.
+ * Mirrors FUN_180008660's lookup behavior for modern Hangul:
+ * - exact packed values map back to their precomposed syllable;
+ * - a requested coda index of zero matches the table's empty-coda entry
+ *   (packed low bits 1).
+ * Returns INVALID_ARGUMENT when no modern Hangul table entry matches.
+ */
+VeaG2pStatus vea_g2p_korean_hangul_from_packed_indices(
+    uint16_t packed_indices,
+    uint32_t* codepoint
+);
+
+/*
+ * Applies two isolated single-syllable rewrites recovered from
+ * FUN_180008730:
+ * - packed vowel 12 -> 10 unless onset index is 7 or 13;
+ * - packed vowel 28 -> 29 unless onset index is 13.
+ *
+ * Other syllables are returned unchanged. Adjacent-syllable transformations
+ * and marker-dependent behavior are not implemented by this helper.
+ */
+VeaG2pStatus vea_g2p_korean_apply_single_syllable_rules(
+    uint32_t codepoint,
+    uint32_t* transformed_codepoint
+);
+
+/*
+ * Base phoneme labels looked up by the Korean manager for a modern Hangul
+ * syllable. These are table components before adjacent-syllable rules,
+ * marker processing, and syllable-level output assembly.
+ *
+ * The strings are null-terminated ASCII labels from the supplied DLL tables;
+ * they are not asserted to be standard X-SAMPA or final spoken phonemes.
+ */
+typedef struct VeaKoreanPhonemeComponents {
+    char onset[4];
+    char vowel[3];
+    char coda[3];
+} VeaKoreanPhonemeComponents;
+
+VeaG2pStatus vea_g2p_korean_syllable_components(
+    uint32_t codepoint,
+    VeaKoreanPhonemeComponents* components
+);
+
+/*
+ * Applies the recovered Korean input-preprocessing subset:
+ * - U+30FC and U+2212 are replaced with U+002D.
+ * - 32 ordered, length-preserving Korean lexical replacements are applied.
+ *
+ * This does not implement the Hangul phonological transformation or G2P
+ * syllable/phoneme generation stages.
  *
  * Input and output are standard UTF-8 byte sequences. output_size is an
  * in/out parameter: supply the output capacity; on BUFFER_TOO_SMALL it is set

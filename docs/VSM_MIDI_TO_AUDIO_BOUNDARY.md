@@ -29,7 +29,23 @@ The temporary records constructed in `FUN_18006f500` occupy six 32-bit words (24
 | Vibrato | frame offset within chunk | `0x0f` | vibrato slot (0 or 1) | `2` | pointer to `VibratoEvent + 0x10` |
 | MIDI controller | frame offset within chunk | controller-index loop value | `2` | `0` | pointer to `MidiController + 0x10` |
 
-The note and vibrato descriptors are emitted after type checks against their corresponding VSM classes. Controller records are generated in the controller pass. The helper routines `FUN_18006c2d0`, `FUN_18006c6f0`, and `FUN_18006e670` participate in these conversions; their full decompilation is the subject of the follow-up analysis in PR #10.
+The note and vibrato descriptors are emitted after type checks against their corresponding VSM classes. Controller records are generated in the controller pass. The helper bodies have now been inspected:
+
+- `FUN_18006c6f0` receives a `VSM::Note` object. It reads the note's lyric string at object offset `+0xA8` (following the long-string pointer when the string is not stored inline), splits the text on ASCII spaces into ordered tokens, and builds a command byte stream using the note and its owning sequence/part context. The command stream includes token bytes, note-associated scalar/byte values and additional control fields. This confirms that the VSM path consumes lyric text at note scope; it does **not** establish that the command bytes are phoneme IDs or reveal the full command grammar.
+- `FUN_18006e670` is called for `VSM::VibratoEvent`. Its selector accepts only values 0 and 1, emitting the corresponding command marker byte `'e'` (0x65) or `'d'` (0x64), and includes a byte read from the vibrato object at `+0x3C`. The semantic names of the selector and payload byte are not proven.
+- `FUN_18006c2d0` builds the controller/parameter command stream. Its first selector maps 1, 2 and 4 to the marker bytes `'c'`, `'g'` and `'T'`; other values use `'U'`. A second selector has observed cases 6–14 that emit marker bytes `'1'`, `'2'`, `'3'`, `'4'`, `'7'`, `'8'`, `'9'`, `'p'` and `'6'`. These are raw command markers, not verified controller names or phoneme symbols.
+
+The helpers therefore establish a lyric-and-expression serialization layer upstream of the voice-engine call, but their output grammar and the receiving parser are still unresolved.
+
+### Record ordering
+
+`FUN_180071440` sorts the 24-byte records as six 32-bit words. The small-array insertion-sort path and the large-array comparison helpers use the same observed ordering key:
+
+1. word 0, ascending;
+2. word 3, ascending;
+3. only when word 3 is zero, word 1, ascending.
+
+When word 0 and nonzero word 3 are equal, the comparison does not use word 1. The remaining words are moved with the record but do not participate in this ordering decision. This is a comparator observation, not a semantic definition of those fields.
 
 ## Voice-engine boundary that remains unresolved
 
