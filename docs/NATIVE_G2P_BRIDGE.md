@@ -68,6 +68,14 @@ delimiter set. `NativeG2pBridge.normalizeKoreanInput()` now has an identical
 Kotlin fallback when the ARM64 library is unavailable, while retaining the
 native implementation when it is loaded.
 
+The immediately following `FUN_1800034e0` record builder stores each token in
+two UTF-16 fields: the first field contains up to 30 code units, and the
+second field contains every remaining code unit. This is a fixed code-unit
+boundary, not a Unicode code-point boundary; a surrogate pair at position 30
+can therefore be split between the two fields. The Android
+`KoreanG2pTokenFields` / `splitTokenForNativeModule()` port preserves that behavior
+and does not truncate long tokens.
+
 This is only a verified text-preparation primitive. It does not assign
 phonemes, syllable boundaries, phone durations or model category IDs. The
 vendor's subsequent token-to-internal-module conversion and note-container
