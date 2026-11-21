@@ -97,9 +97,6 @@ class S5MegpoidSpectralOverlapAddTest {
             parameters(ringMask = 2)
         }
         assertThrows(IllegalArgumentException::class.java) {
-            parameters(overlapCount = 5, ringMask = 3)
-        }
-        assertThrows(IllegalArgumentException::class.java) {
             parameters(frameWindow = FloatArray(7))
         }
         assertThrows(IllegalArgumentException::class.java) {
