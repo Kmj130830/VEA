@@ -37,13 +37,14 @@ class S5MegpoidOutputWindowBuilderTest {
     }
 
     @Test
-    fun flagAt92BranchUsesReciprocalOverlapSumOfFrameWindow() {
+    fun flagAt92BranchReplacesFrameWindowWithUnityAndNormalizesIt() {
         val frame = FloatArray(8) { 0.25f }
 
         val result = buildBase(frameWindow = frame, flagAt92 = true)
 
-        assertEquals(frame.toList(), result.frameWindow.toList())
-        result.outputWindow.forEach { assertEquals(2f, it, 1e-6f) }
+        result.frameWindow.forEach { assertEquals(1f, it, 0f) }
+        result.outputWindow.forEach { assertEquals(0.5f, it, 1e-6f) }
+        assertEquals(0.25f, frame[0], 0f)
     }
 
     @Test
@@ -68,8 +69,8 @@ class S5MegpoidOutputWindowBuilderTest {
             flagAt92 = true
         )
 
-        result.frameWindow.forEach { assertEquals(0.25f, it, 0f) }
-        result.outputWindow.forEach { assertEquals(2f, it, 1e-6f) }
+        result.frameWindow.forEach { assertEquals(1f, it, 0f) }
+        result.outputWindow.forEach { assertEquals(0.5f, it, 1e-6f) }
     }
 
     @Test
