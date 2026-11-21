@@ -132,12 +132,12 @@ object S5RecurrentParameterLoader {
                         parameterName(base, ".bias_ih_l", layer, reverse),
                         layout.gateRows,
                         1
-                )
+                    )
                     specs += S5RecurrentTensorSpec(
                         parameterName(base, ".bias_hh_l", layer, reverse),
                         layout.gateRows,
                         1
-                )
+                    )
                 }
             }
         }
@@ -173,7 +173,7 @@ object S5RecurrentParameterLoader {
                         tensors,
                         parameterName(base, ".bias_ih_l", layer, reverse),
                         layout.gateRows
-                )
+                    )
                 } else {
                     null
                 }
