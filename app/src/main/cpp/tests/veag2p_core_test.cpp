@@ -90,6 +90,41 @@ int main() {
     assert(vea_g2p_korean_hangul_from_packed_indices(
                0x8861U, nullptr) == VEA_G2P_STATUS_INVALID_ARGUMENT);
 
+    // First recovered single-syllable G2P rule from FUN_180008730:
+    // packed vowel 12 -> 10, except onset indices 7 (ㄹ) and 13 (ㅇ).
+    uint32_t transformed = 0;
+    assert(vea_g2p_korean_apply_single_syllable_rules(
+               0xBA8CU, &transformed) == VEA_G2P_STATUS_OK);  // 몌
+    assert(transformed == 0xBA54U);  // 메
+    assert(vea_g2p_korean_apply_single_syllable_rules(
+               0xB840U, &transformed) == VEA_G2P_STATUS_OK);  // 례
+    assert(transformed == 0xB840U);
+    assert(vea_g2p_korean_apply_single_syllable_rules(
+               0xC608U, &transformed) == VEA_G2P_STATUS_OK);  // 예
+    assert(transformed == 0xC608U);
+    assert(vea_g2p_korean_apply_single_syllable_rules(
+               0xBA60U, &transformed) == VEA_G2P_STATUS_OK);
+    assert(transformed == 0xBA60U);  // Non-target medial remains unchanged.
+    assert(vea_g2p_korean_apply_single_syllable_rules(
+               0x0041U, &transformed) == VEA_G2P_STATUS_INVALID_ARGUMENT);
+    assert(vea_g2p_korean_apply_single_syllable_rules(
+               0xBA8CU, nullptr) == VEA_G2P_STATUS_INVALID_ARGUMENT);
+
+    // Exhaustively cover all onsets and codas for the target medial.
+    for (uint32_t initial = 0; initial < 19U; ++initial) {
+        for (uint32_t final = 0; final < 28U; ++final) {
+            const uint32_t source = 0xAC00U + initial * 588U + 7U * 28U + final;
+            const uint32_t expected =
+                (initial == 5U || initial == 11U)
+                    ? source
+                    : 0xAC00U + initial * 588U + 5U * 28U + final;
+            transformed = 0;
+            assert(vea_g2p_korean_apply_single_syllable_rules(
+                       source, &transformed) == VEA_G2P_STATUS_OK);
+            assert(transformed == expected);
+        }
+    }
+
     // Base labels are table lookups only; context-sensitive G2P rules are
     // applied in later stages and are deliberately not inferred here.
     VeaKoreanPhonemeComponents components{};
