@@ -16,6 +16,18 @@ data class S5ApiDefaultPhoneFeatureMatrix(
         val start = index * rowWidth
         return values.copyOfRange(start, start + rowWidth)
     }
+
+    /** Transposes [position][feature] rows into the Dense stage's [feature][position] layout. */
+    fun toFeatureMajor(): FloatArray {
+        val transposed = FloatArray(values.size)
+        for (position in 0 until rowCount) {
+            val rowStart = position * rowWidth
+            for (feature in 0 until rowWidth) {
+                transposed[feature * rowCount + position] = values[rowStart + feature]
+            }
+        }
+        return transposed
+    }
 }
 
 /**

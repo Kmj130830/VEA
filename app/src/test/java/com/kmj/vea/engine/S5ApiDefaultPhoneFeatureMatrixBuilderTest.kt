@@ -70,6 +70,19 @@ class S5ApiDefaultPhoneFeatureMatrixBuilderTest {
     }
 
     @Test
+    fun transposesRowMajorPhoneRowsToFeatureMajorDenseInput() {
+        val matrix = S5ApiDefaultPhoneFeatureMatrix(
+            rowCount = 3,
+            rowWidth = 2,
+            values = floatArrayOf(1f, 10f, 2f, 20f, 3f, 30f)
+        )
+        assertEquals(
+            listOf(1f, 2f, 3f, 10f, 20f, 30f),
+            matrix.toFeatureMajor().toList()
+        )
+    }
+
+    @Test
     fun returnsAnEmptyMatrixForNoPhoneEvents() {
         val layout = S5ApiDefaultPhoneFeatureLayout(14, 1, 1, false)
         val matrix = S5ApiDefaultPhoneFeatureMatrixBuilder.build(emptyList(), layout)

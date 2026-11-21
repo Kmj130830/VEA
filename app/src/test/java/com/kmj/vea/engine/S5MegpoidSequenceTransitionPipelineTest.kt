@@ -5,15 +5,16 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class S5MegpoidSequenceTransitionPipelineTest {
-    private class DenseFake : S5MegpoidDenseFeatureOperator {
-        override val inputFeatures = 1
+    private class DenseFake(
+        override val inputFeatures: Int = 1
+    ) : S5MegpoidDenseFeatureOperator {
         override val outputFeatures = 1
         override fun forward(
             input: FloatArray,
             positions: Int,
             gemm: S5MegpoidGemmKernel,
             statistics: S5MegpoidStatisticsKernel
-        ): FloatArray = FloatArray(input.size) { input[it] + 1.0f }
+        ): FloatArray = FloatArray(positions) { input[it] + 1.0f }
     }
 
     private class TemporalFake(
@@ -65,9 +66,12 @@ class S5MegpoidSequenceTransitionPipelineTest {
     private val calls = mutableListOf<String>()
     private val bankedInputs = mutableListOf<Float>()
 
-    private fun makePipeline(banks: IntArray = intArrayOf(1, 1, 1)) =
+    private fun makePipeline(
+        banks: IntArray = intArrayOf(1, 1, 1),
+        inputFeatures: Int = 1
+    ) =
         S5MegpoidSequenceTransitionPipeline(
-            denseStage = DenseFake(),
+            denseStage = DenseFake(inputFeatures),
             temporalStages = (0 until 3).map { TemporalFake(it, calls) },
             bankedStages = (0 until 3).map { BankedFake(it, banks[it], calls, bankedInputs) },
             residualExecutor = S5MegpoidResidualBlockExecutor(buildList {
@@ -97,6 +101,21 @@ class S5MegpoidSequenceTransitionPipelineTest {
         assertEquals(43f, result.features.first(), 0.0001f)
         assertEquals(1, result.channels)
         assertEquals(7, result.positions)
+    }
+
+    @Test
+    fun acceptsS5ApiPhoneRowsAndTransposesBeforeDenseProjection() {
+        calls.clear()
+        bankedInputs.clear()
+        val matrix = S5ApiDefaultPhoneFeatureMatrix(
+            rowCount = 3,
+            rowWidth = 2,
+            values = floatArrayOf(1f, 100f, 2f, 200f, 3f, 300f)
+        )
+        val result = makePipeline(inputFeatures = 2).runPhoneFeatureMatrix(matrix)
+        assertEquals(44f, result.features.first(), 0.0001f)
+        assertEquals(1, result.channels)
+        assertEquals(3, result.positions)
     }
 
     @Test

@@ -93,6 +93,34 @@ class S5MegpoidSequenceTransitionPipeline(
         }
     }
 
+    /**
+     * Runs an S5API mode-0 phone matrix through the neural sequence path.
+     * Native row-major phone rows are transposed to the Dense operator's
+     * [inputFeature][position] layout before inference.
+     */
+    @Synchronized
+    fun runPhoneFeatureMatrix(
+        phoneMatrix: S5ApiDefaultPhoneFeatureMatrix,
+        epsilon: Float = S5MegpoidResidualBlockShape.DEFAULT_EPSILON,
+        gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel,
+        statistics: S5MegpoidStatisticsKernel = NativeS5MegpoidStatisticsKernel
+    ): S5MegpoidSequenceTransitionOutput {
+        require(phoneMatrix.rowCount > 0) {
+            "A phone feature matrix must contain at least one position."
+        }
+        require(phoneMatrix.rowWidth == denseStage.inputFeatures) {
+            "S5API phone row width " + phoneMatrix.rowWidth +
+                " does not match Dense inputFeatures " + denseStage.inputFeatures + "."
+        }
+        return run(
+            input = phoneMatrix.toFeatureMajor(),
+            inputPositions = phoneMatrix.rowCount,
+            epsilon = epsilon,
+            gemm = gemm,
+            statistics = statistics
+        )
+    }
+
     @Synchronized
     fun run(
         input: FloatArray,
