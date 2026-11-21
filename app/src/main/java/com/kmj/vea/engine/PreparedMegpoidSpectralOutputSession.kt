@@ -14,6 +14,12 @@ class PreparedMegpoidSpectralOutputSession(
 
     init {
         require(outputSamples > 0) { "Spectral output block length must be positive." }
+        require(spectrumShape.fftSize == overlapAdd.fftSizeSamples) {
+            "Spectrum shape FFT size does not match the overlap-add processor."
+        }
+        require(outputSamples == overlapAdd.outputSampleCount) {
+            "Declared output block length does not match the overlap-add processor."
+        }
     }
 
     /** Number of spectrum frames successfully consumed since the last reset. */
