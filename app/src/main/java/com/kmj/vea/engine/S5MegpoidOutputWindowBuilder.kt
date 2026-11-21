@@ -139,9 +139,9 @@ object S5MegpoidOutputWindowBuilder {
             if (sourceEnd <= sourceStart) continue
 
             val outputStart = if (sourceEnd <= outputSamples) {
-                0
+                outputSamples - sourceEnd
             } else {
-                maxOf(0, outputSamples - sourceEnd)
+                0
             }
             val copyCount = sourceEnd - sourceStart
             require(outputStart.toLong() + copyCount.toLong() <= outputSamples.toLong()) {
