@@ -75,16 +75,16 @@ The component strings are copied from the three static pointer tables, not synth
 
 These are **base table components**, not final spoken phonemes. The proprietary context rules change some syllables and markers before the segment strings are assembled. Therefore the language-ready mask remains zero and the renderer remains unavailable.
 
-## First recovered single-syllable context rule
+## Recovered isolated single-syllable rules
 
-The initial pass in `FUN_180008730` scans each prepared Hangul syllable and rewrites it when:
+Two local rewrites from `FUN_180008730` have been isolated from its adjacent-syllable branches:
 
-- packed onset index is neither 7 nor 13;
-- packed vowel index is 12.
+1. If packed onset index is neither 7 nor 13 and packed vowel index is 12, retain onset/coda and change the vowel index to 10. This corresponds to a `ㅖ → ㅔ` medial rewrite, with `ㄹ` and `ㅇ` onset exceptions. Example: `몌 → 메`; `례` and `예` remain unchanged.
+2. If packed onset index is not 13 and packed vowel index is 28, retain onset/coda and change the vowel index to 29. This corresponds to the DLL's local `ㅢ`-family rewrite. Example: `므 → 믜`; the onset-index-13 case remains unchanged.
 
-For those syllables it performs a reverse lookup using the same onset and coda indices but vowel index 10. In the Unicode modern-Hangul decomposition this corresponds to the `ㅖ → ㅔ` medial rewrite, with `ㄹ` and `ㅇ` onset exceptions. The native bridge exposes this bounded operation as `vea_g2p_korean_apply_single_syllable_rules`.
+The native helper `vea_g2p_korean_apply_single_syllable_rules` applies these two isolated checks in order. Its C++ tests cover all 19 onset rows × 28 coda values for each target vowel, as well as representative exception cases.
 
-Tests cover `몌 → 메`, preservation of `례` and `예`, a non-target medial, and all 19 initial-consonant rows × 28 final-consonant values. This is only the first single-syllable pass from the much larger `FUN_180008730` routine; the adjacent-syllable transformations in the remainder of that function are not yet ported.
+These checks are only the local parts of a much larger routine. They do not implement the adjacent-syllable transformations, marker propagation or final segment generation. The JNI/Kotlin diagnostic method `NativeG2pBridge.applyKoreanSingleSyllableRules` exposes the same limited preview after lexical normalization; it must not be used as the final singing phoneme stream.
 
 ## Reverse packed-index lookup
 
@@ -106,12 +106,12 @@ Non-Hangul characters are omitted from this diagnostic result; their positions r
 
 ## Files
 
-- `app/src/main/cpp/include/veag2p.h`: stable C ABI, status values, ABI version, language readiness mask, forward/reverse Hangul lookup, single-syllable rewrite and base-component output contracts.
-- `app/src/main/cpp/veag2p_core.cpp`: UTF-8 validation, two code-point canonicalizations, 32 ordered Korean lexical replacements, forward/reverse packed Hangul-index lookup, the first verified single-syllable rewrite, and base onset/vowel/coda label tables.
-- `app/src/main/cpp/veag2p_jni.cpp`: JNI boundary; converts Java UTF-16 strings without relying on JNI modified UTF-8 and exposes base-component arrays.
+- `app/src/main/cpp/include/veag2p.h`: stable C ABI, status values, ABI version, language readiness mask, forward/reverse Hangul lookup, two isolated syllable rewrites and base-component output contracts.
+- `app/src/main/cpp/veag2p_core.cpp`: UTF-8 validation, two code-point canonicalizations, 32 ordered Korean lexical replacements, forward/reverse packed Hangul-index lookup, two isolated single-syllable rewrites, and base onset/vowel/coda label tables.
+- `app/src/main/cpp/veag2p_jni.cpp`: JNI boundary; converts Java UTF-16 strings without relying on JNI modified UTF-8, and exposes base-component arrays plus the isolated rewrite helper.
 - `app/src/main/cpp/CMakeLists.txt`: Android shared-library and host-test targets.
-- `app/src/main/java/com/kmj/vea/engine/NativeG2pBridge.kt`: Kotlin facade, including diagnostic `inspectKoreanBaseComponents`.
-- `app/src/main/cpp/tests/veag2p_core_test.cpp`: host-side tests for UTF-8 validation, all 32 Korean replacements, repeated matches, full 11,172-syllable packed-index/base-label hashes and round trips, and exhaustive coverage of the first single-syllable rewrite.
+- `app/src/main/java/com/kmj/vea/engine/NativeG2pBridge.kt`: Kotlin facade, including diagnostic `inspectKoreanBaseComponents` and partial `applyKoreanSingleSyllableRules`.
+- `app/src/main/cpp/tests/veag2p_core_test.cpp`: host-side tests for UTF-8 validation, all 32 Korean replacements, repeated matches, full 11,172-syllable packed-index/base-label hashes and round trips, and exhaustive coverage of both isolated single-syllable rewrites.
 
 ## ABI
 
