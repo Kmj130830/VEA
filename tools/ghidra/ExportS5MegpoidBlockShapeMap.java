@@ -68,6 +68,56 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
         "180014f70", // hash digest stream finalization
         "180083c50", // integer-to-string component used by RNN name builder
         "1800873a0", // high-level VSM model/configuration initializer
+        "1800dc0a0", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e7320", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e6c20", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800dbd20", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e25b0", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800dbee0", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e7160", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e6de0", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800db910", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800dbad0", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e1cf0", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e23f0", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800dafc0", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e6670", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800db180", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800db340", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800db500", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e1b30", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e1eb0", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e1430", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e15f0", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e2070", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e2230", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e3030", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e2cb0", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e2930", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e2af0", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e2770", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800dfd10", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e2e70", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e0250", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800deb10", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800dfb50", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800dfed0", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e0090", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e17b0", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e1970", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e31f0", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e33b0", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e3570", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e3730", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e3b90", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e6fa0", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e7500", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e9580", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e9740", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e9900", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e9ac0", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e9c80", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
+        "1800e9e40", // zero-argument VTB2 property-key accessor used by FUN_1800ced10; field role unresolved
         "1800af170", // parent constructor that populates the render-state root
         "1800b8f60", // converts the model property passed into the runtime-root builder
         "1800af230", // follow-up runtime-root configuration called after model population
