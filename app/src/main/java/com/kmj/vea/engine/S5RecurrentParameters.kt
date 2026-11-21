@@ -54,12 +54,11 @@ data class S5RecurrentLayerLayout(
 data class S5RecurrentTensorSpec(
     val name: String,
     val rows: Int,
-    val columns: Int,
-    val member: S5ModelTensorKey.Member
+    val columns: Int
 ) {
-    /** Hashed key used by the decoded S5API JSON-like model object. */
+    /** Hashed key for the fully constructed recurrent member name. */
     val lookupKey: String
-        get() = S5ModelTensorKey.derive(name, member)
+        get() = S5ModelTensorKey.deriveParameterName(name)
 
     val elementCount: Int
         get() {
@@ -121,28 +120,24 @@ object S5RecurrentParameterLoader {
                 specs += S5RecurrentTensorSpec(
                     parameterName(base, ".weight_ih_l", layer, reverse),
                     layout.gateRows,
-                    inputFeatures,
-                    S5ModelTensorKey.Member.WEIGHT
+                    inputFeatures
                 )
                 specs += S5RecurrentTensorSpec(
                     parameterName(base, ".weight_hh_l", layer, reverse),
                     layout.gateRows,
-                    layout.hiddenFeatures,
-                    S5ModelTensorKey.Member.WEIGHT
+                    layout.hiddenFeatures
                 )
                 if (layout.hasBias) {
                     specs += S5RecurrentTensorSpec(
                         parameterName(base, ".bias_ih_l", layer, reverse),
                         layout.gateRows,
-                        1,
-                        S5ModelTensorKey.Member.BIAS
-                    )
+                        1
+                )
                     specs += S5RecurrentTensorSpec(
                         parameterName(base, ".bias_hh_l", layer, reverse),
                         layout.gateRows,
-                        1,
-                        S5ModelTensorKey.Member.BIAS
-                    )
+                        1
+                )
                 }
             }
         }
@@ -167,21 +162,18 @@ object S5RecurrentParameterLoader {
                 val inputName = parameterName(base, ".weight_ih_l", layer, reverse)
                 val recurrentName = parameterName(base, ".weight_hh_l", layer, reverse)
                 val inputWeights = requiredTensor(
-                    tensors, inputName, checkedProduct(layout.gateRows, inputFeatures),
-                    S5ModelTensorKey.Member.WEIGHT
+                    tensors, inputName, checkedProduct(layout.gateRows, inputFeatures)
                 )
                 val recurrentWeights = requiredTensor(
                     tensors, recurrentName,
-                    checkedProduct(layout.gateRows, layout.hiddenFeatures),
-                    S5ModelTensorKey.Member.WEIGHT
+                    checkedProduct(layout.gateRows, layout.hiddenFeatures)
                 )
                 val inputBias = if (layout.hasBias) {
                     requiredTensor(
                         tensors,
                         parameterName(base, ".bias_ih_l", layer, reverse),
-                        layout.gateRows,
-                        S5ModelTensorKey.Member.BIAS
-                    )
+                        layout.gateRows
+                )
                 } else {
                     null
                 }
@@ -189,9 +181,8 @@ object S5RecurrentParameterLoader {
                     requiredTensor(
                         tensors,
                         parameterName(base, ".bias_hh_l", layer, reverse),
-                        layout.gateRows,
-                        S5ModelTensorKey.Member.BIAS
-                    )
+                        layout.gateRows
+                )
                 } else {
                     null
                 }
@@ -282,10 +273,9 @@ object S5RecurrentParameterLoader {
     private fun requiredTensor(
         tensors: Map<String, FloatArray>,
         name: String,
-        expectedCount: Int,
-        member: S5ModelTensorKey.Member
+        expectedCount: Int
     ): FloatArray {
-        val lookupKey = S5ModelTensorKey.derive(name, member)
+        val lookupKey = S5ModelTensorKey.deriveParameterName(name)
         val values = tensors[lookupKey] ?: throw IllegalArgumentException(
             "Required S5 recurrent tensor '$name' (model key '$lookupKey') is missing."
         )
