@@ -1,6 +1,12 @@
 package com.kmj.vea.ui
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import com.kmj.vea.engine.MegpoidV7PackageInstaller
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
@@ -52,6 +58,79 @@ fun VeaApp() {
             ).show()
         }
     }
+    var pendingMegpoidBankUri by rememberSaveable { mutableStateOf("") }
+    var installedMegpoidPackage by remember {
+        mutableStateOf<MegpoidV7PackageInstaller.InstalledPackage?>(null)
+    }
+    var megpoidInstallCheckComplete by remember { mutableStateOf(false) }
+    val importScope = rememberCoroutineScope()
+
+    LaunchedEffect(context) {
+        installedMegpoidPackage = withContext(Dispatchers.IO) {
+            MegpoidV7PackageInstaller.findInstalled(context)
+        }
+        megpoidInstallCheckComplete = true
+    }
+
+    val sharedModelArchiveLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { modelUri ->
+        val bankUriText = pendingMegpoidBankUri
+        pendingMegpoidBankUri = ""
+        if (modelUri != null && bankUriText.isNotBlank()) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    modelUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            importScope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    runCatching {
+                        MegpoidV7PackageInstaller.install(
+                            context,
+                            Uri.parse(bankUriText),
+                            modelUri
+                        )
+                    }
+                }
+                result.onSuccess { installed ->
+                    installedMegpoidPackage = installed
+                    Toast.makeText(
+                        context,
+                        "AI Megpoid model files installed and verified.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }.onFailure { error ->
+                    Toast.makeText(
+                        context,
+                        "Model import failed: ${error.message.orEmpty().take(140)}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
+    val megpoidBankArchiveLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { bankUri ->
+        if (bankUri == null) {
+            pendingMegpoidBankUri = ""
+        } else {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    bankUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            pendingMegpoidBankUri = bankUri.toString()
+            sharedModelArchiveLauncher.launch(
+                arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")
+            )
+        }
+    }
+
     val history = remember(project.id) { ProjectHistory(project, limit = 200) }
 
     var selectedTrackId by rememberSaveable {
@@ -219,6 +298,13 @@ fun VeaApp() {
                     onPlay = ::playSelectedClip,
                     onStop = PianoPreview::stop,
                     onAssignVoice = ::updateTrackVoice,
+                    isMegpoidModelInstalled = installedMegpoidPackage != null,
+                    isMegpoidInstallCheckComplete = megpoidInstallCheckComplete,
+                    onImportMegpoidModel = {
+                        megpoidBankArchiveLauncher.launch(
+                            arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")
+                        )
+                    },
                     canUndo = canUndo,
                     canRedo = canRedo
                 )
