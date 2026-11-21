@@ -129,7 +129,7 @@ extern "C" VeaS5ContainerStatus vea_s5_decode_container_payload(
         uint32_t folded_state = (state << 11u) ^ state;
         const uint32_t mixed =
             (((stream_word >> 11u) ^ folded_state) >> 8u) ^
-            folded_state ^ stream_word ^ state ^ tail_word;
+            folded_state ^ stream_word ^ tail_word;
         for (uint32_t i = 0; i < remainder; ++i) {
             output[word_count * 4u + i] =
                 static_cast<uint8_t>(mixed >> (i * 8u));
