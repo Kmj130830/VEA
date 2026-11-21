@@ -7,11 +7,12 @@ import kotlin.math.sin
 /**
  * Contract-level inverse real-spectrum transform for the Megpoid output path.
  *
- * S5API's real-transform wrapper stores the interior one-sided spectrum with
- * the imaginary components conjugated relative to its internal forward FFT
- * convention. Its inverse path restores those signs and calls the FFT core in
- * the negative direction. This reference implementation folds those two
- * operations into a direct inverse using the positive exponential direction.
+ * S5API's outer output converter optionally negates both components of bins
+ * 1, 3, 5, ... when its descriptor flag at +0x90 is enabled. The real-FFT
+ * wrapper then conjugates the imaginary component of every interior bin
+ * before calling its negative-direction packed transform. This reference
+ * implementation folds the latter conjugation and direction into a direct
+ * positive-exponent inverse over a Hermitian full spectrum.
  *
  * Input is N/2 + 1 interleaved complex float32 bins. The output is N normalized
  * real samples. DC and Nyquist are self-conjugate and their imaginary values
@@ -38,12 +39,15 @@ class S5MegpoidInverseRealFft(val fftSize: Int) {
     /**
      * Transforms interleaved [real, imaginary] bins for frequencies 0..N/2.
      *
-     * The vendor wrapper's inverse operation conjugates every interior
-     * imaginary bin before calling its negative-direction packed real FFT.
-     * Using a positive-direction full complex inverse is mathematically
-     * equivalent and avoids exposing a vendor-specific packed workspace.
+     * When alternatingBinSign is true, this mirrors FUN_18012c740's descriptor
+     * flag at +0x90: both real and imaginary components are negated for every
+     * odd-indexed bin (1, 3, 5, ...). It is distinct from FUN_180040630's
+     * imaginary-only conjugation of all interior bins.
      */
-    fun transform(interleavedSpectrum: FloatArray): FloatArray {
+    fun transform(
+        interleavedSpectrum: FloatArray,
+        alternatingBinSign: Boolean = false
+    ): FloatArray {
         require(interleavedSpectrum.size.toLong() == binCount.toLong() * 2L) {
             "The spectrum must contain exactly N/2 + 1 interleaved complex bins."
         }
@@ -56,12 +60,13 @@ class S5MegpoidInverseRealFft(val fftSize: Int) {
         val lastBin = fftSize / 2
 
         for (bin in 0..lastBin) {
-            real[bin] = interleavedSpectrum[bin * 2]
-            // DC and Nyquist are real-valued bins in a real transform.
+            val negateBin = alternatingBinSign && (bin and 1) == 1
+            val sign = if (negateBin) -1f else 1f
+            real[bin] = interleavedSpectrum[bin * 2] * sign
             imaginary[bin] = if (bin == 0 || bin == lastBin) {
                 0f
             } else {
-                interleavedSpectrum[bin * 2 + 1]
+                interleavedSpectrum[bin * 2 + 1] * sign
             }
         }
 

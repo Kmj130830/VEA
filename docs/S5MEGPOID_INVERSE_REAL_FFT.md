@@ -12,30 +12,34 @@ normalized real samples.
 
 ## Evidence-to-implementation mapping
 
-The Ghidra static pseudocode for S5API FUN_180040630 establishes the wrapper
-operations:
+Static analysis of S5API establishes two distinct sign operations:
 
-- Forward mode calls the FFT core with direction +1, then flips the sign bit
-  of the imaginary component of every interior one-sided complex bin.
-- Inverse mode first flips the sign bit of the imaginary component of every
-  interior one-sided complex bin, packs the Nyquist real value into the real
-  FFT workspace slot, zeros the packed tail, doubles the workspace values,
-  and calls the FFT core with direction -1.
-- The higher-level output conversion FUN_18012c740 then divides the first N
-  transformed real samples by N before overlap-add.
+1. In FUN_18012c740, the output converter copies N/2 + 1 complex bins into
+   scratch storage. When the transform descriptor byte at +0x90 is enabled,
+   it negates both the real and imaginary components of bins 1, 3, 5, ... .
+   This is an optional alternating-bin sign operation on the complex values.
+2. FUN_180040630 performs the real-transform packing. In inverse mode it
+   negates only the imaginary component of every interior bin (1 through
+   N/2 - 1), moves the Nyquist real value into the packed workspace slot,
+   zeros the packed tail, doubles the first N workspace floats, and calls the
+   FFT core with direction -1.
+3. FUN_18012c740 divides the first N transformed real samples by N before
+   overlap-add.
 
-This reference implementation folds the inverse wrapper's imaginary-sign
-restoration and negative-direction packed real FFT into a direct positive-
-exponent complex inverse over a Hermitian full spectrum. DC and Nyquist are
-self-conjugate; their imaginary values are ignored. It does not emulate the
-vendor's packed workspace byte-for-byte.
+The reference implementation represents operation 1 using the
+alternatingBinSign parameter. It folds operation 2's imaginary conjugation
+and negative-direction packed real FFT into a direct positive-exponent
+complex inverse over a Hermitian full spectrum. DC and Nyquist are
+self-conjugate; their imaginary values are ignored. The code does not emulate
+the vendor's packed workspace byte-for-byte.
 
 ## Test coverage
 
-The unit tests verify reconstruction of DC, cosine, sine under S5API's
-conjugated forward-spectrum convention, and Nyquist frames. They also check
-that imaginary DC/Nyquist values are ignored, malformed/non-finite spectra
-are rejected, and mixed spectra produce finite samples.
+The unit tests verify reconstruction of DC, cosine and sine frames under the
+S5API external-spectrum convention, the optional alternating-bin sign effect
+on both real and imaginary components of odd bins, Nyquist reconstruction,
+ignored DC/Nyquist imaginary values, malformed/non-finite spectrum rejection,
+and finite output for a mixed spectrum.
 
 ## Remaining integration boundary
 

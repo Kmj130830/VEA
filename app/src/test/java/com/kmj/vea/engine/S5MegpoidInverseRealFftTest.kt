@@ -51,6 +51,35 @@ class S5MegpoidInverseRealFftTest {
     }
 
     @Test
+    fun alternatingBinFlagNegatesBothComponentsOfOddBins() {
+        val size = 8
+        val cosineSpectrum = FloatArray((size / 2 + 1) * 2)
+        cosineSpectrum[2] = size / 2f
+
+        val negativeCosine = S5MegpoidInverseRealFft(size).transform(
+            interleavedSpectrum = cosineSpectrum,
+            alternatingBinSign = true
+        )
+
+        for (sample in negativeCosine.indices) {
+            val expected = -cos(2.0 * PI * sample / size).toFloat()
+            assertEquals(expected, negativeCosine[sample], 1e-5f)
+        }
+
+        val sineSpectrum = FloatArray((size / 2 + 1) * 2)
+        sineSpectrum[3] = -size / 2f
+        val negativeSine = S5MegpoidInverseRealFft(size).transform(
+            interleavedSpectrum = sineSpectrum,
+            alternatingBinSign = true
+        )
+
+        for (sample in negativeSine.indices) {
+            val expected = -sin(2.0 * PI * sample / size).toFloat()
+            assertEquals(expected, negativeSine[sample], 1e-5f)
+        }
+    }
+
+    @Test
     fun reconstructsNyquistAlternatingFrame() {
         val size = 8
         val spectrum = FloatArray((size / 2 + 1) * 2)
