@@ -92,7 +92,11 @@ public class ExportS5RendererPath extends GhidraScript {
                 // FUN_180074a50 separately from the global alias tree.
                 // Force its initializer and adjacent subobject constructors
                 // into the report instead of relying on the bounded closure.
-                "180050aa0", "180013410", "180012030", "180011be0"
+                "180050aa0", "180013410", "180012030", "180011be0",
+                // The phone-label -> category-index map builder walks the
+                // global grouped phone inventory at DAT_1801c4160/4168.
+                "18006c520", "1800103e0", "180197460",
+                "18004be40", "18004cb90"
             };
             out.println("## Explicit internal call targets");
             out.println();
@@ -189,6 +193,62 @@ public class ExportS5RendererPath extends GhidraScript {
             }
             out.println();
 
+            out.println("## Direct callers of phone-label category map builder");
+            out.println();
+            Address categoryMapBuilder = toAddr("18006c520");
+            ReferenceIterator categoryMapBuilderRefs =
+                currentProgram.getReferenceManager().getReferencesTo(categoryMapBuilder);
+            int categoryMapCallerCount = 0;
+            while (categoryMapBuilderRefs.hasNext()) {
+                Reference ref = categoryMapBuilderRefs.next();
+                Function caller = currentProgram.getFunctionManager()
+                    .getFunctionContaining(ref.getFromAddress());
+                if (caller == null) continue;
+                categoryMapCallerCount++;
+                out.printf("- %s at %s, call site %s%n",
+                    caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+            }
+            if (categoryMapCallerCount == 0) {
+                out.println("- No direct call reference recovered; inspect vtable/initializer paths.");
+            }
+            out.println();
+
+            out.println("## Grouped phone-vocabulary global references");
+            out.println();
+            out.println("| Global address | Referencing function | Reference site | Reference type |");
+            out.println("|---:|---|---:|---|");
+            String[] phoneVocabularyGlobals = {"1801c4160", "1801c4168"};
+            int vocabularyReferenceCount = 0;
+            for (String hex : phoneVocabularyGlobals) {
+                Address globalAddress = toAddr(hex);
+                ReferenceIterator vocabularyRefs =
+                    currentProgram.getReferenceManager().getReferencesTo(globalAddress);
+                while (vocabularyRefs.hasNext()) {
+                    Reference ref = vocabularyRefs.next();
+                    Function caller = currentProgram.getFunctionManager()
+                        .getFunctionContaining(ref.getFromAddress());
+                    if (caller == null) continue;
+                    vocabularyReferenceCount++;
+                    out.printf("| %s | %s at %s | %s | %s |%n",
+                        globalAddress, caller.getName(), caller.getEntryPoint(),
+                        ref.getFromAddress(), ref.getReferenceType());
+                }
+                byte[] raw = new byte[0x40];
+                try {
+                    currentProgram.getMemory().getBytes(globalAddress, raw);
+                    StringBuilder hexBytes = new StringBuilder();
+                    for (byte b : raw) hexBytes.append(String.format("%02x", b & 0xff));
+                    out.printf("- Initial bytes at %s: %s%n", globalAddress, hexBytes);
+                } catch (Exception e) {
+                    out.printf("- Initial bytes at %s: unavailable (%s)%n",
+                        globalAddress, e.getMessage());
+                }
+            }
+            if (vocabularyReferenceCount == 0) {
+                out.println("| - | no code references recovered | - | - |");
+            }
+            out.println();
+
             out.println("## Direct callers of S5API runtime-context allocator");
             out.println();
             Address allocatorTarget = toAddr("180012b40");
@@ -221,7 +281,8 @@ public class ExportS5RendererPath extends GhidraScript {
             String[][] globalRanges = {
                 {"1801c3080", "1801c3238"},
                 {"1801c3240", "1801c3328"},
-                {"1801c4140", "1801c4148"}
+                {"1801c4140", "1801c4148"},
+                {"1801c4160", "1801c4170"}
             };
             int globalReferenceCount = 0;
             for (String[] range : globalRanges) {
