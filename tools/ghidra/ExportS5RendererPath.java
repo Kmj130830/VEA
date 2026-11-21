@@ -119,6 +119,8 @@ public class ExportS5RendererPath extends GhidraScript {
                 "18004e580", "18004e620", "18002ace0", "180010110",
                 "180040630", "180082a30", "18007d700", "18007fca0",
                 "18007a000", "18000fc20",
+                // Populate the root scalar fields consumed by FUN_1800d5a00.
+                "1800ced10", "1800bc5e0", "1800d4bf0", "1800d5a00",
                 "1800ccafd"
             };
             out.println("## Explicit internal call targets");
@@ -264,6 +266,49 @@ public class ExportS5RendererPath extends GhidraScript {
                     out.println();
                 }
             }
+
+            out.println("## Render-root scalar population callsite");
+            out.println();
+            Function rootBuilder =
+                currentProgram.getFunctionManager().getFunctionAt(toAddr("1800ced10"));
+            if (rootBuilder == null) {
+                out.println("- FUN_1800ced10 was not recovered.");
+            } else {
+                Address targetAddress = toAddr("1800d5a00");
+                InstructionIterator rootInstructions =
+                    currentProgram.getListing().getInstructions(rootBuilder.getBody(), true);
+                ArrayDeque<Instruction> preceding = new ArrayDeque<>();
+                int matchingCalls = 0;
+                while (rootInstructions.hasNext()) {
+                    monitor.checkCancelled();
+                    Instruction ins = rootInstructions.next();
+                    boolean match = false;
+                    for (Reference ref : ins.getReferencesFrom()) {
+                        if (ref.getReferenceType().isCall() &&
+                            ref.getToAddress().equals(targetAddress)) {
+                            match = true;
+                            break;
+                        }
+                    }
+                    if (match) {
+                        matchingCalls++;
+                        out.println("Callsite: " + ins.getAddress());
+                        out.println("~~~asm");
+                        for (Instruction prior : preceding) {
+                            out.println(prior.getAddress() + "  " + prior.toString());
+                        }
+                        out.println(ins.getAddress() + "  " + ins.toString());
+                        out.println("~~~");
+                        out.println();
+                    }
+                    preceding.addLast(ins);
+                    while (preceding.size() > 64) preceding.removeFirst();
+                }
+                if (matchingCalls == 0) {
+                    out.println("- No direct call to FUN_1800d5a00 found in FUN_1800ced10.");
+                }
+            }
+            out.println();
 
             out.println("## Output overlap descriptor construction callsites");
             out.println();
