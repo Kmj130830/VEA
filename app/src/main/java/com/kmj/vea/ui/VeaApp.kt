@@ -164,13 +164,20 @@ fun VeaApp() {
         }
     }
 
-    fun updateTrackVoice(trackId: String, singerId: String, singerName: String, styleId: String) {
+    fun updateTrackVoice(
+        trackId: String,
+        singerId: String,
+        singerName: String,
+        styleId: String,
+        sourceUri: String
+    ) {
         val next = project.copy(
             tracks = project.tracks.map { track ->
                 if (track.id == trackId) track.copy(
                     singerId = singerId,
                     singerName = singerName,
-                    singerStyleId = styleId
+                    singerStyleId = styleId,
+                    singerSourceUri = sourceUri
                 ) else track
             }
         )
@@ -298,6 +305,8 @@ fun VeaApp() {
                     onPlay = ::playSelectedClip,
                     onStop = PianoPreview::stop,
                     onAssignVoice = ::updateTrackVoice,
+                    megpoidVoicebankSourceUri = installedMegpoidPackage
+                        ?.toVoicebankDescriptor()?.sourceUri.orEmpty(),
                     isMegpoidModelInstalled = installedMegpoidPackage != null,
                     isMegpoidInstallCheckComplete = megpoidInstallCheckComplete,
                     onImportMegpoidModel = {
