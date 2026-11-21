@@ -97,7 +97,8 @@ public class ExportVsmAnalysis extends GhidraScript {
                 "FUN_18006c2d0", "FUN_18006c6f0", "FUN_18006e670",
                 "FUN_180056c70", "FUN_180074580", "FUN_180074400",
                 "FUN_180074350", "FUN_180077c40", "FUN_18007bf80",
-                "FUN_18007ef90", "FUN_18007d000", "FUN_1801294d0"
+                "FUN_18007ef90", "FUN_18007d000", "FUN_1801294d0",
+                "FUN_180071440"
             };
             out.println("## Explicit MIDI-to-render helper seeds");
             out.println();
