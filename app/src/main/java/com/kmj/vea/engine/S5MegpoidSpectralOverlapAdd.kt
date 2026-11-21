@@ -118,7 +118,7 @@ class S5MegpoidSpectralOverlapAdd(
             // Reproduces the clamped source interval selected by FUN_18012c740.
             val startCandidate = -checkedLongProduct(relativeOffset, outputSamples.toLong())
             val sourceStartValue = (frameHalf.toLong() +
-                minOf(frameHalf.toLong(), startCandidate)).coerceAtLeast(0L)
+                minOf(geometryHalf.toLong(), startCandidate)).coerceAtLeast(0L)
 
             val endCandidate = checkedLongProduct(1L - relativeOffset, outputSamples.toLong())
             val sourceEndValue = (frameHalf.toLong() +
