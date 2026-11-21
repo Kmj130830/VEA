@@ -69,6 +69,18 @@ class S5ModelTensorKeyTest {
         )
     }
 
+    @Test
+    fun derivesVtmgConventionalDigestByteOrder() {
+        assertEquals(
+            "f8b15a70e9fe50b828e5803435580c63",
+            S5ModelTensorKey.deriveDigestHex("pre1", S5ModelTensorKey.Member.WEIGHT)
+        )
+        assertEquals(
+            "e0b8e91e6062dd010960e012a5410dfc",
+            S5ModelTensorKey.deriveDigestHex("pre1", S5ModelTensorKey.Member.BIAS)
+        )
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun rejectsNonAsciiBaseName() {
         S5ModelTensorKey.derive("한글", S5ModelTensorKey.Member.WEIGHT)
