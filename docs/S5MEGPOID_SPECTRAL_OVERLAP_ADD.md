@@ -169,7 +169,7 @@ and +0x92. The disassembly establishes three distinct paths:
    `0.5 * (cos(pi*x) + 1)`, where
    `x = (index - geometry/2) / outputSamples` and values with `abs(x) >= 1`
    become zero. It divides the original frame window by
-   `max(originalFrameWindow, 1e-4)`, overlap-adds the raised-cosine vector,
+   `max(originalFrameWindow, 1e-3)`, overlap-adds the raised-cosine vector,
    and stores the reciprocal overlap sum.
 3. With +0x92 set, that branch takes precedence. It overlap-adds the current
    frame window itself and stores the reciprocal overlap sum.
