@@ -57,7 +57,6 @@ fun ArrangementScreen(
     megpoidVoicebankSourceUri: String,
     isMegpoidModelInstalled: Boolean,
     isMegpoidInstallCheckComplete: Boolean,
-    onImportMegpoidModel: () -> Unit,
     canUndo: Boolean,
     canRedo: Boolean
 ) {
@@ -281,15 +280,12 @@ fun ArrangementScreen(
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Button(
-                        onClick = onImportMegpoidModel,
-                        enabled = isMegpoidInstallCheckComplete,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(if (isMegpoidModelInstalled) "REIMPORT MODEL FILES" else "IMPORT MODEL FILES")
-                    }
                     Text(
-                        "Select megpoidV7.zip first, then AI Model.zip. The app installs only files that pass SHA-256 and container-header checks.",
+                        if (isMegpoidModelInstalled) {
+                            "AI Megpoid V7 weights are bundled with the app and verified in private storage."
+                        } else {
+                            "Bundled AI Megpoid model resources are unavailable. Rebuild the app with the model archives at the repository root."
+                        },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 10.sp
                     )
