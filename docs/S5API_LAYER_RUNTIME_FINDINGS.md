@@ -19,7 +19,9 @@ This establishes a recurrent layer plus two additional model-layer setup paths i
 
 `FUN_18005ebe0` iterates over layer/direction combinations, constructs `.weight_ih_l...` and `.weight_hh_l...` keys, and optionally appends `_reverse`. It reads both sets of weights into per-layer buffers and copies them into the packed matrix structures.
 
-The code also derives a three-gate width (`param_5 * 3`). This is strong evidence for a GRU-shaped recurrent parameter layout, potentially bidirectional. However, the parameter reader alone does not establish the forward equations, gate ordering, reset/update placement, bias handling, activation functions, or sequence direction semantics. Calling it a proven GRU implementation would be premature.
+The code derives a three-gate width (`param_5 * 3`). In the input-weight copy loop, each of those gate rows receives `inputFeatures` values. The recurrent-weight copy loop similarly stores `3 * hiddenFeatures` rows with `hiddenFeatures` values per row. For the bidirectional path, later-layer input width is multiplied by the direction count. These observations establish parameter dimensions and key naming, not the recurrent forward equations.
+
+The parameter reader alone does not establish gate ordering, reset/update placement, bias equations, activation functions, or sequence direction semantics. Calling it a proven GRU implementation would be premature.
 
 ## Matrix layout linked to the recurrent layer
 
@@ -30,7 +32,20 @@ The recovered matrix loader `FUN_180064670` provides the exact copy mapping now 
 - `padded_axis0 = align_up(axis0_count, 8)`;
 - descriptor records are 0x18 bytes and 32-byte arena allocations are used.
 
-The source indexing is interleaved across the matrix-bank dimension, rather than a plain row-major matrix dump.
+The source indexing is interleaved across the matrix-bank dimension, rather than a plain row-major matrix dump. The recurrent reader separately copies its per-direction weight matrices row by row.
+
+## Android recurrent parameter preparation
+
+`app/src/main/java/com/kmj/vea/engine/S5RecurrentParameters.kt` now contains a Kotlin parameter-layout and validation layer based on the recovered reader:
+
+- creates `rnn.weight_ih_lN` and `rnn.weight_hh_lN` names, including `_reverse` direction names;
+- validates the recovered `[3 * hiddenFeatures][inputFeatures]` and `[3 * hiddenFeatures][hiddenFeatures]` matrix lengths;
+- validates the optional pair of `bias_ih` / `bias_hh` vectors;
+- accounts for the doubled input width of later layers in a bidirectional stack;
+- sends validated matrices to the existing native `packRowMajor` routine, which pads the column dimension to eight floats;
+- cross-checks generated parameter names against the existing native C++ name builder when that library is loaded.
+
+The JVM tests cover unidirectional and bidirectional layouts, reverse names, later-layer width, missing tensors, non-finite data, and copy isolation. This stage accepts already-decoded tensor arrays. It does not parse the outer VTB2 object tree or execute the recurrent layer.
 
 ## Next static-analysis targets
 
@@ -46,4 +61,4 @@ These are used to recover concrete scalar math, operator shapes, and the relatio
 
 ## Implementation boundary
 
-The Android ARM64 library currently implements the recovered aligned arena, 0x18-byte descriptor, numeric double-to-float conversion, and interleaved matrix-bank packing. It does not yet execute the recurrent layer or any neural graph. No AI Megpoid audio render is available at this milestone.
+The Android ARM64 library currently implements recovered tensor primitives and recurrent parameter packing, but it does not yet execute the recurrent layer or complete neural graph. The VTB2 object-tree/weight-key reader and the full acoustic rendering path remain incomplete. No AI Megpoid audio render is available at this milestone.
