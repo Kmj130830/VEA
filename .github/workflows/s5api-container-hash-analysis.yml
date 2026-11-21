@@ -6,6 +6,7 @@ on:
     paths:
       - "Editor.zip"
       - "tools/inspect_s5_model_payload.py"
+      - "tools/inspect_s5_all_model_payloads.py"
       - "app/src/main/cpp/vea_s5_container.cpp"
       - "tools/ghidra/ExportS5ContainerAndHash.java"
       - ".github/workflows/s5api-container-hash-analysis.yml"
@@ -65,6 +66,9 @@ jobs:
 
       - name: Decode and inspect the AI Megpoid VTB2 body
         run: python3 tools/inspect_s5_model_payload.py
+
+      - name: Inspect all bundled Megpoid and shared VOCALOID7 model resources
+        run: python3 tools/inspect_s5_all_model_payloads.py
 
       - name: Download and verify Ghidra 12.2
         shell: bash
