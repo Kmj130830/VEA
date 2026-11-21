@@ -64,3 +64,48 @@ Func_47a12a73 creates an approximately 0x21d8-byte object and parses a hierarchi
 - VSM dynamic function order and S5API RVA/signature inventory are recovered at Ghidra decompiler level.
 - A portable Android implementation still needs verified field layouts, function semantics, model tensor contracts, and audio callback data lifetime.
 - No binary PE-to-ELF conversion is attempted. A working Android arm64-v8a renderer must be rebuilt from portable source or reimplemented and validated against reference renders.
+
+
+## Exported input-record preparation: Func_417eec3e
+
+The VSM resolver loads Func_417eec3e as S5API function-table slot 9 (the
+module handle occupies the preceding slot). The Ghidra body for
+Func_417eec3e accepts an input vector and builds two owned internal
+representations. The observations below are byte-layout facts only; the
+field semantics and ownership of the copied qwords are not assigned.
+
+### Observed 0x28-byte source record
+
+| Source offset | Observed operation |
+|---:|---|
+| +0x00 | 8 bytes copied unchanged to both internal record forms |
+| +0x08 | 8 bytes copied unchanged to both internal record forms |
+| +0x10 | float32 read and converted to float64 in the 0x58-byte form |
+| +0x14 | byte copied to destination +0x48 in the 0x58-byte form |
+| +0x15 | byte copied to destination +0x49 in the 0x58-byte form |
+| +0x16 | NUL-terminated byte string, deep-copied into owned string storage |
+| +0x20 | 32-bit value copied into the 0x38-byte form at +0x30 and into an inner field of the 0x58-byte form |
+
+The source vector advances in 0x28-byte steps. One derived internal vector
+uses a 0x38-byte stride; a second uses a 0x58-byte stride. The 0x58-byte
+form stores the float from +0x10 as a double at +0x50 and preserves the
+bytes from +0x14/+0x15 at +0x48/+0x49. The function also consults render
+configuration and builds additional per-record state; this table is not a
+complete description of its work.
+
+### Separate render-dispatch observation
+
+FUN_1801361f0 invokes Func_92864e29 with a pointer advancing by 0x28 bytes
+for each work item, while its float output destination advances by 0x800
+bytes. This proves a 0x28-byte stride at that render-dispatch call site.
+It does NOT yet prove that this is the same logical record layout consumed
+by Func_417eec3e, despite the matching stride.
+
+### Android port boundary
+
+VEA must not serialize these records yet. The qwords at +0x00/+0x08 may be
+process-local references, and the receiver-side contract, object lifetime,
+and relation between the two 0x28-stride uses remain unresolved. The current
+Android implementation therefore keeps VsmScheduledNote and lyricTokens as
+owned app-side values; it does not manufacture native pointers or claim that
+these records are already a portable S5API input.
