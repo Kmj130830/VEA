@@ -95,6 +95,8 @@ contribution. The ring slot is ((writeCursor - i - 1) & ringMask); the
 current frame is stored at (oldWriteCursor & ringMask) before the cursor is
 incremented.
 
-Both source bounds clamp against Q = floor(G/2); the start bound does not clamp against H.\n\nThe Android implementation adds explicit bounds checks around these exact
+Both source bounds clamp against Q = floor(G/2); the start bound does not clamp against H.
+
+The Android implementation adds explicit bounds checks around these exact
 source/destination intervals. These checks reject invalid transform
 descriptors that would otherwise read or write outside the native arrays.
