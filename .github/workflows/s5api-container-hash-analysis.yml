@@ -26,6 +26,41 @@ jobs:
       - name: Extract S5API.dll
         run: python3 tools/inspect_editor_zip.py
 
+      - name: Probe bundled Megpoid container marker boundaries
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import io
+          import zipfile
+          from pathlib import Path
+
+          targets = {
+              "megpoidV7.zip": ["AI_Megpoid.vtb2", "AI_Megpoid.vpit"],
+              "AI Model.zip": ["COMMON7.vpit", "VOCALOID7.vhnv", "VOCALOID7.vtmg"],
+          }
+          accepted = (b"VTMB", b"VTBR", b"VTMG", b"VPIT", b"VNPV", b"VHNV")
+          for archive_name, wanted in targets.items():
+              path = Path(archive_name)
+              if not path.is_file():
+                  raise SystemExit(f"missing bundled archive: {archive_name}")
+              with zipfile.ZipFile(path) as archive:
+                  members = archive.namelist()
+                  for base in wanted:
+                      matches = [name for name in members if name.rsplit("/", 1)[-1] == base]
+                      if len(matches) != 1:
+                          raise SystemExit(f"{base}: expected one archive member, found {len(matches)}")
+                      data = archive.read(matches[0])
+                      offsets = [
+                          i for i in range(min(len(data), 256))
+                          if data[i:i + 4] in accepted
+                      ]
+                      print(f"FILE {base} bytes={len(data)} sha256={hashlib.sha256(data).hexdigest()}")
+                      print(f"  first136={data[:136].hex()}")
+                      print(f"  markers_in_first256={[(i, data[i:i+4].decode('ascii')) for i in offsets]}")
+                      print(f"  bytes_112_160={data[112:160].hex()}")
+          PY
+
       - name: Download and verify Ghidra 12.2
         shell: bash
         run: |
