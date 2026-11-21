@@ -49,7 +49,7 @@ class VsmPhoneEventPreprocessorTest {
     }
 
     @Test
-    fun removesHyphenRowsAndExtendsEachKeptRowToNextKeptEnd() {
+    fun removesHyphenRowsAndEndsEachKeptRowAtNextKeptStart() {
         val input = listOf(
             event(0.00, 0.05, "a", 1),
             event(0.05, 0.10, "-", 2),
