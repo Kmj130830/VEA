@@ -93,8 +93,10 @@ final = offset % 28
 
 nativeOnsetIndex = initial + 2
 nativeVowelIndex = [3,4,5,6,7,10,11,12,13,14,15,18,19,20,21,22,23,26,27,28,29][medial]
-nativeCodaIndex = final + 1
+nativeCodaIndex = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,19,20,21,22,23,24,25,26,27,28,29][final]
 ```
+
+The coda map deliberately skips native index 18, which is a null pointer slot in the vendor coda alias table. This is not a simple `final + 1` mapping; the distinction is required for syllables whose final consonant is ㅂ or later in the native order.
 
 The reverse lookup uses the same 19×21×28 Hangul composition grid. Native intermediate coda indices 0, 30 and 31 are normalized to the no-coda form, matching the mask behavior in `FUN_180008660`.
 
