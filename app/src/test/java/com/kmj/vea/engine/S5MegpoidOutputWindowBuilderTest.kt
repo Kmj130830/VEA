@@ -74,6 +74,36 @@ class S5MegpoidOutputWindowBuilderTest {
     }
 
     @Test
+    fun placesPartialOverlapSegmentsAtNativeRightAlignedOutputOffsets() {
+        val frame = FloatArray(8) { (it + 1).toFloat() }
+
+        val result = S5MegpoidOutputWindowBuilder.build(
+            frameWindow = frame,
+            outputSamples = 8,
+            geometry = 8,
+            fftSize = 8,
+            windowOffset = 1,
+            overlapContributionCount = 3,
+            flagAt91 = false,
+            flagAt92 = false
+        )
+
+        val expected = floatArrayOf(
+            1f / 25f,
+            1f / 36f,
+            1f / 49f,
+            1f / 64f,
+            1f,
+            1f / 4f,
+            1f / 9f,
+            1f / 16f
+        )
+        expected.indices.forEach { index ->
+            assertEquals(expected[index], result.outputWindow[index], 1e-6f)
+        }
+    }
+
+    @Test
     fun rejectsGeometryNotMatchingMegpoidFrameBuffer() {
         assertThrows(IllegalArgumentException::class.java) {
             buildBase(geometry = 16, fftSize = 8, frameWindow = FloatArray(16))
