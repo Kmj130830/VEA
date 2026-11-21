@@ -26,4 +26,12 @@ class S5KoreanG2pSyllableTableTest {
         assertNull(S5KoreanG2pSyllableTable.decompose('A'.code))
         assertNull(S5KoreanG2pSyllableTable.decompose('ㄱ'.code))
     }
+
+    @Test
+    fun roundTripsEveryModernHangulSyllableThroughNativeIndices() {
+        for (codePoint in 0xAC00..0xD7A3) {
+            val decomposition = S5KoreanG2pSyllableTable.decompose(codePoint)
+            assertEquals(codePoint, S5KoreanG2pSyllableTable.compose(decomposition!!))
+        }
+    }
 }
