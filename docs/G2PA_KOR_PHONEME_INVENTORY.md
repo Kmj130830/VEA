@@ -20,6 +20,47 @@ The recovered internal preprocessing function `FUN_180007210`:
 
 The final mapper builds a list of per-syllable UTF-16 strings at object offsets `+0x30` and `+0x2C`. It does not simply concatenate the input syllable strings into one output word. Spaces and hyphens have dedicated handling in the preprocessing and final mapping paths.
 
+## Recovered ordered pre-normalization replacements
+
+The 32 source/replacement pairs referenced by `FUN_180007210` were recovered from the two pointer tables at `PTR_DAT_18001f9c0` and `PTR_DAT_18001f9c8`. They are applied in this exact order, replacing all occurrences of each source before moving to the next pair.
+
+| # | Source | Replacement |
+|---:|---|---|
+| 1 | 디귿이 | 디그시 |
+| 2 | 디귿을 | 디그슬 |
+| 3 | 디귿에 | 디그세 |
+| 4 | 지읒이 | 지으시 |
+| 5 | 지읒을 | 지으슬 |
+| 6 | 지읒에 | 지으세 |
+| 7 | 치읓이 | 치으시 |
+| 8 | 치읓을 | 치으슬 |
+| 9 | 치읓에 | 치으세 |
+| 10 | 키읔이 | 키으기 |
+| 11 | 키읔을 | 키으글 |
+| 12 | 키읔에 | 키으게 |
+| 13 | 티읕이 | 티으시 |
+| 14 | 티읕을 | 티으슬 |
+| 15 | 티읕에 | 티으세 |
+| 16 | 피읖이 | 피으비 |
+| 17 | 피읖을 | 피으블 |
+| 18 | 피읖에 | 피으베 |
+| 19 | 히읗이 | 히으시 |
+| 20 | 히읗을 | 히으슬 |
+| 21 | 히읗에 | 히으세 |
+| 22 | 의견란 | 의견난 |
+| 23 | 임진란 | 임진난 |
+| 24 | 생산량 | 생산냥 |
+| 25 | 결단력 | 결딴녁 |
+| 26 | 공권력 | 공꿘녁 |
+| 27 | 동원령 | 동원녕 |
+| 28 | 상견례 | 상견녜 |
+| 29 | 횡단로 | 횡단노 |
+| 30 | 이원론 | 이원논 |
+| 31 | 입원료 | 이붠뇨 |
+| 32 | 구근류 | 구근뉴 |
+
+VEA now implements this exact ordered substitution stage in `S5KoreanG2pPreprocessor`, with a unit test covering all 32 pairs. This is not yet the complete Korean G2P port: the two contextual transformation passes and the manager output contract remain separate work.
+
 ## Hangul syllable table
 
 The KOR module contains a 11,172-entry Hangul syllable table (0x2BA4 entries), beginning at RVA `0xF1E2`, with a six-byte record stride.
