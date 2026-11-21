@@ -57,6 +57,17 @@ internal object S5KoreanG2pSyllableTable {
         )
     }
 
+    /** Returns the native 16-bit table value, including its constant high flag bit. */
+    fun pack(syllable: S5KoreanG2pSyllable): Int? {
+        if (syllable.onsetIndex !in 2..20) return null
+        if (syllable.vowelIndex !in nativeVowelIndices) return null
+        if (syllable.codaIndex !in nativeCodaIndices) return null
+        return 0x8000 or
+            (syllable.onsetIndex shl 10) or
+            (syllable.vowelIndex shl 5) or
+            syllable.codaIndex
+    }
+
     /**
      * Reverse lookup equivalent to the native packed-index search in
      * FUN_180008660. Intermediate coda indices 0, 30 and 31 are treated
