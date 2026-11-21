@@ -2,8 +2,10 @@ package com.kmj.vea.engine
 
 data class S5ContainerHeaderInfo(
     val kind: String,
-    val payloadSize: Long,
-    val formatWord: Long
+    val declaredSpan: Long,
+    val formatWord: Long,
+    val transformSeed: Long,
+    val decodedPayloadSize: Long
 )
 
 /**
@@ -24,21 +26,41 @@ object NativeS5TensorBridge {
     val abiVersion: Int
         get() = if (loaded) nativeAbiVersion() else 0
 
-    /** Parses exactly the first 136 bytes; the opaque header bytes are preserved natively but not interpreted. */
+    /** Parses the 16-byte S5API prefix: magic, declared span, format word, and transform seed. */
     fun parseContainerHeader(header: ByteArray, totalFileSize: Long): S5ContainerHeaderInfo? {
         check(loaded) { "Native S5 tensor library is not loaded." }
-        require(header.size == 136) { "The V7 container header is exactly 136 bytes." }
-        require(totalFileSize >= 136L)
+        require(header.size == 16) { "The S5API container prefix is exactly 16 bytes." }
+        require(totalFileSize >= 16L)
         val fields = nativeParseContainerHeader(header, totalFileSize) ?: return null
-        if (fields.size != 3) return null
+        if (fields.size != 5) return null
         val kind = when (fields[0].toInt()) {
-            1 -> "VTBR"
-            2 -> "VPIT"
-            3 -> "VHNV"
-            4 -> "VTMG"
+            1 -> "VTMB"
+            2 -> "VTBR"
+            3 -> "VTMG"
+            4 -> "VPIT"
+            5 -> "VNPV"
+            6 -> "VHNV"
             else -> return null
         }
-        return S5ContainerHeaderInfo(kind, fields[1], fields[2])
+        return S5ContainerHeaderInfo(
+            kind = kind,
+            declaredSpan = fields[1],
+            formatWord = fields[2],
+            transformSeed = fields[3],
+            decodedPayloadSize = fields[4]
+        )
+    }
+
+    /**
+     * Applies the S5API FUN_18002aa90 byte transform to a complete V7 container.
+     * The result contains only the decoded body. It is not yet parsed into the
+     * JSON-like object tree or converted into model tensors.
+     */
+    fun decodeContainerPayload(fileBytes: ByteArray): ByteArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(fileBytes.size >= 16) { "The V7 container is shorter than its 16-byte prefix." }
+        return nativeDecodeContainerPayload(fileBytes)
+            ?: throw IllegalArgumentException("Unsupported or malformed S5 container payload.")
     }
 
     /**
@@ -371,4 +393,5 @@ object NativeS5TensorBridge {
         header: ByteArray,
         totalFileSize: Long
     ): LongArray?
+    private external fun nativeDecodeContainerPayload(fileBytes: ByteArray): ByteArray?
 }
