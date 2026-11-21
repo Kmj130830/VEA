@@ -222,12 +222,15 @@ class VocaloidAiEngineAdapter(
         val layers = prepared.namedLayerParameters.size
 
         throw UnsupportedOperationException(
-            "AI Megpoid V7 model preparation succeeded: five verified model members, " +
+            "AI Megpoid V7 preparation succeeded: five verified model members, " +
                 "$layers shared neural layers, $blocks compiled residual blocks, and " +
                 "$scheduledNotes note events scheduled on the 44.1 kHz / 256-sample input grid. " +
-                "The end-to-end note/phoneme-to-feature conditioning, complete render-state " +
-                "descriptor population, spectral frame generation, overlap-add and verified " +
-                "PCM conversion are still incomplete. No audio was written."
+                "The Android reference output stage now includes recovered descriptor geometry, " +
+                "frame/output window construction, inverse real FFT, and stateful overlap-add. " +
+                "It is not yet connected to a complete note/phoneme feature-conditioning path or " +
+                "the full neural forward pass that produces model spectra. The native FFT plan " +
+                "parity, sample-rate conversion, and verified PCM/WAV export boundary also remain " +
+                "incomplete. No audio was written."
         )
     }
 }
