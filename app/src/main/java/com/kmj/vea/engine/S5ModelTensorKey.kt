@@ -40,6 +40,26 @@ object S5ModelTensorKey {
     }
 
     /**
+     * Returns the conventional MD5 byte sequence as lowercase hexadecimal.
+     *
+     * The shared VTMG JSON object stores layer tensor keys in this byte order
+     * (for example, MD5("pre1.weight" + the recovered 24-byte salt)). This is
+     * intentionally separate from [derive], which formats four MD5 state
+     * words using the word order recovered for the other S5API lookup path.
+     */
+    fun deriveDigestHex(baseName: String, member: Member): String {
+        require(baseName.isNotBlank()) { "Tensor base name must not be empty." }
+        require(baseName.all { it.code in 0x20..0x7e }) {
+            "S5API tensor base names must be printable ASCII."
+        }
+        val input = (baseName + member.suffix).toByteArray(Charsets.US_ASCII) + digestSuffix
+        val digest = MessageDigest.getInstance("MD5").digest(input)
+        return digest.joinToString("") { byte ->
+            "%02x".format(byte.toInt() and 0xff)
+        }
+    }
+
+    /**
      * Recurrent S5API code constructs the complete member name first
      * (e.g. ".weight_ih_l" + layer index), then appends the digest suffix
      * directly. It does not add another ".weight" or ".bias" after that name.
