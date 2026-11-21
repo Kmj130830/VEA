@@ -15,7 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class ExportS5ModelRuntime extends GhidraScript {
-    private static final int MAX_FUNCTIONS = 100;
+    private static final int MAX_FUNCTIONS = 180;
     private static final int MAX_DEPTH = 1;
 
     private static final class Work {
@@ -102,6 +102,22 @@ public class ExportS5ModelRuntime extends GhidraScript {
                 }
                 if (count == 0) out.println("- No direct code references recovered.");
                 out.println();
+            }
+
+            // Expand one layer of callers for the seeded render wrappers and state setters.
+            // This is needed to recover the public API entry point that supplies initialized
+            // render state, note/phoneme buffers and chunk metadata.
+            for (Map.Entry<Address, Function> item : new LinkedHashMap<>(selected).entrySet()) {
+                monitor.checkCancelled();
+                if (selected.size() >= MAX_FUNCTIONS) break;
+                for (Reference ref : currentProgram.getReferenceManager().getReferencesTo(item.getKey())) {
+                    if (selected.size() >= MAX_FUNCTIONS) break;
+                    Function caller = currentProgram.getFunctionManager().getFunctionContaining(ref.getFromAddress());
+                    if (caller != null && !selected.containsKey(caller.getEntryPoint())) {
+                        selected.put(caller.getEntryPoint(), caller);
+                        depths.put(caller.getEntryPoint(), 1);
+                    }
+                }
             }
 
             // Include one layer of direct callees for tensor loaders and DSP operators.
