@@ -106,6 +106,49 @@ data class S5PackedRecurrentDirection(
 object S5RecurrentParameterLoader {
     private const val DEFAULT_BASE = "rnn"
 
+    /**
+     * Builds only the hash lookup keys for a known S5 RNN configuration.
+     *
+     * The lookup names do not depend on hidden/input feature dimensions. This
+     * allows the model scanner to probe the actual model namespace without
+     * inventing an unresolved feature size merely to calculate name hashes.
+     */
+    fun lookupKeys(
+        layerCount: Int,
+        bidirectional: Boolean,
+        includeBias: Boolean,
+        base: String = DEFAULT_BASE
+    ): Set<String> {
+        require(layerCount in 1..128) {
+            "RNN layer count must be between 1 and 128."
+        }
+        require(base.isNotBlank() && base.all { it.code in 0x20..0x7e }) {
+            "RNN parameter base must be printable ASCII."
+        }
+        val directionCount = if (bidirectional) 2 else 1
+        val result = LinkedHashSet<String>()
+        for (layer in 0 until layerCount) {
+            for (direction in 0 until directionCount) {
+                val reverse = direction == 1
+                result += S5ModelTensorKey.deriveParameterName(
+                    parameterName(base, ".weight_ih_l", layer, reverse)
+                )
+                result += S5ModelTensorKey.deriveParameterName(
+                    parameterName(base, ".weight_hh_l", layer, reverse)
+                )
+                if (includeBias) {
+                    result += S5ModelTensorKey.deriveParameterName(
+                        parameterName(base, ".bias_ih_l", layer, reverse)
+                    )
+                    result += S5ModelTensorKey.deriveParameterName(
+                        parameterName(base, ".bias_hh_l", layer, reverse)
+                    )
+                }
+            }
+        }
+        return result
+    }
+
     fun specifications(
         layout: S5RecurrentLayerLayout,
         base: String = DEFAULT_BASE
