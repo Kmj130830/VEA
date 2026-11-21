@@ -116,7 +116,7 @@ public class ExportS5RendererPath extends GhidraScript {
                 // Explicit frame-window generator and its math helpers.
                 "18012a9a0", "180082db0", "18007b870",
                 // FFT plan creation used by the output transform descriptor.
-                "18004e580", "180040630", "18000fc20",
+                "18004e580", "180040630", "180082a30", "18007a000", "18000fc20",
                 "1800ccafd"
             };
             out.println("## Explicit internal call targets");
