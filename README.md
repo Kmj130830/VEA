@@ -133,6 +133,22 @@ After verification, the voice picker enables **LOAD VOICE** and stores the packa
 
 This is the first real model-resource connection step, not a completed synthesizer. The importer does not decode or transform the proprietary model payloads, bypass authorization, execute Windows DLLs, or mark the engine as available. VDM database integration, the complete S5API model execution graph, Yamaha G2P, and the Android ARM64 singing renderer are still required before Megpoid WAV rendering can be enabled.
 
+## Built-in AI Megpoid model packaging and render-plan stage
+
+The Android build now extracts only the five required model members from the repository's supplied `megpoidV7.zip` and `AI Model.zip` archives into generated APK assets:
+
+- `AI_Megpoid.vtb2`
+- `AI_Megpoid.vpit`
+- `COMMON7.vpit`
+- `VOCALOID7.vhnv`
+- `VOCALOID7.vtmg`
+
+The Gradle `prepareMegpoidModelAssets` task runs before `preBuild`. At first launch, `MegpoidV7PackageInstaller.installBundled(context)` copies the bundled assets into app-private storage and verifies their known SHA-256 digests and 136-byte container headers. Existing verified files are reused. The user no longer needs to select two ZIP archives to install the default Megpoid bank.
+
+The synthesis-input stage is now implemented in `VocalRenderPlanBuilder`. It converts project tempo/meter, clip bar offsets, note tick positions and durations, MIDI pitch, lyric/phoneme strings, language, style ID and note-relative pitch points into a time-normalized `VocalRenderPlan`. `VocaloidAiEngineAdapter.prepareRenderPlans()` connects this request format to the selected voicebank binding. The format is voicebank-neutral so later bank adapters can share the same scheduling and render request layer.
+
+**Important renderer status:** this is not yet a completed acoustic synthesizer. The app currently bundles the Megpoid model resources, but the S5API graph is only partially ported and the supplied runtime inventory does not include the primary VSM native renderer module. The render adapter deliberately reports that no WAV was generated until an Android ARM64 acoustic backend is implemented and verified. Piano preview remains separate from vocal rendering.
+
 ## Playback and pitch preview
 
 - The piano roll offers DRAW, SELECT, and PITCH tools, bounded zoom (65–230%), and note resizing.
