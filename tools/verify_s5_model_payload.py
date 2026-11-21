@@ -682,35 +682,57 @@ def inspect_megpoid_block_descriptor_fields(
 
 
 def inspect_s5_context_option_fields(member: str, root: dict) -> None:
-    """Report scalar S5API render-context options by their exact VTB2 lookup keys.
+    """Read S5API render options from the native-selected Megpoid subtree.
 
     Keys are reconstructed from the native formatter's four uint32 words in
-    memory order. Values are reported as scalar metadata, never tensor bytes.
+    memory order. Scalar values are safe metadata; tensor contents are omitted.
     """
-    occurrences_by_key: dict[str, list[tuple[str, object]]] = {
-        key: [] for key in S5_CONTEXT_OPTION_KEYS.values()
-    }
-    stack: list[tuple[object, str]] = [(root, "$")]
-    while stack:
-        current, path = stack.pop()
-        if isinstance(current, dict):
-            for key, child in current.items():
-                if key in occurrences_by_key:
-                    occurrences_by_key[key].append((path + "/" + key, child))
-                stack.append((child, path + "/" + key))
-        elif isinstance(current, list):
-            for index, child in enumerate(current):
-                stack.append((child, f"{path}[{index}]"))
+    current: object = root
+    traversed: list[str] = []
+    for key in MEGPOID_RUNTIME_MODEL_PATH:
+        if not isinstance(current, dict) or key not in current:
+            print(
+                "S5_CONTEXT_OPTION_SCOPE_MISSING",
+                f"member={member}",
+                f"path=$/{'/'.join((*traversed, key))}",
+            )
+            return
+        current = current[key]
+        traversed.append(key)
+
+    if not isinstance(current, dict):
+        print("S5_CONTEXT_OPTION_SCOPE_INVALID", f"member={member}", f"kind={json_value_kind(current)}")
+        return
+    options = current.get("a4ba655a061e6151f80574e6088492a0")
+    if not isinstance(options, dict):
+        print(
+            "S5_CONTEXT_OPTION_SCOPE_MISSING",
+            f"member={member}",
+            f"path=$/{'/'.join(traversed)}/a4ba655a061e6151f80574e6088492a0",
+        )
+        return
 
     for label, lookup_key in S5_CONTEXT_OPTION_KEYS.items():
-        matches = occurrences_by_key[lookup_key]
+        present = lookup_key in options
+        value = options.get(lookup_key)
+        if isinstance(value, bool):
+            rendered_value = str(value).lower()
+            value_kind = "boolean"
+        elif isinstance(value, (int, float)):
+            rendered_value = repr(value)
+            value_kind = "number"
+        else:
+            rendered_value = describe_value(value) if present else "missing"
+            value_kind = json_value_kind(value) if present else "missing"
         print(
             "S5_CONTEXT_OPTION_FIELD",
             f"member={member}",
             f"slot={label}",
             f"lookup_key={lookup_key}",
-            f"occurrences={len(matches)}",
-            f"values_and_paths={[(path, describe_value(value)) for path, value in matches]}",
+            f"present={present}",
+            f"value_kind={value_kind}",
+            f"value={rendered_value}",
+            f"selected_path=$/{'/'.join((*traversed, 'a4ba655a061e6151f80574e6088492a0', lookup_key))}",
         )
 
 
