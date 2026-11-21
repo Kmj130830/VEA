@@ -59,6 +59,13 @@ data class S5VoicebankModelPackage(
         )
     }
 
+    /** Scalar render-context options read from the exact native-selected VTB2 object. */
+    val runtimeOptionsDescriptor: S5MegpoidRuntimeOptionsDescriptor by lazy(
+        LazyThreadSafetyMode.PUBLICATION
+    ) {
+        S5MegpoidRuntimeOptionsDescriptor.from(runtimeOptionsTree)
+    }
+
     /**
      * Exact VTB2 tensors used by the pre-residual dense and global-normalization operators.
      */
@@ -176,7 +183,8 @@ data class S5VoicebankModelPackage(
         tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder,
         firstInputWorkspace: S5MegpoidWorkspaceSlot = S5MegpoidWorkspaceSlot.FIRST
     ): S5MegpoidSequenceTransitionPipeline {
-        val transitionCount = S5MegpoidRuntimeBlockFactoryKeys.BLOCK_ROWS - 1
+        runtimeOptionsDescriptor.requireMegpoidV7BlockGrid()
+        val transitionCount = runtimeOptionsDescriptor.temporalTransitionCount
         require(
             temporalOutputFeatures.size == transitionCount &&
                 temporalKernelSizes.size == transitionCount &&
@@ -184,7 +192,8 @@ data class S5VoicebankModelPackage(
                 bankCounts.size == transitionCount &&
                 bankedBiasEnabled.size == transitionCount
         ) {
-            "Four sequence slots require exactly three temporal and three banked descriptor entries."
+            "Runtime options require " + transitionCount +
+                " Temporal and Banked descriptor entries for this model."
         }
 
         val dense = preparePreResidualDenseNormalizationStage(
