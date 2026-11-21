@@ -180,6 +180,32 @@ def main():
                     candidate_count += 1
                     if variant in json_keys:
                         report.append(f"- MATCH `{base + member_suffix}` -> `{variant}`")
+        # FUN_18005ebe0 builds complete recurrent names such as
+        # "rnn.weight_ih_l0" and passes them to FUN_18001b1f0 directly.
+        # Unlike FUN_180020190/FUN_1800214c0, this path does not append
+        # an additional ".weight" or ".bias" suffix.
+        recurrent_names = []
+        for layer in range(4):
+            recurrent_names.extend([
+                f"rnn.weight_ih_l{layer}", f"rnn.weight_hh_l{layer}",
+                f"rnn.bias_ih_l{layer}", f"rnn.bias_hh_l{layer}",
+                f"rnn.weight_ih_l{layer}_reverse", f"rnn.weight_hh_l{layer}_reverse",
+                f"rnn.bias_ih_l{layer}_reverse", f"rnn.bias_hh_l{layer}_reverse",
+            ])
+        direct_matches = 0
+        for parameter_name in recurrent_names:
+            digest = hashlib.md5(parameter_name.encode("ascii") + salt).digest()
+            variants = {
+                digest.hex(),
+                "".join(f"{int.from_bytes(digest[i:i+4], 'little'):08x}" for i in range(0, 16, 4)),
+                "".join(f"{int.from_bytes(digest[i:i+4], 'big'):08x}" for i in range(0, 16, 4)),
+            }
+            candidate_count += len(variants)
+            for variant in sorted(variants):
+                if variant in json_keys:
+                    direct_matches += 1
+                    report.append(f"- DIRECT MATCH `{parameter_name}` -> `{variant}`")
+        report.append(f"- direct recurrent parameter matches: {direct_matches}")
         report.append(f"- candidate digests tested: {candidate_count}")
         report.append(f"- JSON object keys compared: {len(json_keys)}")
         report += ["", "## Top-level object paths", ""]
