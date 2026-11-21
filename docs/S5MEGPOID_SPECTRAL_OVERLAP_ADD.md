@@ -51,15 +51,17 @@ mask validation, window dimensions, geometry bounds, and silence handling.
 
 ## Remaining integration boundary
 
-The vendor transform descriptor constructor/populator has not yet been
-ported. Therefore this stage requires FFT size, output length, geometry
-parameters, ring mask, windows and sign flag to be supplied by a verified
-descriptor. The model-to-spectrum producer, full note/phoneme conditioning,
-sample-rate handling and final PCM/WAV conversion remain separate stages.
+The Megpoid-specific scalar geometry constructor, frame-window generator,
+three output-window normalization branches, root-relative scalar mapping and
+stateful inverse-FFT/overlap-add executor are now ported as separate Android
+components. The frame core-length/shape inputs and descriptor flag bytes are
+preserved from their recovered render-state offsets.
 
-The reference FFT currently supports even power-of-two sizes only and has
-not yet been numerically compared to the vendor FFT backend. No successful
-Megpoid render is claimed by this component.
+The FFT plan object created by FUN_18004e580, the vendor FFT backend's
+numerical parity, upstream model-to-spectrum generation, full note/phoneme
+conditioning, sample-rate handling and final PCM/WAV conversion remain
+separate tasks. No successful Megpoid singing render is claimed by this
+component.
 
 ## Exact ring interval calculation
 
