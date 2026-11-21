@@ -286,14 +286,14 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
             out.println("> Separate this-relative vector triples at +0x1f0/+0x1f8/+0x200 and +0x220/+0x228/+0x230 belong to FUN_180015d10's object, and +0x240/+0x248/+0x250 belongs to FUN_180016dc0's object. Do not conflate these bases.");
             out.println();
             String[] watchedOffsets = {
-                    "0x1f8]", // confirmed vector end pointer for the vector beginning at +0x1f0 (capacity at +0x200)
-                    "0x228]", // confirmed vector end pointer for the vector beginning at +0x220 (capacity at +0x230)
-                    "0x250]", // confirmed vector end pointer for the vector beginning at +0x240 in FUN_180016dc0
-                    "0x268]", // candidate member field; semantic role not established by offset scan
-                    "0x280]", // candidate member field; semantic role not established by offset scan
-                    "0x2b0]", // candidate member field; semantic role not established by offset scan
-                    "0x2e0]", // residual block-data vector field identified at FUN_1800c7ad0
-                    "0x2f8]"  // residual block-state vector field identified at FUN_1800c7ad0
+                    "0x1f8]", // render-state root: dense descriptor; same numeric offset is a vector end in FUN_180015d10's different object
+                    "0x228]", // render-state root: global-normalization descriptor; also a vector end in FUN_180015d10's different object
+                    "0x250]", // render-state root: begin pointer for 0x30-stride temporal projection descriptors
+                    "0x268]", // render-state root: begin pointer for 0x18-stride temporal workspace descriptors
+                    "0x280]", // render-state root: begin pointer for 0x30-stride banked-linear descriptors
+                    "0x2b0]", // render-state root: begin pointer for 0x28-stride alternate banked descriptors
+                    "0x2e0]", // render-state root: begin pointer for 0x100-stride residual block-data records
+                    "0x2f8]"  // render-state root: begin pointer for 0x88-stride residual block-state records
             };
             LinkedHashMap<Address, Function> recordOffsetFunctions = new LinkedHashMap<>();
             LinkedHashMap<String, Integer> offsetHitCounts = new LinkedHashMap<>();
