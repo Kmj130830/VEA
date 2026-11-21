@@ -8,39 +8,39 @@ import com.kmj.vea.data.VeaTrack
 
 class MegpoidV7PackageInstallerTest {
     @Test
-    fun acceptsMatchingVtbrHeaderAndPayloadLength() {
-        val header = makeHeader("VTBR", payloadSize = 37L)
-        validateV7ContainerHeader(header, 136L + 37L, "VTBR")
+    fun acceptsMatchingVtbrPrefixAndPayloadLength() {
+        val prefix = makePrefix("VTBR", payloadSize = 37L)
+        validateV7ContainerPrefix(prefix, 136L + 37L, "VTBR")
     }
 
     @Test
     fun rejectsWrongContainerKind() {
-        val header = makeHeader("VPIT", payloadSize = 4L)
+        val prefix = makePrefix("VPIT", payloadSize = 4L)
         assertThrows(IllegalArgumentException::class.java) {
-            validateV7ContainerHeader(header, 140L, "VTBR")
+            validateV7ContainerPrefix(prefix, 140L, "VTBR")
         }
     }
 
     @Test
     fun rejectsPayloadLengthMismatch() {
-        val header = makeHeader("VTMG", payloadSize = 9L)
+        val prefix = makePrefix("VTMG", payloadSize = 9L)
         assertThrows(IllegalArgumentException::class.java) {
-            validateV7ContainerHeader(header, 136L + 10L, "VTMG")
+            validateV7ContainerPrefix(prefix, 136L + 10L, "VTMG")
         }
     }
 
     @Test
-    fun rejectsShortHeader() {
+    fun rejectsShortPrefix() {
         assertThrows(IllegalArgumentException::class.java) {
-            validateV7ContainerHeader(ByteArray(135), 135L, "VHNV")
+            validateV7ContainerPrefix(ByteArray(15), 136L, "VHNV")
         }
     }
 
     @Test
     fun treatsPayloadLengthAsUnsignedLittleEndian() {
         val payloadSize = 0x8000_0001L
-        val header = makeHeader("VPIT", payloadSize)
-        validateV7ContainerHeader(header, 136L + payloadSize, "VPIT")
+        val prefix = makePrefix("VPIT", payloadSize)
+        validateV7ContainerPrefix(prefix, 136L + payloadSize, "VPIT")
     }
 
     @Test
@@ -71,13 +71,13 @@ class MegpoidV7PackageInstallerTest {
         assertNull(track.voicebankDescriptorOrNull())
     }
 
-    private fun makeHeader(magic: String, payloadSize: Long): ByteArray {
-        val header = ByteArray(136)
+    private fun makePrefix(magic: String, payloadSize: Long): ByteArray {
+        val prefix = ByteArray(16)
         val magicBytes = magic.toByteArray(Charsets.US_ASCII)
-        magicBytes.copyInto(header, destinationOffset = 0)
+        magicBytes.copyInto(prefix, destinationOffset = 0)
         for (index in 0 until 4) {
-            header[4 + index] = ((payloadSize ushr (index * 8)) and 0xffL).toByte()
+            prefix[4 + index] = ((payloadSize ushr (index * 8)) and 0xffL).toByte()
         }
-        return header
+        return prefix
     }
 }
