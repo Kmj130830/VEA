@@ -62,7 +62,12 @@ def walk(value, keys: set[str], counters: dict[str, int]) -> None:
             counters["typed"] += 1
 
 
-def inspect_member(archive_name: str, member_name: str, expected_sha: str) -> list[str]:
+def inspect_member(
+    archive_name: str,
+    member_name: str,
+    expected_sha: str,
+    decoded_output_dir: Path,
+) -> list[str]:
     archive_path = Path(archive_name)
     if not archive_path.is_file():
         raise SystemExit(f"missing required archive: {archive_name}")
@@ -78,6 +83,8 @@ def inspect_member(archive_name: str, member_name: str, expected_sha: str) -> li
         raise SystemExit(f"{member_name}: SHA-256 mismatch: {actual_sha}")
 
     decoded, metadata = decode_payload(raw)
+    decoded_output_dir.mkdir(parents=True, exist_ok=True)
+    (decoded_output_dir / f"{member_name}.json").write_bytes(decoded)
     lines = [
         f"## {member_name}",
         f"- archive: {archive_name}",
@@ -127,6 +134,34 @@ def inspect_member(archive_name: str, member_name: str, expected_sha: str) -> li
             for candidate in key_variants(name + suffix):
                 if candidate in keys:
                     suffixed.append((name + suffix, candidate))
+    def describe_objects(value, path="$"):
+        if isinstance(value, dict):
+            direct_types = []
+            for key, child in value.items():
+                if isinstance(child, dict):
+                    kind = f"object({len(child)})"
+                elif isinstance(child, list):
+                    kind = f"array({len(child)})"
+                elif isinstance(child, str) and child.startswith(("*F32", "*F16", "*S32")):
+                    kind = f"tensor-string({child[:4]}, chars={len(child)})"
+                elif isinstance(child, str):
+                    kind = f"string(chars={len(child)})"
+                else:
+                    kind = type(child).__name__ + (f"({child})" if isinstance(child, (int, float, bool)) else "")
+                direct_types.append(f"{key}={kind}")
+            lines.append(f"- object path `{path}` ({len(value)} keys)")
+            for item in direct_types[:24]:
+                lines.append(f"  - {item}")
+            if len(direct_types) > 24:
+                lines.append(f"  - ... {len(direct_types) - 24} more keys")
+            for key, child in value.items():
+                describe_objects(child, path + "." + key)
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                describe_objects(child, f"{path}[{index}]")
+
+    describe_objects(parsed)
+
     lines.append(f"- direct recurrent-name digest matches (layers 0-31): {len(direct)}")
     for name, digest in direct[:32]:
         lines.append(f"  - {name} -> {digest}")
@@ -143,9 +178,12 @@ def main() -> None:
         "> Offline decoding and structure inspection only; no model inference is run.",
         "",
     ]
+    decoded_output_dir = Path("build/s5-container-hash/decoded")
     for archive_name, members in ARCHIVES.items():
         for member_name, expected_sha in members.items():
-            report.extend(inspect_member(archive_name, member_name, expected_sha))
+            report.extend(inspect_member(
+                archive_name, member_name, expected_sha, decoded_output_dir
+            ))
             report.append("")
 
     output = Path("build/s5-container-hash/ALL_MODEL_RESOURCES_INSPECTION.md")
