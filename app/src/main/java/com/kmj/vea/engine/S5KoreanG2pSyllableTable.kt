@@ -17,6 +17,12 @@ internal object S5KoreanG2pSyllableTable {
         18, 19, 20, 21, 22, 23, 26, 27, 28, 29
     )
 
+    // Native coda table has an empty slot at index 18.
+    private val nativeCodaIndices = intArrayOf(
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
+        15, 16, 17, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29
+    )
+
     private val onsetAliases = arrayOf(
         null, null, "g", "g'", "n", "d", "d'", "l",
         "m", "b", "b'", "s", "s'", "N", "c", "c'",
@@ -47,7 +53,7 @@ internal object S5KoreanG2pSyllableTable {
         return S5KoreanG2pSyllable(
             onsetIndex = initial + 2,
             vowelIndex = nativeVowelIndices[medial],
-            codaIndex = final + 1
+            codaIndex = nativeCodaIndices[final]
         )
     }
 
@@ -63,7 +69,8 @@ internal object S5KoreanG2pSyllableTable {
         if (medial < 0) return null
         val final = when (syllable.codaIndex) {
             0, 1, 30, 31 -> 0
-            in 2..29 -> syllable.codaIndex - 1
+            in 2..17 -> syllable.codaIndex - 1
+            in 19..29 -> syllable.codaIndex - 2
             else -> return null
         }
         if (final !in 0 until 28) return null
