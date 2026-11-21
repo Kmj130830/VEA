@@ -426,10 +426,12 @@ That routine has not yet been proven to initialize the exact same object
 instance passed to `FUN_1800c7ad0`; it remains a candidate initialization
 path until the constructor/caller relation is established.
 
-This does not yet identify the assignments that populate each record's
-internal tensor pointers (for example the `0x20`, `0x98`, and `0xC8`
-fields of a block-data record). Those writes are the next required link
-before the model-tree tensors can be bound to the Android kernel inputs.
+The subsequent constructor trace in
+`docs/S5API_MEGPOID_RUNTIME_RECORD_POPULATION.md` identifies the eight
+`FUN_1800ced10` property-key families, recovers their 16x16 static lookup
+tables, and matches the used 4x2 cells against the supplied
+`AI_Megpoid.vtb2`. The eight source-property families are now mapped to the
+runtime-record builder inputs and their destination fields.
 
 ## Residual runtime record offsets
 
@@ -491,12 +493,20 @@ The offset roles align with the Android kernel's argument shapes:
 - residual scale and optional bias: `C) each;
 - sequence workspaces: `C * N) and `C * E * N).
 
-This is the first confirmed connection between native runtime record fields
-and the existing Android kernel's input contract. It still does not identify
-which hashed `AI_Megpoid.vtb2` tensor path is stored at each pointer offset.
-That requires tracing the constructor writes into these record offsets.
+The follow-up constructor analysis links these destination fields to the
+actual used factory keys and typed tensors in `AI_Megpoid.vtb2`. For each of
+the eight residual blocks, the audit confirms the 7x7 filter, two 32-element
+conditioning vectors, 32x64 expansion source matrix, 64-element expansion
+bias, 64x32 projection matrix, 32-element projection bias, and 32-element
+residual scale. The corresponding Android assembler reconstructs the
+conditioned expansion matrix and its two 64-element affine arrays.
 
-This establishes where the residual operator is scheduled and how its per-position/per-block records are addressed. It does **not** yet show which `AI_Megpoid.vtb2` tensor paths populate the `0x100`-byte block-data records, the `0x88`-byte state records, or the workspace descriptors. Therefore the current Android matrix decoder remains an isolated layout conversion layer; it is not yet wired to `vea_s5_run_residual_dw_mlp_block_f32`, and no PCM synthesis is claimed.
+See `docs/S5API_MEGPOID_RUNTIME_RECORD_POPULATION.md` for the complete
+key-to-field and tensor-layout evidence. The Android port now has a separate
+history state per block and a declarative sequence-major scheduler. These
+are bounded implementation milestones: the full feature-generation graph,
+neighboring preprocessing/transition operations, and the PCM synthesis path
+are still unfinished. No end-to-end vocal output is claimed.
 
 ## Named neural layer weights in VOCALOID7.vtmg
 
