@@ -49,3 +49,22 @@ handling, channel layout, and a verified WAV export stage.
 The two source offsets and shared count are now part of the analysis record.
 A future Android callback bridge should preserve them as two named-but-neutral
 float streams until the producer/consumer dataflow proves their semantics.
+
+## VSM sampling-rate boundary
+
+The VSM wrapper exports sequence sampling-rate accessors separately from
+the S5API float-buffer accessors:
+
+- `VIS_VSM_WIVSMSequence_samplingRate` checks the sequence runtime type and
+  dispatches through its vtable at byte offset `+0xE0`. For a null receiver
+  or a receiver of a different runtime type, the wrapper returns `0xAC44`
+  (44,100 Hz).
+- `VIS_VSM_WIVSMSequence_setSamplingRate` performs the same type check and
+  dispatches the requested 32-bit value through vtable byte offset `+0xE8`.
+
+This confirms the VSM sequence's default fallback rate and its configurable
+rate boundary. It does not establish that every S5API model runs natively
+at 44.1 kHz, nor does it prove the conversion ratio used between the
+model-frame rate and the VSM sequence rate. VEA's current 44.1 kHz render
+schedule is consistent with the VSM fallback but still needs an explicit
+model-output resampling stage before a final audio export can be claimed.
