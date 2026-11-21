@@ -94,20 +94,19 @@ class S5MegpoidCompiledRuntimeBlock internal constructor(
             epsilon = epsilon
         )
     }
-}
-
-/**
- * Runs one sequential feature chunk through this block's private history ring
- * and the isolated residual-block kernel. This is not a complete voice
- * synthesis path: callers must supply the actual input features, and upstream
- * and downstream model layers are still required.
- */
-fun S5MegpoidCompiledRuntimeBlock.runChunk(
-    residualInput: FloatArray,
-    epsilon: Float = S5MegpoidResidualBlockShape.DEFAULT_EPSILON
-): FloatArray {
-    val window = buildHistoryWindow(residualInput)
-    return runReferenceWindow(window, residualInput, epsilon)
+    /**
+     * Runs one sequential feature chunk through this block's private history
+     * ring and the isolated residual-block kernel. This is not a complete
+     * voice synthesis path: callers must supply the actual input features,
+     * and upstream/downstream model layers are still required.
+     */
+    fun runChunk(
+        residualInput: FloatArray,
+        epsilon: Float = S5MegpoidResidualBlockShape.DEFAULT_EPSILON
+    ): FloatArray {
+        val window = buildHistoryWindow(residualInput)
+        return runReferenceWindow(window, residualInput, epsilon)
+    }
 }
 
 /**
