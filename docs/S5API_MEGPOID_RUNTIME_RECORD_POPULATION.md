@@ -188,11 +188,19 @@ without an additional matrix transpose in `FUN_1800d4610`.
 The history helper is stateful: it sizes a workspace from the channel count,
 chunk position count and the descriptor's history depth; copies each incoming
 chunk into a rotating history slot; then builds pointers to the retained slots
-before applying the depthwise filter. Consequently, the stateless Android
-`vea_s5_run_residual_dw_mlp_block_f32` path, which accepts already materialized
-`[channel][7][position]` windows and applies a direct reflect-padded 7x7
-convolution, is currently a reference kernel, not a proven bit-exact port of
-`FUN_1800c67e0`.
+before applying the depthwise filter. Android now has
+`S5MegpoidDepthwiseHistoryState`, which preserves an independent seven-slot
+ring per compiled block, zero-initializes it on first use or chunk-length
+change, advances the cursor after each copy, and materializes the retained
+slots oldest-to-newest in `[channel][7][position]` order. Each compiled block
+exposes `buildHistoryWindow`, `resetHistory`, and `runChunk`.
+
+This ports the observed ring-buffer state and data ordering, but it is not yet
+a proven bit-exact port of the complete native helper: the history pointer
+lifetime, chunk scheduling, and the exact depthwise boundary behavior still
+need comparison against S5API runtime traces. The native
+`vea_s5_run_residual_dw_mlp_block_f32` remains a reference kernel using
+reflect-padded 7x7 convolution.
 
 The residual affine order was checked against the original operator and the
 C++ helper matches it: `(projected + optionalBias) * residualScale + residual`.
@@ -208,10 +216,13 @@ and complete singing forward pass remain unfinished.
   metadata and element counts, forms the generated expansion matrix and
   affine arrays, and keeps both the source channel-major filter and the
   `[C][W][H]` native-record permutation.
-- `S5VoicebankModelPackage.prepareRuntimeBlocks(..., positions)` prepares
-  the eight blocks from the loaded voicebank package. It requires the
-  caller's actual chunk length.
-- `runReferenceWindow` is explicitly limited to kernel-level experiments;
-  it does not claim to reproduce the original stateful history path.
+- `S5VoicebankModelPackage.prepareRuntimeBlocks()` prepares the eight blocks
+  from the loaded voicebank package without assuming an audio chunk length.
+- Each `S5MegpoidCompiledRuntimeBlock` owns its own seven-slot history ring;
+  `buildHistoryWindow()` and `runChunk()` provide the sequential-chunk
+  boundary, while `resetHistory()` starts a fresh utterance.
+- `runReferenceWindow` remains available for isolated kernel-level tests.
+  The ring state is ported, but bit-exact convolution and scheduling parity
+  have not yet been established.
 - `SynthesisEngine.render` remains unimplemented. No end-to-end vocal
   synthesis or WAV/PCM output is claimed.
