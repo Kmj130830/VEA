@@ -65,6 +65,19 @@ class KoreanG2pInputTokenizerTest {
     }
 
     @Test
+    fun splitsAtThirtyUtf16UnitsEvenWhenThatBoundaryBisectsASurrogatePair() {
+        val token = "가".repeat(29) + "😀" + "나"
+
+        val actual = KoreanG2pInputTokenizer.splitTokenForNativeModule(token)
+
+        assertEquals(30, actual.prefix30.length)
+        assertEquals(2, actual.remainder.length)
+        assertTrue(actual.prefix30.last().isHighSurrogate())
+        assertTrue(actual.remainder.first().isLowSurrogate())
+        assertEquals(token, actual.combined)
+    }
+
+    @Test
     fun buildsNativeTokenFieldsAfterNormalizationAndTokenization() {
         val actual = KoreanG2pInputTokenizer.prepareNativeTokenFields("가ー나 다−라")
         assertEquals(listOf("가-나", "다-라"), actual.map { it.combined })
