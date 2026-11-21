@@ -61,9 +61,9 @@ class S5RecurrentParametersTest {
             ),
             layerOne.map { it.name }
         )
-        assertEquals(6, layerOne.first().rows)
+        assertEquals(9, layerOne.first().rows)
         assertEquals(6, layerOne.first().columns)
-        assertEquals(6, layerOne[4].rows)
+        assertEquals(9, layerOne[4].rows)
         assertEquals(6, layerOne[4].columns)
     }
 
@@ -85,7 +85,7 @@ class S5RecurrentParametersTest {
         assertFalse(parsed[0].reverseDirection)
         assertTrue(parsed[1].reverseDirection)
         assertEquals(2, parsed[0].inputFeatures)
-        assertEquals(6, parsed[0].inputWeights.size)
+        assertEquals(12, parsed[0].inputWeights.size)
         assertEquals(12, parsed[0].recurrentWeights.size)
         assertEquals(6, parsed[1].inputBias?.size)
         assertEquals(6, parsed[1].recurrentBias?.size)
