@@ -188,7 +188,8 @@ object S5RecurrentParameterLoader {
                     requiredTensor(
                         tensors,
                         parameterName(base, ".bias_hh_l", layer, reverse),
-                        layout.gateRows
+                        layout.gateRows,
+                        S5ModelTensorKey.Member.BIAS
                     )
                 } else {
                     null
