@@ -105,9 +105,11 @@ Project data is stored in the app's private files directory as vea-project.json.
 The three supplied ZIP archives are checked statically in CI. AI Megpoid V7 metadata, the 8 official Voice Types, artwork, and model-reference hashes are catalogued. The archive payloads are retained in the repository for compatibility research; they are not currently packaged as if Android could execute them.
 
 The archives contain:
-- Editor dll.zip: 10 Windows AMD64 PE DLLs.
+- Editor dll.zip: Windows AMD64 PE modules, including S5API.dll and VSM.dll.
 - AI Model.zip: COMMON7.vpit, VOCALOID7.vhnv, and VOCALOID7.vtmg.
 - megpoidV7.zip: AI Megpoid bank data, manifest, styles, and artwork.
+
+The five required runtime model members are extracted from the supplied archives into generated APK assets by the Gradle preparation task. They are installed and hash-verified into app-private storage on first launch; this packaging step does not itself provide an acoustic renderer.
 
 AI Megpoid's official Voice Types are Native, Whisper, Cute, Downer, Power, Soft, Vivid, and Ballade. The product languages are Japanese, English, and Chinese.
 
@@ -120,22 +122,9 @@ The CI prepares only allow-listed artwork from megpoidV7.zip:
 
 The app can select the AI Megpoid identity and Voice Type metadata. This does not imply that singing synthesis is already available.
 
-## Verified AI Megpoid V7 model import
+## Bundled AI Megpoid model and S5API payload decoding
 
-The Android app now includes a private-storage importer for the two user-selected source archives:
-
-- `megpoidV7.zip`: imports `AI_Megpoid.vtb2` and `AI_Megpoid.vpit`.
-- `AI Model.zip`: imports `COMMON7.vpit`, `VOCALOID7.vhnv`, and `VOCALOID7.vtmg`.
-
-`MegpoidV7PackageInstaller.install(context, bankZipUri, modelZipUri)` must be called from an I/O dispatcher. It streams the archives, extracts only those five allow-listed files, validates each file's catalog SHA-256 and 136-byte outer header, and activates the new package only after both archives pass verification. Unrelated files are not installed. `findInstalled(context)` rechecks the installed files, and the returned package can provide a `VoicebankDescriptor` whose source URI points to the app-private model directory.
-
-After verification, the voice picker enables **LOAD VOICE** and stores the package's private-directory URI on the selected vocal track. The URI is saved and restored with the project, and `VeaTrack.voicebankDescriptorOrNull()` can rebuild the corresponding engine descriptor. The package record also exposes the manifest component ID.
-
-This is the first real model-resource connection step, not a completed synthesizer. The importer does not decode or transform the proprietary model payloads, bypass authorization, execute Windows DLLs, or mark the engine as available. VDM database integration, the complete S5API model execution graph, Yamaha G2P, and the Android ARM64 singing renderer are still required before Megpoid WAV rendering can be enabled.
-
-## Built-in AI Megpoid model packaging and render-plan stage
-
-The Android build now extracts only the five required model members from the repository's supplied `megpoidV7.zip` and `AI Model.zip` archives into generated APK assets:
+The Android build extracts only the five required model members from the repository's supplied `megpoidV7.zip` and `AI Model.zip` archives into generated APK assets:
 
 - `AI_Megpoid.vtb2`
 - `AI_Megpoid.vpit`
@@ -143,11 +132,15 @@ The Android build now extracts only the five required model members from the rep
 - `VOCALOID7.vhnv`
 - `VOCALOID7.vtmg`
 
-The Gradle `prepareMegpoidModelAssets` task runs before `preBuild`. At first launch, `MegpoidV7PackageInstaller.installBundled(context)` copies the bundled assets into app-private storage and verifies their known SHA-256 digests and 136-byte container headers. Existing verified files are reused. The user no longer needs to select two ZIP archives to install the default Megpoid bank.
+The Gradle `prepareMegpoidModelAssets` task runs before `preBuild`. At first launch, `MegpoidV7PackageInstaller.installBundled(context)` copies the bundled assets into app-private storage and verifies their known SHA-256 digests and 16-byte S5API prefixes. For the five catalog assets, the declared span at +0x04 equals file size minus 136 bytes; this represents the 16-byte prefix, the transformed body, and a 128-byte trailing region left untouched by the vendor transform.
 
-The synthesis-input stage is now implemented in `VocalRenderPlanBuilder`. It converts project tempo/meter, clip bar offsets, note tick positions and durations, MIDI pitch, lyric/phoneme strings, language, style ID and note-relative pitch points into a time-normalized `VocalRenderPlan`. `VocaloidAiEngineAdapter.prepareRenderPlans()` connects this request format to the selected voicebank binding. The format is voicebank-neutral so later bank adapters can share the same scheduling and render request layer.
+The model-container boundary is now ported from S5API `FUN_18002aa90`. `vea_s5_container.cpp` parses the magic, declared span, format word, and per-file 32-bit transform seed, then applies the recovered word-wise seeded transform and its distinct 1–3 byte tail path. The JNI bridge exposes this as `NativeS5TensorBridge.decodeContainerPayload()`. A deterministic native fixture verifies the decoded bytes and confirms that the 128-byte trailing region is outside the transform range.
 
-**Important renderer status:** this is not yet a completed acoustic synthesizer. The app currently bundles the Megpoid model resources, but the S5API graph is only partially ported and the supplied runtime inventory does not include the primary VSM native renderer module. The render adapter deliberately reports that no WAV was generated until an Android ARM64 acoustic backend is implemented and verified. Piano preview remains separate from vocal rendering.
+The decoded body is the next input to the still-unfinished JSON-like model-object parser. The existing `*F32`, `*F16`, and `*S32` Base64 tensor decoders and padded matrix packers are already ported, and the recovered three-gate RNN parameter dimensions are validated and prepared for packing. The RNN forward equations, exact MD5-derived tensor key format, and complete model graph are not yet available.
+
+The synthesis-input stage is implemented in `VocalRenderPlanBuilder`. It converts project tempo/meter, clip bar offsets, note tick positions and durations, MIDI pitch, lyric/phoneme strings, language, style ID and note-relative pitch points into a time-normalized `VocalRenderPlan`. `VocaloidAiEngineAdapter.prepareRenderPlans()` connects this request format to the selected voicebank binding. The format is voicebank-neutral so later bank adapters can share the same scheduling and render request layer.
+
+**Important renderer status:** the built-in AI Megpoid assets are installed and their outer body transform is implemented, but the inner model tree, full neural graph, Yamaha G2P, and Android ARM64 acoustic rendering path are not complete. The app must continue to report synthesis as unavailable and must not claim to have generated a Megpoid WAV until an actual reference-validated render succeeds. Piano preview remains separate from vocal rendering.
 
 ## Playback and pitch preview
 
