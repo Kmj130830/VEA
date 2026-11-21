@@ -60,6 +60,15 @@ data class S5VoicebankModelPackage(
     }
 
     /**
+     * Exact VTB2 tensors used by the pre-residual dense and global-normalization operators.
+     */
+    val preResidualTensorIndex: S5MegpoidPreResidualTensorIndex by lazy(
+        LazyThreadSafetyMode.PUBLICATION
+    ) {
+        S5MegpoidPreResidualTensorIndex.build(residualRuntimeConfigTree)
+    }
+
+    /**
      * Lazily indexes the eight FUN_1800ced10 model-property families for
      * the four-by-two block grid, scoped to the exact subtree selected by
      * the high-level native initializer.
@@ -114,13 +123,27 @@ data class S5VoicebankModelPackage(
         )
 
     /**
+     * Creates the model-backed dense projection + global normalization stage.
+     * Dimensions must come from the active render-state descriptor.
+     */
+    fun preparePreResidualDenseNormalizationStage(
+        inputFeatures: Int,
+        outputFeatures: Int,
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidDenseNormalizationStage =
+        preResidualTensorIndex.buildDenseNormalizationStage(
+            inputFeatures = inputFeatures,
+            outputFeatures = outputFeatures,
+            tensorDecoder = tensorDecoder
+        )
+
+    /**
      * Builds the sequence-major residual-block invocation plan recovered
-     * from FUN_1800c7ad0. sequenceCount includes the terminal sequence slot;
-     * the native loop executes sequenceCount - 1 positions.
+     * from FUN_1800c7ad0. AI Megpoid V7 has four sequence rows, visited in
+     * reverse row order; each row invokes its two block columns once.
      *
      * This produces call ordering and workspace ownership only. The
-     * neighboring preprocessing and feature-generation operators are not
-     * represented as executable stages yet.
+     * neighboring temporal and banked-linear stages remain separate.
      */
     fun buildResidualBlockSchedule(sequenceCount: Int): S5MegpoidResidualBlockSchedule =
         S5MegpoidResidualBlockSchedule.megpoidV7(sequenceCount)

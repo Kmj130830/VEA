@@ -48,7 +48,7 @@ class S5MegpoidResidualBlockScheduleTest {
         schedule.steps.groupBy { it.sequenceIndex }.values.forEach { rowSteps ->
             assertEquals(S5MegpoidWorkspaceSlot.SECOND, rowSteps.first().inputWorkspace)
             assertEquals(S5MegpoidWorkspaceSlot.FIRST, rowSteps.first().outputWorkspace)
-            assertEquals(S5MegpoidWorkspaceSlot.FIRST, rowSteps.last().outputWorkspace)
+            assertEquals(S5MegpoidWorkspaceSlot.SECOND, rowSteps.last().outputWorkspace)
         }
     }
 

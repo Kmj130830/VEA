@@ -97,3 +97,21 @@ The Android implementation already parses and hash-validates the five Megpoid/sh
 The newly mapped native path provides the missing high-level connection between a model-object value and `FUN_1800ced10`. Android still needs a behaviorally equivalent implementation of the configuration conversion at `FUN_1800b8f60`, the complete population of all root descriptors consumed by `FUN_1800c7ad0`, and validation of `FUN_1800af230`. The full forward graph, phoneme/event preparation, output-domain conversion, and verified PCM rendering remain incomplete.
 
 No successful Megpoid vocal render or WAV output is claimed by this analysis.
+
+
+## Confirmed pre-residual tensor keys
+
+The initialization routine resolves three properties before building
+per-sequence descriptors. The embedded constants passed to
+\`FUN_18001acc0\` produce the exact keys:
+
+- Dense weights: \`dd8f659ac91cbd5ef58ebd6ed786339e\`.
+- Normalization scale: \`6121c88871cfb21dab889701aef1922a\`.
+- Normalization bias: \`f860a37573c14d61e3a339d70eadd90f\`.
+
+The dense descriptor's bias flag is zero. The normalization constructor
+stores scale first at descriptor \`+0x08\`, then bias at \`+0x18\`; its
+epsilon is float32 \`1.0e-6\`. Android now indexes these exact VTB2 keys and
+can construct the Dense + Global-Normalization stage when supplied with the
+active render-state feature dimensions. Temporal and banked-linear per-index
+property keys remain unresolved.

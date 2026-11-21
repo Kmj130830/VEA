@@ -121,3 +121,43 @@ contracts. It does not yet prove which precise model-tree property keys
 populate the dense and normalization descriptors at +0x1F8/+0x228, or
 the temporal/banked operator descriptors in the arrays. Those model-value
 provenance paths remain the next mapping task.
+
+
+## VTB2 property provenance: dense projection and global normalization
+
+The model-population trace in \`FUN_1800ced10\` resolves the three exact
+property keys used by the operators at root offsets \`+0x1F8\` and
+\`+0x228\`. The key generator \`FUN_18001acc0\` formats four 32-bit words
+from the embedded constants as zero-padded lowercase hexadecimal words.
+
+| Descriptor | Lookup key | VTB2 role | Construction evidence |
+|---|---|---|---|
+| Dense weights | \`dd8f659ac91cbd5ef58ebd6ed786339e\` | \`[outputFeature][inputFeature]\` matrix | \`FUN_1800d5970\` -> \`FUN_1800d4610\` |
+| Normalization scale | \`6121c88871cfb21dab889701aef1922a\` | Per-feature multiplier | First vector passed to \`FUN_1800d4a90\`, stored at descriptor \`+0x08\` |
+| Normalization bias | \`f860a37573c14d61e3a339d70eadd90f\` | Per-feature offset | Second vector passed to \`FUN_1800d4a90\`, stored at descriptor \`+0x18\` |
+
+The dense descriptor is initialized with its bias-enable flag set to zero by
+\`FUN_1800c06c0\`; the subsequent \`FUN_1800d4610\` call attaches the dense
+weight vector but does not allocate a bias vector. Therefore this dense
+projection has no model bias. Its matrix size is the product of the active
+input and output feature dimensions supplied by the render-state descriptor.
+
+The normalizer epsilon comes from the float32 bit pattern \`0x358637bd\`,
+which is \`1.0e-6\`. The decompiled \`FUN_1800c7920\` reads the vector at
+descriptor \`+0x08\` as the scale and the vector at \`+0x18\` as the bias,
+then applies the global mean/inverse-standard-deviation transform across the
+complete feature-position tensor. The Android index preserves these exact
+roles and constructs the dense/normalization stage from these three VTB2
+properties when the caller supplies the active descriptor dimensions.
+
+## Still-unresolved per-sequence operator keys
+
+The temporal projection descriptors are populated through the indexed key
+factories \`FUN_1800e76c0(sequenceIndex)\` and
+\`FUN_1800e8620(sequenceIndex)\`. The banked-linear descriptors use
+\`FUN_180122880(sequenceIndex)\` and \`FUN_1801256a0(sequenceIndex)\`;
+the alternate dispatch branch uses \`FUN_1801237e0\` and
+\`FUN_180124740\`. Their generated key tables are not yet mapped to actual
+VTB2 paths. The Android code must not infer those links from element counts
+or substitute the nine named VTMG layer tensors without an explicit data-flow
+match.
