@@ -19,9 +19,9 @@ Method: Ghidra 12.2 static decompilation of the VSM render path. The target DLLs
 6. In the 44.1 kHz branch, `FUN_18006eab0` configures the object with sample rate `0xac44` and chunk length `0x100`. It allocates a `0x200`-byte output buffer for the 256-sample chunk.
 7. `FUN_18000f810` appends the returned samples to the VSM audio-buffer accumulator using `memcpy(..., sampleCount * 2)` and advances the destination position in two-byte sample units. This establishes a 16-bit-width VSM audio-buffer representation on this path. Signedness and exact quantization semantics are not established by this helper alone.
 
-## Raw 24-byte event descriptor observations
+## Raw 24-byte staging-record observations
 
-The temporary records constructed in `FUN_18006f500` occupy six 32-bit words (24 bytes) on the observed 64-bit build. The fifth word pair contains a pointer to an event-owned payload/member. The values below are the raw decompiler-visible fields; names such as `kind` or `controllerId` are deliberately not assigned until helper bodies and call sites confirm their semantics.
+The temporary records constructed in `FUN_18006f500` occupy six 32-bit words (24 bytes) on the observed 64-bit build. The fifth word pair contains a pointer to an event-owned payload/member. These are *staging records*: before the engine call, `FUN_180071440` is invoked to transform the per-chunk records. The code then copies the transformed chunk data as eight-byte units into the argument descriptor passed to virtual method `+0x78`. Therefore the 24-byte staging record must not be treated as the final engine-facing event ABI. The values below are raw decompiler-visible fields; names such as `kind` or `controllerId` are deliberately not assigned until the converter and helper bodies confirm their semantics.
 
 | Event family | word 0 | word 1 | word 2 | word 3 | word 4-5 |
 |---|---|---|---|---|---|
@@ -33,19 +33,19 @@ The note and vibrato descriptors are emitted after type checks against their cor
 
 ## Voice-engine boundary that remains unresolved
 
-The VSM caller obtains the object through indirect manager/interface calls and invokes several virtual methods, including offsets `+0x10`, `+0x30`, `+0x50`, `+0x58`, `+0x78`, `+0x80`, and `+0x88`. At `+0x78`, it supplies the per-block event descriptor and the output-buffer descriptor. Those byte offsets are observed on the VSM object, but their C/C++ signatures and ownership rules are not recovered.
+The VSM caller obtains the object through indirect manager/interface calls and invokes several virtual methods, including offsets `+0x10`, `+0x30`, `+0x50`, `+0x58`, `+0x78`, `+0x80`, and `+0x88`. At `+0x78`, it supplies the per-block event descriptor and the output-buffer descriptor. Those byte offsets are observed on the VSM object, but their C/C++ signatures and ownership rules are not recovered. In particular, the exact eight-byte packed event item emitted by `FUN_180071440` has not been decoded yet.
 
 Separately, `FUN_18003b380` loads `S5API.dll` and `FUN_180086750` resolves 28 obfuscated exports with `GetProcAddress`, including `Func_92864e29`. The available static trace does not yet prove which VSM virtual method dispatches to which S5API export. In particular, do not equate VSM `+0x78` with `Func_92864e29` without a recovered vtable or thunk mapping.
 
 ## Android port implications
 
 - Keep the imported AI Megpoid V7 model package and its prepared weights as the voicebank layer; do not treat successful bank parsing as a rendered singer.
-- Represent MIDI notes, vibrato and controller events as separate typed source events before attempting to encode the native 24-byte descriptor. The payloads in the desktop DLL are native object pointers and cannot be copied into an Android process.
+- Represent MIDI notes, vibrato and controller events as separate typed source events. Do not encode the 24-byte desktop staging records directly: `FUN_180071440` transforms them before the engine call, and the desktop records contain process-local pointers that cannot be copied into Android.
 - Use an explicit sample-format boundary. The VSM 44.1 kHz path consumes 256-sample blocks with a two-byte sample stride; signedness, scaling and conversion from S5API's internal float buffers must be resolved before writing WAV output.
 - The exact VSM interface ABI, event payload layouts, S5API export mapping, upstream F0/voicing/features and final PCM conversion are still outstanding. The current Android `SynthesisEngine.render()` remains unavailable.
 
 ## Next evidence needed
 
-1. Decompile the three event conversion helpers and their callers to name descriptor fields and payload semantics.
+1. Decompile the three event conversion helpers and `FUN_180071440` to recover the eight-byte packed engine event and payload semantics.
 2. Recover the VSM voice-engine interface vtable/thunks and map its methods to the 28 S5API exports.
 3. Trace the first S5API input state populated from note/phoneme/pitch/controller events, then confirm the final sample format and scaling.
