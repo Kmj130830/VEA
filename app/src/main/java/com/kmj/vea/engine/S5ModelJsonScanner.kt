@@ -481,6 +481,57 @@ object S5ModelContainerScanner {
         maxDocumentChars = maxDocumentChars
     )
 
+    fun scanVtb2ForObjectKeys(
+        vtb2File: File,
+        targetObjectKeys: Set<String>,
+        maxDocumentChars: Long = 128L * 1024L * 1024L
+    ): S5ModelJsonScanResult = scanContainerFileForObjectKeys(
+        containerFile = vtb2File,
+        expectedKind = "VTBR",
+        targetObjectKeys = targetObjectKeys,
+        maxDocumentChars = maxDocumentChars
+    )
+
+    fun scanContainerFileForObjectKeys(
+        containerFile: File,
+        expectedKind: String,
+        targetObjectKeys: Set<String>,
+        maxDocumentChars: Long = 128L * 1024L * 1024L
+    ): S5ModelJsonScanResult {
+        require(containerFile.isFile) {
+            "The model container file does not exist: ${containerFile.name}."
+        }
+        require(containerFile.length() in 16L..512L * 1024L * 1024L) {
+            "The model container size is outside the supported range: ${containerFile.name}."
+        }
+        check(NativeS5TensorBridge.isLoaded) {
+            "The native S5API container decoder is not loaded."
+        }
+
+        val encoded = FileInputStream(containerFile).use { it.readBytes() }
+        val prefix = encoded.copyOfRange(0, 16)
+        val header = NativeS5TensorBridge.parseContainerHeader(prefix, encoded.size.toLong())
+            ?: throw IllegalArgumentException("Invalid S5API container prefix: ${containerFile.name}.")
+        require(header.kind == expectedKind) {
+            "Expected $expectedKind in ${containerFile.name}, found ${header.kind}."
+        }
+
+        val decoded = NativeS5TensorBridge.decodeContainerPayload(encoded)
+        require(decoded.size.toLong() == header.decodedPayloadSize) {
+            "Decoded body size does not match the container prefix: ${containerFile.name}."
+        }
+
+        return ByteArrayInputStream(decoded).use { input ->
+            InputStreamReader(input, StandardCharsets.UTF_8).use { reader ->
+                S5ModelJsonScanner.scanForObjectKeys(
+                    reader,
+                    targetObjectKeys,
+                    maxDocumentChars = maxDocumentChars
+                )
+            }
+        }
+    }
+
     fun scanMegpoidPackage(
         packageDirectory: File,
         targetTensorKeys: Set<String> = emptySet(),
