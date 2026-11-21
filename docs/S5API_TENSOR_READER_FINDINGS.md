@@ -28,7 +28,19 @@ This reveals a 32-byte aligned, 8-column-padded float32 matrix representation. I
 
 ## Weight and bias lookup keys
 
-FUN_180020190 constructs the suffix .weight; FUN_1800214c0 constructs a .bias member. Both combine the incoming base name with a fixed binary suffix and call FUN_180010260. The current static trace identifies MD5 state initialization in the digest helper, but the exact byte encoding, digest-to-key formatting, and salt/concatenation order must be matched byte-for-byte before implementing key derivation in Android.
+The deeper trace establishes the exact digest input construction in both accessors:
+
+- FUN_180020190 appends the ASCII suffix `.weight` to the incoming base name.
+- FUN_1800214c0 appends the ASCII suffix `.bias` to the incoming base name.
+- Both then append the same 24-byte binary constant before calling FUN_180010260.
+
+The constant's bytes, in memory order, are:
+
+`69 23 33 65 2e 63 5a 54 25 35 6b 39 6a 32 64 2c 32 5a 72 53 2f 2b 2f 32`
+
+ASCII view: `i#3e.cZT%5k9j2d,2ZrS/+/2`.
+
+FUN_180010260 initializes the standard four MD5 state words and calls the MD5 update/finalization path. FUN_18001acc0 streams four 32-bit digest words with zero-fill and a hexadecimal stream manipulator. VEA's decoded-body inspector now generates the conventional MD5-byte, little-endian-word, and big-endian-word representations for candidate `.weight`/`.bias` names and compares them against actual decoded JSON object keys. The exact digest word display order is left unclaimed until that cross-check completes.
 
 ## Recurrent parameter naming and direction
 
