@@ -22,6 +22,10 @@ data class VsmPhoneEvent(
 
     val durationSeconds: Double
         get() = endSeconds - startSeconds
+
+    /** Canonical string alias used before the context-specific numeric lookup. */
+    val canonicalPhoneLabel: String
+        get() = VsmPhoneLabelCanonicalizer.canonicalize(phoneLabel)
 }
 
 /**
