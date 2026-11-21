@@ -39,10 +39,18 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
         "180012030", // initializes the adjacent subobject and its fields
         "180013c00", // initializes the larger render/voice engine object
         "180014940", // destroys embedded vector subobjects
-        "180015d10", // destroys vectors at +0x1f0, +0x208 and +0x220
-        "180016dc0", // destroys the vector at +0x240 and nested +0x1f8 object
+        "180015990", // destroys compact pointer-bearing vector subobjects
+        "180015d10", // destroys vectors at +0x1f0, +0x208 and +0x220 in its own object
+        "180016dc0", // destroys the vector at +0x240 and nested +0x1f8 object in its own type
         "180016a80", // nested object cleanup invoked by FUN_180016dc0
         "18007af10", // nested object cleanup invoked at +0x1f8
+        "1800beaa0", // runtime-root embedded descriptor/vector subobject destructor
+        "1800c0110", // runtime-root embedded temporal/feature subobject destructor
+        "1800be7f0", // runtime-root embedded 0x30-stride descriptor-vector destructor
+        "1800be890", // runtime-root embedded alternate descriptor-vector destructor
+        "1800af5b0", // copies 0x18-stride descriptor/workspace records
+        "1800af940", // copies another 0x18-stride descriptor/workspace vector
+        "1800af720", // copies 0x88-stride residual state records
         "180063ca0", // primary typed matrix-array loader
         "180064e90", // secondary property loader/consumer
         "180064670", // matrix descriptor and numeric tensor packer
@@ -60,7 +68,13 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
         "180014f70", // hash digest stream finalization
         "180083c50", // integer-to-string component used by RNN name builder
         "1800c4730", // runtime model-state resolver before forward dispatch
-        "1800ccce0", // caller that constructs/copies model runtime state
+        "1800bca40", // initializes the full runtime-state root object
+        "1800ccce0", // allocates and copies model runtime state
+        "1800cdbb0", // copies descriptor vectors and residual block records into runtime state
+        "1800c47a0", // copies runtime state, including temporal workspace descriptor vectors
+        "1800becd0", // destroys runtime-state root and its embedded descriptor/vector subobjects
+        "1800c0290", // copies compact embedded descriptor objects
+        "1800d5a00", // prepares sequence workspaces and temporal buffers
         "1800ced10", // builds per-block runtime records from parsed model configuration
         "1800d4bf0", // per-block 0x100-byte runtime record builder
         "1800bc5e0", // initializes dimension fields for the per-block constructor
@@ -267,8 +281,9 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
             out.println("## Global engine-object field-reference candidate scan");
             out.println();
             out.println("> Candidate non-stack references to engine-object fields observed near FUN_1800c7ad0 and related constructors/destructors.");
-            out.println("> These are member-offset candidates, not direct tensor/weight descriptors. Constructor, destructor and callsite dataflow must be checked before assigning a semantic role.");
-            out.println("> Confirmed vector triples include [begin,end,capacity] at +0x1f0/+0x1f8/+0x200 and +0x220/+0x228/+0x230 in FUN_180015d10, plus +0x240/+0x248/+0x250 in FUN_180016dc0.");
+            out.println("> A numeric offset is meaningful only relative to a particular object's base. The same offset can denote an operator descriptor in the render-state root and a vector boundary in a different nested object's this-pointer.");
+            out.println("> Confirmed render-state callsite roles: +0x1f8 is passed as the dense-projection descriptor to FUN_1800c5260; +0x228 is passed as the global-normalization descriptor to FUN_1800c7920; +0x250/+0x280/+0x2b0 are bases for 0x30/0x30/0x28-stride operator descriptor arrays; +0x268 and +0x298 are workspace descriptor vectors.");
+            out.println("> Separate this-relative vector triples at +0x1f0/+0x1f8/+0x200 and +0x220/+0x228/+0x230 belong to FUN_180015d10's object, and +0x240/+0x248/+0x250 belongs to FUN_180016dc0's object. Do not conflate these bases.");
             out.println();
             String[] watchedOffsets = {
                     "0x1f8]", // confirmed vector end pointer for the vector beginning at +0x1f0 (capacity at +0x200)
