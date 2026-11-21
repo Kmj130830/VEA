@@ -43,6 +43,17 @@ public class ExportS5ContainerAndHash extends GhidraScript {
         "180020190", // .weight hashed lookup
         "1800214c0", // .bias hashed lookup
         "180068190", // model layer construction entry
+        "18004e3b0", // derives first S5 model feature flag
+        "18004e1e0", // derives second S5 model feature flag
+        "18004d170", // selects first nested S5 model object
+        "18004d3b0", // selects second nested S5 model object
+        "18004c460", // secondary path first nested object selector
+        "18004c6a0", // secondary path second nested object selector
+        "180026f60", // optional typed-object fallback
+        "180010740", // string composition helper
+        "180010540", // string composition helper
+        "18001acc0", // digest-to-hex string conversion
+        "180010260", // MD5 digest computation
         "180056d60", // caller/factory for model sub-layers, including the RNN block
         "180056f40", // model-config path that instantiates the RNN block
         "18005ebe0", // recurrent parameter loader
