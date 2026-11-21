@@ -1,6 +1,6 @@
 # S5API tensor-reader findings
 
-Date: 2026-11-19
+Date: 2026-11-19 (updated 2026-11-21)
 
 ## Numeric-array conversion
 
@@ -10,6 +10,12 @@ The recovered FUN_180006c80 conversion helper supports at least two input node t
 - For node tag 3, the helper extracts a string and delegates to FUN_18000f5f0, then copies the resulting float vector into the destination. The exact string grammar is still under analysis.
 
 This is direct evidence for a JSON-like typed object tree used by the layer loader. It is not evidence that the outer .vtb2 file itself is JSON.
+
+## S5API container prefix and transform
+
+The supplied V7 files begin with a 16-byte prefix: magic, a declared span, a format/version word, and a 32-bit transform seed. The S5API routine FUN_18002aa90 uses the seed to decode the body beginning at offset 16. For the five catalog model assets, the declared span is file_size - 136, so the decoder emits file_size - 144 bytes and leaves the final 128 bytes outside the transform range.
+
+The portable implementation is now in `vea_s5_container.cpp` and exposed to Kotlin as `NativeS5TensorBridge.decodeContainerPayload()`. This decodes the outer byte transform only; it does not parse the resulting JSON-like model-object tree.
 
 ## Aligned arena and layer descriptors
 
@@ -22,9 +28,7 @@ This reveals a 32-byte aligned, 8-column-padded float32 matrix representation. I
 
 ## Weight and bias lookup keys
 
-FUN_180020190 constructs the suffix .weight; FUN_1800214c0 constructs .bias. Both combine the incoming base name with a fixed binary suffix and call FUN_180010260.
-
-FUN_180010260 initializes the standard MD5 state words (67452301, efcdab89, 98badcfe, 10325476) and delegates to the lower-level block update/finalization helpers. The observed lookup key path is therefore MD5-based. The exact byte encoding and whether the suffix is used as a salt must be matched byte-for-byte before implementing the key derivation in Android.
+FUN_180020190 constructs the suffix .weight; FUN_1800214c0 constructs a .bias member. Both combine the incoming base name with a fixed binary suffix and call FUN_180010260. The current static trace identifies MD5 state initialization in the digest helper, but the exact byte encoding, digest-to-key formatting, and salt/concatenation order must be matched byte-for-byte before implementing key derivation in Android.
 
 ## Recurrent parameter naming and direction
 
@@ -34,28 +38,15 @@ Three gates plus reverse-direction parameter names remain consistent with a bidi
 
 ## Model payload byte observations
 
-The V7 payloads have high global entropy and contain many candidate zlib/gzip headers:
-
-- AI_Megpoid.vtb2: 23,541,731 bytes, global entropy approximately 8 bits/byte.
-- VOCALOID7.vhnv: 5,485,182 bytes, global entropy approximately 8 bits/byte.
-- VOCALOID7.vtmg: 148,942 bytes, global entropy approximately 8 bits/byte.
-- AI_Megpoid.vpit: 16,754 bytes, global entropy approximately 7.99 bits/byte.
-
-The presence of embedded compression signatures is only a candidate indication until each stream is successfully decompressed and its boundaries/parent records are mapped. The updated static inspection workflow attempts bounded zlib/gzip decompression and records only streams that reach a valid end. No model bytes are modified.
+The transformed/encoded V7 payloads have high global entropy and contain many candidate zlib/gzip signatures. The previous bounded scanner attempted full zlib/gzip decompression and found zero valid streams in the untransformed files. Those byte signatures are not evidence of standard zlib/gzip compression. This does not rule out proprietary compression or additional encoding in the decoded JSON-like model body.
 
 ## Porting consequence
 
-The Android model loader should be split into three independently testable components:
+The Android model loader should be split into four independently testable components:
 
-1. Outer container reader for VTBR/VPIT/VHNV/VTMG.
-2. Typed-object/tensor extraction, including the MD5-based key derivation and numeric-array conversion.
-3. Float32 matrix packing using the 32-byte arena and 8-column padded descriptor representation.
+1. Outer 16-byte prefix parser and seeded body transform.
+2. JSON-like typed-object tree parser, including the MD5-based key derivation.
+3. Numeric typed-array extraction and float32 matrix packing using the 32-byte arena and 8-column padded descriptor representation.
+4. Recurrent/convolutional model graph construction and execution.
 
-Only the tensor extraction and packing boundary has been partially recovered here. The complete V7 container parser, neural execution graph, and Megpoid V7 synthesis are still not implemented.
-
-
-## 2026-11-19 compression-candidate validation correction
-
-The follow-up byte scanner tested candidate zlib/gzip signatures by attempting decompression from each candidate offset and requiring the decompressor to reach a valid end-of-stream marker. The inspected `.vtb2`, `.vpit`, `.vhnv`, and `.vtmg` files produced **zero** candidates that passed this full-stream check.
-
-Therefore, the byte signatures in the high-entropy payloads are not evidence of embedded standard zlib/gzip streams; they are likely coincidental byte sequences or use a different framing/codec. The scanner records both the candidate offsets and the successful-stream list so this distinction is explicit. This result does not rule out proprietary compression or encrypted/obfuscated sections.
+Only the outer body transform, typed numeric-array primitives, and matrix packing boundary have been partially recovered and ported here. The complete model-object parser, neural execution graph, and Megpoid V7 synthesis remain incomplete.
