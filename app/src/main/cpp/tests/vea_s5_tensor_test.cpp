@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <cmath>
 #include <limits>
+#include <array>
+#include <vector>
 
 namespace {
 
@@ -19,6 +21,190 @@ bool IsAligned(const void* pointer, uintptr_t alignment) {
 
 int main() {
     assert(vea_s5_tensor_abi_version() == VEA_S5_TENSOR_ABI_VERSION);
+
+    // S5API digest key: salted MD5 words formatted as 4 x 8 lowercase hex digits.
+    static constexpr uint8_t key_abc[] = {'a', 'b', 'c'};
+    char hashed_key[33] = {};
+    size_t hashed_key_required = 0;
+    assert(vea_s5_hash_parameter_key(
+        key_abc, sizeof(key_abc), hashed_key, sizeof(hashed_key),
+        &hashed_key_required) == VEA_S5_TENSOR_STATUS_OK);
+    assert(hashed_key_required == 33);
+    assert(std::strcmp(hashed_key, "de6c737db70b0f13e4db2c5fd5015e9c") == 0);
+
+    // A 48-byte key forces MD5 to process two 64-byte blocks after the salt.
+    static constexpr char long_key[] =
+        "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKL";
+    static_assert(sizeof(long_key) - 1u == 48u);
+    assert(vea_s5_hash_parameter_key(
+        reinterpret_cast<const uint8_t*>(long_key), sizeof(long_key) - 1u,
+        hashed_key, sizeof(hashed_key), &hashed_key_required) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(std::strcmp(hashed_key, "c70b98ec2a90d909a5a0977f6d8cd948") == 0);
+
+    // These names are present as typed-tensor keys in the supplied
+    // VOCALOID7.vtmg model member. Their JSON keys are canonical MD5 byte hex.
+    static constexpr char pre1_weight[] = "pre1.weight";
+    static constexpr char conv1_bias[] = "conv1.bias";
+    assert(vea_s5_hash_parameter_key(
+        reinterpret_cast<const uint8_t*>(pre1_weight), sizeof(pre1_weight) - 1u,
+        hashed_key, sizeof(hashed_key), &hashed_key_required) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(std::strcmp(hashed_key, "f8b15a70e9fe50b828e5803435580c63") == 0);
+    assert(vea_s5_hash_parameter_key(
+        reinterpret_cast<const uint8_t*>(conv1_bias), sizeof(conv1_bias) - 1u,
+        hashed_key, sizeof(hashed_key), &hashed_key_required) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(std::strcmp(hashed_key, "bf1fb08e8ffbab205dbb90120465e856") == 0);
+
+    struct RealModelKeyVector { const char* name; const char* expected; };
+    static constexpr RealModelKeyVector real_model_keys[] = {
+        {"pre1.weight", "f8b15a70e9fe50b828e5803435580c63"},
+        {"pre1.bias", "e0b8e91e6062dd010960e012a5410dfc"},
+        {"pre2.weight", "5f070ac57c6e37c82ef5338f3325fdb0"},
+        {"pre2.bias", "a236e71e934a1ef9421a3aa58dc4a32d"},
+        {"conv1.weight", "220316df91912792cb42bc663a8df636"},
+        {"conv1.bias", "bf1fb08e8ffbab205dbb90120465e856"},
+        {"cond1.weight", "edf0ab9aee552c38c05ca173eee22ac1"},
+        {"cond1.bias", "696e7aab6b19e87bda4d64d30787f024"},
+        {"conv2.weight", "7352c2e9486a73ce344f167dfad31876"},
+        {"conv2.bias", "c968ce1719cfab911f40b224b5bb28df"},
+        {"cond2.weight", "d2513a339c1cd73dccef828453a4d23a"},
+        {"cond2.bias", "f6b8236c129bd838ccee88b5e54ab949"},
+        {"conv3.weight", "7646bc7c9e90a59c368ef2b779853dff"},
+        {"conv3.bias", "68b10aa33dc35fe0030cd4bcf63d69b1"},
+        {"cond3.weight", "aa0c15b96de654347f8cf7f3d318d537"},
+        {"cond3.bias", "84560ce6291c9ad58de7fcace89954cf"},
+        {"linear.weight", "ecf71a24e4595ed754ce7c2a519102f0"},
+        {"linear.bias", "e7e58da68e9b65d684a141ccf7071bca"}
+    };
+    for (const auto& vector : real_model_keys) {
+        assert(vea_s5_hash_parameter_key(
+            reinterpret_cast<const uint8_t*>(vector.name), std::strlen(vector.name),
+            hashed_key, sizeof(hashed_key), &hashed_key_required) ==
+            VEA_S5_TENSOR_STATUS_OK);
+        assert(std::strcmp(hashed_key, vector.expected) == 0);
+    }
+
+    char small_hashed_key[8] = "stable";
+    assert(vea_s5_hash_parameter_key(
+        key_abc, sizeof(key_abc), small_hashed_key, sizeof(small_hashed_key),
+        &hashed_key_required) == VEA_S5_TENSOR_STATUS_BUFFER_TOO_SMALL);
+    assert(hashed_key_required == 33);
+    assert(std::strcmp(small_hashed_key, "stable") == 0);
+    assert(vea_s5_hash_parameter_key(
+        nullptr, 1, hashed_key, sizeof(hashed_key), &hashed_key_required) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
+    // Build the persistent 9-layer descriptor-pair table at the same
+    // object offsets used by FUN_180068190 (0x20 through 0xa0).
+    constexpr size_t kLayerCount = VEA_S5_NAMED_LAYER_COUNT;
+    // These are the exact descriptor dimensions recovered from the
+    // supplied VOCALOID7.vtmg member, in FUN_180068190 layer order.
+    const std::array<uint32_t, kLayerCount> layer_axis0 = {
+        32u, 32u, 64u, 64u, 64u, 64u, 64u, 64u, 3u
+    };
+    const std::array<uint32_t, kLayerCount> layer_axis1 = {
+        82u, 32u, 32u, 26u, 32u, 26u, 32u, 26u, 32u
+    };
+    const std::array<uint32_t, kLayerCount> layer_banks = {
+        1u, 1u, 3u, 1u, 3u, 1u, 3u, 1u, 1u
+    };
+    std::array<uint32_t, kLayerCount> layer_offsets{};
+    std::array<std::vector<float>, kLayerCount> layer_weights;
+    std::array<std::vector<float>, kLayerCount> layer_biases;
+    std::array<const float*, kLayerCount> layer_weight_ptrs{};
+    std::array<const float*, kLayerCount> layer_bias_ptrs{};
+    std::array<size_t, kLayerCount> layer_weight_counts{};
+    std::array<size_t, kLayerCount> layer_bias_counts{};
+    for (size_t layer = 0; layer < kLayerCount; ++layer) {
+        layer_offsets[layer] = 0x20u + static_cast<uint32_t>(layer) * 0x10u;
+        const size_t weight_count =
+            static_cast<size_t>(layer_axis0[layer]) * layer_axis1[layer] * layer_banks[layer];
+        layer_weights[layer].resize(weight_count);
+        layer_biases[layer].resize(layer_axis0[layer]);
+        for (size_t index = 0; index < weight_count; ++index) {
+            layer_weights[layer][index] =
+                static_cast<float>(1000u * layer + index + 1u);
+        }
+        for (size_t index = 0; index < layer_biases[layer].size(); ++index) {
+            layer_biases[layer][index] =
+                static_cast<float>(100u * layer + index + 1u);
+        }
+        layer_weight_ptrs[layer] = layer_weights[layer].data();
+        layer_bias_ptrs[layer] = layer_biases[layer].data();
+        layer_weight_counts[layer] = layer_weights[layer].size();
+        layer_bias_counts[layer] = layer_biases[layer].size();
+    }
+
+    VeaS5NamedLayerParameterSet* named_layer_set = nullptr;
+    assert(vea_s5_named_layer_parameter_set_create(
+        layer_weight_ptrs.data(), layer_weight_counts.data(),
+        layer_bias_ptrs.data(), layer_bias_counts.data(),
+        layer_axis0.data(), layer_axis1.data(), layer_banks.data(),
+        layer_offsets.data(), kLayerCount, &named_layer_set) == VEA_S5_TENSOR_STATUS_OK);
+    assert(named_layer_set != nullptr);
+
+    for (size_t layer = 0; layer < kLayerCount; ++layer) {
+        const VeaS5MatrixDescriptor* weight_descriptors = nullptr;
+        const VeaS5MatrixDescriptor* bias_descriptor = nullptr;
+        size_t weight_descriptor_count = 0;
+        uint32_t axis0 = 0, axis1 = 0, padded_axis0 = 0;
+        assert(vea_s5_named_layer_parameter_set_get_layer(
+            named_layer_set, layer, &weight_descriptors, &weight_descriptor_count,
+            &bias_descriptor, &axis0, &axis1, &padded_axis0) ==
+            VEA_S5_TENSOR_STATUS_OK);
+        assert(weight_descriptors != nullptr);
+        assert(bias_descriptor != nullptr);
+        assert(weight_descriptor_count == layer_banks[layer]);
+        assert(axis0 == layer_axis0[layer]);
+        assert(axis1 == layer_axis1[layer]);
+        assert(padded_axis0 == ((axis0 + 7u) & ~7u));
+        assert(weight_descriptors[0].axis0 == axis0);
+        assert(weight_descriptors[0].axis1 == axis1);
+        assert(weight_descriptors[0].padded_axis0 == padded_axis0);
+        assert(bias_descriptor->axis0 == axis0);
+        assert(bias_descriptor->axis1 == 1u);
+        assert(bias_descriptor->padded_axis0 == padded_axis0);
+
+        const size_t source_index =
+            (static_cast<size_t>(axis0 - 1u) * axis1 + (axis1 - 1u)) *
+            layer_banks[layer];
+        const size_t output_index =
+            static_cast<size_t>(axis1 - 1u) * padded_axis0 + (axis0 - 1u);
+        for (size_t bank = 0; bank < weight_descriptor_count; ++bank) {
+            assert(weight_descriptors[bank].values[output_index] ==
+                layer_weights[layer][source_index + bank]);
+        }
+        assert(bias_descriptor->values[axis0 - 1u] == layer_biases[layer].back());
+        for (uint32_t padding = axis0; padding < padded_axis0; ++padding) {
+            assert(bias_descriptor->values[padding] == 0.0f);
+        }
+    }
+
+    // Invalid table offsets and incomplete source vectors are rejected atomically.
+    auto invalid_offsets = layer_offsets;
+    invalid_offsets[4] += 8u;
+    VeaS5NamedLayerParameterSet* rejected_set = nullptr;
+    assert(vea_s5_named_layer_parameter_set_create(
+        layer_weight_ptrs.data(), layer_weight_counts.data(),
+        layer_bias_ptrs.data(), layer_bias_counts.data(),
+        layer_axis0.data(), layer_axis1.data(), layer_banks.data(),
+        invalid_offsets.data(), kLayerCount, &rejected_set) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(rejected_set == nullptr);
+
+    auto invalid_weight_counts = layer_weight_counts;
+    invalid_weight_counts[2] -= 1u;
+    assert(vea_s5_named_layer_parameter_set_create(
+        layer_weight_ptrs.data(), invalid_weight_counts.data(),
+        layer_bias_ptrs.data(), layer_bias_counts.data(),
+        layer_axis0.data(), layer_axis1.data(), layer_banks.data(),
+        layer_offsets.data(), kLayerCount, &rejected_set) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(rejected_set == nullptr);
+
+    vea_s5_named_layer_parameter_set_destroy(named_layer_set);
 
     VeaS5Arena* arena = nullptr;
     assert(vea_s5_arena_create(8192, &arena) == VEA_S5_TENSOR_STATUS_OK);
@@ -34,6 +220,53 @@ int main() {
     assert(converted[1] == -2.5f);
     assert(converted[2] == 3.125f);
     assert(converted[3] == 0.0f);
+
+    // Model-constructor mode confirmed at FUN_180057459: one layer, bias, bidirectional.
+    VeaS5RnnDirectionLayout rnn_model_forward{};
+    assert(vea_s5_rnn_direction_layout(80, 128, 1, 1, 1, 0, 0, &rnn_model_forward) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(rnn_model_forward.layer_index == 0 && rnn_model_forward.direction_index == 0);
+    assert(rnn_model_forward.input_features == 80);
+    assert(rnn_model_forward.gate_features == 384);
+    assert(rnn_model_forward.direction_count == 2);
+    assert(rnn_model_forward.weight_ih_elements == 30720);
+    assert(rnn_model_forward.weight_hh_elements == 49152);
+    assert(vea_s5_rnn_direction_layout(80, 128, 1, 1, 1, 0, 1, &rnn_model_forward) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(rnn_model_forward.direction_index == 1);
+    assert(rnn_model_forward.input_features == 80);
+
+    // Recovered recurrent parameter sizes: 3 gate blocks and stacked directions.
+    VeaS5RnnDirectionLayout rnn_layout{};
+    assert(vea_s5_rnn_direction_layout(80, 128, 3, 1, 1, 0, 0, &rnn_layout) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(rnn_layout.layer_index == 0 && rnn_layout.direction_index == 0);
+    assert(rnn_layout.input_features == 80 && rnn_layout.hidden_features == 128);
+    assert(rnn_layout.gate_features == 384 && rnn_layout.direction_count == 2);
+    assert(rnn_layout.weight_ih_elements == 30720);
+    assert(rnn_layout.weight_hh_elements == 49152);
+    assert(rnn_layout.bias_ih_elements == 384 && rnn_layout.bias_hh_elements == 384);
+
+    assert(vea_s5_rnn_direction_layout(80, 128, 3, 1, 1, 1, 1, &rnn_layout) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(rnn_layout.input_features == 256);
+    assert(rnn_layout.weight_ih_elements == 98304);
+    assert(rnn_layout.weight_hh_elements == 49152);
+
+    assert(vea_s5_rnn_direction_layout(80, 128, 3, 0, 0, 2, 0, &rnn_layout) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(rnn_layout.input_features == 128 && rnn_layout.direction_count == 1);
+    assert(rnn_layout.weight_ih_elements == 49152);
+    assert(rnn_layout.bias_ih_elements == 0 && rnn_layout.bias_hh_elements == 0);
+
+    assert(vea_s5_rnn_direction_layout(80, 128, 3, 1, 1, 0, 2, &rnn_layout) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_rnn_direction_layout(80, 128, 3, 2, 0, 0, 0, &rnn_layout) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_rnn_direction_layout(80, 128, 0, 1, 0, 0, 0, &rnn_layout) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_rnn_direction_layout(1, UINT32_MAX, 1, 1, 0, 0, 0, &rnn_layout) ==
+        VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW);
 
     // Two matrices, 3 x 2 logical dimensions; axis0 is padded to 8.
     // Source layout: [axis0][axis1][matrix].
@@ -544,73 +777,108 @@ int main() {
         block_output, block_channels, block_positions, block_expanded, 0.25f) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
-        // S5API FUN_18002aa90: 16-byte prefix, seeded body transform, opaque trailer.
-    constexpr size_t kPrefixBytes = VEA_S5_CONTAINER_PREFIX_SIZE;
-    constexpr size_t kDecodedBytes = 13;
-    constexpr size_t kTrailerBytes = 128;
-    constexpr size_t kFileBytes = kPrefixBytes + kDecodedBytes + kTrailerBytes;
-    uint8_t raw_file[kFileBytes] = {};
-    const char* magics[] = {"VTMB", "VTBR", "VTMG", "VPIT", "VNPV", "VHNV"};
-    const uint32_t kinds[] = {
-        VEA_S5_CONTAINER_KIND_VTMB, VEA_S5_CONTAINER_KIND_VTBR,
-        VEA_S5_CONTAINER_KIND_VTMG, VEA_S5_CONTAINER_KIND_VPIT,
-        VEA_S5_CONTAINER_KIND_VNPV, VEA_S5_CONTAINER_KIND_VHNV
+    // S5API FUN_18002aa90 payload transform: seeded multiword and tail vectors.
+    const uint8_t payload_tail_input[] = {
+        0x56, 0x54, 0x42, 0x52, 0x0f, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x78, 0x56, 0x34, 0x12,
+        0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77
     };
-    const uint32_t declared_span = static_cast<uint32_t>(kFileBytes - 136u);
-    for (size_t i = 0; i < 6; ++i) {
-        std::memcpy(raw_file, magics[i], 4);
-        for (size_t byte = 0; byte < 4; ++byte) {
-            raw_file[4 + byte] = static_cast<uint8_t>(declared_span >> (byte * 8u));
-            raw_file[8 + byte] = static_cast<uint8_t>(16u >> (byte * 8u));
-            raw_file[12 + byte] = static_cast<uint8_t>(0x12345678u >> (byte * 8u));
-        }
-        VeaS5ContainerHeader parsed{};
-        assert(vea_s5_parse_container_header(raw_file, kFileBytes, &parsed) ==
-            VEA_S5_CONTAINER_STATUS_OK);
-        assert(parsed.kind == kinds[i]);
-        assert(parsed.declared_span == declared_span);
-        assert(parsed.format_word == 16u);
-        assert(parsed.transform_seed == 0x12345678u);
-        assert(parsed.decoded_payload_size == kDecodedBytes);
-    }
-
-    // Fixed ciphertext bytes cover three complete words plus the distinct tail path.
-    // The final 128 bytes are deliberately nonzero and must not enter the decoded body.
-    const uint8_t encrypted_body[kDecodedBytes] = {
-        0x21u, 0x22u, 0x23u, 0x24u, 0x25u, 0x26u, 0x27u,
-        0x28u, 0x29u, 0x2au, 0x2bu, 0x2cu, 0x2du
+    const uint8_t payload_tail_expected[] = {
+        0x65, 0x20, 0x4d, 0xf1, 0x16, 0x3a, 0xfb
     };
-    std::memcpy(raw_file + kPrefixBytes, encrypted_body, sizeof(encrypted_body));
-    std::memset(raw_file + kPrefixBytes + kDecodedBytes, 0xee, kTrailerBytes);
-    const uint8_t expected_decoded[kDecodedBytes] = {
-        0x55u, 0x20u, 0x5du, 0x91u, 0x66u, 0x7au, 0xabu,
-        0x5au, 0x1du, 0x24u, 0xe6u, 0xd0u, 0x38u
-    };
-    uint8_t decoded[kDecodedBytes] = {};
-    uint64_t decoded_size = 0;
-    assert(vea_s5_decode_container_payload(
-        raw_file, kFileBytes, decoded, sizeof(decoded), &decoded_size) ==
+    size_t decoded_payload_size = 0u;
+    assert(vea_s5_decode_model_payload(
+        payload_tail_input, sizeof(payload_tail_input), nullptr, 0u,
+        &decoded_payload_size) == VEA_S5_CONTAINER_STATUS_BUFFER_TOO_SMALL);
+    assert(decoded_payload_size == sizeof(payload_tail_expected));
+    uint8_t decoded_payload[sizeof(payload_tail_expected)] = {};
+    assert(vea_s5_decode_model_payload(
+        payload_tail_input, sizeof(payload_tail_input),
+        decoded_payload, sizeof(decoded_payload), &decoded_payload_size) ==
         VEA_S5_CONTAINER_STATUS_OK);
-    assert(decoded_size == kDecodedBytes);
-    assert(std::memcmp(decoded, expected_decoded, sizeof(decoded)) == 0);
+    assert(decoded_payload_size == sizeof(payload_tail_expected));
+    assert(std::memcmp(decoded_payload, payload_tail_expected, sizeof(decoded_payload)) == 0);
 
-    uint64_t required_size = 0;
-    assert(vea_s5_decode_container_payload(
-        raw_file, kFileBytes, decoded, sizeof(decoded) - 1u, &required_size) ==
+    const uint8_t payload_multiword_input[] = {
+        0x56, 0x54, 0x4d, 0x47, 0x14, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0xef, 0xbe, 0xad, 0xde,
+        0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+        0x09, 0x0a, 0x0b, 0x0c
+    };
+    const uint8_t payload_multiword_expected[] = {
+        0xb2, 0x8d, 0xa3, 0xb2, 0xfa, 0xd7, 0x55, 0x79,
+        0xfa, 0x89, 0x18, 0xf3
+    };
+    uint8_t decoded_multiword[sizeof(payload_multiword_expected)] = {};
+    assert(vea_s5_decode_model_payload(
+        payload_multiword_input, sizeof(payload_multiword_input),
+        decoded_multiword, sizeof(decoded_multiword), &decoded_payload_size) ==
+        VEA_S5_CONTAINER_STATUS_OK);
+    assert(decoded_payload_size == sizeof(payload_multiword_expected));
+    assert(std::memcmp(decoded_multiword, payload_multiword_expected,
+        sizeof(decoded_multiword)) == 0);
+
+    // Insufficient capacity is atomic, and unrecognized data uses the copy path.
+    uint8_t too_small_output[sizeof(payload_tail_expected) - 1u];
+    std::memset(too_small_output, 0xa5, sizeof(too_small_output));
+    assert(vea_s5_decode_model_payload(
+        payload_tail_input, sizeof(payload_tail_input),
+        too_small_output, sizeof(too_small_output), &decoded_payload_size) ==
         VEA_S5_CONTAINER_STATUS_BUFFER_TOO_SMALL);
-    assert(required_size == kDecodedBytes);
+    for (uint8_t value : too_small_output) assert(value == 0xa5u);
 
+    uint8_t passthrough_input[20] = {
+        0x4a, 0x53, 0x4f, 0x4e, 0x10, 0x00, 0x00, 0x00
+    };
+    for (size_t index = 8; index < sizeof(passthrough_input); ++index) {
+        passthrough_input[index] = static_cast<uint8_t>(index * 3u);
+    }
+    uint8_t passthrough_output[sizeof(passthrough_input)] = {};
+    assert(vea_s5_decode_model_payload(
+        passthrough_input, sizeof(passthrough_input),
+        passthrough_output, sizeof(passthrough_output), &decoded_payload_size) ==
+        VEA_S5_CONTAINER_STATUS_OK);
+    assert(decoded_payload_size == sizeof(passthrough_input));
+    assert(std::memcmp(passthrough_input, passthrough_output, sizeof(passthrough_input)) == 0);
+
+    const uint8_t short_model_header[12] = {};
+    assert(vea_s5_decode_model_payload(
+        short_model_header, sizeof(short_model_header), nullptr, 0u,
+        &decoded_payload_size) == VEA_S5_CONTAINER_STATUS_OK);
+    assert(decoded_payload_size == 0u);
+
+    // Fixed 136-byte outer header observed in all five supplied V7 model files.
+    uint8_t raw_header[VEA_S5_CONTAINER_HEADER_SIZE] = {};
+    raw_header[4] = 100u;
+    raw_header[8] = 16u;
+    for (size_t i = 12; i < sizeof(raw_header); ++i) {
+        raw_header[i] = static_cast<uint8_t>(i ^ 0x5au);
+    }
+    const char* magics[] = {"VTBR", "VPIT", "VHNV", "VTMG"};
+    const uint32_t kinds[] = {
+        VEA_S5_CONTAINER_KIND_VTBR, VEA_S5_CONTAINER_KIND_VPIT,
+        VEA_S5_CONTAINER_KIND_VHNV, VEA_S5_CONTAINER_KIND_VTMG
+    };
+    assert(vea_s5_container_header_size() == 136u);
+    for (size_t i = 0; i < 4; ++i) {
+        VeaS5ContainerHeader parsed{};
+        for (size_t b = 0; b < 4; ++b) raw_header[b] = static_cast<uint8_t>(magics[i][b]);
+        assert(vea_s5_parse_container_header(
+            raw_header, sizeof(raw_header) + 100u, &parsed) == VEA_S5_CONTAINER_STATUS_OK);
+        assert(parsed.kind == kinds[i]);
+        assert(parsed.payload_size == 100u);
+        assert(parsed.format_word == 16u);
+        assert(parsed.raw_bytes_after_format_word[0] == raw_header[12]);
+        assert(parsed.raw_bytes_after_format_word[123] == raw_header[135]);
+    }
     VeaS5ContainerHeader invalid_header{};
-    const uint8_t invalid_magic[VEA_S5_CONTAINER_PREFIX_SIZE] = {};
-    assert(vea_s5_parse_container_header(
-        invalid_magic, kFileBytes, &invalid_header) ==
-        VEA_S5_CONTAINER_STATUS_INVALID_MAGIC);
-    assert(vea_s5_parse_container_header(
-        raw_file, VEA_S5_CONTAINER_PREFIX_SIZE - 1u, &invalid_header) ==
-        VEA_S5_CONTAINER_STATUS_INVALID_LENGTH);
-    assert(vea_s5_decode_container_payload(
-        raw_file, VEA_S5_CONTAINER_PREFIX_SIZE - 1u, decoded,
-        sizeof(decoded), &decoded_size) == VEA_S5_CONTAINER_STATUS_INVALID_LENGTH);
+    assert(vea_s5_parse_container_header(raw_header, sizeof(raw_header) + 99u, &invalid_header)
+        == VEA_S5_CONTAINER_STATUS_INVALID_LENGTH);
+    const uint8_t invalid_magic[VEA_S5_CONTAINER_HEADER_SIZE] = {};
+    assert(vea_s5_parse_container_header(invalid_magic, sizeof(invalid_magic), &invalid_header)
+        == VEA_S5_CONTAINER_STATUS_INVALID_MAGIC);
+    assert(vea_s5_parse_container_header(raw_header, 135u, &invalid_header)
+        == VEA_S5_CONTAINER_STATUS_INVALID_LENGTH);
 
     vea_s5_arena_reset(arena);
     assert(vea_s5_arena_used(arena) == 0);

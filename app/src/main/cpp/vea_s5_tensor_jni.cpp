@@ -10,6 +10,7 @@
 #include <limits>
 #include <new>
 #include <vector>
+#include <array>
 
 namespace {
 
@@ -66,6 +67,71 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeBuildRecurrentParameterName(
         env->ReleaseStringUTFChars(base_string, base);
         return nullptr;
     }
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeHashParameterKey(
+    JNIEnv* env, jobject, jbyteArray name_array) {
+    if (name_array == nullptr) return nullptr;
+    const jsize length = env->GetArrayLength(name_array);
+    if (length < 0 || length > (1 << 20)) return nullptr;
+
+    try {
+        std::vector<uint8_t> name_bytes(static_cast<size_t>(length));
+        if (length != 0) {
+            env->GetByteArrayRegion(
+                name_array, 0, length, reinterpret_cast<jbyte*>(name_bytes.data()));
+            if (env->ExceptionCheck()) return nullptr;
+        }
+
+        char key[33] = {};
+        size_t required = 0;
+        const VeaS5TensorStatus status = vea_s5_hash_parameter_key(
+            name_bytes.empty() ? nullptr : name_bytes.data(),
+            name_bytes.size(), key, sizeof(key), &required);
+        if (status != VEA_S5_TENSOR_STATUS_OK || required != sizeof(key)) return nullptr;
+        return env->NewStringUTF(key);
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+extern "C" JNIEXPORT jlongArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeRnnDirectionLayout(
+    JNIEnv* env, jobject,
+    jint input_size, jint hidden_size, jint num_layers,
+    jboolean has_bias, jboolean bidirectional,
+    jint layer_index, jint direction_index) {
+    if (input_size <= 0 || hidden_size <= 0 || num_layers <= 0 ||
+        layer_index < 0 || direction_index < 0) return nullptr;
+
+    VeaS5RnnDirectionLayout layout{};
+    const VeaS5TensorStatus status = vea_s5_rnn_direction_layout(
+        static_cast<uint32_t>(input_size), static_cast<uint32_t>(hidden_size),
+        static_cast<uint32_t>(num_layers),
+        has_bias == JNI_TRUE ? 1 : 0,
+        bidirectional == JNI_TRUE ? 1 : 0,
+        static_cast<uint32_t>(layer_index),
+        static_cast<uint32_t>(direction_index), &layout);
+    if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+
+    const jlong values[] = {
+        static_cast<jlong>(layout.layer_index),
+        static_cast<jlong>(layout.direction_index),
+        static_cast<jlong>(layout.input_features),
+        static_cast<jlong>(layout.hidden_features),
+        static_cast<jlong>(layout.gate_features),
+        static_cast<jlong>(layout.direction_count),
+        static_cast<jlong>(layout.weight_ih_elements),
+        static_cast<jlong>(layout.weight_hh_elements),
+        static_cast<jlong>(layout.bias_ih_elements),
+        static_cast<jlong>(layout.bias_hh_elements)
+    };
+    jlongArray result = env->NewLongArray(10);
+    if (result != nullptr) env->SetLongArrayRegion(result, 0, 10, values);
+    return env->ExceptionCheck() ? nullptr : result;
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -184,16 +250,16 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeParseContainerHeader(
     jobject,
     jbyteArray header_array,
     jlong total_file_size) {
-    if (header_array == nullptr || total_file_size < static_cast<jlong>(VEA_S5_CONTAINER_PREFIX_SIZE)) {
+    if (header_array == nullptr || total_file_size < static_cast<jlong>(VEA_S5_CONTAINER_HEADER_SIZE)) {
         return nullptr;
     }
-    if (env->GetArrayLength(header_array) != static_cast<jsize>(VEA_S5_CONTAINER_PREFIX_SIZE)) {
+    if (env->GetArrayLength(header_array) != static_cast<jsize>(VEA_S5_CONTAINER_HEADER_SIZE)) {
         return nullptr;
     }
 
-    uint8_t header_bytes[VEA_S5_CONTAINER_PREFIX_SIZE] = {};
+    uint8_t header_bytes[VEA_S5_CONTAINER_HEADER_SIZE] = {};
     env->GetByteArrayRegion(
-        header_array, 0, static_cast<jsize>(VEA_S5_CONTAINER_PREFIX_SIZE),
+        header_array, 0, static_cast<jsize>(VEA_S5_CONTAINER_HEADER_SIZE),
         reinterpret_cast<jbyte*>(header_bytes));
     if (env->ExceptionCheck()) return nullptr;
 
@@ -202,64 +268,69 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeParseContainerHeader(
         header_bytes, static_cast<uint64_t>(total_file_size), &parsed);
     if (status != VEA_S5_CONTAINER_STATUS_OK) return nullptr;
 
-    const jlong values[5] = {
+    const jlong values[3] = {
         static_cast<jlong>(parsed.kind),
-        static_cast<jlong>(parsed.declared_span),
-        static_cast<jlong>(parsed.format_word),
-        static_cast<jlong>(parsed.transform_seed),
-        static_cast<jlong>(parsed.decoded_payload_size)
+        static_cast<jlong>(parsed.payload_size),
+        static_cast<jlong>(parsed.format_word)
     };
-    jlongArray result = env->NewLongArray(5);
-    if (result != nullptr) env->SetLongArrayRegion(result, 0, 5, values);
+    jlongArray result = env->NewLongArray(3);
+    if (result != nullptr) env->SetLongArrayRegion(result, 0, 3, values);
     return env->ExceptionCheck() ? nullptr : result;
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeDecodeContainerPayload(
-    JNIEnv* env,
-    jobject,
-    jbyteArray file_array) {
-    if (file_array == nullptr) return nullptr;
-    const jsize input_length = env->GetArrayLength(file_array);
-    if (input_length < static_cast<jsize>(VEA_S5_CONTAINER_PREFIX_SIZE)) return nullptr;
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeDecodeModelPayload(
+    JNIEnv* env, jobject, jbyteArray input_array) {
+    if (input_array == nullptr) return nullptr;
+    const jsize input_length = env->GetArrayLength(input_array);
+    if (input_length < 0) return nullptr;
 
-    try {
-        std::vector<uint8_t> input(static_cast<size_t>(input_length));
-        env->GetByteArrayRegion(
-            file_array, 0, input_length, reinterpret_cast<jbyte*>(input.data()));
-        if (env->ExceptionCheck()) return nullptr;
+    jbyte* input = env->GetByteArrayElements(input_array, nullptr);
+    if (input == nullptr) return nullptr;
 
-        VeaS5ContainerHeader parsed{};
-        const VeaS5ContainerStatus parse_status = vea_s5_parse_container_header(
-            input.data(), input.size(), &parsed);
-        if (parse_status != VEA_S5_CONTAINER_STATUS_OK ||
-            parsed.decoded_payload_size > static_cast<uint64_t>(std::numeric_limits<jsize>::max())) {
-            return nullptr;
-        }
-
-        std::vector<uint8_t> output(static_cast<size_t>(parsed.decoded_payload_size));
-        uint64_t written = 0;
-        const VeaS5ContainerStatus status = vea_s5_decode_container_payload(
-            input.data(), input.size(),
-            output.empty() ? nullptr : output.data(),
-            output.size(), &written);
-        if (status != VEA_S5_CONTAINER_STATUS_OK ||
-            written != parsed.decoded_payload_size) {
-            return nullptr;
-        }
-
-        jbyteArray result = env->NewByteArray(static_cast<jsize>(written));
-        if (result != nullptr && written != 0) {
-            env->SetByteArrayRegion(
-                result, 0, static_cast<jsize>(written),
-                reinterpret_cast<const jbyte*>(output.data()));
-        }
-        return env->ExceptionCheck() ? nullptr : result;
-    } catch (const std::bad_alloc&) {
-        return nullptr;
-    } catch (...) {
+    size_t output_size = 0u;
+    const VeaS5ContainerStatus query_status = vea_s5_decode_model_payload(
+        reinterpret_cast<const uint8_t*>(input),
+        static_cast<size_t>(input_length),
+        nullptr, 0u, &output_size);
+    if (query_status != VEA_S5_CONTAINER_STATUS_BUFFER_TOO_SMALL &&
+        query_status != VEA_S5_CONTAINER_STATUS_OK) {
+        env->ReleaseByteArrayElements(input_array, input, JNI_ABORT);
         return nullptr;
     }
+    if (output_size > static_cast<size_t>(std::numeric_limits<jsize>::max())) {
+        env->ReleaseByteArrayElements(input_array, input, JNI_ABORT);
+        return nullptr;
+    }
+
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(output_size));
+    if (result == nullptr) {
+        env->ReleaseByteArrayElements(input_array, input, JNI_ABORT);
+        return nullptr;
+    }
+
+    if (output_size != 0u) {
+        jbyte* output = env->GetByteArrayElements(result, nullptr);
+        if (output == nullptr) {
+            env->ReleaseByteArrayElements(input_array, input, JNI_ABORT);
+            return nullptr;
+        }
+        size_t written = 0u;
+        const VeaS5ContainerStatus status = vea_s5_decode_model_payload(
+            reinterpret_cast<const uint8_t*>(input),
+            static_cast<size_t>(input_length),
+            reinterpret_cast<uint8_t*>(output),
+            output_size,
+            &written);
+        env->ReleaseByteArrayElements(result, output,
+            status == VEA_S5_CONTAINER_STATUS_OK ? 0 : JNI_ABORT);
+        env->ReleaseByteArrayElements(input_array, input, JNI_ABORT);
+        if (status != VEA_S5_CONTAINER_STATUS_OK || written != output_size) return nullptr;
+    } else {
+        env->ReleaseByteArrayElements(input_array, input, JNI_ABORT);
+    }
+
+    return env->ExceptionCheck() ? nullptr : result;
 }
 
 extern "C" JNIEXPORT jfloatArray JNICALL
@@ -813,4 +884,155 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeRunResidualDwMlpBlock(
     } catch (...) {
         return nullptr;
     }
+}
+
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeCreateNamedLayerParameterSet(
+    JNIEnv* env, jobject, jobjectArray weight_arrays, jobjectArray bias_arrays,
+    jintArray axis0_array, jintArray axis1_array, jintArray matrix_counts_array,
+    jintArray pair_offsets_array) {
+    constexpr jsize kLayerCount = static_cast<jsize>(VEA_S5_NAMED_LAYER_COUNT);
+    if (weight_arrays == nullptr || bias_arrays == nullptr ||
+        axis0_array == nullptr || axis1_array == nullptr ||
+        matrix_counts_array == nullptr || pair_offsets_array == nullptr ||
+        env->GetArrayLength(weight_arrays) != kLayerCount ||
+        env->GetArrayLength(bias_arrays) != kLayerCount ||
+        env->GetArrayLength(axis0_array) != kLayerCount ||
+        env->GetArrayLength(axis1_array) != kLayerCount ||
+        env->GetArrayLength(matrix_counts_array) != kLayerCount ||
+        env->GetArrayLength(pair_offsets_array) != kLayerCount) {
+        return 0;
+    }
+
+    try {
+        std::array<std::vector<float>, VEA_S5_NAMED_LAYER_COUNT> weights;
+        std::array<std::vector<float>, VEA_S5_NAMED_LAYER_COUNT> biases;
+        std::array<const float*, VEA_S5_NAMED_LAYER_COUNT> weight_pointers{};
+        std::array<const float*, VEA_S5_NAMED_LAYER_COUNT> bias_pointers{};
+        std::array<size_t, VEA_S5_NAMED_LAYER_COUNT> weight_counts{};
+        std::array<size_t, VEA_S5_NAMED_LAYER_COUNT> bias_counts{};
+        std::array<jint, VEA_S5_NAMED_LAYER_COUNT> axis0{};
+        std::array<jint, VEA_S5_NAMED_LAYER_COUNT> axis1{};
+        std::array<jint, VEA_S5_NAMED_LAYER_COUNT> matrix_counts{};
+        std::array<jint, VEA_S5_NAMED_LAYER_COUNT> offsets{};
+
+        env->GetIntArrayRegion(axis0_array, 0, kLayerCount, axis0.data());
+        env->GetIntArrayRegion(axis1_array, 0, kLayerCount, axis1.data());
+        env->GetIntArrayRegion(matrix_counts_array, 0, kLayerCount, matrix_counts.data());
+        env->GetIntArrayRegion(pair_offsets_array, 0, kLayerCount, offsets.data());
+        if (env->ExceptionCheck()) return 0;
+
+        for (jsize layer = 0; layer < kLayerCount; ++layer) {
+            if (axis0[layer] <= 0 || axis1[layer] <= 0 || matrix_counts[layer] <= 0 ||
+                offsets[layer] < 0) {
+                return 0;
+            }
+
+            auto weight_array = static_cast<jfloatArray>(
+                env->GetObjectArrayElement(weight_arrays, layer));
+            if (weight_array == nullptr || env->ExceptionCheck()) return 0;
+            const jsize weight_length = env->GetArrayLength(weight_array);
+            if (weight_length <= 0) {
+                env->DeleteLocalRef(weight_array);
+                return 0;
+            }
+            weights[static_cast<size_t>(layer)].resize(static_cast<size_t>(weight_length));
+            env->GetFloatArrayRegion(
+                weight_array, 0, weight_length, weights[static_cast<size_t>(layer)].data());
+            env->DeleteLocalRef(weight_array);
+            if (env->ExceptionCheck()) return 0;
+
+            auto bias_array = static_cast<jfloatArray>(
+                env->GetObjectArrayElement(bias_arrays, layer));
+            if (bias_array == nullptr || env->ExceptionCheck()) return 0;
+            const jsize bias_length = env->GetArrayLength(bias_array);
+            if (bias_length <= 0) {
+                env->DeleteLocalRef(bias_array);
+                return 0;
+            }
+            biases[static_cast<size_t>(layer)].resize(static_cast<size_t>(bias_length));
+            env->GetFloatArrayRegion(
+                bias_array, 0, bias_length, biases[static_cast<size_t>(layer)].data());
+            env->DeleteLocalRef(bias_array);
+            if (env->ExceptionCheck()) return 0;
+
+            weight_pointers[static_cast<size_t>(layer)] =
+                weights[static_cast<size_t>(layer)].data();
+            bias_pointers[static_cast<size_t>(layer)] =
+                biases[static_cast<size_t>(layer)].data();
+            weight_counts[static_cast<size_t>(layer)] =
+                weights[static_cast<size_t>(layer)].size();
+            bias_counts[static_cast<size_t>(layer)] =
+                biases[static_cast<size_t>(layer)].size();
+        }
+
+        std::array<uint32_t, VEA_S5_NAMED_LAYER_COUNT> axis0_values{};
+        std::array<uint32_t, VEA_S5_NAMED_LAYER_COUNT> axis1_values{};
+        std::array<uint32_t, VEA_S5_NAMED_LAYER_COUNT> bank_values{};
+        std::array<uint32_t, VEA_S5_NAMED_LAYER_COUNT> offset_values{};
+        for (size_t layer = 0; layer < VEA_S5_NAMED_LAYER_COUNT; ++layer) {
+            axis0_values[layer] = static_cast<uint32_t>(axis0[layer]);
+            axis1_values[layer] = static_cast<uint32_t>(axis1[layer]);
+            bank_values[layer] = static_cast<uint32_t>(matrix_counts[layer]);
+            offset_values[layer] = static_cast<uint32_t>(offsets[layer]);
+        }
+
+        VeaS5NamedLayerParameterSet* parameter_set = nullptr;
+        const VeaS5TensorStatus status = vea_s5_named_layer_parameter_set_create(
+            weight_pointers.data(), weight_counts.data(),
+            bias_pointers.data(), bias_counts.data(),
+            axis0_values.data(), axis1_values.data(), bank_values.data(),
+            offset_values.data(), VEA_S5_NAMED_LAYER_COUNT, &parameter_set);
+        if (status != VEA_S5_TENSOR_STATUS_OK || parameter_set == nullptr) return 0;
+        return reinterpret_cast<jlong>(parameter_set);
+    } catch (const std::bad_alloc&) {
+        return 0;
+    } catch (...) {
+        return 0;
+    }
+}
+
+extern "C" JNIEXPORT jintArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeGetNamedLayerParameterShape(
+    JNIEnv* env, jobject, jlong handle, jint layer_index) {
+    if (handle == 0 || layer_index < 0 ||
+        layer_index >= static_cast<jint>(VEA_S5_NAMED_LAYER_COUNT)) {
+        return nullptr;
+    }
+
+    const auto* parameter_set =
+        reinterpret_cast<const VeaS5NamedLayerParameterSet*>(handle);
+    const VeaS5MatrixDescriptor* weight_descriptors = nullptr;
+    const VeaS5MatrixDescriptor* bias_descriptor = nullptr;
+    size_t matrix_count = 0;
+    uint32_t axis0 = 0, axis1 = 0, padded_axis0 = 0;
+    const VeaS5TensorStatus status = vea_s5_named_layer_parameter_set_get_layer(
+        parameter_set, static_cast<size_t>(layer_index),
+        &weight_descriptors, &matrix_count, &bias_descriptor,
+        &axis0, &axis1, &padded_axis0);
+    if (status != VEA_S5_TENSOR_STATUS_OK || weight_descriptors == nullptr ||
+        bias_descriptor == nullptr ||
+        matrix_count > static_cast<size_t>(std::numeric_limits<jint>::max())) {
+        return nullptr;
+    }
+
+    const jint values[4] = {
+        static_cast<jint>(axis0),
+        static_cast<jint>(axis1),
+        static_cast<jint>(padded_axis0),
+        static_cast<jint>(matrix_count)
+    };
+    jintArray result = env->NewIntArray(4);
+    if (result == nullptr) return nullptr;
+    env->SetIntArrayRegion(result, 0, 4, values);
+    return env->ExceptionCheck() ? nullptr : result;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeDestroyNamedLayerParameterSet(
+    JNIEnv*, jobject, jlong handle) {
+    if (handle == 0) return;
+    vea_s5_named_layer_parameter_set_destroy(
+        reinterpret_cast<VeaS5NamedLayerParameterSet*>(handle));
 }
