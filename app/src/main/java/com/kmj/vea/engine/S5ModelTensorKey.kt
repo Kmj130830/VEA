@@ -36,9 +36,24 @@ object S5ModelTensorKey {
         require(baseName.all { it.code in 0x20..0x7e }) {
             "S5API tensor base names must be printable ASCII."
         }
+        return digestKey((baseName + member.suffix).toByteArray(Charsets.US_ASCII))
+    }
 
-        val input = (baseName + member.suffix).toByteArray(Charsets.US_ASCII) +
-            digestSuffix
+    /**
+     * Recurrent S5API code constructs the complete member name first
+     * (e.g. ".weight_ih_l" + layer index), then appends the digest suffix
+     * directly. It does not add another ".weight" or ".bias" after that name.
+     */
+    fun deriveParameterName(parameterName: String): String {
+        require(parameterName.isNotBlank()) { "Tensor parameter name must not be empty." }
+        require(parameterName.all { it.code in 0x20..0x7e }) {
+            "S5API tensor parameter names must be printable ASCII."
+        }
+        return digestKey(parameterName.toByteArray(Charsets.US_ASCII))
+    }
+
+    private fun digestKey(nameBytes: ByteArray): String {
+        val input = nameBytes + digestSuffix
         val digest = MessageDigest.getInstance("MD5").digest(input)
         check(digest.size == 16) { "Unexpected MD5 digest size." }
 
