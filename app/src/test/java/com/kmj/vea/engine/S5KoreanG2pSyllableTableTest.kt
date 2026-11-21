@@ -18,6 +18,13 @@ class S5KoreanG2pSyllableTableTest {
     }
 
     @Test
+    fun packsTheNativeHighFlagAndNonContiguousCodaIndices() {
+        assertEquals(0x8861, S5KoreanG2pSyllableTable.pack(S5KoreanG2pSyllable(2, 3, 1)))
+        assertEquals(0x8873, S5KoreanG2pSyllableTable.pack(S5KoreanG2pSyllable(2, 3, 19)))
+        assertEquals(0x8877, S5KoreanG2pSyllableTable.pack(S5KoreanG2pSyllable(2, 3, 23)))
+    }
+
+    @Test
     fun exposesTheRecoveredYamahaAliasesWithoutApplyingSoundChanges() {
         val syllable = S5KoreanG2pSyllableTable.decompose('글'.code)!!
         assertEquals("g", S5KoreanG2pSyllableTable.onsetAlias(syllable.onsetIndex))
