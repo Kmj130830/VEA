@@ -49,7 +49,10 @@ public class ExportS5ModelRuntime extends GhidraScript {
             "180040630", "18000fa00",
             // Render-state allocation/configuration and runtime tree population.
             "1800bca40", "180126940", "180127220", "180127630",
-            "1800af230", "1800af170", "1800b8f60", "1800ced10"
+            "1800af230", "1800af170", "1800b8f60", "1800ced10",
+            // Neural input setters and render-root descriptor copy paths.
+            "18012b150", "18012b470", "18012b450",
+            "1800cdbb0", "1800c47a0"
         };
 
         LinkedHashMap<Address, Function> selected = new LinkedHashMap<>();
