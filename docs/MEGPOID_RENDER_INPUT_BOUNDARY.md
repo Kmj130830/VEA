@@ -153,8 +153,8 @@ from note-level display text:
 1. Break normalization: exact `br` becomes `sil`; when a `br` follows an
    existing `sil`, the previous silence row is extended through the break.
 2. Rest-marker removal: exact `-` rows are removed. Each remaining row's
-   end is updated to the next remaining row's end; the last retained row
-   inherits the final pre-filter endpoint.
+   end is updated to the next remaining row's **start**; the last retained
+   row inherits the final pre-filter endpoint.
 3. Short-event filter: intervals shorter than native float32 `0.001f`
    seconds are discarded.
 
