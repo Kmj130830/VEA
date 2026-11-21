@@ -226,3 +226,46 @@ nor the numeric category map needed for items 2-3. Therefore this stage
 has not been connected to `S5MegpoidSequenceTransitionPipeline`; doing so
 with guessed category IDs or equal note-duration splits would create
 invalid model inputs.
+
+## Upstream VSM/G2PA phoneme-service boundary
+
+The VSM export inventory exposes three relevant phoneme-service entry
+points:
+
+- `VIS_VSM_PhonemeService_setG2PAManager` at `0x180038ac0`;
+- `VIS_VSM_PhonemeService_setLyricsAndPhonemesByLangID` at `0x180038b50`;
+- `VIS_VSM_PhonemeService_setPhonemesByLangID` at `0x180038ba0`.
+
+The focused VSM decompilation shows these are thin interface wrappers.
+`setG2PAManager` dispatches through the phoneme-service object's vtable
+at `+0x08`; `setLyricsAndPhonemesByLangID` dispatches at `+0x50`; and
+`setPhonemesByLangID` dispatches at `+0x60`. The export wrappers validate
+their receiver and selected arguments, but do not contain the phoneme
+generation algorithm.
+
+The supplied `G2PAManager.dll` export inventory separately exposes
+`WG2PAManager_setLyricsAndPhonemes`, `WG2PAManager_setPhonemes`,
+`WG2PAManager_setSyllableSegArray`, `normalizeAllPhonemes`, and
+`normalizeRangedPhonemes`. Their wrapper bodies dispatch to manager
+vtable offsets `+0x20`, `+0x30`, `+0x38`, `+0x48`, and `+0x50`
+respectively. It also exposes syllable-segment-array operations for
+creation, append, size, syllable-string retrieval and phoneme-string
+retrieval.
+
+These API names establish a layered pronunciation interface with
+separate lyric-to-phoneme, explicit-phoneme, normalization and syllable
+segmentation operations. They do not, on their own, establish the
+resulting phone ordering, per-phone time alignment, phone-label encoding,
+or the exact meaning of the opaque arguments passed through the
+forwarding wrappers.
+
+### Android consequence
+
+VEA's next pronunciation dependency is not a new heuristic splitter for
+`VeaNote.phoneme`. It is a portable implementation of the recovered
+language-specific G2PA contract, including the manager's syllable/phone
+result representation, followed by the VSM-equivalent conversion of that
+ordered output to timed `VsmPhoneEvent` rows. Until these contracts are
+recovered, the app must retain editor phoneme text separately and must not
+pretend that an X-SAMPA display string is already a renderer-ready phone
+sequence.
