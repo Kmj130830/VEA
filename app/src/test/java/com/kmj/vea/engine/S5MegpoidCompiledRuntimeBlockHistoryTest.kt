@@ -36,7 +36,8 @@ class S5MegpoidCompiledRuntimeBlockHistoryTest {
 
         first.buildHistoryWindow(FloatArray(7) { 33f })
         val secondAgain = second.buildHistoryWindow(FloatArray(7) { 44f })
-        assertEquals(List(7) { 22f }, secondAgain.toList().subList(0, 7))
+        // Oldest-to-newest: five zero rows, then the previous chunk, then the new chunk.
+        assertEquals(List(7) { 22f }, secondAgain.toList().subList(5 * 7, 6 * 7))
         assertEquals(List(7) { 44f }, secondAgain.takeLast(7))
     }
 
@@ -53,7 +54,10 @@ class S5MegpoidCompiledRuntimeBlockHistoryTest {
 
         assertTrue(firstAfterReset.take(6 * 7).all { it == 0f })
         assertEquals(List(7) { 5f }, firstAfterReset.takeLast(7))
-        assertEquals(List(7) { 8f }, secondAfterFirstReset.toList().subList(0, 7))
+        assertEquals(
+            List(7) { 8f },
+            secondAfterFirstReset.toList().subList(5 * 7, 6 * 7)
+        )
         assertEquals(List(7) { 9f }, secondAfterFirstReset.takeLast(7))
     }
 }
