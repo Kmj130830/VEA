@@ -66,6 +66,16 @@ data class S5MegpoidRuntimeOptionsDescriptor(
             flagAtRoot1F75 = false
         )
     }
+    /**
+     * The native model output buffer at root +0x4F8 contains param[2]
+     * complex values; the inspected forward path allocates/clears one
+     * 8-byte complex element per bin before FUN_18012c740 consumes it.
+     */
+    fun buildSpectrumOutputShape(): S5MegpoidSpectrumOutputShape =
+        S5MegpoidSpectrumOutputShape(
+            fftSize = param1,
+            complexBinCount = param2
+        )
     /** Number of feature buffers owned by the native render context. */
     val sequenceSlotCount: Int get() = param5
 
