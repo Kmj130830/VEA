@@ -128,25 +128,21 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
     }
 
     /**
-     * Loads the installed Megpoid VTB2 file through the recovered 16-byte
-     * container transform, then parses its JSON-like tensor object tree.
-     * The returned paths remain opaque until the model graph's parameter-name
-     * mapping is recovered; this method intentionally does not guess that map.
+     * Scans the installed Megpoid VTB2 model without materializing a giant
+     * JSONObject tree or decoding unrelated tensors. The scanner reports the
+     * opaque JSON key namespace and typed tensor-string count; parameter-to-
+     * object mapping remains an explicit unresolved stage.
      */
-    fun loadModelTensorObjects(voicebank: VoicebankDescriptor): S5DecodedModelObjectTree {
+    fun scanModelJson(
+        voicebank: VoicebankDescriptor,
+        targetTensorKeys: Set<String> = emptySet()
+    ): S5ModelJsonScanResult {
         require(voicebank.id == "ai_megpoid_v7" && voicebank.engineFamily == "VOCALOID7") {
-            "This model loader currently targets the bundled AI Megpoid V7 voicebank."
-        }
-        check(NativeS5TensorBridge.isLoaded) {
-            "The native S5 container and typed-tensor decoder is not loaded."
+            "This model scanner currently targets the bundled AI Megpoid V7 voicebank."
         }
         val directory = File(URI(voicebank.sourceUri))
         val modelFile = File(directory, "AI_Megpoid.vtb2")
-        val tree = S5ModelPayloadReader.decodeContainerFile(modelFile)
-        require(tree.floatTensorCount > 0) {
-            "The decoded Megpoid model contains no typed floating-point tensors."
-        }
-        return tree
+        return S5ModelContainerScanner.scanVtb2(modelFile, targetTensorKeys)
     }
 
     override suspend fun render(
@@ -157,11 +153,14 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
         val plans = prepareRenderPlans(project, voicebank)
         require(plans.any { !it.isEmpty }) { "There are no notes to synthesize." }
 
-        val modelTree = loadModelTensorObjects(voicebank)
+        val modelScan = scanModelJson(voicebank)
+        require(modelScan.typedTensorStringCount > 0L) {
+            "The decoded Megpoid model contains no typed tensor strings."
+        }
         throw UnsupportedOperationException(
-            "AI Megpoid VTB2 was decoded and parsed (${modelTree.floatTensorCount} float tensor fields, " +
-                "${modelTree.intTensorCount} integer tensor fields). The neural graph's opaque parameter " +
-                "mapping and acoustic execution are not complete; no WAV was generated."
+            "AI Megpoid VTB2 was decoded and streamed (${modelScan.objectCount} objects, " +
+                "${modelScan.typedTensorStringCount} typed tensor strings). The neural graph's opaque " +
+                "parameter mapping and acoustic execution are not complete; no WAV was generated."
         )
     }
 }
