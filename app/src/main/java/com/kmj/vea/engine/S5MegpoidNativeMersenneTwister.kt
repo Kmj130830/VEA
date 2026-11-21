@@ -61,11 +61,11 @@ internal class S5MegpoidNativeMersenneTwister(seed: Int = DEFAULT_SEED) {
         const val DEFAULT_SEED = 42
         private const val STATE_WORDS = 624
         private const val PERIOD = 397
-        private const val UPPER_MASK = -0x80000000
+        private const val UPPER_MASK = -2_147_483_648
         private const val LOWER_MASK = 0x7fffffff
-        private const val MATRIX_A = 0x9908b0df.toInt()
-        private const val TEMPER_MASK_B = 0x9d2c5680.toInt()
-        private const val TEMPER_MASK_C = 0xefc60000.toInt()
+        private const val MATRIX_A = -1_727_483_681
+        private const val TEMPER_MASK_B = -1_658_038_656
+        private const val TEMPER_MASK_C = -272_236_544
         private const val UINT24_SCALE = 5.9604645e-8f
     }
 }
