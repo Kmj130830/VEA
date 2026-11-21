@@ -108,6 +108,24 @@ class S5MegpoidSpectralOverlapAddTest {
     }
 
     @Test
+    fun permitsContributionCountToWrapTheNativePowerOfTwoRing() {
+        val overlap = S5MegpoidSpectralOverlapAdd(
+            parameters(
+                outputSamples = 4,
+                geometry = 8,
+                fftSize = 8,
+                windowOffset = 1,
+                overlapCount = 5,
+                ringMask = 3
+            )
+        )
+
+        val output = overlap.processFrame(FloatArray(8) { (it + 1).toFloat() })
+        assertEquals(4, output.size)
+        assertTrue(output.all { it.isFinite() })
+    }
+
+    @Test
     fun rejectsFrameAndGeometryBoundsViolations() {
         val overlap = S5MegpoidSpectralOverlapAdd(
             parameters(outputSamples = 8, geometry = 16, windowOffset = 0, overlapCount = 1, ringMask = 0)
