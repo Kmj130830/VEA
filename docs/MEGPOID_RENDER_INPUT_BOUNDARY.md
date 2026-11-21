@@ -142,3 +142,27 @@ connect a verified phone-label string to the classifier's numeric map and
 recover the meaning of the source uint32 and auxiliary 0x28-record fields.
 Until then, do not serialize a private 0x38/0x58 record or claim a
 model-ready phoneme index.
+
+## Android phone-event preprocessor
+
+VEA now has an owned data model `VsmPhoneEvent(startSeconds, endSeconds,
+phoneLabel, opaqueSourceU32)` and `VsmPhoneEventPreprocessor`. This ports
+the confirmed native helper order without attempting to build phone events
+from note-level display text:
+
+1. Break normalization: exact `br` becomes `sil`; when a `br` follows an
+   existing `sil`, the previous silence row is extended through the break.
+2. Rest-marker removal: exact `-` rows are removed. Each remaining row's
+   end is updated to the next remaining row's end; the last retained row
+   inherits the final pre-filter endpoint.
+3. Short-event filter: intervals shorter than native float32 `0.001f`
+   seconds are discarded.
+
+The uint32 copied to row `+0x30` is retained bit-for-bit as
+`opaqueSourceU32`; its semantics have not been assigned. The unit tests
+cover leading/non-leading `br`, silence merging, exact `-` removal,
+endpoint adjustment, case sensitivity and the 1 ms threshold.
+
+This preprocessor starts from already timed phone events. It does not
+perform G2P, split `VeaNote.phoneme`, recover phone alignment, or assign
+the internal category ID returned by `FUN_180074a50`.
