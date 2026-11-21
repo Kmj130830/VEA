@@ -30,6 +30,42 @@ int main() {
     assert(vea_g2p_bridge_abi_version() == VEA_G2P_ABI_VERSION);
     assert(vea_g2p_supported_language_mask() == 0);
 
+    // Spot-check packed fields against the Korean DLL's Hangul index table.
+    uint16_t packed = 0;
+    assert(vea_g2p_korean_hangul_packed_indices(0xAC00U, &packed) == VEA_G2P_STATUS_OK);
+    assert(packed == 0x8861U);  // 가
+    assert(vea_g2p_korean_hangul_packed_indices(0xAC01U, &packed) == VEA_G2P_STATUS_OK);
+    assert(packed == 0x8862U);  // 각
+    assert(vea_g2p_korean_hangul_packed_indices(0xAC04U, &packed) == VEA_G2P_STATUS_OK);
+    assert(packed == 0x8865U);  // 간
+    assert(vea_g2p_korean_hangul_packed_indices(0xAC11U, &packed) == VEA_G2P_STATUS_OK);
+    assert(packed == 0x8873U);  // 갑 (sparse coda index)
+    assert(vea_g2p_korean_hangul_packed_indices(0xD7A3U, &packed) == VEA_G2P_STATUS_OK);
+    assert(packed == 0xD3BDU);  // 힣
+    assert(vea_g2p_korean_hangul_packed_indices(0x0041U, &packed) ==
+           VEA_G2P_STATUS_INVALID_ARGUMENT);
+    assert(vea_g2p_korean_hangul_packed_indices(0xAC00U, nullptr) ==
+           VEA_G2P_STATUS_INVALID_ARGUMENT);
+
+    // FNV-1a over the packed values for all 11,172 modern Hangul syllables.
+    // Reference hash was calculated from the 6-byte records in the supplied
+    // G2PAManager_KOR.dll .rdata section (little-endian packed ushort stream).
+    uint64_t packed_table_hash = 14695981039346656037ULL;
+    for (uint32_t codepoint = 0xAC00U; codepoint <= 0xD7A3U; ++codepoint) {
+        packed = 0;
+        assert(vea_g2p_korean_hangul_packed_indices(codepoint, &packed) ==
+               VEA_G2P_STATUS_OK);
+        const uint8_t bytes[] = {
+            static_cast<uint8_t>(packed & 0xFFU),
+            static_cast<uint8_t>((packed >> 8U) & 0xFFU),
+        };
+        for (uint8_t byte : bytes) {
+            packed_table_hash ^= byte;
+            packed_table_hash *= 1099511628211ULL;
+        }
+    }
+    assert(packed_table_hash == 0x7AE6C4656323F3C6ULL);
+
     assert(Normalize("Hangul: \xEA\xB0\x80\xEB\x82\x98") ==
            "Hangul: \xEA\xB0\x80\xEB\x82\x98");
     assert(Normalize("\xE3\x82\xAB\xE3\x83\xBC") == "\xE3\x82\xAB-");
