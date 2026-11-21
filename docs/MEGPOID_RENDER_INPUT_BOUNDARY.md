@@ -269,3 +269,45 @@ ordered output to timed `VsmPhoneEvent` rows. Until these contracts are
 recovered, the app must retain editor phoneme text separately and must not
 pretend that an X-SAMPA display string is already a renderer-ready phone
 sequence.
+
+## Confirmed phone-label classifier lookup behavior — FUN_180074a50
+
+The 2026-11-21 focused Ghidra report now contains the complete body of
+`FUN_180074a50` (1,308 bytes). The three arguments are:
+
+- `param_1`: an MSVC x64 string object holding the phone label;
+- `param_2`: a pointer to the active render-context phone-category tree;
+- `param_3`: optional one-byte output. When present, it is set according
+  to whether the original label begins with `!`.
+
+The lookup flow is now established:
+
+1. Compare the original string against the two exact read-only alias
+   pointer-table ranges at `0x1801C3080..0x1801C3237` and
+   `0x1801C3240..0x1801C3327`.
+2. If no direct alias-table match is taken, build a filtered fallback
+   string using the character classes visible in the function body.
+3. Search the active render-context tree using `FUN_18000b100` and
+   verify an exact string match with `FUN_180026f60`.
+4. If the key is not present in the context tree, consult the separate
+   global alias-to-canonical tree rooted at `DAT_1801c4140`. When an
+   alias is found, copy its canonical string and retry the context-tree
+   lookup.
+5. On an exact context-tree match, return the 32-bit value stored in the
+   matched tree node's value field. Four additional short special-label
+   comparisons return the fixed value `1`; their literal byte strings
+   are not assigned semantic names in this note.
+
+The tree search is a lower-bound lookup followed by an exact comparison.
+The global 43-entry alias map and the active context's label-to-uint32
+map are therefore two distinct structures with different responsibilities.
+
+### What remains unknown
+
+The classifier's lookup and return behavior are now confirmed, but the
+constructor/populator for the active context tree has not yet been
+recovered. The current trace shows `FUN_1800591d0` calling
+`FUN_180050aa0` while preparing the render context; the next focused
+analysis explicitly seeds that initializer and its adjacent subobject
+constructors. Until that population path is recovered, no numeric phone
+IDs are hardcoded in Android.
