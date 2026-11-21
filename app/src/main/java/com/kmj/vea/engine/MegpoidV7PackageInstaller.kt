@@ -199,7 +199,7 @@ object MegpoidV7PackageInstaller {
         ZipInputStream(BufferedInputStream(input)).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
-                val normalizedName = entry.name.replace('\\\\', '/')
+                val normalizedName = entry.name.replace('\\', '/')
                 val baseName = normalizedName.substringAfterLast('/')
 
                 if (entry.isDirectory) {
