@@ -55,6 +55,43 @@ class S5VoicebankModelPackageAssemblerTest {
     }
 
     @Test
+    fun exposesOnlyTheS5apiSelectedResidualRuntimeSubtree() {
+        val selectedTree = S5ModelObjectTree.parseUtf8(
+            """
+            {
+              "sibling": {"unrelated": true},
+              "${S5MegpoidRuntimeModelPath.MODEL_CONTEXT_KEY": {
+                "${S5MegpoidRuntimeModelPath.RESIDUAL_RUNTIME_CONFIG_KEY}": {
+                  "43726e4ce752ea6cc300dc2fca3e8372": {"setting": 32}
+                }
+              }
+            }
+            """.trimIndent()
+        )
+        val singerMember = S5ModelArchiveMember(
+            entryName = "AI_Megpoid.vtb2",
+            magic = "VTBR",
+            formatWord = 16L,
+            encodedSizeBytes = 160,
+            decodedJsonSizeBytes = 12,
+            sha256 = "a".repeat(64),
+            tree = selectedTree
+        )
+        val voicebank = S5VoicebankModelPackage(
+            voicebankId = "test",
+            componentId = "test",
+            models = S5ModelArchive(mapOf("AI_Megpoid.vtb2" to singerMember))
+        )
+
+        val runtimeGroup = voicebank.residualRuntimeConfigTree
+            .findByLookupKey("43726e4ce752ea6cc300dc2fca3e8372")
+            ?.asObject()
+
+        assertEquals(setOf("43726e4ce752ea6cc300dc2fca3e8372"), voicebank.residualRuntimeConfigTree.root.fields.keys)
+        assertEquals(32.0, (runtimeGroup?.fields?.get("setting") as S5ModelValue.NumberValue).value, 0.0)
+    }
+
+    @Test
     fun rejectsAHashMismatchBeforeExposingTheModelSet() {
         val bank = S5ModelArchive(
             mapOf(
