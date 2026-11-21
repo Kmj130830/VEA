@@ -62,6 +62,18 @@ class S5MegpoidOutputTransformInputsTest {
     }
 
     @Test
+    fun composesUnityFrameAndReciprocalOutputWindowForFlagAt92() {
+        val parameters = inputs(
+            coreWindowLength = 5,
+            flagAt91 = true,
+            flagAt92 = true
+        ).buildOverlapAddParameters()
+
+        parameters.frameWindow.forEach { assertEquals(1f, it, 0f) }
+        parameters.outputWindow.forEach { assertEquals(0.5f, it, 1e-6f) }
+    }
+
+    @Test
     fun retainsUnusedFloatDescriptorParameterWithoutInferringItsMeaning() {
         val input = inputs(floatParameter = 0.125f)
         assertEquals(0.125f, input.floatParameterAtRoot10, 0f)
