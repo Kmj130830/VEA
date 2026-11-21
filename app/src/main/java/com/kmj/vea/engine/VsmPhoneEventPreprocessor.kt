@@ -8,13 +8,20 @@ package com.kmj.vea.engine
  * The uint32 is kept bit-for-bit as an Int; its vendor meaning is not named.
  */
 data class VsmPhoneEvent(
-    val interval: VsmEventInterval,
+    val startSeconds: Double,
+    val endSeconds: Double,
     val phoneLabel: String,
     val opaqueSourceU32: Int
 ) {
     init {
+        require(startSeconds.isFinite() && endSeconds.isFinite()) {
+            "Phone event times must be finite."
+        }
         require(phoneLabel.isNotEmpty()) { "Phone label must not be empty." }
     }
+
+    val durationSeconds: Double
+        get() = endSeconds - startSeconds
 }
 
 /**
@@ -49,16 +56,13 @@ object VsmPhoneEventPreprocessor {
                 ?.endSeconds
                 ?: originalFinalEnd
             event.copy(
-                interval = VsmEventInterval(
-                    startSeconds = event.interval.startSeconds,
-                    endSeconds = nextEnd
-                )
+                endSeconds = nextEnd
             )
         }
 
         // FUN_180007ec0 retains intervals whose duration is >= float32(0.001).
         return endpointAdjusted.filter {
-            it.interval.durationSeconds >= MIN_INTERVAL_SECONDS
+            it.durationSeconds >= MIN_INTERVAL_SECONDS
         }
     }
 
@@ -81,8 +85,8 @@ object VsmPhoneEventPreprocessor {
                 // Consecutive break after silence extends the existing silence.
                 result[result.lastIndex] = previous.copy(
                     interval = VsmEventInterval(
-                        startSeconds = previous.interval.startSeconds,
-                        endSeconds = event.interval.endSeconds
+                        startSeconds = previous.startSeconds,
+                        endSeconds = event.endSeconds
                     )
                 )
             } else {
