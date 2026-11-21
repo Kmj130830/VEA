@@ -21,7 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.regex.Pattern;
 
 public class ExportVsmAnalysis extends GhidraScript {
-    private static final int MAX_FUNCTIONS = 180;
+    private static final int MAX_FUNCTIONS = 220;
     private static final int MAX_DEPTH = 3;
     private static final Pattern TARGET = Pattern.compile(
         "VIS_VSM_(WVSMModuleIF_createManager|" +
@@ -86,6 +86,56 @@ public class ExportVsmAnalysis extends GhidraScript {
             }
             out.println();
             out.println("Seed count: " + selected.size());
+            out.println();
+
+            // These helpers are called by the MIDI-part preparation routine.
+            // Seed them explicitly so the event encoding is not lost when the
+            // generic renderer call graph reaches its function-count limit.
+            String[] midiInputHelpers = {
+                "FUN_18006eab0", "FUN_18006f500",
+                "FUN_18005e9c0", "FUN_18006bfa0",
+                "FUN_18006c2d0", "FUN_18006c6f0", "FUN_18006e670",
+                "FUN_180056c70", "FUN_180074580", "FUN_180074400",
+                "FUN_180074350", "FUN_180077c40", "FUN_18007bf80",
+                "FUN_18007ef90", "FUN_18007d000", "FUN_1801294d0"
+            };
+            out.println("## Explicit MIDI-to-render helper seeds");
+            out.println();
+            out.println("| Helper | Address | Prototype |");
+            out.println("|---|---:|---|");
+            for (String helperName : midiInputHelpers) {
+                monitor.checkCancelled();
+                SymbolIterator helperSymbols = currentProgram.getSymbolTable().getAllSymbols(true);
+                boolean found = false;
+                while (helperSymbols.hasNext()) {
+                    Symbol symbol = helperSymbols.next();
+                    if (!symbol.getName().equals(helperName)) continue;
+                    Function f = currentProgram.getFunctionManager().getFunctionAt(symbol.getAddress());
+                    if (f == null) f = currentProgram.getFunctionManager().getFunctionContaining(symbol.getAddress());
+                    if (f == null) continue;
+                    found = true;
+                    if (!selected.containsKey(f.getEntryPoint()) && selected.size() < MAX_FUNCTIONS) {
+                        selected.put(f.getEntryPoint(), f);
+                        queue.addLast(new Work(f, 0));
+                    }
+                    out.printf("| `%s` | `%s` | `%s %s(%s)` |%n",
+                        helperName, f.getEntryPoint(), f.getReturnType().getDisplayName(),
+                        f.getName(), parameters(f));
+
+                    ReferenceIterator helperRefs = currentProgram.getReferenceManager()
+                        .getReferencesTo(f.getEntryPoint());
+                    while (helperRefs.hasNext()) {
+                        Reference ref = helperRefs.next();
+                        Function caller = currentProgram.getFunctionManager()
+                            .getFunctionContaining(ref.getFromAddress());
+                        if (caller != null) {
+                            out.printf("  - caller: `%s` at `%s`, site `%s`%n",
+                                caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+                        }
+                    }
+                }
+                if (!found) out.printf("| `%s` | - | not recovered |%n", helperName);
+            }
             out.println();
 
             out.println("## Dynamic module-loading references");
