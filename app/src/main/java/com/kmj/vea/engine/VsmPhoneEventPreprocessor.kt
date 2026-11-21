@@ -42,7 +42,7 @@ object VsmPhoneEventPreprocessor {
         val breakNormalized = normalizeBreakEvents(source)
         if (breakNormalized.isEmpty()) return emptyList()
 
-        val originalFinalEnd = breakNormalized.last().interval.endSeconds
+        val originalFinalEnd = breakNormalized.last().endSeconds
 
         // FUN_180007a90 removes exact "-" labels, then assigns each retained
         // event the end position of the next retained event. The last retained
@@ -52,7 +52,6 @@ object VsmPhoneEventPreprocessor {
 
         val endpointAdjusted = withoutRestMarkers.mapIndexed { index, event ->
             val nextEnd = withoutRestMarkers.getOrNull(index + 1)
-                ?.interval
                 ?.endSeconds
                 ?: originalFinalEnd
             event.copy(
@@ -84,10 +83,7 @@ object VsmPhoneEventPreprocessor {
             if (previous.phoneLabel == "sil") {
                 // Consecutive break after silence extends the existing silence.
                 result[result.lastIndex] = previous.copy(
-                    interval = VsmEventInterval(
-                        startSeconds = previous.startSeconds,
-                        endSeconds = event.endSeconds
-                    )
+                    endSeconds = event.endSeconds
                 )
             } else {
                 result += event.copy(phoneLabel = "sil")
