@@ -75,6 +75,14 @@ The component strings are copied from the three static pointer tables, not synth
 
 These are **base table components**, not final spoken phonemes. The proprietary context rules change some syllables and markers before the segment strings are assembled. Therefore the language-ready mask remains zero and the renderer remains unavailable.
 
+## Reverse packed-index lookup
+
+The Korean helper `FUN_180008660` is used throughout the context-transform stage to turn a modified packed onset/vowel/coda index back into a Hangul code unit. The native bridge now exposes the same lookup direction as `vea_g2p_korean_hangul_from_packed_indices`.
+
+For the standard 11,172 modern Hangul records, the helper reverses the sparse vowel and coda maps and reconstructs the Unicode syllable index. It also preserves the DLL's empty-coda lookup convention: when the requested low five bits are zero, the coda index 1 entry is returned. The native test round-trips every modern Hangul syllable and checks the zero-coda alias behavior.
+
+This inverse lookup is a prerequisite for a faithful port of `FUN_180008730`; it does not itself implement the context transformations.
+
 ## Android Kotlin access to base components
 
 The JNI bridge now exposes `vea_g2p_korean_syllable_components` to `NativeG2pBridge.inspectKoreanBaseComponents`. For each precomposed modern Hangul character in the lexically normalized input, the Kotlin method returns:
@@ -87,12 +95,12 @@ Non-Hangul characters are omitted from this diagnostic result; their positions r
 
 ## Files
 
-- `app/src/main/cpp/include/veag2p.h`: stable C ABI, status values, ABI version, language readiness mask, Hangul index lookup and base-component output contracts.
-- `app/src/main/cpp/veag2p_core.cpp`: UTF-8 validation, two code-point canonicalizations, 32 ordered Korean lexical replacements, packed Hangul-index lookup, and base onset/vowel/coda label tables.
+- `app/src/main/cpp/include/veag2p.h`: stable C ABI, status values, ABI version, language readiness mask, forward/reverse Hangul index lookup and base-component output contracts.
+- `app/src/main/cpp/veag2p_core.cpp`: UTF-8 validation, two code-point canonicalizations, 32 ordered Korean lexical replacements, forward/reverse packed Hangul-index lookup, and base onset/vowel/coda label tables.
 - `app/src/main/cpp/veag2p_jni.cpp`: JNI boundary; converts Java UTF-16 strings without relying on JNI modified UTF-8 and exposes base-component arrays.
 - `app/src/main/cpp/CMakeLists.txt`: Android shared-library and host-test targets.
 - `app/src/main/java/com/kmj/vea/engine/NativeG2pBridge.kt`: Kotlin facade, including diagnostic `inspectKoreanBaseComponents`.
-- `app/src/main/cpp/tests/veag2p_core_test.cpp`: host-side tests for UTF-8 validation, all 32 Korean replacements, repeated matches, the full 11,172-syllable packed-index and base-label hashes, and output-buffer sizing.
+- `app/src/main/cpp/tests/veag2p_core_test.cpp`: host-side tests for UTF-8 validation, all 32 Korean replacements, repeated matches, full 11,172-syllable packed-index/base-label hashes and packed-index round trips, and output-buffer sizing.
 
 ## ABI
 
