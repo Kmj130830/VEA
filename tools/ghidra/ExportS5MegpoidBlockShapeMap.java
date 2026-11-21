@@ -67,6 +67,15 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
         "180083610", // hash digest stream formatting
         "180014f70", // hash digest stream finalization
         "180083c50", // integer-to-string component used by RNN name builder
+        "1800873a0", // high-level VSM model/configuration initializer
+        "1800af170", // parent constructor that populates the render-state root
+        "180012240", // related embedded runtime-state constructor
+        "180126940", // public wrapper constructing a render-state root
+        "1801269f0", // public wrapper copying a render-state root
+        "180126ad0", // public wrapper destroying a render-state root
+        "180131fa0", // runtime-state producer with writes to descriptor and block arrays
+        "1800c0710", // compact runtime descriptor/object builder
+        "1800c0860", // related compact runtime descriptor/object builder
         "1800c4730", // runtime model-state resolver before forward dispatch
         "1800bca40", // initializes the full runtime-state root object
         "1800ccce0", // allocates and copies model runtime state
