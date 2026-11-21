@@ -50,10 +50,10 @@ class S5MegpoidExcitationGeneratorTest {
         )
 
         generator.generate(4, 1_000f, 0f, 0f)
-        val firstEnd = generator.phaseForTesting
         generator.generate(4, 1_000f, 0f, 0f)
 
-        assertEquals(2f * firstEnd, generator.phaseForTesting, 1e-5f)
+        val expectedPhase = 5_500f * (S5MegpoidExcitationGenerator.TWO_PI / 32_000f)
+        assertEquals(expectedPhase, generator.phaseForTesting, 1e-5f)
     }
 
     @Test
