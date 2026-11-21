@@ -27,6 +27,14 @@ The convolution/conditioning layers use axis0 count 64.
 The bias copy path consumes \`param_5\` values, so each layer bias has
 \`axis0Count\` elements.
 
+
+The VTMG object stores the 18 member keys as conventional lowercase MD5 digest
+bytes for `layerName + ".weight"` / `layerName + ".bias"` followed by the
+recovered 24-byte salt. This byte-order representation is distinct from the
+separate S5API lookup helper that formats four MD5 state words. VEA therefore
+uses `S5ModelTensorKey.deriveDigestHex()` specifically for VTMG layer fields
+and keeps the other formatter unchanged for its existing callers.
+
 | Layer | axis0 | axis1 | banks | Weight values | Bias values |
 |---|---:|---:|---:|---:|---:|
 | pre1 | 32 | 82 | 1 | 2,624 | 32 |
