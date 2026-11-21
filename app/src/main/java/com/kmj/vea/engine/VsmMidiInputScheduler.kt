@@ -42,6 +42,13 @@ data class VsmScheduledNote(
     val lyric: String,
     val phoneme: String
 ) {
+    /**
+     * Ordered lyric units using the VSM-observed ASCII-space delimiter.
+     * This is lexical segmentation only; it is not Yamaha phoneme conversion.
+     */
+    val lyricTokens: List<String>
+        get() = VsmLyricTokenizer.tokenize(lyric)
+
     init {
         require(absoluteStartTick >= 0L)
         require(durationTicks > 0L)
