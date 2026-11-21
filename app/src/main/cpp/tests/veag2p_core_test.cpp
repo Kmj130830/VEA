@@ -125,21 +125,30 @@ int main() {
         }
     }
 
-    // Second recovered pass: vowel index 28 -> 29 except onset 13 (ㅇ).
+    // Second recovered pass: packed vowel index 28 (Hangul medial 19, ㅢ)
+    // becomes packed vowel index 29 (medial 20, ㅣ), except onset index 13.
+    // Build the code points from the modern Hangul L/V/T indices so the
+    // fixture actually exercises the recovered branch.
+    const uint32_t vowel28_source = 0xAC00U + 19U * 28U;  // initial 0, medial 19, no coda
+    const uint32_t vowel29_expected = 0xAC00U + 20U * 28U;
     assert(vea_g2p_korean_apply_single_syllable_rules(
-               0xBBC0U, &transformed) == VEA_G2P_STATUS_OK);  // 므
-    assert(transformed == 0xBBDCU);  // 믜
+               vowel28_source, &transformed) == VEA_G2P_STATUS_OK);
+    assert(transformed == vowel29_expected);
+
+    // onset index 13 corresponds to initial index 11 and is exempt.
+    const uint32_t exempt_onset_source =
+        0xAC00U + 11U * 588U + 19U * 28U;
     assert(vea_g2p_korean_apply_single_syllable_rules(
-               0xC73CU, &transformed) == VEA_G2P_STATUS_OK);  // 으
-    assert(transformed == 0xC73CU);
+               exempt_onset_source, &transformed) == VEA_G2P_STATUS_OK);
+    assert(transformed == exempt_onset_source);
 
     for (uint32_t initial = 0; initial < 19U; ++initial) {
         for (uint32_t final = 0; final < 28U; ++final) {
-            const uint32_t source = 0xAC00U + initial * 588U + 18U * 28U + final;
+            const uint32_t source = 0xAC00U + initial * 588U + 19U * 28U + final;
             const uint32_t expected =
                 (initial == 11U)
                     ? source
-                    : 0xAC00U + initial * 588U + 19U * 28U + final;
+                    : 0xAC00U + initial * 588U + 20U * 28U + final;
             transformed = 0;
             assert(vea_g2p_korean_apply_single_syllable_rules(
                        source, &transformed) == VEA_G2P_STATUS_OK);
