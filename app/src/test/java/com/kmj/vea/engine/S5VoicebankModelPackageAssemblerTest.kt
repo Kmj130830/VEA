@@ -62,7 +62,8 @@ class S5VoicebankModelPackageAssemblerTest {
               "sibling": {"unrelated": true},
               "${S5MegpoidRuntimeModelPath.MODEL_CONTEXT_KEY}": {
                 "${S5MegpoidRuntimeModelPath.RESIDUAL_RUNTIME_CONFIG_KEY}": {
-                  "43726e4ce752ea6cc300dc2fca3e8372": {"setting": 32}
+                  "${S5MegpoidRuntimeModelPath.RUNTIME_OPTIONS_KEY}": {"setting": 32},
+                  "43726e4ce752ea6cc300dc2fca3e8372": {"block": true}
                 }
               }
             }
@@ -86,9 +87,25 @@ class S5VoicebankModelPackageAssemblerTest {
         val runtimeGroup = voicebank.residualRuntimeConfigTree
             .findByLookupKey("43726e4ce752ea6cc300dc2fca3e8372")
             ?.asObject()
+        val runtimeOptions = voicebank.runtimeOptionsTree
 
-        assertEquals(setOf("43726e4ce752ea6cc300dc2fca3e8372"), voicebank.residualRuntimeConfigTree.root.fields.keys)
-        assertEquals(32.0, (runtimeGroup?.fields?.get("setting") as S5ModelValue.NumberValue).value, 0.0)
+        assertEquals(
+            setOf(
+                S5MegpoidRuntimeModelPath.RUNTIME_OPTIONS_KEY,
+                "43726e4ce752ea6cc300dc2fca3e8372"
+            ),
+            voicebank.residualRuntimeConfigTree.root.fields.keys
+        )
+        assertEquals(setOf("setting"), runtimeOptions.root.fields.keys)
+        assertEquals(
+            32.0,
+            (runtimeOptions.findByLookupKey("setting") as S5ModelValue.NumberValue).value,
+            0.0
+        )
+        assertEquals(
+            true,
+            (runtimeGroup?.fields?.get("block") as S5ModelValue.BooleanValue).value
+        )
     }
 
     @Test
