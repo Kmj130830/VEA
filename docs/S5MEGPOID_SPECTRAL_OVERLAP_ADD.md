@@ -78,7 +78,7 @@ define:
 The native code computes the source interval:
 
 ```text
-sourceStart = max(0, H + min(H, -r * O))
+sourceStart = max(0, H + min(Q, -r * O))
 sourceEnd   = max(0, H + min(Q, (1 - r) * O))
 ```
 
@@ -95,6 +95,6 @@ contribution. The ring slot is ((writeCursor - i - 1) & ringMask); the
 current frame is stored at (oldWriteCursor & ringMask) before the cursor is
 incremented.
 
-The Android implementation adds explicit bounds checks around these exact
+Both source bounds clamp against Q = floor(G/2); the start bound does not clamp against H.\n\nThe Android implementation adds explicit bounds checks around these exact
 source/destination intervals. These checks reject invalid transform
 descriptors that would otherwise read or write outside the native arrays.
