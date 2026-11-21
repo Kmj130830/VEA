@@ -177,6 +177,20 @@ Java_com_kmj_vea_engine_NativeG2pBridge_nativeKoreanBaseComponents(
     return result;
 }
 
+extern "C" JNIEXPORT jint JNICALL
+Java_com_kmj_vea_engine_NativeG2pBridge_nativeApplyKoreanSingleSyllableRules(
+    JNIEnv*,
+    jobject,
+    jint code_point) {
+    uint32_t transformed = 0;
+    const VeaG2pStatus status = vea_g2p_korean_apply_single_syllable_rules(
+        static_cast<uint32_t>(code_point), &transformed);
+    if (status != VEA_G2P_STATUS_OK) {
+        return 0;
+    }
+    return static_cast<jint>(transformed);
+}
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_kmj_vea_engine_NativeG2pBridge_nativeNormalizeKoreanInput(JNIEnv* env, jobject, jstring input) {
     std::vector<char> utf8;
