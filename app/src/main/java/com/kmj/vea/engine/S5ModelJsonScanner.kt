@@ -340,35 +340,86 @@ object S5ModelJsonScanner {
     }
 }
 
+data class S5ModelResourceScan(
+    val fileName: String,
+    val containerKind: String,
+    val result: S5ModelJsonScanResult
+)
+
 /**
- * File-level convenience entry point for AI Megpoid VTB2.
- * The model JSON is streamed; a full JSONObject tree is never retained.
+ * File-level streaming entry points for the five bundled Megpoid/shared
+ * VOCALOID7 resources. The JSON bodies are scanned one at a time; no full
+ * JSONObject tree is retained.
  */
 object S5ModelContainerScanner {
+    private val bundledResources = listOf(
+        "AI_Megpoid.vtb2" to "VTBR",
+        "AI_Megpoid.vpit" to "VPIT",
+        "COMMON7.vpit" to "VPIT",
+        "VOCALOID7.vhnv" to "VHNV",
+        "VOCALOID7.vtmg" to "VTMG"
+    )
+
     fun scanVtb2(
         vtb2File: File,
         targetTensorKeys: Set<String>,
         maxDocumentChars: Long = 128L * 1024L * 1024L
+    ): S5ModelJsonScanResult = scanContainerFile(
+        containerFile = vtb2File,
+        expectedKind = "VTBR",
+        targetTensorKeys = targetTensorKeys,
+        maxDocumentChars = maxDocumentChars
+    )
+
+    fun scanMegpoidPackage(
+        packageDirectory: File,
+        targetTensorKeys: Set<String> = emptySet(),
+        maxDocumentChars: Long = 128L * 1024L * 1024L
+    ): List<S5ModelResourceScan> {
+        require(packageDirectory.isDirectory) {
+            "The installed Megpoid model directory does not exist."
+        }
+        return bundledResources.map { (fileName, kind) ->
+            S5ModelResourceScan(
+                fileName = fileName,
+                containerKind = kind,
+                result = scanContainerFile(
+                    containerFile = File(packageDirectory, fileName),
+                    expectedKind = kind,
+                    targetTensorKeys = targetTensorKeys,
+                    maxDocumentChars = maxDocumentChars
+                )
+            )
+        }
+    }
+
+    fun scanContainerFile(
+        containerFile: File,
+        expectedKind: String,
+        targetTensorKeys: Set<String>,
+        maxDocumentChars: Long = 128L * 1024L * 1024L
     ): S5ModelJsonScanResult {
-        require(vtb2File.isFile) { "The VTB2 model file does not exist." }
-        require(vtb2File.length() in 16L..512L * 1024L * 1024L) {
-            "The VTB2 model file size is outside the supported range."
+        require(containerFile.isFile) {
+            "The model container file does not exist: ${containerFile.name}."
+        }
+        require(containerFile.length() in 16L..512L * 1024L * 1024L) {
+            "The model container size is outside the supported range: ${containerFile.name}."
         }
         check(NativeS5TensorBridge.isLoaded) {
             "The native S5API container decoder is not loaded."
         }
 
-        val encoded = FileInputStream(vtb2File).use { it.readBytes() }
+        val encoded = FileInputStream(containerFile).use { it.readBytes() }
         val prefix = encoded.copyOfRange(0, 16)
         val header = NativeS5TensorBridge.parseContainerHeader(prefix, encoded.size.toLong())
-            ?: throw IllegalArgumentException("Invalid S5API VTB2 container prefix.")
-        require(header.kind == "VTBR") {
-            "Expected a VTBR model container, found " + header.kind + "."
+            ?: throw IllegalArgumentException("Invalid S5API container prefix: ${containerFile.name}.")
+        require(header.kind == expectedKind) {
+            "Expected $expectedKind in ${containerFile.name}, found ${header.kind}."
         }
 
         val decoded = NativeS5TensorBridge.decodeContainerPayload(encoded)
         require(decoded.size.toLong() == header.decodedPayloadSize) {
-            "Decoded VTB2 body size does not match the container prefix."
+            "Decoded body size does not match the container prefix: ${containerFile.name}."
         }
 
         return ByteArrayInputStream(decoded).use { input ->
