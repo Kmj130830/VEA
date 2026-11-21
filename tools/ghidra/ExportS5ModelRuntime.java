@@ -42,8 +42,9 @@ public class ExportS5ModelRuntime extends GhidraScript {
             "1800e76c0", "1800e8620", "180122880", "1801256a0",
             "1801237e0", "180124740", "1800d44b0", "1800d47c0",
             "1800c5440", "1800c6390", "1800c72d0",
-            // Upstream feature-input caller and public render wrappers.
-            "1800aec40", "1800aeea0", "180126c20"
+            // Upstream feature-input caller, public render wrappers, and state/output helpers.
+            "1800aec40", "1800aeea0", "180126c20", "180127330",
+            "1800c4730", "18012c740"
         };
 
         LinkedHashMap<Address, Function> selected = new LinkedHashMap<>();
