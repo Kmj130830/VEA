@@ -49,6 +49,8 @@ The JVM tests cover unidirectional and bidirectional layouts, reverse names, lat
 
 ## VTB2 payload and tensor-object parsing
 
+The complete archive inventories contain 21 members in `megpoidV7.zip` and 3 members in `AI Model.zip`. Apart from the five model containers below, the Megpoid archive contains artwork, manifest metadata, and 13 small `.vsstyle` presets; there is no additional neural-weight binary hidden elsewhere in these two archives.
+
 All five packaged Megpoid/shared VOCALOID7 resources were decoded offline with the recovered `FUN_18002aa90` transform. Every decoded body is valid UTF-8 JSON:
 
 | Resource | Container | Decoded bytes | JSON objects | Arrays | Strings | Typed tensor strings |
