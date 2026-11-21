@@ -45,6 +45,18 @@ class S5ModelTensorKeyTest {
         )
     }
 
+    @Test
+    fun derivesCompleteRecurrentNamesWithoutAppendingAnotherMemberSuffix() {
+        assertEquals(
+            "2377051edb208e4b1b07a052125310ad",
+            S5ModelTensorKey.deriveParameterName("rnn.weight_ih_l0")
+        )
+        assertEquals(
+            "a78e70c38488a9cc282736f4835fb38f",
+            S5ModelTensorKey.deriveParameterName("rnn.weight_hh_l0_reverse")
+        )
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun rejectsNonAsciiBaseName() {
         S5ModelTensorKey.derive("한글", S5ModelTensorKey.Member.WEIGHT)
