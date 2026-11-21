@@ -47,6 +47,20 @@ The source indexing is interleaved across the matrix-bank dimension, rather than
 
 The JVM tests cover unidirectional and bidirectional layouts, reverse names, later-layer width, missing tensors, non-finite data, and copy isolation. This stage accepts already-decoded tensor arrays. It does not parse the outer VTB2 object tree or execute the recurrent layer.
 
+## VTB2 payload and tensor-object parsing
+
+The bundled `AI_Megpoid.vtb2` asset was decoded offline with the recovered `FUN_18002aa90` transform. The resulting body is valid UTF-8 JSON:
+
+- payload size: 23,541,587 bytes;
+- root type: object with 8 opaque hashed keys;
+- 258 JSON objects, 108 arrays, and 1,389 string values;
+- typed tensor leaves use `*F32`, `*F16`, and `*S32` tagged strings;
+- tensor objects contain repeated inner field keys across different parent objects, so a flat key-to-array map is ambiguous.
+
+The Android port now contains `S5ModelPayloadReader`, which streams the decoded JSON with Gson's `JsonReader`, decodes typed float/int arrays through the existing JNI tensor bridge, and preserves each tensor object's complete JSON path and immediate field keys. The render adapter loads `AI_Megpoid.vtb2` from the installed bundled Megpoid directory and runs this decoder before reaching the explicit unsupported-render boundary.
+
+The parser intentionally does not flatten duplicate inner keys or infer which opaque object path is the RNN's `weight_ih` / `weight_hh` member. That mapping must be recovered from the model-layer construction and lookup call chain. This avoids feeding a valid but unrelated tensor into the recurrent loader.
+
 ## Next static-analysis targets
 
 The latest Ghidra pass additionally decompiles:
