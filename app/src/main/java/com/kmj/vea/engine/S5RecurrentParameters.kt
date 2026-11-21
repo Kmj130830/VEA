@@ -99,8 +99,9 @@ data class S5PackedRecurrentDirection(
  * Converts decoded S5 recurrent tensors into the padded row-major matrix
  * representation used by the existing native S5 tensor bridge.
  *
- * tensors is the already-decoded name -> float-array map. The outer VTB2
- * object-tree parser and the RNN forward pass are separate, unfinished parts.
+ * tensors is an already-decoded S5 hashed-lookup-key -> float-array map.
+ * The VTB2 object-tree parser preserves nested paths; graph-path-to-parameter
+ * mapping and the RNN forward pass remain separate, unfinished parts.
  */
 object S5RecurrentParameterLoader {
     private const val DEFAULT_BASE = "rnn"
