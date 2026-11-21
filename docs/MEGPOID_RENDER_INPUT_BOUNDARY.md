@@ -10,7 +10,8 @@ This note records the verified boundary between the high-level S5API render path
 - `FUN_180127330` validates the handle and forwards to `FUN_1800aeea0`. The latter writes a 32-bit value to offset `+0x3678) of the underlying context. The semantic name of this value is not yet proven.
 - `FUN_180126c20` validates its handle and forwards to `FUN_1800aec40`.
 - `FUN_1800aec40` resolves the underlying context, obtains the active render length through `FUN_1800c4730`, copies the value at context offset `+0x624), then calls `FUN_1800c7ad0`.
-- `FUN_1800c7ad0` is the actual native model/render execution routine. It eventually sends its generated float output through `FUN_18012c740` into the caller-provided output buffer.
+- `FUN_1800c7ad0` is the actual native model/render execution routine. Its second argument is retained as the destination buffer and is passed to `FUN_18012c740` near the end of the function, confirming that this argument is the final output area rather than the neural input feature tensor.
+- At entry, `FUN_1800c7ad0` also calls `FUN_18012b150`, `FUN_18012b470` and `FUN_18012b450` using pointers stored in the render context. Their exact roles and the provenance of those context buffers are the next data-flow targets.
 
 ## Important distinction
 
