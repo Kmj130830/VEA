@@ -166,3 +166,63 @@ endpoint adjustment, case sensitivity and the 1 ms threshold.
 This preprocessor starts from already timed phone events. It does not
 perform G2P, split `VeaNote.phoneme`, recover phone alignment, or assign
 the internal category ID returned by `FUN_180074a50`.
+
+## Confirmed phone-event feature builder — FUN_18006c720
+
+The decompilation of FUN_18006c720 establishes the direct consumer of the
+0x38-byte event-row array. Its `param_3` is traversed with a seven-qword
+stride (`row = param_3 + index * 7`), which is exactly 0x38 bytes. The
+earlier `double*` decompiler type is only a pointer type: not all seven
+qwords are doubles.
+
+For each row, the function reads:
+
+- qword 0 (`+0x00`) as interval start;
+- qword 1 (`+0x08`) as interval end;
+- the MSVC string object at qword 2 (`+0x10`) and passes it to
+  `FUN_180074a50` to obtain a render-context phone-category index;
+- the remaining row storage is retained in the seven-qword stride, but
+  its complete semantic field names are not assigned here.
+
+The function allocates a zero-initialized float32 output matrix with
+`positions * featureWidth` values. For each phone row it builds at least
+these verified feature groups:
+
+1. A continuous duration-derived feature. It computes a logarithmic
+   duration value, normalizes it between logarithms of two caller-supplied
+   limits, and clamps the result to [-1, +1].
+2. A categorical one-hot feature at an offset determined by the render
+   configuration and the category index returned by `FUN_180074a50`.
+3. Optional neighboring-phone categorical features. It clamps the
+   neighboring event index to the available event range, calls
+   `FUN_180074a50` for that event's string, and sets the corresponding
+   category slot in the neighboring feature region.
+4. An optional two-value flag pair whose orientation depends on the
+   third output of `FUN_180074a50` and a render-mode flag.
+
+The function has two layout branches selected by its mode argument. The
+exact source names for all mode flags, feature widths and auxiliary
+category regions remain unresolved; the numeric feature positions must
+come from the live render-context descriptor, not from the read-only label
+string order.
+
+### Consequence for the Android implementation
+
+This confirms that `VsmPhoneEventPreprocessor` is an upstream preparation
+stage, not the feature builder itself. A correct Android feature builder
+needs, in order:
+
+1. An ordered, already aligned list of individual phone labels and their
+   start/end intervals.
+2. The exact per-render-context `phoneLabel -> categoryIndex` map used by
+   `FUN_180074a50` (not yet recovered).
+3. The render-context feature-width, context-window and mode descriptors
+   that parameterize `FUN_18006c720` (not yet completely mapped).
+4. A portable float32 implementation of the duration normalization,
+   categorical placement and optional neighbor windows.
+
+VEA does not yet have the phone alignment/G2P output needed for item 1,
+nor the numeric category map needed for items 2-3. Therefore this stage
+has not been connected to `S5MegpoidSequenceTransitionPipeline`; doing so
+with guessed category IDs or equal note-duration splits would create
+invalid model inputs.
