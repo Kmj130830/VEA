@@ -168,16 +168,27 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
         require(typedTensorCount > 0L) {
             "The bundled Megpoid package contains no typed tensor strings."
         }
-        val recurrentMatches = resourceScans.sumOf { scan ->
-            scan.result.matchedTensorStrings.values.sumOf { it.size.toLong() }
+        val matchedTensorStrings = resourceScans.flatMap { scan ->
+            scan.result.matchedTensorStrings.values.flatten()
         }
+        val decodedCandidateTensors = if (matchedTensorStrings.isEmpty()) {
+            emptyList()
+        } else {
+            S5ModelTensorDecoder.decodeMatches(
+                matches = matchedTensorStrings,
+                decodeFloatArray = NativeS5TensorBridge::decodeTypedFloatArray,
+                decodeInt32Array = NativeS5TensorBridge::decodeTypedInt32Array
+            )
+        }
+        val recurrentMatches = matchedTensorStrings.size
         val resourceSummary = resourceScans.joinToString { scan ->
             "${scan.fileName}: ${scan.result.objectCount} objects / " +
                 "${scan.result.typedTensorStringCount} typed tensors"
         }
         throw UnsupportedOperationException(
             "The five bundled Megpoid/shared model containers were decoded and streamed ($resourceSummary; " +
-                "$recurrentMatches candidate recurrent objects matched). The neural graph's exact parameter " +
+                "$recurrentMatches candidate recurrent objects matched, " +
+                "${decodedCandidateTensors.size} selected tensor fields decoded). The neural graph's exact parameter " +
                 "mapping and acoustic execution are not complete; no WAV was generated."
         )
     }
