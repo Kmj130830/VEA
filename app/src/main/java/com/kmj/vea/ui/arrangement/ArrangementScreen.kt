@@ -54,6 +54,9 @@ fun ArrangementScreen(
     onPlay: () -> Unit,
     onStop: () -> Unit,
     onAssignVoice: (String, String, String, String) -> Unit,
+    isMegpoidModelInstalled: Boolean,
+    isMegpoidInstallCheckComplete: Boolean,
+    onImportMegpoidModel: () -> Unit,
     canUndo: Boolean,
     canRedo: Boolean
 ) {
@@ -262,6 +265,30 @@ fun ArrangementScreen(
                     }
                     Text(
                         "Singer identity and styles are loaded from the supplied package. VOCALOID rendering still requires an authorized Android engine.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 10.sp
+                    )
+                    Divider()
+                    Text(
+                        when {
+                            !isMegpoidInstallCheckComplete -> "MODEL FILES: CHECKING..."
+                            isMegpoidModelInstalled -> "MODEL FILES: VERIFIED IN APP STORAGE"
+                            else -> "MODEL FILES: NOT INSTALLED"
+                        },
+                        color = if (isMegpoidModelInstalled) Color(0xFF6A9A42)
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Button(
+                        onClick = onImportMegpoidModel,
+                        enabled = isMegpoidInstallCheckComplete,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (isMegpoidModelInstalled) "REIMPORT MODEL FILES" else "IMPORT MODEL FILES")
+                    }
+                    Text(
+                        "Select megpoidV7.zip first, then AI Model.zip. The app installs only files that pass SHA-256 and container-header checks.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 10.sp
                     )
