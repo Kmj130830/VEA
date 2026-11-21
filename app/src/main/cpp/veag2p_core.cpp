@@ -152,6 +152,29 @@ constexpr uint8_t kKoreanCodaIndices[28] = {
     15, 16, 17, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
 };
 
+constexpr const char* kKoreanOnsetPhones[32] = {
+    "", "", "g", "g'", "n", "d", "d'", "l",
+    "m", "b", "b'", "s", "s'", "N", "c", "c'",
+    "ch", "k", "t", "p", "h", "", "", "",
+    "", "", "sh", "N", "r", "sh'", "", "",
+};
+
+constexpr const char* kKoreanVowelPhones[32] = {
+    "", "", "", "a", "e", "ja", "je", "7",
+    "", "", "e", "j7", "je", "o", "oa", "ue",
+    "", "", "ue", "jo", "u", "u7", "ue", "ui",
+    "", "", "ju", "M", "Mi", "i", "", "",
+};
+
+constexpr const char* kKoreanCodaPhones[32] = {
+    "", "", "gp", "gp", "gp", "np", "np", "np",
+    "dp", "rp", "gp", "mp", "mp", "dp", "dp", "mp",
+    "rp", "mp", "", "bp", "bp", "dp", "dp", "Np",
+    "dp", "dp", "gp", "dp", "bp", "dp", "", "",
+};
+
+
+
 size_t EncodedSize(char32_t value) {
     if (value <= 0x7F) return 1;
     if (value <= 0x7FF) return 2;
@@ -206,6 +229,41 @@ extern "C" VeaG2pStatus vea_g2p_korean_hangul_packed_indices(
 
     *packed_indices = static_cast<uint16_t>(
         0x8000U | (onset << 10U) | (vowel << 5U) | coda);
+    return VEA_G2P_STATUS_OK;
+}
+
+extern "C" VeaG2pStatus vea_g2p_korean_syllable_components(
+    uint32_t codepoint,
+    VeaKoreanPhonemeComponents* components) {
+    if (components == nullptr) {
+        return VEA_G2P_STATUS_INVALID_ARGUMENT;
+    }
+
+    uint16_t packed = 0;
+    const VeaG2pStatus status =
+        vea_g2p_korean_hangul_packed_indices(codepoint, &packed);
+    if (status != VEA_G2P_STATUS_OK) {
+        return status;
+    }
+
+    const uint32_t onset_index = (packed >> 10U) & 0x1FU;
+    const uint32_t vowel_index = (packed >> 5U) & 0x1FU;
+    const uint32_t coda_index = packed & 0x1FU;
+
+    const char* onset = kKoreanOnsetPhones[onset_index];
+    const char* vowel = kKoreanVowelPhones[vowel_index];
+    const char* coda = kKoreanCodaPhones[coda_index];
+
+    if (std::strlen(onset) >= sizeof(components->onset) ||
+        std::strlen(vowel) >= sizeof(components->vowel) ||
+        std::strlen(coda) >= sizeof(components->coda)) {
+        return VEA_G2P_STATUS_INVALID_ARGUMENT;
+    }
+
+    std::memset(components, 0, sizeof(*components));
+    std::memcpy(components->onset, onset, std::strlen(onset));
+    std::memcpy(components->vowel, vowel, std::strlen(vowel));
+    std::memcpy(components->coda, coda, std::strlen(coda));
     return VEA_G2P_STATUS_OK;
 }
 
