@@ -50,6 +50,7 @@ class VsmMidiInputSchedulerTest {
         assertEquals(22_050L, event.durationSamples)
         assertEquals("あ", event.lyric)
         assertEquals("a", event.phoneme)
+        assertEquals(listOf("あ"), event.lyricTokens)
     }
 
     @Test
