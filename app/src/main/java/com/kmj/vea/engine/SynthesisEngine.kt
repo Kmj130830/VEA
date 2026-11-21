@@ -153,9 +153,9 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
         require(plans.any { !it.isEmpty }) { "There are no notes to synthesize." }
 
         val candidateLayout = S5RecurrentLayerLayout(
-            inputFeatures = 1,
-            hiddenFeatures = 1,
-            layerCount = 32,
+            inputFeatures = 418,
+            hiddenFeatures = 9,
+            layerCount = 1,
             bidirectional = true,
             hasBias = true
         )
