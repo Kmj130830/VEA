@@ -155,3 +155,32 @@ It does not infer the descriptor's coreLength or shapeMode: those remain
 inputs supplied by the output-state constructor. The separate output window
 at descriptor +0x60 is still being traced and is not substituted with this
 frame window.
+
+## Output-window normalization branches
+
+The output-window code in FUN_180127dc0 uses the descriptor flags at +0x91
+and +0x92. The disassembly establishes three distinct paths:
+
+1. With both flags clear, it squares every frame-window coefficient,
+   overlap-adds that squared vector into the output-length vector using the
+   same interval calculation as the final renderer, then stores
+   `1 / max(sum, 1e-8)` as the output window.
+2. With +0x91 set and +0x92 clear, it forms a centered raised-cosine vector
+   `0.5 * (cos(pi*x) + 1)`, where
+   `x = (index - geometry/2) / outputSamples` and values with `abs(x) >= 1`
+   become zero. It divides the original frame window by
+   `max(originalFrameWindow, 1e-4)`, overlap-adds the raised-cosine vector,
+   and stores the reciprocal overlap sum.
+3. With +0x92 set, that branch takes precedence. It overlap-adds the current
+   frame window itself and stores the reciprocal overlap sum.
+
+`S5MegpoidOutputWindowBuilder` implements those three paths for the supplied
+Megpoid geometry where `geometry == fftSize`. It returns a frame window
+(possibly updated by the +0x91 path) and the complementary output window.
+The two flags remain explicit inputs because the static caller passes
+separate root-state bytes; their semantic product names are not inferred.
+
+The frame-window and output-window builders are now independent components
+that can be composed with `S5MegpoidOverlapAddDescriptorGeometry` and the
+stateful `S5MegpoidSpectralOverlapAdd` executor. The complete transform-plan
+constructor, root scalar provenance, and verified PCM boundary remain open.
