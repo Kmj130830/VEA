@@ -544,38 +544,73 @@ int main() {
         block_output, block_channels, block_positions, block_expanded, 0.25f) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
-    // Fixed 136-byte outer header observed in all five supplied V7 model files.
-    uint8_t raw_header[VEA_S5_CONTAINER_HEADER_SIZE] = {};
-    raw_header[4] = 100u;
-    raw_header[8] = 16u;
-    for (size_t i = 12; i < sizeof(raw_header); ++i) {
-        raw_header[i] = static_cast<uint8_t>(i ^ 0x5au);
-    }
-    const char* magics[] = {"VTBR", "VPIT", "VHNV", "VTMG"};
+        // S5API FUN_18002aa90: 16-byte prefix, seeded body transform, opaque trailer.
+    constexpr size_t kPrefixBytes = VEA_S5_CONTAINER_PREFIX_SIZE;
+    constexpr size_t kDecodedBytes = 13;
+    constexpr size_t kTrailerBytes = 128;
+    constexpr size_t kFileBytes = kPrefixBytes + kDecodedBytes + kTrailerBytes;
+    uint8_t raw_file[kFileBytes] = {};
+    const char* magics[] = {"VTMB", "VTBR", "VTMG", "VPIT", "VNPV", "VHNV"};
     const uint32_t kinds[] = {
-        VEA_S5_CONTAINER_KIND_VTBR, VEA_S5_CONTAINER_KIND_VPIT,
-        VEA_S5_CONTAINER_KIND_VHNV, VEA_S5_CONTAINER_KIND_VTMG
+        VEA_S5_CONTAINER_KIND_VTMB, VEA_S5_CONTAINER_KIND_VTBR,
+        VEA_S5_CONTAINER_KIND_VTMG, VEA_S5_CONTAINER_KIND_VPIT,
+        VEA_S5_CONTAINER_KIND_VNPV, VEA_S5_CONTAINER_KIND_VHNV
     };
-    assert(vea_s5_container_header_size() == 136u);
-    for (size_t i = 0; i < 4; ++i) {
+    const uint32_t declared_span = static_cast<uint32_t>(kFileBytes - 136u);
+    for (size_t i = 0; i < 6; ++i) {
+        std::memcpy(raw_file, magics[i], 4);
+        for (size_t byte = 0; byte < 4; ++byte) {
+            raw_file[4 + byte] = static_cast<uint8_t>(declared_span >> (byte * 8u));
+            raw_file[8 + byte] = static_cast<uint8_t>(16u >> (byte * 8u));
+            raw_file[12 + byte] = static_cast<uint8_t>(0x12345678u >> (byte * 8u));
+        }
         VeaS5ContainerHeader parsed{};
-        for (size_t b = 0; b < 4; ++b) raw_header[b] = static_cast<uint8_t>(magics[i][b]);
-        assert(vea_s5_parse_container_header(
-            raw_header, sizeof(raw_header) + 100u, &parsed) == VEA_S5_CONTAINER_STATUS_OK);
+        assert(vea_s5_parse_container_header(raw_file, kFileBytes, &parsed) ==
+            VEA_S5_CONTAINER_STATUS_OK);
         assert(parsed.kind == kinds[i]);
-        assert(parsed.payload_size == 100u);
+        assert(parsed.declared_span == declared_span);
         assert(parsed.format_word == 16u);
-        assert(parsed.opaque_metadata[0] == raw_header[12]);
-        assert(parsed.opaque_metadata[123] == raw_header[135]);
+        assert(parsed.transform_seed == 0x12345678u);
+        assert(parsed.decoded_payload_size == kDecodedBytes);
     }
+
+    // Fixed ciphertext bytes cover three complete words plus the distinct tail path.
+    // The final 128 bytes are deliberately nonzero and must not enter the decoded body.
+    const uint8_t encrypted_body[kDecodedBytes] = {
+        0x21u, 0x22u, 0x23u, 0x24u, 0x25u, 0x26u, 0x27u,
+        0x28u, 0x29u, 0x2au, 0x2bu, 0x2cu, 0x2du
+    };
+    std::memcpy(raw_file + kPrefixBytes, encrypted_body, sizeof(encrypted_body));
+    std::memset(raw_file + kPrefixBytes + kDecodedBytes, 0xee, kTrailerBytes);
+    const uint8_t expected_decoded[kDecodedBytes] = {
+        0x55u, 0x20u, 0x5du, 0x91u, 0x66u, 0x7au, 0xabu,
+        0x5au, 0x1du, 0x24u, 0xe6u, 0xd0u, 0x38u
+    };
+    uint8_t decoded[kDecodedBytes] = {};
+    uint64_t decoded_size = 0;
+    assert(vea_s5_decode_container_payload(
+        raw_file, kFileBytes, decoded, sizeof(decoded), &decoded_size) ==
+        VEA_S5_CONTAINER_STATUS_OK);
+    assert(decoded_size == kDecodedBytes);
+    assert(std::memcmp(decoded, expected_decoded, sizeof(decoded)) == 0);
+
+    uint64_t required_size = 0;
+    assert(vea_s5_decode_container_payload(
+        raw_file, kFileBytes, decoded, sizeof(decoded) - 1u, &required_size) ==
+        VEA_S5_CONTAINER_STATUS_BUFFER_TOO_SMALL);
+    assert(required_size == 0u);
+
     VeaS5ContainerHeader invalid_header{};
-    assert(vea_s5_parse_container_header(raw_header, sizeof(raw_header) + 99u, &invalid_header)
-        == VEA_S5_CONTAINER_STATUS_INVALID_LENGTH);
-    const uint8_t invalid_magic[VEA_S5_CONTAINER_HEADER_SIZE] = {};
-    assert(vea_s5_parse_container_header(invalid_magic, sizeof(invalid_magic), &invalid_header)
-        == VEA_S5_CONTAINER_STATUS_INVALID_MAGIC);
-    assert(vea_s5_parse_container_header(raw_header, 135u, &invalid_header)
-        == VEA_S5_CONTAINER_STATUS_INVALID_LENGTH);
+    const uint8_t invalid_magic[VEA_S5_CONTAINER_PREFIX_SIZE] = {};
+    assert(vea_s5_parse_container_header(
+        invalid_magic, kFileBytes, &invalid_header) ==
+        VEA_S5_CONTAINER_STATUS_INVALID_MAGIC);
+    assert(vea_s5_parse_container_header(
+        raw_file, VEA_S5_CONTAINER_PREFIX_SIZE - 1u, &invalid_header) ==
+        VEA_S5_CONTAINER_STATUS_INVALID_LENGTH);
+    assert(vea_s5_decode_container_payload(
+        raw_file, VEA_S5_CONTAINER_PREFIX_SIZE - 1u, decoded,
+        sizeof(decoded), &decoded_size) == VEA_S5_CONTAINER_STATUS_INVALID_LENGTH);
 
     vea_s5_arena_reset(arena);
     assert(vea_s5_arena_used(arena) == 0);
