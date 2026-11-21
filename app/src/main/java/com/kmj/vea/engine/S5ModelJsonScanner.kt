@@ -45,6 +45,7 @@ data class S5ModelJsonScanResult(
     val booleanCount: Long,
     val nullCount: Long,
     val typedTensorStringCount: Long,
+    val matchedObjectKeys: Set<String>,
     val matchedTensorStrings: Map<String, List<S5TypedTensorString>>,
     val matchedValues: Map<String, List<S5JsonMatchedValue>>
 )
@@ -163,6 +164,7 @@ object S5ModelJsonScanner {
         private var booleans = 0L
         private var nulls = 0L
         private var typedStrings = 0L
+        private val matchedObjectKeys = LinkedHashSet<String>()
         private val matched = LinkedHashMap<String, MutableList<S5TypedTensorString>>()
         private val matchedValues = LinkedHashMap<String, MutableList<S5JsonMatchedValue>>()
 
@@ -189,6 +191,7 @@ object S5ModelJsonScanner {
             booleanCount = booleans,
             nullCount = nulls,
             typedTensorStringCount = typedStrings,
+            matchedObjectKeys = matchedObjectKeys.toSet(),
             matchedTensorStrings = matched.mapValues { it.value.toList() },
             matchedValues = matchedValues.mapValues { it.value.toList() }
         )
@@ -277,6 +280,7 @@ object S5ModelJsonScanner {
                 skipWhitespace()
                 require(readChar() == ':'.code) { "Expected ':' after S5 model JSON object key." }
                 val childPath = appendJsonPath(path, key)
+                if (key in targetKeys) matchedObjectKeys += key
                 val childTarget = if (key in targetKeys) key else matchedObjectKey
                 parseValue(key, childPath, depth, childTarget)
                 skipWhitespace()
