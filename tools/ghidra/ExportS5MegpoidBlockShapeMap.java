@@ -75,6 +75,8 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
         "180012240", // related embedded runtime-state constructor
         "180126940", // public wrapper constructing a render-state root
         "180127220", // high-level model initializer writes model values into a render-state object
+        "18000ee30", // extracts/serializes the selected hashed model-property value before JSON parsing
+        "180081940", // resolves a model-object child by its generated hashed key
         "180127630", // high-level render-state finalization/configuration step
         "1801269f0", // public wrapper copying a render-state root
         "180126ad0", // public wrapper destroying a render-state root
