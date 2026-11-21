@@ -78,6 +78,26 @@ class S5MegpoidSpectralOverlapAddTest {
     }
 
     @Test
+    fun rightAlignsPartialNativeOverlapSegmentsInOutputBlock() {
+        val overlap = S5MegpoidSpectralOverlapAdd(
+            parameters(
+                outputSamples = 8,
+                geometry = 8,
+                fftSize = 8,
+                windowOffset = 1,
+                overlapCount = 3,
+                ringMask = 0,
+                frameWindow = FloatArray(8) { 1f },
+                outputWindow = FloatArray(8) { 1f }
+            )
+        )
+
+        val output = overlap.processFrame(FloatArray(8) { (it + 1).toFloat() })
+
+        assertEquals(listOf(5f, 6f, 7f, 8f, 1f, 2f, 3f, 4f), output.toList())
+    }
+
+    @Test
     fun resetHistoryDropsPreviousFramesAndResetsRingCursor() {
         val overlap = S5MegpoidSpectralOverlapAdd(parameters())
         overlap.processFrame(FloatArray(8) { (it + 1).toFloat() })
