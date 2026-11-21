@@ -41,7 +41,9 @@ public class ExportS5ModelRuntime extends GhidraScript {
             // Per-sequence descriptor factories and their target operator constructors.
             "1800e76c0", "1800e8620", "180122880", "1801256a0",
             "1801237e0", "180124740", "1800d44b0", "1800d47c0",
-            "1800c5440", "1800c6390", "1800c72d0"
+            "1800c5440", "1800c6390", "1800c72d0",
+            // Upstream feature-input caller and public render wrappers.
+            "1800aec40", "1800aeea0", "180126c20"
         };
 
         LinkedHashMap<Address, Function> selected = new LinkedHashMap<>();
