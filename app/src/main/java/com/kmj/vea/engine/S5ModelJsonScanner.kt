@@ -169,11 +169,11 @@ object S5ModelJsonScanner {
                     visitor?.onScalar(propertyName, S5JsonScalarKind.STRING, value, depth)
                     if (value.startsWith("*F32") || value.startsWith("*F16") || value.startsWith("*S32")) {
                         typedStrings++
-                        if (matchedObjectKey != null && propertyName != null) {
+                        if (matchedObjectKey != null) {
                             matched.getOrPut(matchedObjectKey) { ArrayList() } += S5TypedTensorString(
                                 objectKey = matchedObjectKey,
                                 valuePath = path,
-                                fieldKey = propertyName,
+                                fieldKey = propertyName ?: path,
                                 typeTag = value.substring(0, 4),
                                 encodedValue = value
                             )
