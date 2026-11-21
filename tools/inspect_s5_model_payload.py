@@ -155,6 +155,33 @@ def main():
         report.append(f"- matching strings: {len(matched)}")
         for path, value in matched[:500]:
             report.append(f"- `{path}`: `{value[:160]}`")
+        report += ["", "## Candidate hashed tensor keys", ""]
+        salt = bytes.fromhex("692333652e635a5425356b396a32642c325a72532f2b2f32")
+        bases = ["pre1", "pre2", "conv1", "cond1", "conv2", "cond2",
+                 "conv3", "cond3", "linear"]
+        for layer in range(4):
+            bases += [
+                f"rnn.weight_ih_l{layer}", f"rnn.weight_hh_l{layer}",
+                f"rnn.bias_ih_l{layer}", f"rnn.bias_hh_l{layer}",
+                f"rnn.weight_ih_l{layer}_reverse", f"rnn.weight_hh_l{layer}_reverse",
+                f"rnn.bias_ih_l{layer}_reverse", f"rnn.bias_hh_l{layer}_reverse",
+            ]
+        json_keys = {value for path, value in tree["strings"] if path.endswith(".[key]")}
+        candidate_count = 0
+        for base in bases:
+            for member_suffix in (".weight", ".bias"):
+                digest = hashlib.md5((base + member_suffix).encode("ascii") + salt).digest()
+                variants = {
+                    digest.hex(),
+                    "".join(f"{int.from_bytes(digest[i:i+4], 'little'):08x}" for i in range(0, 16, 4)),
+                    "".join(f"{int.from_bytes(digest[i:i+4], 'big'):08x}" for i in range(0, 16, 4)),
+                }
+                for variant in sorted(variants):
+                    candidate_count += 1
+                    if variant in json_keys:
+                        report.append(f"- MATCH `{base + member_suffix}` -> `{variant}`")
+        report.append(f"- candidate digests tested: {candidate_count}")
+        report.append(f"- JSON object keys compared: {len(json_keys)}")
         report += ["", "## Top-level object paths", ""]
         for path, count, keys in tree["object_paths"][:100]:
             report.append(f"- `{path}` ({count} keys): {', '.join(map(str, keys))}")
