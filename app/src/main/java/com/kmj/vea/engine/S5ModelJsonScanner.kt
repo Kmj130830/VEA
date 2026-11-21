@@ -27,6 +27,14 @@ data class S5TypedTensorString(
     val encodedValue: String
 )
 
+data class S5JsonMatchedValue(
+    val objectKey: String,
+    val valuePath: String,
+    val fieldKey: String,
+    val kind: S5JsonScalarKind,
+    val value: String?
+)
+
 data class S5ModelJsonScanResult(
     val objectCount: Long,
     val arrayCount: Long,
@@ -37,7 +45,8 @@ data class S5ModelJsonScanResult(
     val booleanCount: Long,
     val nullCount: Long,
     val typedTensorStringCount: Long,
-    val matchedTensorStrings: Map<String, List<S5TypedTensorString>>
+    val matchedTensorStrings: Map<String, List<S5TypedTensorString>>,
+    val matchedValues: Map<String, List<S5JsonMatchedValue>>
 )
 
 /**
@@ -102,6 +111,36 @@ object S5ModelJsonScanner {
         return parser.result()
     }
 
+    /**
+     * Retains scalar fields beneath selected hashed object keys. This is used
+     * for model configuration dimensions and feature flags, which are stored
+     * as ordinary JSON numbers/booleans rather than typed tensor strings.
+     */
+    fun scanForObjectKeys(
+        reader: Reader,
+        targetKeys: Set<String>,
+        maxDepth: Int = DEFAULT_MAX_DEPTH,
+        maxStringChars: Int = DEFAULT_MAX_STRING_CHARS,
+        maxDocumentChars: Long = DEFAULT_MAX_DOCUMENT_CHARS
+    ): S5ModelJsonScanResult {
+        require(targetKeys.all { it.isNotBlank() }) {
+            "Object lookup keys must not be blank."
+        }
+        require(maxDepth in 1..512)
+        require(maxStringChars > 0)
+        require(maxDocumentChars > 0)
+        val parser = Parser(
+            reader = if (reader is PushbackReader) reader else PushbackReader(BufferedReader(reader), 1),
+            visitor = null,
+            maxDepth = maxDepth,
+            maxStringChars = maxStringChars,
+            maxDocumentChars = maxDocumentChars,
+            targetKeys = targetKeys
+        )
+        parser.parseDocument()
+        return parser.result()
+    }
+
     private fun isHexDigit(char: Char): Boolean =
         char in '0'..'9' || char in 'a'..'f' || char in 'A'..'F'
 
@@ -125,6 +164,7 @@ object S5ModelJsonScanner {
         private var nulls = 0L
         private var typedStrings = 0L
         private val matched = LinkedHashMap<String, MutableList<S5TypedTensorString>>()
+        private val matchedValues = LinkedHashMap<String, MutableList<S5JsonMatchedValue>>()
 
         fun parseDocument() {
             skipWhitespace()
@@ -149,7 +189,8 @@ object S5ModelJsonScanner {
             booleanCount = booleans,
             nullCount = nulls,
             typedTensorStringCount = typedStrings,
-            matchedTensorStrings = matched.mapValues { it.value.toList() }
+            matchedTensorStrings = matched.mapValues { it.value.toList() },
+            matchedValues = matchedValues.mapValues { it.value.toList() }
         )
 
         private fun parseValue(
@@ -167,6 +208,9 @@ object S5ModelJsonScanner {
                     val value = parseString()
                     strings++
                     visitor?.onScalar(propertyName, S5JsonScalarKind.STRING, value, depth)
+                    recordMatchedValue(
+                        matchedObjectKey, path, propertyName, S5JsonScalarKind.STRING, value
+                    )
                     if (value.startsWith("*F32") || value.startsWith("*F16") || value.startsWith("*S32")) {
                         typedStrings++
                         if (matchedObjectKey != null) {
@@ -184,21 +228,33 @@ object S5ModelJsonScanner {
                     expectLiteral("rue")
                     booleans++
                     visitor?.onScalar(propertyName, S5JsonScalarKind.BOOLEAN, "true", depth)
+                    recordMatchedValue(
+                        matchedObjectKey, path, propertyName, S5JsonScalarKind.BOOLEAN, "true"
+                    )
                 }
                 'f'.code -> {
                     expectLiteral("alse")
                     booleans++
                     visitor?.onScalar(propertyName, S5JsonScalarKind.BOOLEAN, "false", depth)
+                    recordMatchedValue(
+                        matchedObjectKey, path, propertyName, S5JsonScalarKind.BOOLEAN, "false"
+                    )
                 }
                 'n'.code -> {
                     expectLiteral("ull")
                     nulls++
                     visitor?.onScalar(propertyName, S5JsonScalarKind.NULL, null, depth)
+                    recordMatchedValue(
+                        matchedObjectKey, path, propertyName, S5JsonScalarKind.NULL, null
+                    )
                 }
                 '-'.code, in '0'.code..'9'.code -> {
                     val token = parseNumber(ch)
                     numbers++
                     visitor?.onScalar(propertyName, S5JsonScalarKind.NUMBER, token, depth)
+                    recordMatchedValue(
+                        matchedObjectKey, path, propertyName, S5JsonScalarKind.NUMBER, token
+                    )
                 }
                 -1 -> throw IllegalArgumentException("Unexpected end of S5 model JSON.")
                 else -> throw IllegalArgumentException("Unexpected JSON token '" + ch.toChar() + "'.")
@@ -254,6 +310,23 @@ object S5ModelJsonScanner {
                     else -> throw IllegalArgumentException("Expected ',' or ']' in S5 model JSON array.")
                 }
             }
+        }
+
+        private fun recordMatchedValue(
+            objectKey: String?,
+            path: String,
+            propertyName: String?,
+            kind: S5JsonScalarKind,
+            value: String?
+        ) {
+            if (objectKey == null) return
+            matchedValues.getOrPut(objectKey) { ArrayList() } += S5JsonMatchedValue(
+                objectKey = objectKey,
+                valuePath = path,
+                fieldKey = propertyName ?: path,
+                kind = kind,
+                value = value
+            )
         }
 
         private fun appendJsonPath(parent: String, key: String): String =
