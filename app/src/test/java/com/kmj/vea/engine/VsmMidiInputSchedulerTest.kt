@@ -43,6 +43,8 @@ class VsmMidiInputSchedulerTest {
         assertEquals(34, schedule.chunks.last().validSampleCount)
 
         val event = schedule.chunks.first().noteStarts.single()
+        assertEquals(0L, event.absoluteStartTick)
+        assertEquals(480L, event.durationTicks)
         assertEquals(0L, event.absoluteStartSample)
         assertEquals(0, event.frameOffsetInChunk)
         assertEquals(22_050L, event.durationSamples)
@@ -77,6 +79,8 @@ class VsmMidiInputSchedulerTest {
         val noteChunk = schedule.chunks.first { it.noteStarts.isNotEmpty() }
         val event = noteChunk.noteStarts.single()
 
+        assertEquals(1_920L, event.absoluteStartTick)
+        assertEquals(480L, event.durationTicks)
         assertEquals(88_200L, event.absoluteStartSample)
         assertEquals(344, noteChunk.index)
         assertEquals(136, event.frameOffsetInChunk)
