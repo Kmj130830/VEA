@@ -18,7 +18,11 @@ interface S5ModelJsonVisitor {
 }
 
 data class S5TypedTensorString(
+    /** The matched 32-character hashed JSON object key. */
     val objectKey: String,
+    /** Full path to the typed string value, including its inner field key. */
+    val valuePath: String,
+    val fieldKey: String,
     val typeTag: String,
     val encodedValue: String
 )
@@ -33,7 +37,7 @@ data class S5ModelJsonScanResult(
     val booleanCount: Long,
     val nullCount: Long,
     val typedTensorStringCount: Long,
-    val matchedTensorStrings: Map<String, S5TypedTensorString>
+    val matchedTensorStrings: Map<String, List<S5TypedTensorString>>
 )
 
 /**
@@ -120,7 +124,7 @@ object S5ModelJsonScanner {
         private var booleans = 0L
         private var nulls = 0L
         private var typedStrings = 0L
-        private val matched = LinkedHashMap<String, S5TypedTensorString>()
+        private val matched = LinkedHashMap<String, MutableList<S5TypedTensorString>>()
 
         fun parseDocument() {
             skipWhitespace()
@@ -130,7 +134,7 @@ object S5ModelJsonScanner {
             } else {
                 unreadChar(first)
             }
-            parseValue(propertyName = null, depth = 0)
+            parseValue(propertyName = null, path = "$", depth = 0, matchedObjectKey = null)
             skipWhitespace()
             require(readChar() == -1) { "Trailing content after the S5 model JSON value." }
         }
@@ -145,23 +149,34 @@ object S5ModelJsonScanner {
             booleanCount = booleans,
             nullCount = nulls,
             typedTensorStringCount = typedStrings,
-            matchedTensorStrings = matched.toMap()
+            matchedTensorStrings = matched.mapValues { it.value.toList() }
         )
 
-        private fun parseValue(propertyName: String?, depth: Int) {
+        private fun parseValue(
+            propertyName: String?,
+            path: String,
+            depth: Int,
+            matchedObjectKey: String?
+        ) {
             require(depth <= maxDepth) { "S5 model JSON nesting exceeds the configured limit." }
             skipWhitespace()
             when (val ch = readChar()) {
-                '{'.code -> parseObject(depth + 1)
-                '['.code -> parseArray(depth + 1)
+                '{'.code -> parseObject(path, depth + 1, matchedObjectKey)
+                '['.code -> parseArray(path, depth + 1, matchedObjectKey)
                 '"'.code -> {
                     val value = parseString()
                     strings++
                     visitor?.onScalar(propertyName, S5JsonScalarKind.STRING, value, depth)
                     if (value.startsWith("*F32") || value.startsWith("*F16") || value.startsWith("*S32")) {
                         typedStrings++
-                        if (propertyName != null && propertyName in targetKeys) {
-                            matched[propertyName] = S5TypedTensorString(propertyName, value.substring(0, 4), value)
+                        if (matchedObjectKey != null && propertyName != null) {
+                            matched.getOrPut(matchedObjectKey) { ArrayList() } += S5TypedTensorString(
+                                objectKey = matchedObjectKey,
+                                valuePath = path,
+                                fieldKey = propertyName,
+                                typeTag = value.substring(0, 4),
+                                encodedValue = value
+                            )
                         }
                     }
                 }
@@ -190,7 +205,7 @@ object S5ModelJsonScanner {
             }
         }
 
-        private fun parseObject(depth: Int) {
+        private fun parseObject(path: String, depth: Int, matchedObjectKey: String?) {
             objects++
             skipWhitespace()
             val first = readChar()
@@ -205,7 +220,9 @@ object S5ModelJsonScanner {
                 visitor?.onObjectKey(key, depth)
                 skipWhitespace()
                 require(readChar() == ':'.code) { "Expected ':' after S5 model JSON object key." }
-                parseValue(key, depth)
+                val childPath = appendJsonPath(path, key)
+                val childTarget = if (key in targetKeys) key else matchedObjectKey
+                parseValue(key, childPath, depth, childTarget)
                 skipWhitespace()
                 when (readChar()) {
                     ','.code -> continue
@@ -215,14 +232,21 @@ object S5ModelJsonScanner {
             }
         }
 
-        private fun parseArray(depth: Int) {
+        private fun parseArray(path: String, depth: Int, matchedObjectKey: String?) {
             arrays++
             skipWhitespace()
             val first = readChar()
             if (first == ']'.code) return
             unreadChar(first)
+            var index = 0
             while (true) {
-                parseValue(propertyName = null, depth = depth)
+                parseValue(
+                    propertyName = null,
+                    path = "$path[$index]",
+                    depth = depth,
+                    matchedObjectKey = matchedObjectKey
+                )
+                index++
                 skipWhitespace()
                 when (readChar()) {
                     ','.code -> continue
@@ -231,6 +255,13 @@ object S5ModelJsonScanner {
                 }
             }
         }
+
+        private fun appendJsonPath(parent: String, key: String): String =
+            if (key.all { it.isLetterOrDigit() || it == '_' || it == '-' }) {
+                "$parent.$key"
+            } else {
+                "$parent[\"" + key.replace("\\", "\\\\").replace("\"", "\\\"") + "\"]"
+            }
 
         private fun parseString(): String {
             val result = StringBuilder()
