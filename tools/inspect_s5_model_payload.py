@@ -88,6 +88,7 @@ def walk_json(value, path="$", depth=0, results=None):
     if isinstance(value, dict):
         results["object_paths"].append((path, len(value), list(value.keys())[:40]))
         for key, child in value.items():
+            results["strings"].append((f"{path}.[key]", str(key)[:256]))
             walk_json(child, f"{path}.{key}", depth + 1, results)
     elif isinstance(value, list):
         results["array_paths"].append((path, len(value)))
