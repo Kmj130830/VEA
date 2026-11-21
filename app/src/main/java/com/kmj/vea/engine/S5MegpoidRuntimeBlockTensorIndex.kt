@@ -1,6 +1,18 @@
 package com.kmj.vea.engine
 
 /**
+ * Exact object path selected by the high-level S5API VTB2 initializer before
+ * it builds the render-state residual-block records.
+ *
+ * Both keys are present in the supplied AI_Megpoid.vtb2 tree; the eight
+ * FUN_1800ced10 factory families occur below this selected object.
+ */
+object S5MegpoidRuntimeModelPath {
+    const val MODEL_CONTEXT_KEY = "5be3f5d6495f68286523e230e2d0d9a4"
+    const val RESIDUAL_RUNTIME_CONFIG_KEY = "154c806ba4d274fad9c7484acdc1779e"
+}
+
+/**
  * The eight independent key factories used by S5API FUN_1800ced10.
  *
  * These are deliberately separate from S5MegpoidBlockLookupSlot, which
