@@ -39,6 +39,24 @@ data class PreparedMegpoidRuntime(
             maximumPhoneSeconds = maximumPhoneSeconds
         )
 
+    /**
+     * Builds the recovered mode-0 phone input matrix once actual aligned
+     * phone events and the active render descriptor fields are available.
+     */
+    fun prepareDefaultPhoneFeatureMatrix(
+        phoneEvents: List<VsmPhoneEvent>,
+        layout: S5ApiDefaultPhoneFeatureLayout,
+        minimumPhoneSeconds: Float,
+        maximumPhoneSeconds: Float
+    ): S5ApiDefaultPhoneFeatureMatrix {
+        val aligned = prepareAlignedPhoneFeatures(
+            phoneEvents = phoneEvents,
+            minimumPhoneSeconds = minimumPhoneSeconds,
+            maximumPhoneSeconds = maximumPhoneSeconds
+        )
+        return S5ApiDefaultPhoneFeatureMatrixBuilder.build(aligned, layout)
+    }
+
     fun createResidualBlockExecutor(
         firstInputWorkspace: S5MegpoidWorkspaceSlot = S5MegpoidWorkspaceSlot.FIRST
     ): S5MegpoidResidualBlockExecutor =
