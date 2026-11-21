@@ -4,7 +4,7 @@
 
 The Android app now builds a native shared library named `libveag2p.so` for `arm64-v8a`, with a JNI facade and a small C ABI.
 
-This is **not a converted Yamaha DLL** and is **not yet a Yamaha phoneme converter**. It is the first native-port milestone: a portable bridge boundary plus one narrowly recovered input canonicalization operation. The engine status must remain unavailable.
+This is **not a converted Yamaha DLL** and is **not yet a Yamaha phoneme converter**. It is the first native-port milestone: a portable bridge boundary plus a limited set of recovered Korean input-preprocessing operations. The engine status must remain unavailable.
 
 ## Recovered operation
 
@@ -17,14 +17,35 @@ The Korean language DLL's decompiled lyric-processing path copies UTF-16 input a
 
 The same replacement appears in the Korean manager's lyric processing and phoneme-normalization paths. The Android implementation performs this transformation over validated standard UTF-8. It does not implement Hangul-to-phoneme conversion.
 
+## Recovered ordered Korean lexical replacements
+
+A static read-only-data extraction from the supplied Korean manager identified 32 ordered, three-syllable UTF-16 substring substitutions. The native bridge now applies the complete recovered list after the two code-point canonicalizations above. The order is preserved, and each matching source is replaced repeatedly before the next rule is considered.
+
+Representative verified pairs include:
+
+| Input | Output |
+|---|---|
+| `디귿이` | `디그시` |
+| `지읒이` | `지으시` |
+| `키읔을` | `키으글` |
+| `의견란` | `의견난` |
+| `생산량` | `생산냥` |
+| `결단력` | `결딴녁` |
+| `공권력` | `공꿘녁` |
+| `입원료` | `이붠뇨` |
+
+Host-side tests cover all 32 source/target pairs, repeated occurrences, and unchanged unrelated Hangul. The implementation operates on decoded Unicode code points; all recovered rules are three BMP Hangul syllables on both sides, preserving the original UTF-16 character count.
+
+This is still only an upstream lexical-preprocessing subset. It does **not** implement the subsequent Hangul decomposition, context-sensitive phonological changes, or syllable/phoneme result generation.
+
 ## Files
 
 - `app/src/main/cpp/include/veag2p.h`: stable C ABI, status values, ABI version and language readiness mask.
-- `app/src/main/cpp/veag2p_core.cpp`: UTF-8 validation and the recovered code-point replacement.
+- `app/src/main/cpp/veag2p_core.cpp`: UTF-8 validation, two code-point canonicalizations, and the 32 ordered Korean lexical replacements.
 - `app/src/main/cpp/veag2p_jni.cpp`: JNI boundary; converts Java UTF-16 strings without relying on JNI modified UTF-8.
 - `app/src/main/cpp/CMakeLists.txt`: Android shared-library and host-test targets.
 - `app/src/main/java/com/kmj/vea/engine/NativeG2pBridge.kt`: Kotlin facade.
-- `app/src/main/cpp/tests/veag2p_core_test.cpp`: host-side tests for UTF-8 validation, exact replacement, and output-buffer sizing.
+- `app/src/main/cpp/tests/veag2p_core_test.cpp`: host-side tests for UTF-8 validation, all 32 Korean replacements, repeated matches, and output-buffer sizing.
 
 ## ABI
 
