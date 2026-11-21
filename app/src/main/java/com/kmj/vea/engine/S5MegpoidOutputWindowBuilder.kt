@@ -17,7 +17,8 @@ data class S5MegpoidOverlapAddWindowPair(
  * Ports the three output-window construction branches in FUN_180127dc0.
  *
  * flagAt92 == true:
- *   accumulate the current frame window and invert the overlap sum.
+ *   replace the frame window with all ones, accumulate that rectangular
+ *   window and invert the overlap sum.
  *
  * flagAt92 == false and flagAt91 == false:
  *   accumulate the square of the current frame window and invert the sum.
@@ -54,7 +55,10 @@ object S5MegpoidOutputWindowBuilder {
 
         val resultFrameWindow = frameWindow.copyOf()
         val sourceForOverlap = when {
-            flagAt92 -> resultFrameWindow.copyOf()
+            flagAt92 -> {
+                resultFrameWindow.fill(1f)
+                resultFrameWindow.copyOf()
+            }
             flagAt91 -> {
                 val raisedCosine = buildRaisedCosine(
                     geometry = geometry,
