@@ -82,7 +82,7 @@ class VsmMidiInputSchedulerTest {
         assertEquals(136, event.frameOffsetInChunk)
         assertEquals(110_250L, schedule.totalSampleCount)
         assertEquals(431, schedule.chunks.size)
-        assertEquals(186, schedule.chunks.last().validSampleCount)
+        assertEquals(170, schedule.chunks.last().validSampleCount)
     }
 
     @Test
