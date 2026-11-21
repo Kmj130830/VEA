@@ -11,9 +11,9 @@ import kotlin.math.sqrt
  * Frame-continuous periodic + Gaussian excitation generator recovered from
  * S5API.dll FUN_18012ad70.
  *
- * The transform-state constructor still supplies the exact native rates and
- * threshold; keep those explicit rather than guessing them from model tensor
- * dimensions.
+ * The transform-state constructor still supplies the exact native scales and
+ * threshold. Their physical units are not yet confirmed; do not infer Hz from
+ * the field names or model tensor dimensions.
  */
 internal class S5MegpoidExcitationGenerator(
     private val phaseScale: Float,
