@@ -37,6 +37,19 @@ data class PreparedMegpoidRuntime(
     val runtimeOptions: S5MegpoidRuntimeOptionsDescriptor,
     val inputSchedules: List<VsmRenderSchedule>
 ) {
+    /**
+     * Output-transform inputs populated from the same selected VTB2
+     * runtime-options object and the verified S5API blank-root defaults.
+     * This prepares the final inverse/overlap stage; it does not generate
+     * the model's complex spectrum or render PCM by itself.
+     */
+    val outputTransformInputs: S5MegpoidOutputTransformInputs
+        get() = runtimeOptions.buildOutputTransformInputsFromNativeMegpoidDefaults()
+
+    /** Creates a fresh stateful output executor for one render/utterance. */
+    fun createSpectralOverlapAdd(): S5MegpoidSpectralOverlapAdd =
+        outputTransformInputs.createSpectralOverlapAdd()
+
     val scheduledNotes: List<VsmScheduledNote>
         get() = inputSchedules.flatMap { schedule ->
             schedule.chunks.flatMap { chunk -> chunk.noteStarts }
