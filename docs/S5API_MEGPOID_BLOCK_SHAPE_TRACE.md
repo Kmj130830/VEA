@@ -704,8 +704,11 @@ and synthesis-to-PCM path still require separate tracing and implementation.
 - The runtime block's channel/position/expansion relationships are established.
 - The exact mapping from the nested `FUN_18005e9b0` inputs to depthwise,
   expansion, projection, bias, residual, and epsilon fields is not yet proven.
-- The ring-buffer/history state and VSM scheduling still need a separate
-  runtime-compatibility boundary.
+- Android now ports the per-block seven-slot history ring state and exposes
+  sequential chunk execution at the isolated residual-block boundary.
+- Exact equivalence of the native history helper, its workspace pointer
+  lifecycle, outer per-position/block scheduling, and VSM state transitions
+  remains unverified.
 
 No Megpoid PCM output is produced by this trace. The next required check is the
 shared typed-tensor loader and the source/destination field offsets it fills.
