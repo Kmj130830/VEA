@@ -248,18 +248,44 @@ the 0x20-byte plan's twiddle/bit-reversal data. The Android
 S5MegpoidInverseRealFft remains an independent mathematical reference and
 must not be described as a bit-exact implementation of this native plan.
 
-## Root-field initialization caveat
+## Verified AI Megpoid V7 render-root values
 
-The empty render-state root allocated by FUN_180126940 is initialized by
-FUN_1800bca40. That constructor zero-initializes the early scalar storage
-containing root +0x04, +0x0C and +0x10, and also initializes the frame-window
-related fields before model configuration is applied. Consequently, the
-Android S5MegpoidOutputTransformInputs carrier is intentionally explicit:
-it accepts populated render-root values and does not provide guessed defaults
-for output length, FFT geometry, frame-window length, shape mode or flags.
+The focused static trace of FUN_1800ced10 and FUN_1800bca40 closes the
+source mapping for the first Megpoid output descriptor:
 
-The root-population path FUN_1800ced10 is the next required trace because it
-calls FUN_1800d5a00 after constructing the model-dependent runtime records.
-Until the exact source properties and conversions for these scalar fields
-are recovered, constructing a production output executor from package
-defaults would not reproduce the native renderer.
+| Root field | Source in FUN_1800ced10 | AI Megpoid V7 value |
+|---|---|---:|
+| +0x04 | runtime-options param[1] | 1024 |
+| +0x0C | runtime-options param[3] | 320 |
+| +0x10 | runtime-options param[4], converted to float by FUN_1800d5a00 | 32000.0 |
+| +0x61C | blank-root constructor default | 0 |
+| +0x620 | blank-root constructor default | false |
+| +0x1F74 | blank-root constructor default | false |
+| +0x3418 | upper dword of the default 64-bit field at +0x3414 | 0 |
+| +0x1F75 | blank-root constructor default | false |
+
+The root +0x04, +0x0C and +0x10 source properties are decoded by the
+existing S5MegpoidRuntimeOptionsDescriptor. The remaining output-specific
+fields are not assigned in the FUN_1800ced10 model-population body and retain
+their values established by FUN_1800bca40.
+
+For this package, the descriptor factory therefore derives:
+
+- FFT size and geometry: 1024 samples;
+- output block length: 320 samples;
+- window offset: 2;
+- overlap contribution count: 4;
+- ring slot count: 2, ring mask: 1;
+- frame window: full symmetric Hann (core length 0, shape mode 0);
+- output window: reciprocal overlap sum of squared Hann (both +0x91 and
+  +0x92 flags are false).
+
+`S5MegpoidRuntimeOptionsDescriptor.buildOutputTransformInputsFromNativeMegpoidDefaults()`
+now creates this input carrier from the installed VTB2 runtime options and
+the proven blank-root defaults. Its unit test composes the real geometry and
+window builders and verifies the resulting descriptor fields.
+
+This closes the render-state scalar provenance for the Megpoid output
+transform. It does not establish vendor FFT plan bit-exact numerical parity,
+connect the neural forward graph to the spectral buffer, or complete
+PCM/WAV export.
