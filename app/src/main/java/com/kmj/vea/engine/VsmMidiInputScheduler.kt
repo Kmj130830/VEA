@@ -33,6 +33,8 @@ data class VsmScheduledNote(
     val trackId: String,
     val clipId: String,
     val noteId: String,
+    val absoluteStartTick: Long,
+    val durationTicks: Long,
     val absoluteStartSample: Long,
     val frameOffsetInChunk: Int,
     val pitch: Int,
@@ -41,6 +43,8 @@ data class VsmScheduledNote(
     val phoneme: String
 ) {
     init {
+        require(absoluteStartTick >= 0L)
+        require(durationTicks > 0L)
         require(absoluteStartSample >= 0L)
         require(frameOffsetInChunk >= 0)
         require(pitch in 0..127)
@@ -161,6 +165,8 @@ object VsmMidiInputScheduler {
                         trackId = track.id,
                         clipId = clip.id,
                         noteId = note.id,
+                        absoluteStartTick = absoluteStartTick,
+                        durationTicks = note.lengthTick.toLong(),
                         absoluteStartSample = startSample,
                         frameOffsetInChunk = frameOffset,
                         pitch = note.pitch,
