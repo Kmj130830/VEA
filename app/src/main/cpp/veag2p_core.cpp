@@ -291,6 +291,33 @@ extern "C" VeaG2pStatus vea_g2p_korean_hangul_from_packed_indices(
     return VEA_G2P_STATUS_OK;
 }
 
+extern "C" VeaG2pStatus vea_g2p_korean_apply_single_syllable_rules(
+    uint32_t codepoint,
+    uint32_t* transformed_codepoint) {
+    if (transformed_codepoint == nullptr) {
+        return VEA_G2P_STATUS_INVALID_ARGUMENT;
+    }
+
+    uint16_t packed = 0;
+    const VeaG2pStatus status =
+        vea_g2p_korean_hangul_packed_indices(codepoint, &packed);
+    if (status != VEA_G2P_STATUS_OK) {
+        return status;
+    }
+
+    const uint32_t onset_index = (packed >> 10U) & 0x1FU;
+    const uint32_t vowel_index = (packed >> 5U) & 0x1FU;
+    if (onset_index != 7U && onset_index != 13U && vowel_index == 12U) {
+        const uint16_t target = static_cast<uint16_t>(
+            (packed & 0xFC00U) | 0x0140U | (packed & 0x001FU));
+        return vea_g2p_korean_hangul_from_packed_indices(
+            target, transformed_codepoint);
+    }
+
+    *transformed_codepoint = codepoint;
+    return VEA_G2P_STATUS_OK;
+}
+
 extern "C" VeaG2pStatus vea_g2p_korean_syllable_components(
     uint32_t codepoint,
     VeaKoreanPhonemeComponents* components) {
