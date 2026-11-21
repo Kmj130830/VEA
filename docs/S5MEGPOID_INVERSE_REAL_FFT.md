@@ -4,30 +4,38 @@ Date: 2026-11-21
 
 ## Scope
 
-VEA now contains a portable radix-2 inverse real-spectrum reference kernel in
+VEA contains a portable radix-2 inverse real-spectrum reference kernel in
 S5MegpoidInverseRealFft. It accepts N/2 + 1 complex bins in interleaved
-float32 form, reconstructs the Hermitian full spectrum, executes a complex
-inverse transform, and returns N normalized real samples.
+float32 form, reconstructs a Hermitian full spectrum, executes an inverse
+transform using the S5API external-spectrum sign convention, and returns N
+normalized real samples.
 
 ## Evidence-to-implementation mapping
 
-The static S5API trace in S5API_MEGPOID_SPECTRAL_OUTPUT.md establishes:
+The Ghidra static pseudocode for S5API FUN_180040630 establishes the wrapper
+operations:
 
-- the output conversion receives N/2 + 1 complex float32 bins;
-- the call from FUN_18012c740 selects transform direction -1;
-- the converted real frame is divided by N before overlap-add;
-- a descriptor flag controls an alternating-bin sign change.
+- Forward mode calls the FFT core with direction +1, then flips the sign bit
+  of the imaginary component of every interior one-sided complex bin.
+- Inverse mode first flips the sign bit of the imaginary component of every
+  interior one-sided complex bin, packs the Nyquist real value into the real
+  FFT workspace slot, zeros the packed tail, doubles the workspace values,
+  and calls the FFT core with direction -1.
+- The higher-level output conversion FUN_18012c740 then divides the first N
+  transformed real samples by N before overlap-add.
 
-The implementation follows the recovered inverse direction and 1/N
-normalization. The caller supplies the alternating-bin parity explicitly
-(0 for even bins, 1 for odd bins) because the current descriptor report has
-not yet established which parity the vendor flag selects.
+This reference implementation folds the inverse wrapper's imaginary-sign
+restoration and negative-direction packed real FFT into a direct positive-
+exponent complex inverse over a Hermitian full spectrum. DC and Nyquist are
+self-conjugate; their imaginary values are ignored. It does not emulate the
+vendor's packed workspace byte-for-byte.
 
 ## Test coverage
 
-The unit tests verify reconstruction of DC, cosine, sine and Nyquist frames,
-the caller-selected alternating-bin sign, spectrum-size validation, finite
-input handling, and finite output for a mixed spectrum.
+The unit tests verify reconstruction of DC, cosine, sine under S5API's
+conjugated forward-spectrum convention, and Nyquist frames. They also check
+that imaginary DC/Nyquist values are ignored, malformed/non-finite spectra
+are rejected, and mixed spectra produce finite samples.
 
 ## Remaining integration boundary
 

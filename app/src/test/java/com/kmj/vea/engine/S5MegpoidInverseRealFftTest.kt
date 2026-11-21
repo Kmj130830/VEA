@@ -22,7 +22,7 @@ class S5MegpoidInverseRealFftTest {
     }
 
     @Test
-    fun reconstructsCosineUsingRecoveredInverseDirection() {
+    fun reconstructsCosineUsingS5SpectrumConvention() {
         val size = 8
         val spectrum = FloatArray((size / 2 + 1) * 2)
         spectrum[2] = size / 2f
@@ -36,10 +36,11 @@ class S5MegpoidInverseRealFftTest {
     }
 
     @Test
-    fun reconstructsSineUsingRecoveredInverseDirection() {
+    fun reconstructsSineFromConjugatedS5ForwardSpectrum() {
         val size = 8
         val spectrum = FloatArray((size / 2 + 1) * 2)
-        spectrum[3] = size / 2f
+        // S5API conjugates the imaginary part of every interior forward bin.
+        spectrum[3] = -size / 2f
 
         val output = S5MegpoidInverseRealFft(size).transform(spectrum)
 
@@ -63,20 +64,15 @@ class S5MegpoidInverseRealFftTest {
     }
 
     @Test
-    fun appliesAlternatingSignToCallerSelectedParity() {
+    fun ignoresImaginaryDcAndNyquistValues() {
         val size = 8
         val spectrum = FloatArray((size / 2 + 1) * 2)
-        spectrum[2] = size / 2f
+        spectrum[1] = 100f
+        spectrum[size + 1] = -50f
 
-        val output = S5MegpoidInverseRealFft(size).transform(
-            interleavedSpectrum = spectrum,
-            alternatingBinParity = 1
-        )
+        val output = S5MegpoidInverseRealFft(size).transform(spectrum)
 
-        for (sample in output.indices) {
-            val expected = -cos(2.0 * PI * sample / size).toFloat()
-            assertEquals(expected, output[sample], 1e-5f)
-        }
+        output.forEach { assertEquals(0f, it, 0f) }
     }
 
     @Test

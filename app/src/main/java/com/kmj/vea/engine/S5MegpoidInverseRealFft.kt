@@ -7,16 +7,20 @@ import kotlin.math.sin
 /**
  * Contract-level inverse real-spectrum transform for the Megpoid output path.
  *
- * The native trace identifies N/2 + 1 complex bins as the input to the inverse
- * transform and shows the result normalized by N. It also identifies direction
- * -1 for this inverse call. This implementation expands the one-sided spectrum
- * to a Hermitian full spectrum, runs a radix-2 complex transform with that
- * direction, and returns the N real samples.
+ * S5API's real-transform wrapper stores the interior one-sided spectrum with
+ * the imaginary components conjugated relative to its internal forward FFT
+ * convention. Its inverse path restores those signs and calls the FFT core in
+ * the negative direction. This reference implementation folds those two
+ * operations into a direct inverse using the positive exponential direction.
+ *
+ * Input is N/2 + 1 interleaved complex float32 bins. The output is N normalized
+ * real samples. DC and Nyquist are self-conjugate and their imaginary values
+ * are ignored.
  *
  * This is an independent Android reference kernel. It has not yet been
  * numerically compared with the vendor FFT backend and is not wired into
- * SynthesisEngine.render() until the native transform/overlap descriptor is
- * fully populated.
+ * SynthesisEngine.render() until the transform/overlap descriptor is fully
+ * populated and its numerical behavior is validated.
  */
 class S5MegpoidInverseRealFft(val fftSize: Int) {
     val binCount: Int
@@ -34,24 +38,14 @@ class S5MegpoidInverseRealFft(val fftSize: Int) {
     /**
      * Transforms interleaved [real, imaginary] bins for frequencies 0..N/2.
      *
-     * DC and Nyquist are self-conjugate bins; their imaginary components are
-     * ignored when constructing the real-valued spectrum, as required by a
-     * real inverse transform.
-     *
-     * alternatingBinParity is null when the native sign-flip flag is disabled.
-     * When enabled, pass 0 to negate even-indexed bins or 1 to negate
-     * odd-indexed bins. The caller must supply the parity established by the
-     * transform descriptor; this class does not guess which parity is selected.
+     * The vendor wrapper's inverse operation conjugates every interior
+     * imaginary bin before calling its negative-direction packed real FFT.
+     * Using a positive-direction full complex inverse is mathematically
+     * equivalent and avoids exposing a vendor-specific packed workspace.
      */
-    fun transform(
-        interleavedSpectrum: FloatArray,
-        alternatingBinParity: Int? = null
-    ): FloatArray {
+    fun transform(interleavedSpectrum: FloatArray): FloatArray {
         require(interleavedSpectrum.size.toLong() == binCount.toLong() * 2L) {
             "The spectrum must contain exactly N/2 + 1 interleaved complex bins."
-        }
-        require(alternatingBinParity == null || alternatingBinParity in 0..1) {
-            "Alternating-bin parity must be null, zero, or one."
         }
         require(interleavedSpectrum.all { it.isFinite() }) {
             "The complex spectrum contains a non-finite value."
@@ -62,19 +56,16 @@ class S5MegpoidInverseRealFft(val fftSize: Int) {
         val lastBin = fftSize / 2
 
         for (bin in 0..lastBin) {
-            var binReal = interleavedSpectrum[bin * 2]
-            var binImaginary = interleavedSpectrum[bin * 2 + 1]
-
-            if (alternatingBinParity != null && bin % 2 == alternatingBinParity) {
-                binReal = -binReal
-                binImaginary = -binImaginary
+            real[bin] = interleavedSpectrum[bin * 2]
+            // DC and Nyquist are real-valued bins in a real transform.
+            imaginary[bin] = if (bin == 0 || bin == lastBin) {
+                0f
+            } else {
+                interleavedSpectrum[bin * 2 + 1]
             }
-
-            real[bin] = binReal
-            imaginary[bin] = if (bin == 0 || bin == lastBin) 0f else binImaginary
         }
 
-        // Complete the one-sided real spectrum: X[N-k] = conjugate(X[k]).
+        // Complete the one-sided spectrum: X[N-k] = conjugate(X[k]).
         for (bin in 1 until lastBin) {
             real[fftSize - bin] = real[bin]
             imaginary[fftSize - bin] = -imaginary[bin]
@@ -115,11 +106,11 @@ class S5MegpoidInverseRealFft(val fftSize: Int) {
             }
         }
 
-        // The recovered S5API inverse call uses transform direction -1.
+        // Positive exponent reconstructs S5API's conjugated forward spectrum.
         var blockSize = 2
         while (blockSize <= fftSize) {
             val halfBlock = blockSize / 2
-            val angle = -2.0 * PI / blockSize.toDouble()
+            val angle = 2.0 * PI / blockSize.toDouble()
             val stepReal = cos(angle).toFloat()
             val stepImaginary = sin(angle).toFloat()
 
