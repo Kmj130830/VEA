@@ -13,6 +13,7 @@ import java.io.File;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -147,6 +148,53 @@ public class ExportS5ContainerAndHash extends GhidraScript {
                             depth.put(callee.getEntryPoint(), 2);
                         }
                     }
+                }
+            }
+
+            out.println("## Call-site disassembly contexts");
+            out.println();
+            out.println("The following contexts preserve register/stack setup before calls that build recurrent names, hash parameter names, or look up typed model values.");
+            out.println();
+            String[] interestingTargets = {
+                "18005ebe0", "180024a90", "18001b1f0", "18000b100", "180056f40"
+            };
+            for (Map.Entry<Address, Function> item : selected.entrySet()) {
+                monitor.checkCancelled();
+                Function function = item.getValue();
+                ArrayList<Instruction> recent = new ArrayList<>();
+                InstructionIterator instructions = currentProgram.getListing()
+                    .getInstructions(function.getBody(), true);
+                while (instructions.hasNext()) {
+                    Instruction instruction = instructions.next();
+                    boolean matched = false;
+                    String matchedTarget = null;
+                    for (Reference reference : instruction.getReferencesFrom()) {
+                        if (!reference.getReferenceType().isCall()) continue;
+                        String target = reference.getToAddress().toString().replaceFirst("^0+", "");
+                        for (String interesting : interestingTargets) {
+                            if (target.endsWith(interesting)) {
+                                matched = true;
+                                matchedTarget = interesting;
+                                break;
+                            }
+                        }
+                        if (matched) break;
+                    }
+                    if (matched) {
+                        out.println("### " + function.getName() + " at " +
+                            function.getEntryPoint() + " calls 0x" + matchedTarget +
+                            " from " + instruction.getAddress());
+                        out.println();
+                        out.println("```asm");
+                        for (Instruction prior : recent) {
+                            out.println(prior.getAddress() + ": " + prior);
+                        }
+                        out.println(instruction.getAddress() + ": " + instruction);
+                        out.println("```");
+                        out.println();
+                    }
+                    recent.add(instruction);
+                    if (recent.size() > 24) recent.remove(0);
                 }
             }
 
