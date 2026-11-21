@@ -108,6 +108,11 @@ public class ExportS5RendererPath extends GhidraScript {
                 "18012b470", "18012b450", "18012c730", "1800c7ad0",
                 "180128c40", "180129240", "1800bca40", "1800af170",
                 "1800af230", "180126940", "180127220", "180127630",
+                // The output overlap descriptor is built by the render-state
+                // configuration helper chain; retain every constructor and
+                // transfer helper explicitly in the static report.
+                "1800d5a00", "1800b8d20", "1800b8e00",
+                "180127d00", "180127dc0", "1800ad9d0", "1800ada20",
                 "1800ccafd"
             };
             out.println("## Explicit internal call targets");
@@ -175,6 +180,43 @@ public class ExportS5RendererPath extends GhidraScript {
                 }
             }
             if (spectralReferenceCount == 0) {
+                out.println("| - | - | no direct callers recovered | - |");
+            }
+            out.println();
+
+            out.println("## Output overlap descriptor construction callsites");
+            out.println();
+            out.println("| Target address | Function | Direct caller | Call site |");
+            out.println("|---:|---|---|---:|");
+            String[] outputDescriptorTargets = {
+                "1800d5a00", "1800b8d20", "180127d00", "180127dc0",
+                "1800ad9d0", "1800ada20"
+            };
+            int outputDescriptorReferenceCount = 0;
+            for (String hex : outputDescriptorTargets) {
+                Address targetAddress = toAddr(hex);
+                Function targetFunction =
+                    currentProgram.getFunctionManager().getFunctionAt(targetAddress);
+                if (targetFunction == null) {
+                    targetFunction = currentProgram.getFunctionManager()
+                        .getFunctionContaining(targetAddress);
+                }
+                ReferenceIterator targetRefs =
+                    currentProgram.getReferenceManager().getReferencesTo(targetAddress);
+                while (targetRefs.hasNext()) {
+                    Reference ref = targetRefs.next();
+                    if (!ref.getReferenceType().isCall()) continue;
+                    Function caller = currentProgram.getFunctionManager()
+                        .getFunctionContaining(ref.getFromAddress());
+                    if (caller == null) continue;
+                    outputDescriptorReferenceCount++;
+                    out.printf("| %s | %s | %s at %s | %s |%n",
+                        targetAddress,
+                        targetFunction == null ? "not recovered" : targetFunction.getName(),
+                        caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+                }
+            }
+            if (outputDescriptorReferenceCount == 0) {
                 out.println("| - | - | no direct callers recovered | - |");
             }
             out.println();
