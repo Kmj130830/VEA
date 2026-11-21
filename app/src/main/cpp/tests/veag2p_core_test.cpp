@@ -66,6 +66,30 @@ int main() {
     }
     assert(packed_table_hash == 0x7AE6C4656323F3C6ULL);
 
+    // Exact round-trip across the 11,172 modern Hangul syllables.
+    uint32_t decoded_codepoint = 0;
+    for (uint32_t codepoint = 0xAC00U; codepoint <= 0xD7A3U; ++codepoint) {
+        packed = 0;
+        assert(vea_g2p_korean_hangul_packed_indices(codepoint, &packed) ==
+               VEA_G2P_STATUS_OK);
+        assert(vea_g2p_korean_hangul_from_packed_indices(
+                   packed, &decoded_codepoint) == VEA_G2P_STATUS_OK);
+        assert(decoded_codepoint == codepoint);
+    }
+
+    // FUN_180008660 normalizes empty-coda candidates when the requested
+    // low five bits are zero. 가 is the first matching table entry.
+    assert(vea_g2p_korean_hangul_from_packed_indices(
+               static_cast<uint16_t>(0x8861U & 0xFFE0U),
+               &decoded_codepoint) == VEA_G2P_STATUS_OK);
+    assert(decoded_codepoint == 0xAC00U);
+    assert(vea_g2p_korean_hangul_from_packed_indices(
+               0x0000U, &decoded_codepoint) == VEA_G2P_STATUS_INVALID_ARGUMENT);
+    assert(vea_g2p_korean_hangul_from_packed_indices(
+               0xFFFFU, &decoded_codepoint) == VEA_G2P_STATUS_INVALID_ARGUMENT);
+    assert(vea_g2p_korean_hangul_from_packed_indices(
+               0x8861U, nullptr) == VEA_G2P_STATUS_INVALID_ARGUMENT);
+
     // Base labels are table lookups only; context-sensitive G2P rules are
     // applied in later stages and are deliberately not inferred here.
     VeaKoreanPhonemeComponents components{};
