@@ -61,7 +61,7 @@ public class ExportS5ContainerAndHash extends GhidraScript {
         "18008d5b2", // callsite from Func_4cd84bb7 into FUN_180068190
         "18008ec74", // secondary model factory entry path
         "18008ec14",
-        "18008ebc9"
+        "18008ebc9",
         "180024a90", // indexed/reverse recurrent name builder
         "18001b1f0", // hashed JSON/object lookup helper
         "1800103e0", // string copy used before key generation
