@@ -12,8 +12,8 @@ package com.kmj.vea.engine
  * - root +0x61C supplies the frame-window core length;
  * - root +0x620 supplies the alternating-bin sign flag (+0x90);
  * - root +0x1F74 supplies descriptor flag +0x91;
- * - root +0x1F75 supplies the 32-bit frame-window shape mode;
- * - root +0x3418 supplies descriptor flag +0x92.
+ * - root +0x3418 supplies the 32-bit frame-window shape mode;
+ * - root +0x1F75 supplies descriptor flag +0x92.
  *
  * The +0x10 float is preserved but not consumed by the currently ported
  * geometry/window/OLA code. It belongs to the native descriptor ABI and
@@ -26,8 +26,8 @@ data class S5MegpoidOutputTransformInputs(
     val frameWindowCoreLengthAtRoot61C: Int,
     val alternatingBinSignAtRoot620: Boolean,
     val flagAtRoot1F74: Boolean,
-    val frameWindowShapeModeAtRoot1F75: Int,
-    val flagAtRoot3418: Boolean
+    val frameWindowShapeModeAtRoot3418: Int,
+    val flagAtRoot1F75: Boolean
 ) {
     init {
         require(outputSamplesAtRoot0C > 0)
@@ -50,10 +50,10 @@ data class S5MegpoidOutputTransformInputs(
     fun buildOverlapAddParameters(): S5MegpoidOverlapAddParameters =
         buildDescriptorGeometry().buildOverlapAddParameters(
             coreWindowLength = frameWindowCoreLengthAtRoot61C,
-            frameWindowShapeMode = frameWindowShapeModeAtRoot1F75,
+            frameWindowShapeMode = frameWindowShapeModeAtRoot3418,
             alternatingBinSign = alternatingBinSignAtRoot620,
             flagAt91 = flagAtRoot1F74,
-            flagAt92 = flagAtRoot3418
+            flagAt92 = flagAtRoot1F75
         )
 
     /** Creates the stateful inverse-FFT and overlap-add executor. */
