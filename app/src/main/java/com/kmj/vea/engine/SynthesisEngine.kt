@@ -152,17 +152,14 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
         val plans = prepareRenderPlans(project, voicebank)
         require(plans.any { !it.isEmpty }) { "There are no notes to synthesize." }
 
-        val candidateLayout = S5RecurrentLayerLayout(
-            inputFeatures = 418,
-            hiddenFeatures = 9,
+        // The static callsite establishes one bidirectional layer and
+        // bias lookups. Feature dimensions are intentionally not guessed
+        // here because they do not participate in S5 name hashing.
+        val recurrentCandidateKeys = S5RecurrentParameterLoader.lookupKeys(
             layerCount = 1,
             bidirectional = true,
-            hasBias = true
+            includeBias = true
         )
-        val recurrentCandidateKeys = S5RecurrentParameterLoader
-            .specifications(candidateLayout)
-            .map { it.lookupKey }
-            .toSet()
         val resourceScans = scanModelResources(voicebank, recurrentCandidateKeys)
         val typedTensorCount = resourceScans.sumOf { it.result.typedTensorStringCount }
         require(typedTensorCount > 0L) {
