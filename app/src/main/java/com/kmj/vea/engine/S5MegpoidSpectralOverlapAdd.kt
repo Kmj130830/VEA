@@ -97,7 +97,7 @@ class S5MegpoidSpectralOverlapAdd(
         }
 
         val writeSlot = ringWriteIndex and ringMaskAt1C
-        val writeBase = checkedProduct(writeSlot, fftSize)
+        val writeBase = checkedNonNegativeProduct(writeSlot, fftSize)
         for (sample in 0 until fftSize) {
             ring[writeBase + sample] = timeDomainFrame[sample] * frameWindow[sample]
         }
@@ -112,7 +112,7 @@ class S5MegpoidSpectralOverlapAdd(
         for (contributionIndex in 0 until overlapContributionCountAt14) {
             val slot = ((ringWriteIndex.toLong() - contributionIndex.toLong() - 1L) and
                 ringMaskAt1C.toLong()).toInt()
-            val ringBase = checkedProduct(slot, fftSize)
+            val ringBase = checkedNonNegativeProduct(slot, fftSize)
             val relativeOffset = windowOffsetAt10.toLong() - contributionIndex.toLong()
 
             // Reproduces the clamped source interval selected by FUN_18012c740.
@@ -166,6 +166,14 @@ class S5MegpoidSpectralOverlapAdd(
         val product = a.toLong() * b.toLong()
         require(a > 0 && b > 0 && product <= Int.MAX_VALUE) {
             "Overlap-add buffer size is invalid or exceeds the JVM array limit."
+        }
+        return product.toInt()
+    }
+
+    private fun checkedNonNegativeProduct(a: Int, b: Int): Int {
+        val product = a.toLong() * b.toLong()
+        require(a >= 0 && b >= 0 && product <= Int.MAX_VALUE) {
+            "Overlap-add ring offset is invalid or exceeds the JVM array limit."
         }
         return product.toInt()
     }
