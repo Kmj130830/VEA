@@ -34,3 +34,48 @@ Static decompilation of `S5API.dll`:
 - `FUN_1800aeea0`, `FUN_1800aec40`, `FUN_1800c7ad0`: `S5API_MODEL_RUNTIME.md`
 
 No target native code was executed. Opaque offsets and argument roles remain provisional unless explicitly stated above.
+
+
+## Newly traced upstream event-preparation path — 2026-11-21
+
+The VSM S5API resolver loads Func_417eec3e in function-table slot 9. Its
+exported body consumes a 0x28-stride source-record vector and constructs
+two owned record vectors with 0x38 and 0x58 strides. In the branch where
+the context mode at param_1 + 0xCE4 is zero, it calls:
+
+```text
+Func_417eec3e
+  -> build 0x38-stride records
+  -> FUN_18003ab70(context + 0xD0, ..., records, recordCount)
+  -> FUN_18006c720(...)
+  -> FUN_180076080(...) / FUN_180077520(...) for frame/history processing
+```
+
+The call sites establish this as an upstream event-to-intermediate-data
+path. The names and exact tensor meaning of the intermediate arrays are
+not proven yet. The alternate mode branch follows a different helper path.
+
+Separately, FUN_1801361f0 invokes Func_92864e29 with a record pointer
+advancing by 0x28 bytes and a float output destination advancing by
+0x800 bytes per work item. The matching 0x28 stride does not, by itself,
+prove that this render-dispatch record is the same structure as the
+Func_417eec3e input record.
+
+### Android status
+
+VEA currently implements the app-owned note timeline and the observed
+ASCII-space lyric tokenization. It does not yet build the 0x28 VSM/S5API
+source record, call Func_417eec3e, or construct the intermediate feature
+arrays. Pointer ownership and the mapping between source lyric tokens,
+phoneme commands, render-context fields and the four model feature slots
+remain unresolved.
+
+### Next trace targets
+
+1. Recover FUN_18006c720's feature construction inputs, output layout and
+   position/frame geometry.
+2. Recover FUN_180076080 and FUN_180077520's workspace/history contracts,
+   including state reset and buffer lifetime.
+3. Connect the resulting feature tensors to the existing Dense/Global
+   Normalization -> Temporal -> Residual pipeline only after their
+   dimensions and ordering are confirmed.
