@@ -113,6 +113,8 @@ public class ExportS5RendererPath extends GhidraScript {
                 // transfer helper explicitly in the static report.
                 "1800d5a00", "1800b8d20", "1800b8e00",
                 "180127d00", "180127dc0", "1800ad9d0", "1800ada20",
+                // Explicit frame-window generator and its math helpers.
+                "18012a9a0", "180082db0", "18007b870",
                 "1800ccafd"
             };
             out.println("## Explicit internal call targets");
@@ -181,6 +183,27 @@ public class ExportS5RendererPath extends GhidraScript {
             }
             if (spectralReferenceCount == 0) {
                 out.println("| - | - | no direct callers recovered | - |");
+            }
+            out.println();
+
+            out.println("## Frame-window generator callers");
+            out.println();
+            Address frameWindowTarget = toAddr("18012a9a0");
+            ReferenceIterator frameWindowRefs =
+                currentProgram.getReferenceManager().getReferencesTo(frameWindowTarget);
+            int frameWindowCallerCount = 0;
+            while (frameWindowRefs.hasNext()) {
+                Reference ref = frameWindowRefs.next();
+                if (!ref.getReferenceType().isCall()) continue;
+                Function caller = currentProgram.getFunctionManager()
+                    .getFunctionContaining(ref.getFromAddress());
+                if (caller == null) continue;
+                frameWindowCallerCount++;
+                out.printf("- %s at %s, call site %s%n",
+                    caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+            }
+            if (frameWindowCallerCount == 0) {
+                out.println("- No direct call reference recovered.");
             }
             out.println();
 
