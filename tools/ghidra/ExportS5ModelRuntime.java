@@ -52,6 +52,8 @@ public class ExportS5ModelRuntime extends GhidraScript {
             "1800af230", "1800af170", "1800b8f60", "1800ced10",
             // Neural input setters and render-root descriptor copy paths.
             "18012b150", "18012b470", "18012b450",
+            "18012ad70", "18012c730", "180129240", "180129a50",
+            "180082a30", "18007a000",
             "1800cdbb0", "1800c47a0"
         };
 
