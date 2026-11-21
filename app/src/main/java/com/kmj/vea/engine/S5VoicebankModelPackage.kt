@@ -45,6 +45,21 @@ data class S5VoicebankModelPackage(
     }
 
     /**
+     * The sibling runtime-options object selected by FUN_1800ced10 from the
+     * same native-selected configuration node. Its hashed members populate
+     * scalar/flag fields in the native runtime descriptor.
+     */
+    val runtimeOptionsTree: S5ModelObjectTree by lazy(
+        LazyThreadSafetyMode.PUBLICATION
+    ) {
+        residualRuntimeConfigTree.subtreeAtPath(
+            S5MegpoidRuntimeModelPath.RUNTIME_OPTIONS_KEY
+        ) ?: throw IllegalStateException(
+            "AI_Megpoid.vtb2 is missing the S5API runtime-options object."
+        )
+    }
+
+    /**
      * Lazily indexes the eight FUN_1800ced10 model-property families for
      * the four-by-two block grid, scoped to the exact subtree selected by
      * the high-level native initializer.
