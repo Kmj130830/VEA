@@ -71,6 +71,12 @@ class S5MegpoidSpectralOverlapAdd(
     private val inverseFft = S5MegpoidInverseRealFft(fftSize)
     private val ring = FloatArray(checkedProduct(parameters.ringSlotCount, fftSize))
 
+    /** Number of samples emitted by each processSpectrum/processFrame call. */
+    val outputSampleCount: Int get() = outputSamples
+
+    /** Size of the real inverse-FFT frame consumed by this processor. */
+    val fftSizeSamples: Int get() = fftSize
+
     private var ringWriteIndex = 0
 
     /** Converts model-produced complex bins and emits one output block. */
