@@ -129,6 +129,8 @@ The Android app now includes a private-storage importer for the two user-selecte
 
 `MegpoidV7PackageInstaller.install(context, bankZipUri, modelZipUri)` must be called from an I/O dispatcher. It streams the archives, extracts only those five allow-listed files, validates each file's catalog SHA-256 and 136-byte outer header, and activates the new package only after both archives pass verification. Unrelated files are not installed. `findInstalled(context)` rechecks the installed files, and the returned package can provide a `VoicebankDescriptor` whose source URI points to the app-private model directory.
 
+After verification, the voice picker enables **LOAD VOICE** and stores the package's private-directory URI on the selected vocal track. The URI is saved and restored with the project, and `VeaTrack.voicebankDescriptorOrNull()` can rebuild the corresponding engine descriptor. The package record also exposes the manifest component ID.
+
 This is the first real model-resource connection step, not a completed synthesizer. The importer does not decode or transform the proprietary model payloads, bypass authorization, execute Windows DLLs, or mark the engine as available. VDM database integration, the complete S5API model execution graph, Yamaha G2P, and the Android ARM64 singing renderer are still required before Megpoid WAV rendering can be enabled.
 
 ## Playback and pitch preview
