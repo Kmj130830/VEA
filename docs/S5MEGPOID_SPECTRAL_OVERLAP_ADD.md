@@ -247,3 +247,19 @@ subroutines, but not yet to reproduce the internal stage-table layout or
 the 0x20-byte plan's twiddle/bit-reversal data. The Android
 S5MegpoidInverseRealFft remains an independent mathematical reference and
 must not be described as a bit-exact implementation of this native plan.
+
+## Root-field initialization caveat
+
+The empty render-state root allocated by FUN_180126940 is initialized by
+FUN_1800bca40. That constructor zero-initializes the early scalar storage
+containing root +0x04, +0x0C and +0x10, and also initializes the frame-window
+related fields before model configuration is applied. Consequently, the
+Android S5MegpoidOutputTransformInputs carrier is intentionally explicit:
+it accepts populated render-root values and does not provide guessed defaults
+for output length, FFT geometry, frame-window length, shape mode or flags.
+
+The root-population path FUN_1800ced10 is the next required trace because it
+calls FUN_1800d5a00 after constructing the model-dependent runtime records.
+Until the exact source properties and conversions for these scalar fields
+are recovered, constructing a production output executor from package
+defaults would not reproduce the native renderer.
