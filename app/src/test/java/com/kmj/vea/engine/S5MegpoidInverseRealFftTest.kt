@@ -132,6 +132,19 @@ class S5MegpoidInverseRealFftTest {
     }
 
     @Test
+    fun alternatingBinFlagAlsoAffectsOddNyquistBinAtSmallestFftSize() {
+        val spectrum = floatArrayOf(0f, 0f, 2f, 0f)
+
+        val output = S5MegpoidInverseRealFft(2).transform(
+            interleavedSpectrum = spectrum,
+            alternatingBinSign = true
+        )
+
+        assertEquals(-1f, output[0], 1e-6f)
+        assertEquals(1f, output[1], 1e-6f)
+    }
+
+    @Test
     fun matchesDirectRealInverseForArbitrarySpectraAcrossRadix2Sizes() {
         val random = kotlin.random.Random(0x5A5A)
         for (size in listOf(2, 4, 8, 16, 32)) {
@@ -148,7 +161,10 @@ class S5MegpoidInverseRealFftTest {
             for (sample in 0 until size) {
                 var sum = spectrum[0].toDouble()
                 val nyquistSign = if (sample % 2 == 0) 1.0 else -1.0
-                sum += spectrum[size].toDouble() * nyquistSign
+                val nyquistBin = size / 2
+                val nyquistBinSign =
+                    if (useAlternatingSign && nyquistBin % 2 == 1) -1.0 else 1.0
+                sum += spectrum[size].toDouble() * nyquistSign * nyquistBinSign
                 for (bin in 1 until size / 2) {
                     val sign = if (useAlternatingSign && bin % 2 == 1) -1.0 else 1.0
                     val real = spectrum[bin * 2] * sign
