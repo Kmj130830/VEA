@@ -34,6 +34,42 @@ class S5MegpoidRuntimeBlockTensorIndexTest {
     }
 
     @Test
+    fun canIndexTheNativeSelectedSubtreeWithoutSeeingSiblingProperties() {
+        val factoryKey = S5MegpoidRuntimeBlockFactoryKeys.ALL.first()
+        val json = """
+            {
+              "sibling": {
+                "${factoryKey.lookupKey}": {"payload": "*F32AAAAAA=="}
+              },
+              "${S5MegpoidRuntimeModelPath.MODEL_CONTEXT_KEY}": {
+                "${S5MegpoidRuntimeModelPath.RESIDUAL_RUNTIME_CONFIG_KEY}": {
+                  "43726e4ce752ea6cc300dc2fca3e8372": {
+                    "${factoryKey.lookupKey}": {"payload": "*F32AAAAAA=="}
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+        val fullTree = S5ModelObjectTree.parseUtf8(json)
+        val selected = fullTree.subtreeAtPath(
+            S5MegpoidRuntimeModelPath.MODEL_CONTEXT_KEY,
+            S5MegpoidRuntimeModelPath.RESIDUAL_RUNTIME_CONFIG_KEY
+        ) ?: error("Native-selected runtime configuration is missing.")
+
+        val index = S5MegpoidRuntimeBlockTensorIndex.build(selected, listOf(factoryKey))
+
+        assertEquals(1, index.totalTensorReferences)
+        assertEquals(
+            "$/43726e4ce752ea6cc300dc2fca3e8372/${factoryKey.lookupKey}/payload",
+            index.uniqueTensorOrNull(
+                factoryKey.factory,
+                factoryKey.row,
+                factoryKey.column
+            )?.objectPath
+        )
+    }
+
+    @Test
     fun indexesTypedTensorForTheExactFactoryRowAndColumn() {
         val lookupKey = "11111111111111111111111111111111"
         val tree = S5ModelObjectTree.parseUtf8(
