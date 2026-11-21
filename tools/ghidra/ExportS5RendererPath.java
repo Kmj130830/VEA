@@ -20,7 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class ExportS5RendererPath extends GhidraScript {
-    private static final int MAX_FUNCTIONS = 150;
+    private static final int MAX_FUNCTIONS = 320;
     private static final int MAX_DEPTH = 3;
     private static final class Work {
         final Function function;
@@ -66,10 +66,41 @@ public class ExportS5RendererPath extends GhidraScript {
                 }
             }
 
+            // Explicitly retain the upstream note/event feature path and
+            // its frame/history helpers. These are easy to lose when the
+            // generic call closure reaches its function cap.
             String[] internalSeeds = {
                 "1801361f0", "180131fa0", "1801269f0", "1801270a0",
                 "1801272b0", "180127120", "180127330", "180126c20",
-                "180126e30", "180126d40", "1801271a0"
+                "180126e30", "180126d40", "1801271a0",
+                "18006c720", "180074a50", "180076080", "180077520",
+                "180028cf0", "180039ae0", "18003ab70", "18006fdb0",
+                "18006b8b0", "18006eb60", "18003e540", "180040d50",
+                "180074350", "180074400", "180074580", "180074a10",
+                "180074a50", "180074580", "180074400", "180074350",
+                "180077c40", "18007bf80", "18007ef90", "18007d000",
+                "18006bfa0", "18006c2d0", "18006c6f0", "18006e670",
+                "180007740", "180007a90", "180007ec0", "180007330",
+                "180007cb0", "18006a860", "1800782e0", "180078590",
+                "180001010", "1800066f0", "180010990", "180008a60",
+                "180014230", "180006920", "1800148b0",
+                // Trace construction of the per-render phone-category map.
+                "180012b40", "1800591d0", "1800290f0", "18005b9a0",
+                "18005c890", "18005cba0", "18004f9d0", "1800522f0",
+                "18000adc0", "18000b100", "180026f60", "18007abf0",
+                // The render-context phone-category tree is passed into
+                // FUN_180074a50 separately from the global alias tree.
+                // Force its initializer and adjacent subobject constructors
+                // into the report instead of relying on the bounded closure.
+                "180050aa0", "180013410", "180012030", "180011be0",
+                // The phone-label -> category-index map builder walks the
+                // global grouped phone inventory at DAT_1801c4160/4168.
+                "18006c520", "1800103e0", "180197460",
+                "18004be40", "18004cb90",
+                // CRT/global constructor that populates DAT_1801c4160,
+                // and the helper calls that materialize grouped phone strings.
+                "180003a90", "180011120", "1800111c0", "180010500",
+                "1800111c0", "18007b370"
             };
             out.println("## Explicit internal call targets");
             out.println();
@@ -107,6 +138,206 @@ public class ExportS5RendererPath extends GhidraScript {
                 }
             }
             if (callerCount == 0) out.println("- No direct references recovered at the exact entry address.");
+            out.println();
+
+            out.println("## Direct callers of note/event feature builder");
+            out.println();
+            Address inputTarget = toAddr("18006c720");
+            ReferenceIterator inputRefs = currentProgram.getReferenceManager().getReferencesTo(inputTarget);
+            int inputCallerCount = 0;
+            while (inputRefs.hasNext()) {
+                Reference ref = inputRefs.next();
+                Function caller = currentProgram.getFunctionManager().getFunctionContaining(ref.getFromAddress());
+                if (caller != null) {
+                    inputCallerCount++;
+                    out.printf("- %s at %s, call site %s%n",
+                        caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+                }
+            }
+            if (inputCallerCount == 0) out.println("- No direct references recovered at the exact entry address.");
+            out.println();
+
+            out.println("## Direct callers of phone-event adapter");
+            out.println();
+            Address phoneAdapterTarget = toAddr("18003ab70");
+            ReferenceIterator phoneAdapterRefs =
+                currentProgram.getReferenceManager().getReferencesTo(phoneAdapterTarget);
+            int phoneAdapterCallerCount = 0;
+            while (phoneAdapterRefs.hasNext()) {
+                Reference ref = phoneAdapterRefs.next();
+                Function caller = currentProgram.getFunctionManager()
+                    .getFunctionContaining(ref.getFromAddress());
+                if (caller == null) continue;
+                phoneAdapterCallerCount++;
+                out.printf("- %s at %s, call site %s%n",
+                    caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+            }
+            if (phoneAdapterCallerCount == 0) {
+                out.println("- No direct references recovered at the exact entry address.");
+            }
+            out.println();
+
+            out.println("## Direct callers of phone-category context initializer");
+            out.println();
+            Address phoneMapTarget = toAddr("180050aa0");
+            ReferenceIterator phoneMapRefs =
+                currentProgram.getReferenceManager().getReferencesTo(phoneMapTarget);
+            int phoneMapCallerCount = 0;
+            while (phoneMapRefs.hasNext()) {
+                Reference ref = phoneMapRefs.next();
+                Function caller = currentProgram.getFunctionManager()
+                    .getFunctionContaining(ref.getFromAddress());
+                if (caller == null) continue;
+                phoneMapCallerCount++;
+                out.printf("- %s at %s, call site %s%n",
+                    caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+            }
+            if (phoneMapCallerCount == 0) {
+                out.println("- No direct references recovered at the exact entry address.");
+            }
+            out.println();
+
+            out.println("## Direct callers of global phone-vocabulary constructor");
+            out.println();
+            Address vocabularyConstructor = toAddr("180003a90");
+            ReferenceIterator constructorRefs =
+                currentProgram.getReferenceManager().getReferencesTo(vocabularyConstructor);
+            int constructorCallerCount = 0;
+            while (constructorRefs.hasNext()) {
+                Reference ref = constructorRefs.next();
+                Function caller = currentProgram.getFunctionManager()
+                    .getFunctionContaining(ref.getFromAddress());
+                if (caller == null) continue;
+                constructorCallerCount++;
+                out.printf("- %s at %s, call site %s%n",
+                    caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+            }
+            if (constructorCallerCount == 0) {
+                out.println("- No direct caller recovered; constructor may be registered through CRT initialization metadata.");
+            }
+            out.println();
+
+            out.println("## Direct callers of phone-label category map builder");
+            out.println();
+            Address categoryMapBuilder = toAddr("18006c520");
+            ReferenceIterator categoryMapBuilderRefs =
+                currentProgram.getReferenceManager().getReferencesTo(categoryMapBuilder);
+            int categoryMapCallerCount = 0;
+            while (categoryMapBuilderRefs.hasNext()) {
+                Reference ref = categoryMapBuilderRefs.next();
+                Function caller = currentProgram.getFunctionManager()
+                    .getFunctionContaining(ref.getFromAddress());
+                if (caller == null) continue;
+                categoryMapCallerCount++;
+                out.printf("- %s at %s, call site %s%n",
+                    caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+            }
+            if (categoryMapCallerCount == 0) {
+                out.println("- No direct call reference recovered; inspect vtable/initializer paths.");
+            }
+            out.println();
+
+            out.println("## Grouped phone-vocabulary global references");
+            out.println();
+            out.println("| Global address | Referencing function | Reference site | Reference type |");
+            out.println("|---:|---|---:|---|");
+            String[] phoneVocabularyGlobals = {"1801c4160", "1801c4168"};
+            int vocabularyReferenceCount = 0;
+            for (String hex : phoneVocabularyGlobals) {
+                Address globalAddress = toAddr(hex);
+                ReferenceIterator vocabularyRefs =
+                    currentProgram.getReferenceManager().getReferencesTo(globalAddress);
+                while (vocabularyRefs.hasNext()) {
+                    Reference ref = vocabularyRefs.next();
+                    Function caller = currentProgram.getFunctionManager()
+                        .getFunctionContaining(ref.getFromAddress());
+                    if (caller == null) continue;
+                    vocabularyReferenceCount++;
+                    out.printf("| %s | %s at %s | %s | %s |%n",
+                        globalAddress, caller.getName(), caller.getEntryPoint(),
+                        ref.getFromAddress(), ref.getReferenceType());
+                }
+                byte[] raw = new byte[0x40];
+                try {
+                    currentProgram.getMemory().getBytes(globalAddress, raw);
+                    StringBuilder hexBytes = new StringBuilder();
+                    for (byte b : raw) hexBytes.append(String.format("%02x", b & 0xff));
+                    out.printf("- Initial bytes at %s: %s%n", globalAddress, hexBytes);
+                } catch (Exception e) {
+                    out.printf("- Initial bytes at %s: unavailable (%s)%n",
+                        globalAddress, e.getMessage());
+                }
+            }
+            if (vocabularyReferenceCount == 0) {
+                out.println("| - | no code references recovered | - | - |");
+            }
+            out.println();
+
+            out.println("## Direct callers of S5API runtime-context allocator");
+            out.println();
+            Address allocatorTarget = toAddr("180012b40");
+            ReferenceIterator allocatorRefs =
+                currentProgram.getReferenceManager().getReferencesTo(allocatorTarget);
+            int allocatorCallerCount = 0;
+            while (allocatorRefs.hasNext()) {
+                Reference ref = allocatorRefs.next();
+                Function caller = currentProgram.getFunctionManager()
+                    .getFunctionContaining(ref.getFromAddress());
+                if (caller == null) continue;
+                allocatorCallerCount++;
+                out.printf("- %s at %s, call site %s%n",
+                    caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+            }
+            if (allocatorCallerCount == 0) {
+                out.println("- No direct references recovered at the exact entry address.");
+            }
+            out.println();
+
+            // The phone-label classifier (FUN_180074a50) searches a global
+            // string/index tree and two alias-table ranges. Trace references
+            // to the tree root and every alias-table pointer slot so the
+            // runtime initializer can be recovered rather than guessing IDs
+            // from .rdata string order.
+            out.println("## Global phoneme-map and alias-table cross-references");
+            out.println();
+            out.println("| Global address | Referencing function | Reference site | Reference type |");
+            out.println("|---:|---|---:|---|");
+            String[][] globalRanges = {
+                {"1801c3080", "1801c3238"},
+                {"1801c3240", "1801c3328"},
+                {"1801c4140", "1801c4148"},
+                {"1801c4160", "1801c4170"}
+            };
+            int globalReferenceCount = 0;
+            for (String[] range : globalRanges) {
+                Address begin = toAddr(range[0]);
+                long endOffset = Long.parseLong(range[1], 16) -
+                    Long.parseLong(range[0], 16);
+                for (long offset = 0; offset < endOffset; offset += 8) {
+                    monitor.checkCancelled();
+                    Address globalAddress = begin.add(offset);
+                    ReferenceIterator globalRefs =
+                        currentProgram.getReferenceManager().getReferencesTo(globalAddress);
+                    while (globalRefs.hasNext()) {
+                        Reference ref = globalRefs.next();
+                        Function caller = currentProgram.getFunctionManager()
+                            .getFunctionContaining(ref.getFromAddress());
+                        if (caller == null) continue;
+                        globalReferenceCount++;
+                        out.printf("| %s | %s at %s | %s | %s |%n",
+                            globalAddress, caller.getName(), caller.getEntryPoint(),
+                            ref.getFromAddress(), ref.getReferenceType());
+                        if (!selected.containsKey(caller.getEntryPoint()) &&
+                            selected.size() < MAX_FUNCTIONS) {
+                            selected.put(caller.getEntryPoint(), caller);
+                            queue.addLast(new Work(caller, 0));
+                        }
+                    }
+                }
+            }
+            if (globalReferenceCount == 0) {
+                out.println("| - | no code references recovered | - | - |");
+            }
             out.println();
 
             while (!queue.isEmpty() && selected.size() < MAX_FUNCTIONS) {

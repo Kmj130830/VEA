@@ -14,10 +14,30 @@ data class PreparedMegpoidRuntime(
     val runtimeOptions: S5MegpoidRuntimeOptionsDescriptor,
     val inputSchedules: List<VsmRenderSchedule>
 ) {
-    val scheduledNoteCount: Int
-        get() = inputSchedules.sumOf { schedule ->
-            schedule.chunks.sumOf { chunk -> chunk.noteStarts.size }
+    val scheduledNotes: List<VsmScheduledNote>
+        get() = inputSchedules.flatMap { schedule ->
+            schedule.chunks.flatMap { chunk -> chunk.noteStarts }
         }
+
+    /** Lexical token view; it does not turn editor phoneme text into timed phones. */
+    val lyricTokensByTrackAndNote: Map<String, List<String>>
+        get() = scheduledNotes.associate { note ->
+            "${note.trackId}:${note.noteId}" to note.lyricTokens
+        }
+
+    val scheduledNoteCount: Int
+        get() = scheduledNotes.size
+
+    fun prepareAlignedPhoneFeatures(
+        phoneEvents: List<VsmPhoneEvent>,
+        minimumPhoneSeconds: Float,
+        maximumPhoneSeconds: Float
+    ): List<VsmAlignedPhoneFeature> =
+        VsmAlignedPhoneFeaturePreparer.prepare(
+            source = phoneEvents,
+            minimumPhoneSeconds = minimumPhoneSeconds,
+            maximumPhoneSeconds = maximumPhoneSeconds
+        )
 
     fun createResidualBlockExecutor(
         firstInputWorkspace: S5MegpoidWorkspaceSlot = S5MegpoidWorkspaceSlot.FIRST

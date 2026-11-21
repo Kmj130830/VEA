@@ -1,6 +1,7 @@
 package com.kmj.vea.engine
 
 import java.io.File
+import java.nio.file.Files
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -8,7 +9,7 @@ import org.junit.Test
 class S5ModelFileSetReaderTest {
     @Test
     fun readsAnInstalledModelFileWithoutCreatingAnIntermediateZip() {
-        val directory = createTempDir(prefix = "vea-s5-model-files-")
+        val directory = Files.createTempDirectory("vea-s5-model-files-").toFile()
         try {
             val modelFile = File(directory, "AI_Megpoid.vtb2")
             modelFile.writeBytes(containerEnvelope("VTBR"))
@@ -30,7 +31,7 @@ class S5ModelFileSetReaderTest {
 
     @Test
     fun rejectsUnknownModelFileNames() {
-        val directory = createTempDir(prefix = "vea-s5-model-files-")
+        val directory = Files.createTempDirectory("vea-s5-model-files-").toFile()
         try {
             val unknown = File(directory, "unknown.bin")
             unknown.writeBytes(ByteArray(136))
