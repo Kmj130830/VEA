@@ -46,6 +46,12 @@ data class PreparedMegpoidRuntime(
     val outputTransformInputs: S5MegpoidOutputTransformInputs
         get() = runtimeOptions.buildOutputTransformInputsFromNativeMegpoidDefaults()
 
+    /** Model-output spectrum dimensions recovered from root fields +0x04 and +0x08. */
+    val spectrumOutputShape: S5MegpoidSpectrumOutputShape
+        get() = runtimeOptions.buildSpectrumOutputShape()
+
+    /** Allocates a zeroed complex spectrum frame for the future neural forward pass. */
+    fun newModelSpectrumFrame(): FloatArray = spectrumOutputShape.newInterleavedFrame()
     /** Creates a fresh stateful output executor for one render/utterance. */
     fun createSpectralOverlapAdd(): S5MegpoidSpectralOverlapAdd =
         outputTransformInputs.createSpectralOverlapAdd()
