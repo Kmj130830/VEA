@@ -30,6 +30,16 @@ data class S5DecodedTensorObject(
 data class S5DecodedModelObjectTree(
     val objects: List<S5DecodedTensorObject>
 ) {
+    val floatTensorCount: Int
+        get() = objects.sumOf { objectNode ->
+            objectNode.fields.values.count { it.floatValues != null }
+        }
+
+    val intTensorCount: Int
+        get() = objects.sumOf { objectNode ->
+            objectNode.fields.values.count { it.intValues != null }
+        }
+
     fun objectsContaining(fieldKey: String): List<S5DecodedTensorObject> =
         objects.filter { fieldKey in it.fields }
 
