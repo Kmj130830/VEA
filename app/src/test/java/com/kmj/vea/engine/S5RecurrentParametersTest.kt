@@ -135,7 +135,7 @@ class S5RecurrentParametersTest {
             hasBias = false
         )
         val source = S5RecurrentParameterLoader.specifications(layout)
-            .associate { it.name to FloatArray(it.elementCount) }
+            .associate { it.lookupKey to FloatArray(it.elementCount) }
         source[S5ModelTensorKey.derive("rnn.weight_hh_l0", S5ModelTensorKey.Member.WEIGHT)]!![0] = Float.NaN
 
         S5RecurrentParameterLoader.validate(source, layout)
