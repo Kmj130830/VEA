@@ -46,6 +46,19 @@ The decompiled `FUN_18012c740` establishes these operations:
 
 This is a time-domain frame reconstruction/overlap-add stage. It is more specific than the earlier neutral description of the two output float buffers, but sample-rate conversion, channel layout, final gain convention and the exact WAV boundary are not yet established.
 
+## Confirmed transform direction and input-side frame preparation
+
+The added Ghidra trace of `FUN_180040630` shows that it calls the core transform with a direction value of `+1` when its final argument is zero and `-1` when nonzero. The surrounding call sites establish the direction:
+
+- `FUN_18012b150` calls `FUN_180040630(..., N, 0)`: forward transform. It first obtains a real frame through `FUN_18012ad70`, maintains a circular history, applies a window, transforms it, and copies `N/2+1` complex values to its output pointer.
+- `FUN_18012c740` calls `FUN_180040630(..., N, 1)`: inverse transform. It copies the model-produced `N/2+1` complex bins to scratch, applies the optional alternating-bin sign convention, transforms, normalizes by `N`, and overlap-adds into the caller's float buffer.
+
+This confirms the output transform direction; it is no longer merely inferred from the surrounding dataflow.
+
+Inside `FUN_1800c7ad0`, the transform calls are made using the root-owned transform object at `renderState + 0xF0` (word index `0x1e`). The forward-frame transform writes its spectrum to the root-owned pointer at `+0x110` (word index `0x22`). Two further transform-state arrays are copied by `FUN_18012b470` and `FUN_18012b450` into root-owned pointers at `+0x140` and `+0x170` (word indices `0x28` and `0x2e`). Their exact feature semantics are still under investigation.
+
+The higher-level render path also calls `FUN_180127330`, which forwards a per-frame 32-bit value to `FUN_1800aeea0`. That setter writes the value to render-state offset `+0x3678`. The caller sets it to `1.0f` when the rounded frame index is out of range or the selected frame entry is zero, otherwise `0.0f`. This is a verified frame-validity gate value; its vendor field name is unknown.
+
 ## Descriptor fields observed in FUN_18012c740
 
 The function treats the first argument as a pointer to an object whose first word is a descriptor pointer. Within that descriptor:
