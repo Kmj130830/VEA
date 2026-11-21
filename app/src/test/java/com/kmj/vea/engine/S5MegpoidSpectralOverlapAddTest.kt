@@ -118,6 +118,24 @@ class S5MegpoidSpectralOverlapAddTest {
     }
 
     @Test
+    fun rejectsStartWindowThatExceedsGeometryAndFftBounds() {
+        val overlap = S5MegpoidSpectralOverlapAdd(
+            parameters(
+                outputSamples = 4,
+                geometry = 16,
+                fftSize = 8,
+                windowOffset = -2,
+                overlapCount = 1,
+                ringMask = 0
+            )
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            overlap.processFrame(FloatArray(8) { 1f })
+        }
+    }
+
+    @Test
     fun returnsFiniteOutputForSilence() {
         val overlap = S5MegpoidSpectralOverlapAdd(parameters())
         val output = overlap.processFrame(FloatArray(8))
