@@ -178,6 +178,15 @@ def main() -> None:
         "> Offline decoding and structure inspection only; no model inference is run.",
         "",
     ]
+    report.append("## Archive inventory")
+    for archive_name in ARCHIVES:
+        with zipfile.ZipFile(archive_name) as archive:
+            infos = archive.infolist()
+            report.append(f"### {archive_name} ({len(infos)} members, {sum(x.file_size for x in infos)} uncompressed bytes)")
+            for info in infos:
+                report.append(f"- `{info.filename}` — {info.file_size} bytes")
+            report.append("")
+
     decoded_output_dir = Path("build/s5-container-hash/decoded")
     for archive_name, members in ARCHIVES.items():
         for member_name, expected_sha in members.items():
