@@ -844,7 +844,7 @@ def extract_megpoid_factory_keys(report_path: Path) -> list[dict[str, object]]:
 def inspect_megpoid_runtime_config_path(
     member: str, root: dict, factory_tables: list[dict[str, object]]
 ) -> None:
-    """Validate the exact model subtree selected by the S5API render-state initializer."""
+    """Validate the native-selected subtree and the bank's populated 4x2 block grid."""
     current: object = root
     traversed: list[str] = []
     for key in MEGPOID_RUNTIME_MODEL_PATH:
@@ -869,29 +869,40 @@ def inspect_megpoid_runtime_config_path(
             + f"member={member} path=$/{'/'.join(traversed)}/{MEGPOID_RUNTIME_BLOCK_GROUP_KEY}"
         )
 
-    expected_keys = {
-        str(entry["lookup_key"])
+    # Each factory table has 256 candidate keys, but this singer populates only
+    # rows 0..3 and columns 0..1: eight actual blocks for each of eight factories.
+    expected_entries = [
+        entry
         for table in factory_tables
         for entry in table["entries"]
-    }
+        if int(entry["row"]) in range(4) and int(entry["column"]) in range(2)
+    ]
+    expected_keys = [str(entry["lookup_key"]) for entry in expected_entries]
+    if len(expected_entries) != 64 or len(set(expected_keys)) != 64:
+        raise SystemExit(
+            "INVALID_MODEL_RUNTIME_FACTORY_GRID "
+            + f"expected_entries={len(expected_entries)} unique_keys={len(set(expected_keys))}"
+        )
+    expected_key_set = set(expected_keys)
+
     found: dict[str, int] = {}
-    stack: list[object] = [current]
+    stack: list[object] = [block_group]
     while stack:
         value = stack.pop()
         if isinstance(value, dict):
             for key, child in value.items():
-                if key in expected_keys:
+                if key in expected_key_set:
                     found[key] = found.get(key, 0) + 1
                 stack.append(child)
         elif isinstance(value, list):
             stack.extend(value)
 
-    missing = sorted(expected_keys - found.keys())
+    missing = sorted(expected_key_set - found.keys())
     duplicated = sorted(key for key, count in found.items() if count != 1)
     if missing or duplicated:
         raise SystemExit(
             "MODEL_RUNTIME_CONFIG_KEY_SCOPE_MISMATCH "
-            + f"member={member} expected={len(expected_keys)} "
+            + f"expected_populated_keys={len(expected_key_set)} "
             + f"found_unique={len(found)} missing={missing[:8]} "
             + f"duplicates={duplicated[:8]}"
         )
@@ -904,8 +915,10 @@ def inspect_megpoid_runtime_config_path(
         f"direct_keys={len(current)}",
         f"block_group_key={MEGPOID_RUNTIME_BLOCK_GROUP_KEY}",
         f"block_group_direct_keys={len(block_group)}",
-        f"runtime_factory_keys={len(expected_keys)}",
-        "all_factory_keys_unique_within_selected_subtree=True",
+        f"populated_factory_grid=4x2",
+        f"runtime_factory_keys={len(expected_key_set)}",
+        f"static_factory_candidates={sum(int(table['entry_count']) for table in factory_tables)}",
+        "all_populated_factory_keys_unique_within_selected_block_group=True",
     )
 
 
