@@ -30,7 +30,22 @@ object NativeG2pBridge {
         loaded && nativeLanguageReady(languageId)
 
     fun normalizeKoreanInput(lyric: String): String =
-        if (loaded) nativeNormalizeKoreanInput(lyric) else lyric
+        if (loaded) nativeNormalizeKoreanInput(lyric) else normalizeKoreanInputFallback(lyric)
+
+    /**
+     * Keeps the recovered code-point behavior available to JVM tooling and
+     * devices where the optional ARM64 bridge cannot be loaded.
+     */
+    private fun normalizeKoreanInputFallback(lyric: String): String = buildString(lyric.length) {
+        lyric.forEach { character ->
+            append(
+                when (character) {
+                    '\u30FC', '\u2212' -> '-'
+                    else -> character
+                }
+            )
+        }
+    }
 
     private external fun nativeAbiVersion(): Int
     private external fun nativeSupportedLanguageMask(): Int

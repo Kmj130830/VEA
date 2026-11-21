@@ -52,3 +52,23 @@ The APK packages the shared library only for `arm64-v8a`. The app can load the b
 6. Mark a language ready only after those differential tests pass on Android ARM64.
 
 G2P is only a lyric/phoneme preparation stage. It does not render an AI singing voice. The VOCALOID7 model runtime and audio-render boundary remain separate, unimplemented work.
+
+## Korean pre-parser delimiter port
+
+The next Korean-only helper is `KoreanG2pInputTokenizer`, a direct port of
+`G2PAManager_KOR.dll` function `FUN_180003310` (`0x3310`). The recovered
+loop splits on exactly four UTF-16 code units: ASCII space U+0020, ideographic
+space U+3000, horizontal tab U+0009 and line feed U+000A. It collapses
+delimiter runs and omits empty tokens. Carriage return U+000D, NBSP U+00A0,
+and other Unicode whitespace are not delimiters in this function.
+
+`normalizeAndTokenize()` first applies the Korean manager's separately
+recovered U+30FC/U+2212 to ASCII-hyphen replacement, then applies this
+delimiter set. `NativeG2pBridge.normalizeKoreanInput()` now has an identical
+Kotlin fallback when the ARM64 library is unavailable, while retaining the
+native implementation when it is loaded.
+
+This is only a verified text-preparation primitive. It does not assign
+phonemes, syllable boundaries, phone durations or model category IDs. The
+vendor's subsequent token-to-internal-module conversion and note-container
+update path remain to be ported and differentially tested.

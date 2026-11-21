@@ -1,0 +1,42 @@
+package com.kmj.vea.engine
+
+/**
+ * Token boundary rules recovered from G2PAManager_KOR.dll FUN_180003310.
+ *
+ * This is deliberately separate from VsmLyricTokenizer: the Korean G2P
+ * parser treats U+0020, U+3000, U+0009 and U+000A as delimiters. It does not
+ * split on carriage return, non-breaking space, or the wider Unicode
+ * whitespace category. Empty runs are discarded.
+ */
+object KoreanG2pInputTokenizer {
+    /**
+     * Applies the Korean manager's confirmed U+30FC/U+2212 normalization
+     * before splitting into tokens using its exact native delimiter set.
+     */
+    fun normalizeAndTokenize(lyric: String): List<String> =
+        tokenize(NativeG2pBridge.normalizeKoreanInput(lyric))
+
+    /** Splits already-normalized Korean G2P input without changing contents. */
+    fun tokenize(lyric: String): List<String> {
+        if (lyric.isEmpty()) return emptyList()
+
+        val tokens = ArrayList<String>()
+        var tokenStart = -1
+        for (index in lyric.indices) {
+            if (isNativeDelimiter(lyric[index])) {
+                if (tokenStart >= 0) {
+                    tokens += lyric.substring(tokenStart, index)
+                    tokenStart = -1
+                }
+            } else if (tokenStart < 0) {
+                tokenStart = index
+            }
+        }
+        if (tokenStart >= 0) tokens += lyric.substring(tokenStart)
+        return tokens
+    }
+
+    private fun isNativeDelimiter(character: Char): Boolean =
+        character == '\u0020' || character == '\u3000' ||
+            character == '\u0009' || character == '\u000A'
+}
