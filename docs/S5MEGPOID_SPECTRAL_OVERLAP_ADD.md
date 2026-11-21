@@ -202,8 +202,8 @@ the following root-relative values:
 | +0x61C | argument 6: frame-window core length | frameWindowCoreLengthAtRoot61C |
 | +0x620 | argument 7: descriptor flag +0x90 | alternatingBinSignAtRoot620 |
 | +0x1F74 | argument 8: descriptor flag +0x91 | flagAtRoot1F74 |
-| +0x1F75 | argument 9: frame-window shape mode | frameWindowShapeModeAtRoot1F75 |
-| +0x3418 | argument 10: descriptor flag +0x92 | flagAtRoot3418 |
+| +0x3418 | argument 9: frame-window shape mode | frameWindowShapeModeAtRoot3418 |
+| +0x1F75 | argument 10: descriptor flag +0x92 | flagAtRoot1F75 |
 
 `S5MegpoidOutputTransformInputs` now preserves these source offsets and
 builds the complete currently ported output path:
