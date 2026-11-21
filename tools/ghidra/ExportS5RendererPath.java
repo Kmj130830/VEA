@@ -20,7 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class ExportS5RendererPath extends GhidraScript {
-    private static final int MAX_FUNCTIONS = 260;
+    private static final int MAX_FUNCTIONS = 320;
     private static final int MAX_DEPTH = 3;
     private static final class Work {
         final Function function;
@@ -87,7 +87,12 @@ public class ExportS5RendererPath extends GhidraScript {
                 // Trace construction of the per-render phone-category map.
                 "180012b40", "1800591d0", "1800290f0", "18005b9a0",
                 "18005c890", "18005cba0", "18004f9d0", "1800522f0",
-                "18000adc0", "18000b100", "180026f60", "18007abf0"
+                "18000adc0", "18000b100", "180026f60", "18007abf0",
+                // The render-context phone-category tree is passed into
+                // FUN_180074a50 separately from the global alias tree.
+                // Force its initializer and adjacent subobject constructors
+                // into the report instead of relying on the bounded closure.
+                "180050aa0", "180013410", "180012030", "180011be0"
             };
             out.println("## Explicit internal call targets");
             out.println();
@@ -160,6 +165,26 @@ public class ExportS5RendererPath extends GhidraScript {
                     caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
             }
             if (phoneAdapterCallerCount == 0) {
+                out.println("- No direct references recovered at the exact entry address.");
+            }
+            out.println();
+
+            out.println("## Direct callers of phone-category context initializer");
+            out.println();
+            Address phoneMapTarget = toAddr("180050aa0");
+            ReferenceIterator phoneMapRefs =
+                currentProgram.getReferenceManager().getReferencesTo(phoneMapTarget);
+            int phoneMapCallerCount = 0;
+            while (phoneMapRefs.hasNext()) {
+                Reference ref = phoneMapRefs.next();
+                Function caller = currentProgram.getFunctionManager()
+                    .getFunctionContaining(ref.getFromAddress());
+                if (caller == null) continue;
+                phoneMapCallerCount++;
+                out.printf("- %s at %s, call site %s%n",
+                    caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+            }
+            if (phoneMapCallerCount == 0) {
                 out.println("- No direct references recovered at the exact entry address.");
             }
             out.println();
