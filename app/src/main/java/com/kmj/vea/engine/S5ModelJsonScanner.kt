@@ -469,6 +469,7 @@ object S5ModelContainerScanner {
         "VOCALOID7.vtmg" to "VTMG"
     )
     private val packageScanCache = ConcurrentHashMap<String, List<S5ModelResourceScan>>()
+    private val objectKeyScanCache = ConcurrentHashMap<String, S5ModelJsonScanResult>()
 
     fun scanVtb2(
         vtb2File: File,
@@ -485,12 +486,25 @@ object S5ModelContainerScanner {
         vtb2File: File,
         targetObjectKeys: Set<String>,
         maxDocumentChars: Long = 128L * 1024L * 1024L
-    ): S5ModelJsonScanResult = scanContainerFileForObjectKeys(
-        containerFile = vtb2File,
-        expectedKind = "VTBR",
-        targetObjectKeys = targetObjectKeys,
-        maxDocumentChars = maxDocumentChars
-    )
+    ): S5ModelJsonScanResult {
+        require(vtb2File.isFile) { "The VTB2 model file does not exist." }
+        val file = vtb2File.canonicalFile
+        val cacheKey = buildString {
+            append(file.absolutePath)
+            append('|').append(file.length())
+            append('|').append(file.lastModified())
+            append('|').append(targetObjectKeys.sorted().joinToString(","))
+            append('|').append(maxDocumentChars)
+        }
+        return objectKeyScanCache.computeIfAbsent(cacheKey) {
+            scanContainerFileForObjectKeys(
+                containerFile = file,
+                expectedKind = "VTBR",
+                targetObjectKeys = targetObjectKeys,
+                maxDocumentChars = maxDocumentChars
+            )
+        }
+    }
 
     fun scanContainerFileForObjectKeys(
         containerFile: File,
