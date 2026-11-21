@@ -31,8 +31,13 @@ class S5MegpoidCompiledRuntimeBlock internal constructor(
      * A chunk-length change resets the ring automatically.
      */
     fun buildHistoryWindow(residualInput: FloatArray): FloatArray {
-        require(residualInput.size % channels == 0) {
-            "Residual input length must be divisible by the block channel count."
+        require(residualInput.isNotEmpty() && residualInput.size % channels == 0) {
+            "Residual input must contain a non-empty, whole number of channel rows."
+        }
+        val positions = residualInput.size / channels
+        require(positions >= S5MegpoidResidualBlockShape.KERNEL_WIDTH) {
+            "The 7x7 reference kernel requires at least " +
+                "${S5MegpoidResidualBlockShape.KERNEL_WIDTH} positions per chunk."
         }
         return depthwiseHistory.appendAndBuildWindow(residualInput)
     }
