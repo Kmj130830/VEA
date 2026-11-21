@@ -34,6 +34,18 @@ class S5ModelTensorKeyTest {
     }
 
     @Test
+    fun hashesCompleteRecurrentParameterNameWithoutAppendingWeightSuffix() {
+        assertEquals(
+            "2377051edb208e4b1b07a052125310ad",
+            S5ModelTensorKey.deriveParameterName("rnn.weight_ih_l0")
+        )
+        assertEquals(
+            "afbc925af67d30584adec6ddfe38c30e",
+            S5ModelTensorKey.deriveParameterName("rnn.bias_hh_l0")
+        )
+    }
+
+    @Test
     fun appendsParameterSuffixBeforeBinaryDigestSuffix() {
         assertEquals(
             "705ab1f8b850fee93480e528630c5835",
