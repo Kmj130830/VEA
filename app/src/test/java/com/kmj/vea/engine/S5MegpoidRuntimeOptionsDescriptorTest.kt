@@ -84,6 +84,30 @@ class S5MegpoidRuntimeOptionsDescriptorTest {
         assertEquals(1, parameters.ringMaskAt1C)
     }
     @Test
+    fun derivesOneSidedComplexSpectrumOutputShapeFromModelOptions() {
+        val options = S5MegpoidRuntimeOptionsDescriptor.from(tree())
+        val shape = options.buildSpectrumOutputShape()
+
+        assertEquals(1024, shape.fftSize)
+        assertEquals(513, shape.complexBinCount)
+        assertEquals(1026, shape.interleavedFloatCount)
+
+        val frame = shape.newInterleavedFrame()
+        assertEquals(1026, frame.size)
+        assertTrue(frame.all { it == 0f })
+        shape.requireInterleavedFrame(frame)
+        assertThrows(IllegalArgumentException::class.java) {
+            shape.requireInterleavedFrame(FloatArray(1024))
+        }
+    }
+
+    @Test
+    fun rejectsSpectrumBinCountThatDoesNotMatchTheRealFftSize() {
+        assertThrows(IllegalArgumentException::class.java) {
+            S5MegpoidSpectrumOutputShape(fftSize = 1024, complexBinCount = 512)
+        }
+    }
+    @Test
     fun rejectsMissingFieldsAndWrongJsonValueTypes() {
         val missing = S5ModelObjectTree.parseUtf8("{}")
         assertThrows(IllegalArgumentException::class.java) {
