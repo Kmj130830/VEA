@@ -63,7 +63,7 @@ def decode_payload(file_bytes: bytes) -> tuple[bytes, dict[str, int | str]]:
         folded_state = ((state << 11) ^ state) & MASK32
         mixed = (
             ((((stream_word >> 11) ^ folded_state) >> 8) & MASK32)
-            ^ folded_state ^ stream_word ^ state ^ tail_word
+            ^ folded_state ^ stream_word ^ tail_word
         ) & MASK32
         output[tail_offset:] = mixed.to_bytes(4, "little")[:remainder]
 
