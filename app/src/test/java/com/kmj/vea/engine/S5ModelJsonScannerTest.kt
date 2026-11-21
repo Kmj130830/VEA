@@ -75,6 +75,45 @@ class S5ModelJsonScannerTest {
     }
 
     @Test
+    fun decodesOnlyTensorStringsSelectedByHashedObjectKey() {
+        val matches = listOf(
+            S5TypedTensorString(
+                objectKey = tensorKey,
+                valuePath = "$.root.$tensorKey.weights",
+                fieldKey = "weights",
+                typeTag = "*F32",
+                encodedValue = "*F32weights"
+            ),
+            S5TypedTensorString(
+                objectKey = tensorKey,
+                valuePath = "$.root.$tensorKey.bias",
+                fieldKey = "bias",
+                typeTag = "*S32",
+                encodedValue = "*S32bias"
+            )
+        )
+
+        val decoded = S5ModelTensorDecoder.decodeMatches(
+            matches = matches,
+            decodeFloatArray = { encoded ->
+                assertEquals("*F32weights", encoded)
+                floatArrayOf(1.25f, -0.5f)
+            },
+            decodeInt32Array = { encoded ->
+                assertEquals("*S32bias", encoded)
+                intArrayOf(2, 3)
+            }
+        )
+
+        assertEquals(2, decoded.size)
+        assertEquals(S5DecodedTensorKind.FLOAT32, decoded[0].kind)
+        assertEquals(listOf(1.25f, -0.5f), decoded[0].floatValues?.toList())
+        assertEquals(S5DecodedTensorKind.INT32, decoded[1].kind)
+        assertEquals(listOf(2, 3), decoded[1].intValues?.toList())
+        assertEquals("$.root.$tensorKey.weights", decoded[0].valuePath)
+    }
+
+    @Test
     fun visitorReceivesKeysAndScalarValuesWithoutBuildingTree() {
         val keys = mutableListOf<String>()
         val values = mutableListOf<Pair<String?, String?>>()
