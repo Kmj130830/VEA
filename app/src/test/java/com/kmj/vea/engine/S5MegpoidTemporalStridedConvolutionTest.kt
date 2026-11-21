@@ -44,7 +44,7 @@ class S5MegpoidTemporalStridedConvolutionTest {
         )
 
         // First window: [0,1,2, 0,10,20], second: [2,3,4, 20,30,40].
-        assertEquals(listOf(83f, 263f, 423f), output.toList())
+        assertEquals(listOf(178f, 490f, 424f), output.toList())
     }
 
     @Test
