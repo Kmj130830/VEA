@@ -248,36 +248,59 @@ public class ExportS5MegpoidBlockShapeMap extends GhidraScript {
                 out.println();
             }
 
-            out.println("## Global runtime-record pointer offset scan");
+            out.println("## Global runtime descriptor pointer-offset scan");
             out.println();
-            out.println("> Scans non-stack memory operands for the runtime record-array pointer offsets observed by FUN_1800c7ad0.");
-            out.println("> This is a candidate scan only; an offset match does not by itself prove the same object type.");
+            out.println("> Candidate non-stack references for sequence-operator descriptors, banked-linear descriptors, and residual record arrays used by FUN_1800c7ad0.");
+            out.println("> An offset match is only a candidate; it does not by itself prove descriptor ownership or model-key provenance.");
             out.println();
+            String[] watchedOffsets = {
+                    "0x1f8]", // initial dense projection descriptor (param_1 + 0x7e)
+                    "0x228]", // global feature normalization descriptor (param_1 + 0x8a)
+                    "0x250]", // temporal stride-2 projection descriptor array (param_1 + 0x94)
+                    "0x268]", // temporal projection workspace descriptor array (param_1 + 0x9a)
+                    "0x280]", // banked-linear descriptor array (param_1 + 0xa0)
+                    "0x2b0]", // alternate banked operator descriptor array (param_1 + 0xac)
+                    "0x2e0]", // 0x100-byte residual block-data vector
+                    "0x2f8]"  // 0x88-byte residual block-state vector
+            };
             LinkedHashMap<Address, Function> recordOffsetFunctions = new LinkedHashMap<>();
+            LinkedHashMap<String, Integer> offsetHitCounts = new LinkedHashMap<>();
             InstructionIterator globalInstructions = currentProgram.getListing().getInstructions(true);
             int recordOffsetHits = 0;
             while (globalInstructions.hasNext()) {
                 monitor.checkCancelled();
                 Instruction instruction = globalInstructions.next();
                 String rendered = format(instruction);
-                boolean offsetMatch = rendered.contains("0x2e0]") || rendered.contains("0x2f8]");
                 boolean stackReference = rendered.contains("RBP") || rendered.contains("RSP");
-                if (!offsetMatch || stackReference) continue;
+                if (stackReference) continue;
+                String matchedOffset = null;
+                for (String candidateOffset : watchedOffsets) {
+                    if (rendered.contains(candidateOffset)) {
+                        matchedOffset = candidateOffset.substring(0, candidateOffset.length() - 1);
+                        break;
+                    }
+                }
+                if (matchedOffset == null) continue;
 
                 Function owner = currentProgram.getFunctionManager()
                     .getFunctionContaining(instruction.getAddress());
-                out.println("- " + rendered + " [" +
+                out.println("- field_offset=" + matchedOffset + " " + rendered + " [" +
                     (owner == null ? "<unknown>" : owner.getName()) + "]");
+                offsetHitCounts.put(matchedOffset,
+                    offsetHitCounts.getOrDefault(matchedOffset, 0) + 1);
                 recordOffsetHits++;
-                if (owner != null && recordOffsetFunctions.size() < 32) {
+                if (owner != null && recordOffsetFunctions.size() < 48) {
                     recordOffsetFunctions.putIfAbsent(owner.getEntryPoint(), owner);
                 }
-                if (recordOffsetHits >= 300) {
-                    out.println("- Scan output capped at 300 matching instructions.");
+                if (recordOffsetHits >= 600) {
+                    out.println("- Scan output capped at 600 matching instructions.");
                     break;
                 }
             }
             out.println("- Matching non-stack instructions: " + recordOffsetHits);
+            for (Map.Entry<String, Integer> entry : offsetHitCounts.entrySet()) {
+                out.println("- " + entry.getKey() + " references: " + entry.getValue());
+            }
             out.println("- Distinct candidate functions retained for decompilation: " +
                 recordOffsetFunctions.size());
             out.println();
