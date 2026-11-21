@@ -144,6 +144,19 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
         return S5ModelContainerScanner.scanMegpoidPackage(directory, targetTensorKeys)
     }
 
+    /**
+     * Loads and validates the shared nine-layer neural base graph from
+     * VOCALOID7.vtmg. This is model-weight preparation only; the actual
+     * forward operators and acoustic decoder still need execution ports.
+     */
+    fun loadSharedVtmgBaseGraph(voicebank: VoicebankDescriptor): S5VtmgBaseGraphWeights {
+        require(voicebank.id == "ai_megpoid_v7" && voicebank.engineFamily == "VOCALOID7") {
+            "The shared VTMG graph loader currently targets AI Megpoid V7."
+        }
+        val modelDirectory = File(URI(voicebank.sourceUri))
+        return S5VtmgBaseGraphLoader.load(File(modelDirectory, "VOCALOID7.vtmg"))
+    }
+
     override suspend fun render(
         project: VeaProject,
         voicebank: VoicebankDescriptor,
@@ -165,54 +178,31 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
             )
         )
         val modelFeatures = S5ModelFeatureFlagReader.decode(featureScan)
-        val rnnEnabled = modelFeatures.recurrentBranch
-        val pairedObjectEnabled = modelFeatures.pairedOptionalObjects
 
-        if (!rnnEnabled) {
-            throw UnsupportedOperationException(
-                "AI Megpoid V7's VTB2 was decoded and checked. S5API's optional RNN branch is not enabled " +
-                    "in this model object (the feature key is absent); paired optional model objects are " +
-                    (if (pairedObjectEnabled) "enabled" else "also absent") +
-                    ". VEA must now port the active pre/conv/cond/linear graph and its acoustic decoder; " +
-                    "no WAV was generated."
-            )
+        // VTMG supplies the shared S5 base graph. It is independent of the
+        // optional RNN feature branch stored in the bank's VTB2 object.
+        val baseGraph = loadSharedVtmgBaseGraph(voicebank)
+        require(baseGraph.layers.size == S5VtmgGraphTensorCatalog.layers.size) {
+            "The shared VTMG base graph is incomplete."
         }
 
-        // The static callsite establishes one bidirectional layer and
-        // bias lookups. Feature dimensions are intentionally not guessed
-        // here because they do not participate in S5 name hashing.
-        val recurrentCandidateKeys = S5RecurrentParameterLoader.lookupKeys(
-            layerCount = 1,
-            bidirectional = true,
-            includeBias = true
-        )
-        val resourceScans = scanModelResources(voicebank, recurrentCandidateKeys)
-        val typedTensorCount = resourceScans.sumOf { it.result.typedTensorStringCount }
-        require(typedTensorCount > 0L) {
-            "The bundled Megpoid package contains no typed tensor strings."
-        }
-        val matchedTensorStrings = resourceScans.flatMap { scan ->
-            scan.result.matchedTensorStrings.values.flatten()
-        }
-        val decodedCandidateTensors = if (matchedTensorStrings.isEmpty()) {
-            emptyList()
+        val recurrentStatus = if (modelFeatures.recurrentBranch) {
+            "The optional VTB2 RNN branch is enabled but its model-object mapping and execution are not ported."
         } else {
-            S5ModelTensorDecoder.decodeMatches(
-                matches = matchedTensorStrings,
-                decodeFloatArray = NativeS5TensorBridge::decodeTypedFloatArray,
-                decodeInt32Array = NativeS5TensorBridge::decodeTypedInt32Array
-            )
+            "The optional VTB2 RNN branch is disabled for this Megpoid model."
         }
-        val recurrentMatches = matchedTensorStrings.size
-        val resourceSummary = resourceScans.joinToString { scan ->
-            "${scan.fileName}: ${scan.result.objectCount} objects / " +
-                "${scan.result.typedTensorStringCount} typed tensors"
+        val pairedStatus = if (modelFeatures.pairedOptionalObjects) {
+            "Paired optional VTB2 objects are enabled but not yet integrated."
+        } else {
+            "Paired optional VTB2 objects are disabled."
         }
+
         throw UnsupportedOperationException(
-            "The five bundled Megpoid/shared model containers were decoded and streamed ($resourceSummary; " +
-                "$recurrentMatches candidate recurrent objects matched, " +
-                "${decodedCandidateTensors.size} selected tensor fields decoded). The neural graph's exact parameter " +
-                "mapping and acoustic execution are not complete; no WAV was generated."
+            "Loaded and validated the shared VOCALOID7.vtmg base graph: ${baseGraph.layers.size} layers, " +
+                "${baseGraph.totalFloatCount} float parameters (pre1/pre2, conv1/cond1, conv2/cond2, " +
+                "conv3/cond3, linear). $recurrentStatus $pairedStatus The base-graph forward operators, " +
+                "voicebank-specific VTB2 conditioning, Yamaha G2P, and acoustic waveform decoder are not " +
+                "complete; no WAV was generated."
         )
     }
 }
