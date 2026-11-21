@@ -100,3 +100,39 @@ Both source bounds clamp against Q = floor(G/2); the start bound does not clamp 
 The Android implementation adds explicit bounds checks around these exact
 source/destination intervals. These checks reject invalid transform
 descriptors that would otherwise read or write outside the native arrays.
+
+## Output descriptor geometry constructor
+
+A second instruction-level pass over FUN_180127dc0 recovered the scalar
+constructor inputs and derived fields. The constructor copies three inputs
+independently:
+
+- argument 2 -> descriptor +0x00 (outputSamples);
+- argument 3 -> descriptor +0x04 (geometry);
+- argument 4 -> descriptor +0x08 (fftSize).
+
+It copies a float argument to +0x0C and three byte flags to +0x90, +0x91 and
++0x92. The geometry fields are then computed as follows:
+
+```text
+halfGeometry = floor(geometry / 2)
+windowOffset = ceil(halfGeometry / outputSamples)
+overlapContributionCount = windowOffset + 2
+ringSlotCount = nextPowerOfTwo(windowOffset)
+ringMask = ringSlotCount - 1
+```
+
+The nextPowerOfTwo operation is implemented by spreading the highest set
+bit through shifts by 1, 2, 4, 8 and 16, then adding one. A zero windowOffset
+still produces one ring slot, with mask zero. The contribution loop count is
+independent of the ring capacity and can wrap the ring mask.
+
+S5MegpoidOverlapAddDescriptorGeometryBuilder ports these integer formulas
+and validates signed-32-bit overflow. It deliberately keeps geometry and FFT
+size as separate parameters; the helper does not assume that their values are
+equal merely because one observed caller may supply the same source value.
+
+This creates a verified bridge between render-state scalar inputs and the
+scalar geometry fields required by S5MegpoidSpectralOverlapAdd. The frame and
+output window coefficients, transform-plan setup, and provenance of the
+render-state scalar inputs remain separate tasks.
