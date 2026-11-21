@@ -61,6 +61,9 @@ jobs:
                       print(f"  bytes_112_160={data[112:160].hex()}")
           PY
 
+      - name: Decode and inspect the AI Megpoid VTB2 body
+        run: python3 tools/inspect_s5_model_payload.py
+
       - name: Download and verify Ghidra 12.2
         shell: bash
         run: |
