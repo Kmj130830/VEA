@@ -159,7 +159,7 @@ object S5MegpoidOutputWindowBuilder {
         return product
     }
 
-    private const val FRAME_WINDOW_EPSILON = 1.0e-4f
+    private const val FRAME_WINDOW_EPSILON = 1.0e-3f
     private const val OUTPUT_WINDOW_EPSILON = 1.0e-8f
     private const val PI_F = 3.1415927f
 }
