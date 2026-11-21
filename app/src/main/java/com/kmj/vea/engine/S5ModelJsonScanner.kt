@@ -8,6 +8,7 @@ import java.io.InputStreamReader
 import java.io.PushbackReader
 import java.io.Reader
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.ConcurrentHashMap
 
 enum class S5JsonScalarKind { STRING, NUMBER, BOOLEAN, NULL }
 
@@ -359,6 +360,7 @@ object S5ModelContainerScanner {
         "VOCALOID7.vhnv" to "VHNV",
         "VOCALOID7.vtmg" to "VTMG"
     )
+    private val packageScanCache = ConcurrentHashMap<String, List<S5ModelResourceScan>>()
 
     fun scanVtb2(
         vtb2File: File,
@@ -379,17 +381,37 @@ object S5ModelContainerScanner {
         require(packageDirectory.isDirectory) {
             "The installed Megpoid model directory does not exist."
         }
-        return bundledResources.map { (fileName, kind) ->
-            S5ModelResourceScan(
-                fileName = fileName,
-                containerKind = kind,
-                result = scanContainerFile(
-                    containerFile = File(packageDirectory, fileName),
-                    expectedKind = kind,
-                    targetTensorKeys = targetTensorKeys,
-                    maxDocumentChars = maxDocumentChars
+        val directory = packageDirectory.canonicalFile
+        val files = bundledResources.map { (fileName, _) ->
+            File(directory, fileName).also { file ->
+                require(file.isFile) { "Required model resource is missing: $fileName." }
+            }
+        }
+        val cacheKey = buildString {
+            append(directory.absolutePath)
+            append('|')
+            append(targetTensorKeys.sorted().joinToString(","))
+            for (file in files) {
+                append('|').append(file.name)
+                append(':').append(file.length())
+                append(':').append(file.lastModified())
+            }
+            append('|').append(maxDocumentChars)
+        }
+        return packageScanCache.computeIfAbsent(cacheKey) {
+            bundledResources.zip(files).map { (resource, file) ->
+                val (fileName, kind) = resource
+                S5ModelResourceScan(
+                    fileName = fileName,
+                    containerKind = kind,
+                    result = scanContainerFile(
+                        containerFile = file,
+                        expectedKind = kind,
+                        targetTensorKeys = targetTensorKeys,
+                        maxDocumentChars = maxDocumentChars
+                    )
                 )
-            )
+            }
         }
     }
 
