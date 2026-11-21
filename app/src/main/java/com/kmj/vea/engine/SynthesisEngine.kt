@@ -65,13 +65,6 @@ interface SynthesisEngine {
  * phoneme engine or VOCALOID singing renderer is available yet.
  */
 class VocaloidAiEngineAdapter : SynthesisEngine {
-    private companion object {
-        // FUN_18004e1e0 checks presence of this hashed model-object key.
-        const val RNN_FEATURE_FLAG_KEY = "9f174dc2b1ab89f96f4577e17d5e568a"
-        // FUN_18004e3b0 checks presence of the paired optional-object key.
-        const val PAIRED_OBJECT_FEATURE_FLAG_KEY = "69d61aca6f87b9618d4c65b9560cb5be"
-    }
-
     override fun status(): EngineStatus {
         val vsmMessage = if (NativeVsmCallbackBridge.isLoaded) {
             "VSM callback bridge loaded (ABI 0x%08X, %d Hz transport). ".format(
@@ -166,11 +159,14 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
         val vtb2File = File(modelDirectory, "AI_Megpoid.vtb2")
         val featureScan = S5ModelContainerScanner.scanVtb2ForObjectKeys(
             vtb2File,
-            setOf(RNN_FEATURE_FLAG_KEY, PAIRED_OBJECT_FEATURE_FLAG_KEY)
+            setOf(
+                S5ModelFeatureFlagReader.RECURRENT_BRANCH_KEY,
+                S5ModelFeatureFlagReader.PAIRED_OBJECT_KEY
+            )
         )
-        val rnnEnabled = RNN_FEATURE_FLAG_KEY in featureScan.matchedObjectKeys
-        val pairedObjectEnabled =
-            PAIRED_OBJECT_FEATURE_FLAG_KEY in featureScan.matchedObjectKeys
+        val modelFeatures = S5ModelFeatureFlagReader.decode(featureScan)
+        val rnnEnabled = modelFeatures.recurrentBranch
+        val pairedObjectEnabled = modelFeatures.pairedOptionalObjects
 
         if (!rnnEnabled) {
             throw UnsupportedOperationException(
