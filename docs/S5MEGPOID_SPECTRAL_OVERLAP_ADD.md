@@ -60,3 +60,41 @@ sample-rate handling and final PCM/WAV conversion remain separate stages.
 The reference FFT currently supports even power-of-two sizes only and has
 not yet been numerically compared to the vendor FFT backend. No successful
 Megpoid render is claimed by this component.
+
+## Exact ring interval calculation
+
+The address arithmetic at S5API FUN_18012c740 was checked instruction by
+instruction against the supplied S5API.dll. For one contribution index i,
+define:
+
+- N: FFT size at descriptor +0x08;
+- O: output sample count at descriptor +0x00;
+- G: geometry integer at descriptor +0x04;
+- W: window offset at descriptor +0x10;
+- H = floor(N/2);
+- Q = floor(G/2);
+- r = W - i.
+
+The native code computes the source interval:
+
+```text
+sourceStart = max(0, H + min(H, -r * O))
+sourceEnd   = max(0, H + min(Q, (1 - r) * O))
+```
+
+The destination begins at:
+
+```text
+outputStart = 0                    when sourceEnd <= O
+              O - sourceEnd        otherwise
+```
+
+It copies sourceEnd - sourceStart samples from the selected ring slot,
+adding each sample into the destination. A non-positive copy count skips that
+contribution. The ring slot is ((writeCursor - i - 1) & ringMask); the
+current frame is stored at (oldWriteCursor & ringMask) before the cursor is
+incremented.
+
+The Android implementation adds explicit bounds checks around these exact
+source/destination intervals. These checks reject invalid transform
+descriptors that would otherwise read or write outside the native arrays.
