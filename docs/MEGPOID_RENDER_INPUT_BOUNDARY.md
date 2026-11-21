@@ -79,3 +79,36 @@ remain unresolved.
 3. Connect the resulting feature tensors to the existing Dense/Global
    Normalization -> Temporal -> Residual pipeline only after their
    dimensions and ordering are confirmed.
+
+## Confirmed semantics of the seven-double row: interval + five category keys
+
+The decompiled callers now support a narrower interpretation of the 0x38-byte
+intermediate record passed to `FUN_18003ab70`:
+
+- `row[0]` is the interval start position.
+- `row[1]` is the interval end position.
+- `row[2..6]` is a five-value categorical key consumed by
+  `FUN_180074a50(row + 2, context, ...)`.
+
+`FUN_18003ab70` calculates the frame count from the final row's `row[1]`
+divided by the context time step at `context + 0x30`. For every row it
+computes `ceil(row[1] / timeStep)` as the ending frame index, then fills
+the frame coverage array for that interval. It also calculates the
+interval duration as `row[1] - row[0]`.
+
+`FUN_18006c720` independently confirms that same interval interpretation:
+it reads the first two doubles as start/end, takes their difference,
+applies a logarithm and normalizes the result against the configured
+range (`param_7`, `param_8`) into `[-1, +1]`. That duration feature is
+followed by optional state channels and one-hot categorical entries.
+
+The five values at `row[2..6]` are not yet individually named. They are
+passed together to `FUN_180074a50`, which returns an integer category index.
+The helper is now an explicit Ghidra seed so its comparison/mapping table
+can be recovered next.
+
+Android should therefore preserve event interval start/end separately from
+the categorical key. It should not fill the five category values from
+pitch, phoneme, lyric, or style until `FUN_180007740` / `FUN_180007a90` /
+`FUN_180007ec0` and `FUN_180074a50` confirm which source fields and units
+they represent.
