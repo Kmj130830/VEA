@@ -134,10 +134,10 @@ object S5VtmgBaseGraphLoader {
         decodeFloatArray: (String) -> FloatArray = NativeS5TensorBridge::decodeTypedFloatArray,
         decodeInt32Array: (String) -> IntArray = NativeS5TensorBridge::decodeTypedInt32Array
     ): S5VtmgBaseGraphWeights {
-        val scan = S5ModelContainerScanner.scanContainerFile(
+        val scan = S5ModelContainerScanner.scanContainerFileForObjectKeys(
             containerFile = vtmgFile,
             expectedKind = "VTMG",
-            targetTensorKeys = S5VtmgGraphTensorCatalog.expectedTensorKeys
+            targetObjectKeys = setOf(S5VtmgGraphTensorCatalog.BASE_GRAPH_OBJECT_KEY)
         )
         return S5VtmgGraphTensorCatalog.decode(scan, decodeFloatArray, decodeInt32Array)
     }
