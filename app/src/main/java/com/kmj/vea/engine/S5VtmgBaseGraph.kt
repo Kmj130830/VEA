@@ -31,10 +31,10 @@ data class S5VtmgGraphTensorSpec(
         get() = (paddedAxis0Count.toLong() * axis1Count * matrixCount).toInt()
 
     val weightKey: String
-        get() = S5ModelTensorKey.derive(layerName, S5ModelTensorKey.Member.WEIGHT)
+        get() = S5ModelTensorKey.deriveDigestHex(layerName, S5ModelTensorKey.Member.WEIGHT)
 
     val biasKey: String
-        get() = S5ModelTensorKey.derive(layerName, S5ModelTensorKey.Member.BIAS)
+        get() = S5ModelTensorKey.deriveDigestHex(layerName, S5ModelTensorKey.Member.BIAS)
 }
 
 data class S5VtmgGraphLayerWeights(
