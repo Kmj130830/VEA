@@ -22,8 +22,8 @@ class S5MegpoidOutputTransformInputsTest {
         frameWindowCoreLengthAtRoot61C = coreWindowLength,
         alternatingBinSignAtRoot620 = alternatingBinSign,
         flagAtRoot1F74 = flagAt91,
-        frameWindowShapeModeAtRoot1F75 = shapeMode,
-        flagAtRoot3418 = flagAt92
+        frameWindowShapeModeAtRoot3418 = shapeMode,
+        flagAtRoot1F75 = flagAt92
     )
 
     @Test
