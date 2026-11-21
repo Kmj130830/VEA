@@ -47,6 +47,28 @@ class S5ModelObjectTreeTest {
     }
 
     @Test
+    fun extractsOnlyTheExactObjectSubtreeAndKeepsItsLocalRoot() {
+        val tree = S5ModelObjectTree.parseUtf8(
+            """{"model":{"config":{"blocks":{"filter":32}}},"other":{"config":{"wrong":1}}}"""
+        )
+
+        val subtree = tree.subtreeAtPath("model", "config")
+
+        assertEquals(setOf("blocks"), subtree?.root?.fields?.keys)
+        assertEquals(
+            32.0,
+            (((subtree?.findByLookupKey("blocks") as? S5ModelValue.ObjectValue)
+                ?.fields?.get("filter")) as S5ModelValue.NumberValue).value,
+            0.0
+        )
+        assertNull(tree.subtreeAtPath("model", "missing"))
+        assertNull(tree.subtreeAtPath("model", "config", "blocks", "filter"))
+        assertThrows(IllegalArgumentException::class.java) {
+            tree.subtreeAtPath()
+        }
+    }
+
+    @Test
     fun findsUniqueLookupKeyInsideNestedObjectAndArrayContainers() {
         val tree = S5ModelObjectTree.parseUtf8(
             """{"container":{"layers":[{"weightKey":{"value":17}}]}}"""
