@@ -91,7 +91,7 @@ The decompiled `FUN_18012c740` establishes these operations:
 
 1. It copies `N/2 + 1` complex values (two float32 values per bin, `(N/2+1)*8` bytes) from the model spectrum into descriptor-owned scratch storage.
 2. If descriptor flag `+0x90` is enabled (descriptor word index `0x24`), it flips the sign bit of both float components for alternating complex bins.
-3. It calls `FUN_180040630(plan, descriptorScratch, N, 1)`. The transform helper's exact direction/normalization contract is still being decompiled; the surrounding dataflow is a complex-spectrum-to-real-frame conversion.
+3. It calls `FUN_180040630(plan, descriptorScratch, N, 1)`. The inverse wrapper conjugates the interior imaginary bins, packs the Nyquist real value, doubles the packed real workspace and calls the FFT core with direction `-1`.
 4. It divides the first N real samples by N.
 5. It writes the transformed frame into a circular overlap buffer using the descriptor's current ring index, frame count, hop/overlap geometry and ring mask.
 6. It advances the ring index.
@@ -140,15 +140,15 @@ These names are descriptive observations, not vendor ABI field names. The constr
 
 - Do not pass note/phoneme features through the public output-buffer argument.
 - Keep the existing model forward graph's output as complex spectral bins until the transform stage is implemented.
-- Port the transform plan and overlap-add descriptor only after `FUN_180040630`, descriptor construction, and history reset semantics are verified.
+- The scalar output descriptor, its geometry, frame/output windows, and persistent overlap ring are now represented by the Android reference implementation. The vendor FFT plan factory at `FUN_18004e580` and its table-generation helpers still need an equivalent implementation or differential parity check.
 - The Android implementation must preserve the ring-buffer state across sequential audio chunks and reset it at utterance boundaries.
 - The caller output length is owned by the render state; do not infer it from the VTB2 model tensor sizes.
 
 ## Remaining work
 
-1. Decompile `FUN_180040630` and its selected backend implementation to establish transform direction, scaling and data layout.
-2. Trace the constructor/population sites for the output/overlap descriptor wrapper at render-state root +0x80 and the descriptor object it references.
-3. Trace the root-owned neural input feature buffers and the upstream note/phoneme-to-feature path. The output argument is now excluded from that search.
-4. Verify the sample-rate and final PCM/WAV boundary in the higher-level VSM caller.
+1. Trace `FUN_18004e580`, `FUN_18004e620`, `FUN_18002ace0` and `FUN_180010110` to recover the FFT-plan tables and execution workspace; then compare the Android reference transform against the vendor scalar FFT path.
+2. Connect the render-state model spectrum at root +0x4F8 to the complete neural forward graph and its upstream note/phoneme feature-conditioning path.
+3. Establish the signal-domain meaning and scaling of the higher-level float output buffers at engine offsets +0xA0 and +0xB8.
+4. Verify sample-rate conversion, channel layout and the final PCM/WAV boundary in the higher-level VSM caller.
 
 No successful Megpoid vocal render or WAV output is claimed.
