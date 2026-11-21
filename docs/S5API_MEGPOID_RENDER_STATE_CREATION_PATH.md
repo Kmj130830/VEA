@@ -149,3 +149,16 @@ Bank count is folded into the contiguous position axis because the native
 banked result is \`[feature][position][bank]\`. This pipeline still starts
 from prepared features; it does not synthesize features from note/phoneme
 input.
+
+
+## Corrected native sequence-slot count
+
+The supplied AI Megpoid V7 runtime-options tree decodes to \`param[5] = 4\`
+and \`param[6] = 2\`. The initializer creates four feature slots and runs
+the Temporal and standard Banked descriptor loops three times each. It
+creates eight residual records from the 4×2 grid.
+
+The render order is Temporal[0], Temporal[1], Temporal[2], Residual row 3,
+then Banked[0]/Residual row 2, Banked[1]/Residual row 1, and
+Banked[2]/Residual row 0. This corrects the earlier five-slot/four-transition
+assumption and is the sequence used by the Android pipeline.

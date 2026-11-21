@@ -192,31 +192,35 @@ kernel size, bank count and optional-bias flags still come from render
 descriptor metadata and are not guessed by this index.
 
 
-## Full sequence transition ordering
+## Native sequence/transition counts and reverse feedback order
 
-The dispatcher has five sequence-feature slots but only four adjacent
-transitions. Temporal factory indices 0, 1, 2, 3 materialize slots 1 through
-4 from the preceding slot. The reverse loop then uses banked factory indices
-0 through 3:
+The supplied AI Megpoid V7 `VTB2` runtime-options tree yields
+`param[5] = 4` sequence-feature slots and `param[6] = 2` residual columns.
+The initializer allocates `param[5]` feature slots, runs the Temporal and
+Banked descriptor loops `param[5] - 1` times, and populates the residual
+factory grid `param[5] * param[6]` (4 rows × 2 columns).
 
-| Banked factory index | Source slot | Target slot | Residual row |
-|---:|---:|---:|---:|
-| 0 | 4 | 3 | 3 |
-| 1 | 3 | 2 | 2 |
-| 2 | 2 | 1 | 1 |
-| 3 | 1 | 0 | 0 |
+The verified call order in `FUN_1800c7ad0` is:
 
-Banked projection and residual execution are interleaved. The residual result
-written to a target slot is the input to the next banked projection. This is
-a feedback chain, not four independent banked outputs followed by a batch
-residual pass.
+| Order | Operator | Sequence slot / residual row |
+|---:|---|---|
+| 1 | Temporal[0] | slot 0 → slot 1 |
+| 2 | Temporal[1] | slot 1 → slot 2 |
+| 3 | Temporal[2] | slot 2 → slot 3 |
+| 4 | Residual row 3 | initial highest slot, before the reverse Banked sweep |
+| 5 | Banked[0] → Residual row 2 | slot 3 → slot 2 |
+| 6 | Banked[1] → Residual row 1 | slot 2 → slot 1 |
+| 7 | Banked[2] → Residual row 0 | slot 1 → slot 0 |
 
-Android represents this path with \`S5MegpoidSequenceTransitionPipeline\`.
-It applies Dense + Global Normalization once, runs Temporal projections in
-ascending factory order, then interleaves Banked projection \`i\` with
-residual row \`3-i\`. Each banked output is \`[feature][position][bank]\`;
-because bank is the innermost axis, it is passed as contiguous extended
-positions \`position * bankCount\` to the residual row.
+Thus there are four sequence slots, three Temporal transitions, three
+Banked transitions, and eight residual blocks. The initial Residual row 3
+does not have a preceding Banked operation.
+
+Android's `S5MegpoidSequenceTransitionPipeline` mirrors this order:
+Dense + Global Normalization, Temporal[0..2], Residual row 3, then three
+Banked/Residual pairs. A Banked output is stored as
+`[feature][position][bank]`; the innermost bank axis is flattened into
+`position * bankCount` for the following residual row.
 
 The pipeline starts at an already prepared feature tensor. Note/phoneme
 feature generation and final post-residual decoding remain outside this code.
