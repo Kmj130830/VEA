@@ -17,7 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class ExportS5ContainerAndHash extends GhidraScript {
-    private static final int MAX_FUNCTIONS = 80;
+    private static final int MAX_FUNCTIONS = 120;
     private static final String[] SEEDS = {
         "18002aa90", // VTx? byte transform / container decode
         "18000daa0", // JSON-like parser core
@@ -47,7 +47,13 @@ public class ExportS5ContainerAndHash extends GhidraScript {
         "180024a90", // indexed/reverse recurrent name builder
         "18001b1f0", // hashed JSON/object lookup helper
         "1800103e0", // string copy used before key generation
-        "18000b100"   // typed model object key lookup
+        "18000b100", // typed model object key lookup
+        "18005704b", // callers constructing S5 layer subobjects
+        "1800571c1",
+        "180057337",
+        "18005754b",
+        "1800576d2",
+        "18005fd34"  // additional recurrent parameter lookup caller
     };
 
     @Override
