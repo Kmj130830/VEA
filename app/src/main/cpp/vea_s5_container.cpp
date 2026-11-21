@@ -102,7 +102,6 @@ extern "C" VeaS5ContainerStatus vea_s5_decode_container_payload(
     uint32_t state_b = 0x1f123bb5u;
 
     for (uint64_t word = 0; word < word_count; ++word) {
-        const uint32_t previous_stream = stream_word;
         const uint32_t previous_state = stream_word;
         state = (state << 11u) ^ state;
         stream_word = previous_state ^
@@ -115,7 +114,6 @@ extern "C" VeaS5ContainerStatus vea_s5_decode_container_payload(
         state = state_a;
         state_a = state_b;
         state_b = previous_state;
-        (void)previous_stream;
     }
 
     if (remainder != 0) {
@@ -127,7 +125,7 @@ extern "C" VeaS5ContainerStatus vea_s5_decode_container_payload(
         }
 
         // The final partial group uses the vendor's distinct folded state.
-        uint32_t folded_state = (state_a << 11u) ^ state_a;
+        uint32_t folded_state = (state << 11u) ^ state;
         const uint32_t mixed =
             (((stream_word >> 11u) ^ folded_state) >> 8u) ^
             folded_state ^ stream_word ^ tail_word;
