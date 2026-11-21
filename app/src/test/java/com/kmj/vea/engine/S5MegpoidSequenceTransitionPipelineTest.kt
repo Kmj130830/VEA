@@ -19,18 +19,30 @@ class S5MegpoidSequenceTransitionPipelineTest {
 
     private class TemporalFake(
         private val index: Int,
-        private val calls: MutableList<String>
+        private val calls: MutableList<String>,
+        private val kernelSize: Int? = null
     ) : S5MegpoidTemporalProjectionOperator {
         override val inputFeatures = 1
         override val outputFeatures = 1
-        override fun outputPositions(inputPositions: Int): Int = inputPositions
+
+        override fun outputPositions(inputPositions: Int): Int {
+            val kernel = kernelSize ?: return inputPositions
+            val padding = kernel / 2
+            return (inputPositions + 2 * padding - kernel) / 2 + 1
+        }
+
         override fun project(
             input: FloatArray,
             inputPositions: Int,
             gemm: S5MegpoidGemmKernel
         ): FloatArray {
             calls += "T" + index
-            return FloatArray(input.size) { input[it] + 1.0f }
+            val positions = outputPositions(inputPositions)
+            return FloatArray(positions) { outputPosition ->
+                val sourcePosition = if (kernelSize == null) outputPosition
+                    else (outputPosition * 2).coerceIn(0, inputPositions - 1)
+                input[sourcePosition] + 1.0f
+            }
         }
     }
 
@@ -68,11 +80,12 @@ class S5MegpoidSequenceTransitionPipelineTest {
 
     private fun makePipeline(
         banks: IntArray = intArrayOf(1, 1, 1),
-        inputFeatures: Int = 1
+        inputFeatures: Int = 1,
+        temporalKernelSize: Int? = null
     ) =
         S5MegpoidSequenceTransitionPipeline(
             denseStage = DenseFake(inputFeatures),
-            temporalStages = (0 until 3).map { TemporalFake(it, calls) },
+            temporalStages = (0 until 3).map { TemporalFake(it, calls, temporalKernelSize) },
             bankedStages = (0 until 3).map { BankedFake(it, banks[it], calls, bankedInputs) },
             residualExecutor = S5MegpoidResidualBlockExecutor(buildList {
                 for (row in 0 until 4) for (column in 0 until 2) {
@@ -136,6 +149,39 @@ class S5MegpoidSequenceTransitionPipelineTest {
         org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
             makePipeline(inputFeatures = 2).runPhoneFeatureMatrix(matrix)
         }
+    }
+
+    @Test
+    fun derivesMinimumInputLengthAfterThreeStrideTwoTemporalStages() {
+        val pipeline = makePipeline(temporalKernelSize = 3)
+        assertEquals(49, pipeline.minimumInputPositionsForResidualHistory())
+    }
+
+    @Test
+    fun rejectsInputWhoseTemporalOutputIsShorterThanResidualHistory() {
+        val pipeline = makePipeline(temporalKernelSize = 3)
+        assertThrows(IllegalArgumentException::class.java) {
+            pipeline.run(FloatArray(48), inputPositions = 48)
+        }
+    }
+
+    @Test
+    fun acceptsTheMinimumInputLengthThatLeavesSevenTemporalPositions() {
+        val pipeline = makePipeline(temporalKernelSize = 3)
+        val output = pipeline.run(FloatArray(49), inputPositions = 49)
+        assertEquals(7, output.positions)
+    }
+
+    @Test
+    fun phoneMatrixValidationUsesTheDerivedTemporalInputLength() {
+        val pipeline = makePipeline(inputFeatures = 1, temporalKernelSize = 3)
+        val tooShort = S5ApiDefaultPhoneFeatureMatrix(48, 1, FloatArray(48))
+        val minimum = S5ApiDefaultPhoneFeatureMatrix(49, 1, FloatArray(49))
+
+        assertThrows(IllegalArgumentException::class.java) {
+            pipeline.runPhoneFeatureMatrix(tooShort)
+        }
+        assertEquals(7, pipeline.runPhoneFeatureMatrix(minimum).positions)
     }
 
     @Test

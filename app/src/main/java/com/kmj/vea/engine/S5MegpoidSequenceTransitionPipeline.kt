@@ -105,9 +105,10 @@ class S5MegpoidSequenceTransitionPipeline(
         gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel,
         statistics: S5MegpoidStatisticsKernel = NativeS5MegpoidStatisticsKernel
     ): S5MegpoidSequenceTransitionOutput {
-        require(phoneMatrix.rowCount >= S5MegpoidResidualBlockShape.KERNEL_WIDTH) {
-            "Megpoid's 7x7 residual history requires at least " +
-                S5MegpoidResidualBlockShape.KERNEL_WIDTH + " phone positions."
+        val minimumInputPositions = minimumInputPositionsForResidualHistory()
+        require(phoneMatrix.rowCount >= minimumInputPositions) {
+            "The Temporal stages require at least " + minimumInputPositions +
+                " input phone positions to leave the 7x7 residual history window."
         }
         require(phoneMatrix.rowWidth == denseStage.inputFeatures) {
             "S5API phone row width " + phoneMatrix.rowWidth +
@@ -158,6 +159,14 @@ class S5MegpoidSequenceTransitionPipeline(
             positions = nextPositions
         }
 
+        // Stride-2 Temporal stages can shrink the sequence substantially.
+        // Validate the actual post-Temporal length before entering a 7x7 residual block.
+        require(positions >= S5MegpoidResidualBlockShape.KERNEL_WIDTH) {
+            "Temporal stages reduced the sequence to " + positions +
+                " positions; the residual 7x7 kernel needs at least " +
+                S5MegpoidResidualBlockShape.KERNEL_WIDTH + "."
+        }
+
         // The native reverse loop begins with Residual row 3, before Banked[0].
         check(featureCount == residualExecutor.channels)
         features = residualExecutor.runTransitionRow(
@@ -190,6 +199,40 @@ class S5MegpoidSequenceTransitionPipeline(
         }
 
         return S5MegpoidSequenceTransitionOutput(features, featureCount, positions)
+    }
+
+    /**
+     * Computes the smallest input sequence length whose three configured
+     * Temporal projections leave enough positions for the residual 7x7
+     * history window. The calculation uses each operator's actual output
+     * position function rather than assuming a fixed reduction.
+     */
+    fun minimumInputPositionsForResidualHistory(): Int {
+        val requiredOutput = S5MegpoidResidualBlockShape.KERNEL_WIDTH
+
+        fun outputAfterTemporal(inputPositions: Int): Int =
+            temporal.fold(inputPositions) { positions, stage ->
+                stage.outputPositions(positions)
+            }
+
+        var high = requiredOutput
+        while (outputAfterTemporal(high) < requiredOutput) {
+            require(high <= Int.MAX_VALUE / 2) {
+                "The configured Temporal stages cannot produce a valid residual history window."
+            }
+            high *= 2
+        }
+
+        var low = 1
+        while (low < high) {
+            val middle = low + (high - low) / 2
+            if (outputAfterTemporal(middle) >= requiredOutput) {
+                high = middle
+            } else {
+                low = middle + 1
+            }
+        }
+        return low
     }
 
     @Synchronized
