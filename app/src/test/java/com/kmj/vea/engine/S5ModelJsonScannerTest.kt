@@ -137,6 +137,7 @@ class S5ModelJsonScannerTest {
         )
         val values = result.matchedValues.getValue(configKey)
 
+        assertEquals(setOf(configKey), result.matchedObjectKeys)
         assertEquals(5, values.size)
         assertEquals(
             listOf("input_width", "hidden_width", "enabled", "optional", "scale"),
@@ -161,6 +162,32 @@ class S5ModelJsonScannerTest {
             values.last().valuePath
         )
         assertEquals(0, result.matchedValues.size - 1)
+    }
+
+    @Test
+    fun recordsPresenceOfDirectFeatureFlagKeyEvenWhenValueIsFalse() {
+        val featureKey = "9f174dc2b1ab89f96f4577e17d5e568a"
+        val json = """{"model":{"$featureKey":false}}"""
+
+        val result = S5ModelJsonScanner.scanForObjectKeys(
+            StringReader(json),
+            setOf(featureKey)
+        )
+
+        assertEquals(setOf(featureKey), result.matchedObjectKeys)
+        assertEquals("false", result.matchedValues.getValue(featureKey).single().value)
+    }
+
+    @Test
+    fun absentFeatureKeyIsNotReportedAsPresent() {
+        val featureKey = "9f174dc2b1ab89f96f4577e17d5e568a"
+        val result = S5ModelJsonScanner.scanForObjectKeys(
+            StringReader("""{"model":{"other":true}}"""),
+            setOf(featureKey)
+        )
+
+        assertTrue(result.matchedObjectKeys.isEmpty())
+        assertTrue(result.matchedValues.isEmpty())
     }
 
     @Test
