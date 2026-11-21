@@ -47,7 +47,7 @@ internal class S5MegpoidExcitationGenerator(
         targetHarmonicGain: Float
     ): FloatArray {
         require(sampleCount > 0)
-        val inverseCount = 1f / sampleCount
+        val inverseCount = if (sampleCount < 2) 0f else 1f / sampleCount
         val f0Step = (targetF0 - previousF0) * inverseCount
         val oldF0 = previousF0
         val oldNoiseGain = previousNoiseGain
@@ -133,7 +133,7 @@ internal class S5MegpoidGaussianNoise(
             x = nextUniformMinusOneToOne()
             y = nextUniformMinusOneToOne()
             radiusSquared = x * x + y * y
-        } while (radiusSquared >= 1f || radiusSquared == 0f)
+        } while (radiusSquared >= 1f || radiusSquared == 0f || x == 0f || y == 0f)
 
         val scale = sqrt((-2f * kotlin.math.ln(radiusSquared)) / radiusSquared)
         cachedSample = y * scale
