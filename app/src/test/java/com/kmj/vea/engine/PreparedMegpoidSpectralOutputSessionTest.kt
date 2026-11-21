@@ -25,6 +25,50 @@ class PreparedMegpoidSpectralOutputSessionTest {
     }
 
     @Test
+    fun rejectsProcessorShapeMismatchAtSessionCreation() {
+        val inputs = S5MegpoidOutputTransformInputs(
+            outputSamplesAtRoot0C = 4,
+            geometryAndFftSizeAtRoot04 = 16,
+            floatParameterAtRoot10 = 0f,
+            frameWindowCoreLengthAtRoot61C = 16,
+            alternatingBinSignAtRoot620 = false,
+            flagAtRoot1F74 = false,
+            frameWindowShapeModeAtRoot3418 = 0,
+            flagAtRoot1F75 = false
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            PreparedMegpoidSpectralOutputSession(
+                spectrumShape = S5MegpoidSpectrumOutputShape(fftSize = 8, complexBinCount = 5),
+                outputSamples = 4,
+                overlapAdd = inputs.createSpectralOverlapAdd()
+            )
+        }
+    }
+
+    @Test
+    fun rejectsOutputBlockLengthMismatchAtSessionCreation() {
+        val inputs = S5MegpoidOutputTransformInputs(
+            outputSamplesAtRoot0C = 4,
+            geometryAndFftSizeAtRoot04 = 8,
+            floatParameterAtRoot10 = 0f,
+            frameWindowCoreLengthAtRoot61C = 8,
+            alternatingBinSignAtRoot620 = false,
+            flagAtRoot1F74 = false,
+            frameWindowShapeModeAtRoot3418 = 0,
+            flagAtRoot1F75 = false
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            PreparedMegpoidSpectralOutputSession(
+                spectrumShape = S5MegpoidSpectrumOutputShape(fftSize = 8, complexBinCount = 5),
+                outputSamples = 8,
+                overlapAdd = inputs.createSpectralOverlapAdd()
+            )
+        }
+    }
+
+    @Test
     fun consumesSequentialModelSpectrumFramesAndPreservesState() {
         val session = createSession()
         val firstSpectrum = FloatArray(10).also { it[0] = 16f }
