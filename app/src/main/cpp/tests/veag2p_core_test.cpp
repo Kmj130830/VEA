@@ -125,6 +125,28 @@ int main() {
         }
     }
 
+    // Second recovered pass: vowel index 28 -> 29 except onset 13 (ㅇ).
+    assert(vea_g2p_korean_apply_single_syllable_rules(
+               0xBBC0U, &transformed) == VEA_G2P_STATUS_OK);  // 므
+    assert(transformed == 0xBBDCU);  // 믜
+    assert(vea_g2p_korean_apply_single_syllable_rules(
+               0xC73CU, &transformed) == VEA_G2P_STATUS_OK);  // 으
+    assert(transformed == 0xC73CU);
+
+    for (uint32_t initial = 0; initial < 19U; ++initial) {
+        for (uint32_t final = 0; final < 28U; ++final) {
+            const uint32_t source = 0xAC00U + initial * 588U + 18U * 28U + final;
+            const uint32_t expected =
+                (initial == 11U)
+                    ? source
+                    : 0xAC00U + initial * 588U + 19U * 28U + final;
+            transformed = 0;
+            assert(vea_g2p_korean_apply_single_syllable_rules(
+                       source, &transformed) == VEA_G2P_STATUS_OK);
+            assert(transformed == expected);
+        }
+    }
+
     // Base labels are table lookups only; context-sensitive G2P rules are
     // applied in later stages and are deliberately not inferred here.
     VeaKoreanPhonemeComponents components{};
