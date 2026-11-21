@@ -20,7 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class ExportS5RendererPath extends GhidraScript {
-    private static final int MAX_FUNCTIONS = 190;
+    private static final int MAX_FUNCTIONS = 260;
     private static final int MAX_DEPTH = 3;
     private static final class Work {
         final Function function;
@@ -135,6 +135,52 @@ public class ExportS5RendererPath extends GhidraScript {
                 }
             }
             if (inputCallerCount == 0) out.println("- No direct references recovered at the exact entry address.");
+            out.println();
+
+            // The phone-label classifier (FUN_180074a50) searches a global
+            // string/index tree and two alias-table ranges. Trace references
+            // to the tree root and every alias-table pointer slot so the
+            // runtime initializer can be recovered rather than guessing IDs
+            // from .rdata string order.
+            out.println("## Global phoneme-map and alias-table cross-references");
+            out.println();
+            out.println("| Global address | Referencing function | Reference site | Reference type |");
+            out.println("|---:|---|---:|---|");
+            String[][] globalRanges = {
+                {"1801c3080", "1801c3238"},
+                {"1801c3240", "1801c3328"},
+                {"1801c4140", "1801c4148"}
+            };
+            int globalReferenceCount = 0;
+            for (String[] range : globalRanges) {
+                Address begin = toAddr(range[0]);
+                long endOffset = Long.parseLong(range[1], 16) -
+                    Long.parseLong(range[0], 16);
+                for (long offset = 0; offset < endOffset; offset += 8) {
+                    monitor.checkCancelled();
+                    Address globalAddress = begin.add(offset);
+                    ReferenceIterator globalRefs =
+                        currentProgram.getReferenceManager().getReferencesTo(globalAddress);
+                    while (globalRefs.hasNext()) {
+                        Reference ref = globalRefs.next();
+                        Function caller = currentProgram.getFunctionManager()
+                            .getFunctionContaining(ref.getFromAddress());
+                        if (caller == null) continue;
+                        globalReferenceCount++;
+                        out.printf("| %s | %s at %s | %s | %s |%n",
+                            globalAddress, caller.getName(), caller.getEntryPoint(),
+                            ref.getFromAddress(), ref.getReferenceType());
+                        if (!selected.containsKey(caller.getEntryPoint()) &&
+                            selected.size() < MAX_FUNCTIONS) {
+                            selected.put(caller.getEntryPoint(), caller);
+                            queue.addLast(new Work(caller, 0));
+                        }
+                    }
+                }
+            }
+            if (globalReferenceCount == 0) {
+                out.println("| - | no code references recovered | - | - |");
+            }
             out.println();
 
             while (!queue.isEmpty() && selected.size() < MAX_FUNCTIONS) {
