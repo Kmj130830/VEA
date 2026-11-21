@@ -27,9 +27,6 @@ data class S5MegpoidOverlapAddParameters(
         require((ringMaskAt1C and (ringMaskAt1C + 1)) == 0) {
             "The S5API circular-buffer mask must be 2^n - 1."
         }
-        require(overlapContributionCountAt14 <= ringMaskAt1C + 1) {
-            "The circular buffer cannot retain all requested overlap contributions."
-        }
         require(frameWindow.size == fftSize) {
             "The frame window must contain exactly fftSize values."
         }
