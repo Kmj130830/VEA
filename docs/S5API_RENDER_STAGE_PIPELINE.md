@@ -64,6 +64,37 @@ and `param_1 + 0xe0`; the residual-block call uses the current activation
 and an alternate activation array at `param_1 + 0xe6`. The renderer copies
 or swaps these activation buffers between operator stages.
 
+## Descriptor-copy boundary and source layout
+
+`FUN_1800ccce0` allocates a fresh `0x37a0` execution state, runs the
+`FUN_1800bca40` initializer, obtains the inner config pointer through
+`FUN_1800c4730`, then passes that config to `FUN_1800cdbb0`.
+`FUN_1800cdbb0` is a copy/translation step, not the stage-weight loader.
+It copies the already-populated arrays from the source config into the
+execution-state arrays consumed by `FUN_1800c7ad0`:
+
+| Source field (byte offset) | Destination field (`int*` index) | Count expression | Entry stride |
+|---:|---:|---|---:|
+| `+0x250` | `+0x94` | `(end - begin) / 0x30` | `0x30` |
+| `+0x280` | `+0xa0` | `(end - begin) / 0x30` | `0x30` |
+| `+0x2b0` | `+0xac` | `(end - begin) / 0x28` | `0x28` |
+| `+0x2e0` | `+0xb8` | `(end - begin) >> 8` | `0x100` |
+
+The projection-selection bytes at `+0x59` and `+0x5a` are copied separately.
+The history/skip flag at source index `0xd52` is also copied, retaining the
+`int*`-relative indexing described earlier.
+
+`FUN_1800c47a0` is a separate config-object copy routine. It clones vectors
+at byte offsets `+0x268` (entry stride `0x18`), then either `+0x298` or
+`+0x2c8` depending on the mode byte at `+0x59`, and a residual-state vector
+at `+0x2f8` (entry stride `0x88`). Those are not the same arrays/strides as
+the c7ad0 execution descriptors and must not be substituted for them.
+
+`FUN_18005cba0`, called by the adjacent render preparation path, allocates
+scratch/shape descriptors and zeroes their data buffers. Its recovered body
+does not read or bind the VTMG weight values; therefore it is not evidence
+for assigning VTMG layer names to c5440 or c6390 stages.
+
 ## What is still unresolved
 
 The constructor that populates the descriptor arrays above has not yet been
