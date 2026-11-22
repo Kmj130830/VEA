@@ -159,6 +159,35 @@ public class ExportS5RendererPath extends GhidraScript {
                 out.println();
             }
 
+            // Decompile the functions that instantiate or copy render contexts,
+            // not just print their symbol names. Their bodies populate the arrays
+            // consumed later by FUN_1800c7ad0.
+            out.println("## Decompile caller functions for render-context constructors");
+            out.println();
+            for (String targetHex : new String[] {
+                    "1800c47a0", "1800c4730", "180097ff0", "18008d470", "1800aec40"
+            }) {
+                Address targetAddress = toAddr(targetHex);
+                ReferenceIterator callerRefs =
+                    currentProgram.getReferenceManager().getReferencesTo(targetAddress);
+                int added = 0;
+                out.println("### Callers of " + targetHex);
+                while (callerRefs.hasNext() && selected.size() < MAX_FUNCTIONS) {
+                    Reference ref = callerRefs.next();
+                    if (!ref.getReferenceType().isCall()) continue;
+                    Function caller =
+                        currentProgram.getFunctionManager().getFunctionContaining(ref.getFromAddress());
+                    if (caller == null || selected.containsKey(caller.getEntryPoint())) continue;
+                    selected.put(caller.getEntryPoint(), caller);
+                    queue.addLast(new Work(caller, 0));
+                    added++;
+                    out.printf("- queued %s at %s, call site %s%n",
+                        caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+                }
+                if (added == 0) out.println("- No new caller functions queued.");
+                out.println();
+            }
+
             while (!queue.isEmpty() && selected.size() < MAX_FUNCTIONS) {
                 monitor.checkCancelled();
                 Work work = queue.removeFirst();
