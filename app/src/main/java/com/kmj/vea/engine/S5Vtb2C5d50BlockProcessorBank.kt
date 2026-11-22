@@ -32,17 +32,9 @@ object S5Vtb2C5d50RendererExecutionOrder {
     fun notCalledByC7ad0(
         stageCount: Int,
         blocksPerStage: Int
-    ): List<S5Vtb2C5d50BlockCoordinate> {
-        val active = activeBlocks(stageCount, blocksPerStage).toSet()
-        return buildList {
-            for (stageIndex in 0 until stageCount) {
-                for (blockIndex in 0 until blocksPerStage) {
-                    val coordinate = S5Vtb2C5d50BlockCoordinate(stageIndex, blockIndex)
-                    if (coordinate !in active) add(coordinate)
-                }
-            }
-        }
-    }
+    ): List<S5Vtb2C5d50BlockCoordinate> =
+        S5RendererStageExecutionLayout.create(stageCount, blocksPerStage)
+            .uninvokedResidualCoordinates
 }
 
 /**
@@ -53,9 +45,12 @@ object S5Vtb2C5d50RendererExecutionOrder {
 class S5Vtb2C5d50BlockProcessorBank(
     private val parameterSet: S5Vtb2C5d50StageBlockParameterSet
 ) : AutoCloseable {
-    private val activeCoordinates = S5Vtb2C5d50RendererExecutionOrder.activeBlocks(
+    val executionLayout = S5RendererStageExecutionLayout.create(
         parameterSet.stageCount, parameterSet.blocksPerStage
-    ).toSet()
+    )
+    private val activeCoordinates = executionLayout.invocations
+        .map { it.blockCoordinate }
+        .toSet()
     private val processors = mutableMapOf<S5Vtb2C5d50BlockCoordinate, S5Vtb2C5d50BlockProcessor>()
     private var closed = false
 
