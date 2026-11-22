@@ -38,6 +38,29 @@ native operator without hand-constructed expanded bias arrays.
 This is a static reconstruction of the descriptor-building and block call
 sequence. It has not yet been matched against a live Yamaha render or a
 reference waveform.
+## Stateful streaming wrapper and history layout
+
+`FUN_1800c67e0` appends the current `[channel][position]` activation block
+to the block-local ring before building the seven-row chronological window.
+The ring snapshot is stored as `[history_row][channel][position]`, while
+`FUN_1800c5d50` consumes `[channel][history_row][position]`. These are not
+interchangeable layouts.
+
+`S5DepthwiseHistoryRing.snapshotChannelMajor()` performs that explicit
+transpose, preserving oldest-to-newest row order. The conversion is covered
+by `S5DepthwiseHistoryRingLayoutTest` with a two-channel, two-row fixture.
+
+`S5Vtb2C5d50BlockProcessor` owns one ring for one `(stage, block)` parameter
+descriptor. `process()` appends the input block, snapshots/transposes history,
+and invokes `NativeS5TensorBridge.runVtb2C5d50StageBlock`. `reset()` clears
+only that block's history. The default block length is the recovered 320
+samples and the builder's epsilon constant `0x358637bd` is `1e-6f`.
+
+This is a stateful single-block execution boundary. It is not yet a complete
+four-stage renderer: VTMG stage assignment, block scheduling, recurrent and
+other convolution branches, spectral synthesis, and final waveform output
+remain separate integration work.
+
 ## Android scalar block API
 
 VEA now exposes vea_s5_run_residual_dw_mlp_block_f32 and Kotlin NativeS5TensorBridge.runResidualDepthwiseMlpBlock. The input is an explicit seven-row history tensor per channel, with a separate 7x7 filter per channel. Expansion and projection matrices are row-major. Statistics are global over the depthwise output tensor. The function uses the recovered affine GELU parameter expression and residual update.
