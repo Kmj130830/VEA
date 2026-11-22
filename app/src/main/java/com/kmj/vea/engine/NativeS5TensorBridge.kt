@@ -490,6 +490,14 @@ object NativeS5TensorBridge {
             ?: throw IllegalStateException("Could not copy S5 history rows.")
     }
 
+    /** Returns [channel][oldest-to-newest history row][position] directly from native ring storage. */
+    internal fun copyHistoryRingChannelMajor(handle: Long): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(handle != 0L)
+        return nativeCopyChannelMajorHistoryRing(handle)
+            ?: throw IllegalStateException("Could not copy channel-major S5 history rows.")
+    }
+
     internal fun resetHistoryRing(handle: Long) {
         check(loaded) { "Native S5 tensor library is not loaded." }
         require(handle != 0L)
@@ -505,6 +513,7 @@ object NativeS5TensorBridge {
     private external fun nativeResetHistoryRing(handle: Long): Boolean
     private external fun nativeAppendHistoryRing(handle: Long, block: FloatArray): Boolean
     private external fun nativeCopyChronologicalHistoryRing(handle: Long): FloatArray?
+    private external fun nativeCopyChannelMajorHistoryRing(handle: Long): FloatArray?
 
     private external fun nativeUpsample2Conv3Projection(
         input: FloatArray, weights: FloatArray, bias: FloatArray?,
