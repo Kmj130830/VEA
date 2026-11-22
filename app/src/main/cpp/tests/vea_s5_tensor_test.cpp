@@ -533,6 +533,22 @@ int main() {
         banked_weights, 1, 4, banked_input, nullptr, banked_output, 2, 2, 3, 2) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
+    // FUN_1800c72d0: endpoint-clamped 2x interpolation and zero-padded 3-tap projection.
+    const float upsample_input[] = {2.0f, 4.0f};
+    const float upsample_weights[] = {1.0f, 10.0f, 100.0f};
+    const float upsample_bias[] = {0.25f};
+    float upsample_output[4] = {};
+    assert(vea_s5_upsample2_conv3_projection_f32(
+        upsample_input, upsample_weights, upsample_bias, upsample_output,
+        1, 1, 2) == VEA_S5_TENSOR_STATUS_OK);
+    const float upsample_expected[] = {270.25f, 377.25f, 437.75f, 43.75f};
+    for (size_t i = 0; i < 4; ++i) {
+        assert(std::fabs(upsample_output[i] - upsample_expected[i]) < 1.0e-5f);
+    }
+    assert(vea_s5_upsample2_conv3_projection_f32(
+        nullptr, upsample_weights, nullptr, upsample_output, 1, 1, 2) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
     // FUN_1800c5440: stride-2 Conv1D lowered to [channel*tap][outputPosition] GEMM input.
     const float stride2_input[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
     const float stride2_weights[] = {1.0f, 10.0f, 100.0f};

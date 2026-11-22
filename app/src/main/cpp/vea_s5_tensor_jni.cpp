@@ -1013,3 +1013,70 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeStride2Conv1dProjection(
         return nullptr;
     }
 }
+
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeUpsample2Conv3Projection(
+    JNIEnv* env, jobject,
+    jfloatArray input_array, jfloatArray weights_array, jfloatArray bias_array,
+    jint input_channels, jint output_channels, jint positions) {
+    if (input_array == nullptr || weights_array == nullptr ||
+        input_channels <= 0 || output_channels <= 0 || positions <= 0) return nullptr;
+
+    size_t input_required = 0u;
+    size_t inner_features = 0u;
+    size_t weights_required = 0u;
+    size_t output_positions = 0u;
+    size_t output_required = 0u;
+    if (MultiplyOverflow(static_cast<size_t>(input_channels), static_cast<size_t>(positions), &input_required) ||
+        MultiplyOverflow(static_cast<size_t>(input_channels), 3u, &inner_features) ||
+        MultiplyOverflow(static_cast<size_t>(output_channels), inner_features, &weights_required) ||
+        MultiplyOverflow(static_cast<size_t>(positions), 2u, &output_positions) ||
+        MultiplyOverflow(static_cast<size_t>(output_channels), output_positions, &output_required) ||
+        input_required > static_cast<size_t>(std::numeric_limits<jsize>::max()) ||
+        weights_required > static_cast<size_t>(std::numeric_limits<jsize>::max()) ||
+        output_required > static_cast<size_t>(std::numeric_limits<jsize>::max())) return nullptr;
+
+    if (static_cast<size_t>(env->GetArrayLength(input_array)) < input_required ||
+        static_cast<size_t>(env->GetArrayLength(weights_array)) < weights_required ||
+        (bias_array != nullptr &&
+         static_cast<size_t>(env->GetArrayLength(bias_array)) < static_cast<size_t>(output_channels))) {
+        return nullptr;
+    }
+    if (env->ExceptionCheck()) return nullptr;
+
+    try {
+        std::vector<float> input(input_required);
+        std::vector<float> weights(weights_required);
+        std::vector<float> bias;
+        std::vector<float> output(output_required, 0.0f);
+        env->GetFloatArrayRegion(input_array, 0, static_cast<jsize>(input_required), input.data());
+        if (env->ExceptionCheck()) return nullptr;
+        env->GetFloatArrayRegion(weights_array, 0, static_cast<jsize>(weights_required), weights.data());
+        if (env->ExceptionCheck()) return nullptr;
+
+        const float* bias_ptr = nullptr;
+        if (bias_array != nullptr) {
+            bias.resize(static_cast<size_t>(output_channels));
+            env->GetFloatArrayRegion(bias_array, 0, output_channels, bias.data());
+            if (env->ExceptionCheck()) return nullptr;
+            bias_ptr = bias.data();
+        }
+
+        const VeaS5TensorStatus status = vea_s5_upsample2_conv3_projection_f32(
+            input.data(), weights.data(), bias_ptr, output.data(),
+            static_cast<size_t>(input_channels), static_cast<size_t>(output_channels),
+            static_cast<size_t>(positions));
+        if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+
+        jfloatArray result = env->NewFloatArray(static_cast<jsize>(output.size()));
+        if (result != nullptr && !output.empty()) {
+            env->SetFloatArrayRegion(result, 0, static_cast<jsize>(output.size()), output.data());
+        }
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}

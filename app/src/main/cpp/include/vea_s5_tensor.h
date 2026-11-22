@@ -258,6 +258,24 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_vtmg_bank_to_v0_naive_a_f32(
  * samples input at 2*output_position + kernel_tap - floor(kernel_width/2),
  * and inserts zero for out-of-range input positions.
  */
+/*
+ * Reconstructs the 2x interpolation + three-tap projection in S5API
+ * FUN_1800c72d0.
+ *
+ * input: [input_channel][position]
+ * weights: [output_channel][input_channel * 3], row-major
+ * bias: optional [output_channel]
+ * output: [output_channel][2 * positions]
+ *
+ * Each source sample emits:
+ *   y[2*p]   = 0.75*x[p] + 0.25*x[max(p-1, 0)]
+ *   y[2*p+1] = 0.75*x[p] + 0.25*x[min(p+1, positions-1)]
+ * The following 3-tap windows zero-pad outside this upsampled sequence.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_upsample2_conv3_projection_f32(
+    const float* input, const float* weights, const float* bias, float* output,
+    size_t input_channels, size_t output_channels, size_t positions);
+
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_stride2_conv1d_projection_f32(
     const float* input, const float* weights, const float* bias, float* output,
     size_t input_channels, size_t output_channels, size_t positions,

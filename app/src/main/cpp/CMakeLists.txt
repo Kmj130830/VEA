@@ -33,6 +33,7 @@ add_library(veas5tensor SHARED
     vea_s5_gemm.cpp
     vea_s5_banked_linear.cpp
     vea_s5_stride2_conv1d.cpp
+    vea_s5_upsample2_conv3.cpp
     vea_s5_block.cpp
     vea_s5_history_ring.cpp
 )

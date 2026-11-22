@@ -38,6 +38,11 @@ extern "C" VeaS5TensorStatus vea_s5_stride2_conv1d_projection_f32(
         ? positions / 2u + 1u
         : positions / 2u + positions % 2u;
     const size_t radius = kernel_width / 2u;
+    const uint64_t signed_max = static_cast<uint64_t>(std::numeric_limits<int64_t>::max());
+    if (kernel_width > signed_max ||
+        output_positions - 1u > (signed_max - (kernel_width - 1u)) / 2u) {
+        return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
+    }
 
     size_t input_count = 0u;
     size_t inner_features = 0u;

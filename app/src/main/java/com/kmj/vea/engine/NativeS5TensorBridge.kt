@@ -220,6 +220,41 @@ object NativeS5TensorBridge {
     }
 
     /**
+     * Executes the 2x interpolation + 3-tap projection recovered from FUN_1800c72d0.
+     * Input is [inputChannel][position], weights are [outputChannel][inputChannel*3],
+     * and output is [outputChannel][position*2].
+     */
+    fun applyUpsample2Conv3Projection(
+        input: FloatArray,
+        weights: FloatArray,
+        bias: FloatArray?,
+        inputChannels: Int,
+        outputChannels: Int,
+        positions: Int
+    ): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(inputChannels > 0 && outputChannels > 0 && positions > 0)
+        val expectedInput = inputChannels.toLong() * positions
+        val expectedWeights = outputChannels.toLong() * inputChannels * 3L
+        val expectedOutput = outputChannels.toLong() * positions * 2L
+        require(expectedInput == input.size.toLong()) {
+            "Input length does not match [inputChannel][position]."
+        }
+        require(expectedWeights == weights.size.toLong()) {
+            "Weight length does not match [outputChannel][inputChannel*3]."
+        }
+        require(bias == null || bias.size == outputChannels) {
+            "Bias must contain one value per output channel."
+        }
+        require(expectedOutput <= Int.MAX_VALUE.toLong()) {
+            "Upsample projection output exceeds the supported array size."
+        }
+        return nativeUpsample2Conv3Projection(
+            input, weights, bias, inputChannels, outputChannels, positions
+        ) ?: throw IllegalArgumentException("S5 2x upsample/3-tap projection failed.")
+    }
+
+    /**
      * Executes the stride-2 Conv1D projection recovered from FUN_1800c5440.
      * Input is [inputChannel][position], weights are
      * [outputChannel][inputChannel][kernelTap], and output is
