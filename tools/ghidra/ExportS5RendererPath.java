@@ -74,7 +74,7 @@ public class ExportS5RendererPath extends GhidraScript {
                 "1800c5d50", "1800c67e0", "1800c6390", "1800c3740",
                 "1800c5440", "1800c72d0",
                 // Resolve the exact matrix ABI used by the linear-layer wrapper.
-                "18013aa00", "18013a850"
+                "18013aa00", "18013a850", "18013a600", "18013a110", "18013a540"
             };
             out.println("## Explicit internal call targets");
             out.println();
