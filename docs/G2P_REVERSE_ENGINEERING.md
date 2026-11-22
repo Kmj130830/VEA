@@ -34,9 +34,12 @@ The report includes:
 - optional supplemental parser/helper-function seeds for the Korean, Chinese and Japanese DLLs.
 
 Analysis reports:
-- first pass: run 44430339143;
-- second pass with factory-referenced vtables: run 44431058683;
-- third pass with internal parser seeds: run 44431862910. Check the Actions run for its latest completion state and artifact.
+- earlier first pass: run 44430339143;
+- earlier parser-seed pass: run 44431862910;
+- current factory-vtable pass: [run 45037284998](https://github.com/Kmj130830/VEA/actions/runs/45037284998), completed successfully on 2026-11-22;
+- current artifact digest: `sha256:44ce3723830905ad88c2912cdc3e2819801bc4b50837785457a1d7836c674a3f`.
+
+The current pass resolves JPN and KOR factory-referenced vtable candidates and adds their method bodies to the report. It does not yet establish every note/container structure or the host wrapper's exact ownership contract.
 
 Decompiler output is evidence, not vendor source or a canonical ABI header. It must be corroborated with references, code paths and the authorized reference implementation.
 
