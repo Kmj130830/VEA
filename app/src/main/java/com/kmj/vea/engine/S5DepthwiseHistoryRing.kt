@@ -52,13 +52,8 @@ class S5DepthwiseHistoryRing(
      */
     @Synchronized
     fun snapshotChannelMajor(): FloatArray {
-        val chronological = snapshotChronological()
-        return toChannelMajor(
-            chronological,
-            channels = channels,
-            historyRows = historyRows,
-            positions = positions
-        )
+        check(handle != 0L) { "S5 history ring is already closed." }
+        return NativeS5TensorBridge.copyHistoryRingChannelMajor(handle)
     }
     @Synchronized
     fun reset() {
