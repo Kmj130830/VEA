@@ -62,18 +62,17 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeAppendHistoryRing(
     if (handle == 0 || block_array == nullptr) return JNI_FALSE;
     const jsize count = env->GetArrayLength(block_array);
     if (count <= 0) return JNI_FALSE;
-    try {
-        std::vector<float> block(static_cast<size_t>(count));
-        env->GetFloatArrayRegion(block_array, 0, count, block.data());
-        if (env->ExceptionCheck()) return JNI_FALSE;
-        const VeaS5TensorStatus status = vea_s5_history_ring_append(
-            reinterpret_cast<VeaS5HistoryRing*>(handle), block.data(), block.size());
-        return status == VEA_S5_TENSOR_STATUS_OK ? JNI_TRUE : JNI_FALSE;
-    } catch (const std::bad_alloc&) {
-        return JNI_FALSE;
-    } catch (...) {
-        return JNI_FALSE;
-    }
+    auto* block = static_cast<jfloat*>(
+        env->GetPrimitiveArrayCritical(block_array, nullptr));
+    if (block == nullptr) return JNI_FALSE;
+
+    // The native append only copies the samples; do not allocate another
+    // temporary vector or make any JNI calls while the array is pinned.
+    const VeaS5TensorStatus status = vea_s5_history_ring_append(
+        reinterpret_cast<VeaS5HistoryRing*>(handle),
+        block, static_cast<size_t>(count));
+    env->ReleasePrimitiveArrayCritical(block_array, block, JNI_ABORT);
+    return status == VEA_S5_TENSOR_STATUS_OK ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT jfloatArray JNICALL
