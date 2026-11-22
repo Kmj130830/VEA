@@ -233,6 +233,52 @@ class S5VtmgBaseGraphTest {
     }
 
 
+
+    @Test
+    fun packedBaseGraphBuildsNamedBankedProjectionPlansForAllNineLayers() {
+        val packedLayers = S5VtmgGraphTensorCatalog.layers.map { spec ->
+            S5VtmgPackedGraphLayerWeights(
+                layerName = spec.layerName,
+                matrices = referencePackMatrixBank(
+                    FloatArray(spec.weightElementCount) { (it % 29).toFloat() },
+                    spec.axis0Count, spec.axis1Count, spec.matrixCount
+                ),
+                bias = FloatArray(spec.biasElementCount) { it.toFloat() },
+                axis0Count = spec.axis0Count,
+                axis1Count = spec.axis1Count,
+                matrixCount = spec.matrixCount,
+                paddedAxis0Count = spec.paddedAxis0Count
+            )
+        }
+        val graph = S5VtmgPackedBaseGraphWeights(packedLayers)
+        val plans = graph.toBankedProjectionPlans { source, output, input, padded, banks ->
+            FloatArray(output * input * banks) { index ->
+                val bank = index / (output * input)
+                val out = (index % (output * input)) / input
+                val inFeature = index % input
+                source[(bank * input + inFeature) * padded + out]
+            }
+        }
+
+        assertEquals(
+            listOf("pre1", "pre2", "conv1", "cond1", "conv2", "cond2",
+                "conv3", "cond3", "linear"),
+            plans.keys.toList()
+        )
+        assertEquals(9, plans.size)
+        for (spec in S5VtmgGraphTensorCatalog.layers) {
+            val plan = plans.getValue(spec.layerName)
+            assertEquals(spec.axis1Count, plan.inputFeatures)
+            assertEquals(spec.axis0Count, plan.outputFeatures)
+            assertEquals(spec.matrixCount, plan.banks)
+            assertEquals(spec.weightElementCount, plan.weights.size)
+            assertEquals(spec.biasElementCount, plan.bias.size)
+        }
+        assertEquals(3, plans.getValue("conv1").banks)
+        assertEquals(1, plans.getValue("pre1").banks)
+        assertEquals(3, plans.getValue("linear").outputFeatures)
+    }
+
     @Test
     fun packedVtmgProjectionProducesC6390FeaturePositionBankOrder() {
         val packed = FloatArray(3 * 2 * 8)

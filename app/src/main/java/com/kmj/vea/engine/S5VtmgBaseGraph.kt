@@ -243,6 +243,22 @@ data class S5VtmgPackedBaseGraphWeights(
     fun requireLayer(name: String): S5VtmgPackedGraphLayerWeights =
         layers.singleOrNull { it.layerName == name }
             ?: throw IllegalArgumentException("Packed VTMG base graph has no layer '$name'.")
+
+    /**
+     * Produces one c6390-ready banked projection plan per VTMG layer while
+     * retaining the original layer names. This does not decide stage order.
+     *
+     * Inject [convert] in JVM tests; production defaults to the native
+     * VTMG-to-v0_naive matrix conversion.
+     */
+    fun toBankedProjectionPlans(
+        convert: (FloatArray, Int, Int, Int, Int) -> FloatArray =
+            NativeS5TensorBridge::convertVtmgBankWeightsForV0Naive
+    ): Map<String, S5VtmgBankedProjectionPlan> =
+        layers.associate { layer ->
+            layer.layerName to layer.toBankedProjectionPlan(convert)
+        }
+
 }
 
 /**

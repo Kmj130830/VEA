@@ -151,3 +151,12 @@ the three-bank 64-by-32 conv tensors).
 The conversion does not identify a VTMG key as a particular renderer-stage
 descriptor. That key-to-stage binding must still be recovered from the
 render-state setup.
+
+## Named projection-plan set
+
+`S5VtmgPackedBaseGraphWeights.toBankedProjectionPlans()` converts all nine
+VTMG tensors into c6390-compatible plans, keyed by their original layer
+names. It preserves each layer's `axis0Count`, `axis1Count`, bank count,
+bias and converted matrix values. This provides a ready-to-bind collection
+for the renderer setup code, without asserting which stage consumes which
+entry.
