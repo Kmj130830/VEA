@@ -4,8 +4,18 @@ import java.io.File
 
 /**
  * Eight VTB2 tensor inputs passed by FUN_1800ced10 to FUN_1800d4bf0
- * for one (stage, block) pair. Field names follow the recovered descriptor
- * builder argument positions.
+ * for one (stage, block) pair.
+ *
+ * Recovered builder grouping:
+ * - param_2: depthwise kernel, transposed into the descriptor's channel-first
+ *   7x7 history layout;
+ * - param_3/param_4: conditioning vectors A/B, stored by FUN_1800d4a90;
+ * - param_5/param_6: expansion matrix and optional affine bias;
+ * - param_7/param_8: projection matrix and optional affine bias;
+ * - param_9: channel scale vector C.
+ *
+ * FUN_1800ced10 appends the resulting 0x100-byte descriptor to the
+ * stage-major renderer vector at slot +0xb8 (byte offset 0x2e0).
  */
 data class S5Vtb2C5d50StageBlockParameters(
     val stageIndex: Int,
