@@ -194,3 +194,18 @@ projection `FUN_1800c72d0`, and the residual DW-MLP block `FUN_1800c5d50`.
 Their descriptor construction and model-tensor binding remain separate work.
 The public engine status therefore stays unavailable and `render()` does not
 claim success until a complete Megpoid render produces validated PCM/WAV.
+
+## Explicit VTMG temporal operator boundary
+
+`S5VtmgPackedGraphLayerWeights.toTemporalProjectionPlan()` converts one
+packed matrix-bank descriptor to row-major `[outputChannel][inputChannel][kernelTap]`
+weights. The resulting plan exposes two explicit operations:
+
+- `projectStride2()` invokes the `FUN_1800c5440` stride-2 Conv1D primitive.
+- `projectUpsample2()` invokes the `FUN_1800c72d0` 2x interpolation plus 3-tap projection.
+
+The upsample path requires three taps and validates its expected output frame
+count. Both operations validate input, output, and finite values.
+This is an operator API only: it does not assign `conv1`, `conv2`, or `conv3`
+to a renderer stage or infer which operation the per-voice configuration selects.
+
