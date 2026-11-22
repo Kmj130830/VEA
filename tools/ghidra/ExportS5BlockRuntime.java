@@ -61,7 +61,11 @@ public class ExportS5BlockRuntime extends GhidraScript {
 
     private static final String[] CONTEXT_CALL_SITES = {
         // Caller of the SPP phase/vocoder sample processor.
-        "180096051"
+        "180096051",
+        // Caller which binds the shared VTMG graph returned by FUN_180068190.
+        "18008d5b2",
+        // Caller which reaches the VTB2 Megpoid configuration loader FUN_1800af170.
+        "18012729d"
     };
 
     @Override
