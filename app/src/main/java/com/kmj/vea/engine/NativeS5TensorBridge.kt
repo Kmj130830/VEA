@@ -321,6 +321,48 @@ object NativeS5TensorBridge {
         return result[0] to result[1]
     }
 
+    /** Creates a persistent native S5 block-history ring. */
+    internal fun createHistoryRing(channels: Int, positions: Int, historyRows: Int): Long {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(channels > 0 && positions > 0 && historyRows > 0)
+        return nativeCreateHistoryRing(channels, positions, historyRows).also {
+            check(it != 0L) { "Could not allocate the S5 history ring." }
+        }
+    }
+
+    /** Appends one [channel][position] block to the native history ring. */
+    internal fun appendHistoryRing(handle: Long, block: FloatArray) {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(handle != 0L && block.isNotEmpty())
+        check(nativeAppendHistoryRing(handle, block)) {
+            "The S5 history block does not match the ring dimensions."
+        }
+    }
+
+    /** Returns all history rows as [oldest row][channel][position]. */
+    internal fun copyHistoryRingChronological(handle: Long): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(handle != 0L)
+        return nativeCopyChronologicalHistoryRing(handle)
+            ?: throw IllegalStateException("Could not copy S5 history rows.")
+    }
+
+    internal fun resetHistoryRing(handle: Long) {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(handle != 0L)
+        check(nativeResetHistoryRing(handle)) { "Could not reset S5 history ring." }
+    }
+
+    internal fun destroyHistoryRing(handle: Long) {
+        if (loaded && handle != 0L) nativeDestroyHistoryRing(handle)
+    }
+
+    private external fun nativeCreateHistoryRing(channels: Int, positions: Int, historyRows: Int): Long
+    private external fun nativeDestroyHistoryRing(handle: Long)
+    private external fun nativeResetHistoryRing(handle: Long): Boolean
+    private external fun nativeAppendHistoryRing(handle: Long, block: FloatArray): Boolean
+    private external fun nativeCopyChronologicalHistoryRing(handle: Long): FloatArray?
+
     private external fun nativeRunResidualDwMlpBlock(
         historyRows: FloatArray, depthwiseWeights: FloatArray,
         expandWeights: FloatArray, expandedBiasA: FloatArray, expandedBiasB: FloatArray,
