@@ -123,11 +123,31 @@ The conversion itself is generic; it does not assert that a particular VTMG
 layer is wired to a specific `FUN_1800c5440` or `FUN_1800c72d0` stage.
 ## Banked projection handoff
 
-The VTMG layer's bank-packed weights are also converted by
-`toBankedProjectionPlan()` into the exact matrix layout expected by
-`FUN_1800c6390`: `[bank][outputFeature][inputFeature]`, with a row stride
-of `inputFeatures` and bank stride `outputFeatures * inputFeatures`.
-The plan passes the per-output bias and invokes the existing native banked
-projection bridge, whose result layout is `[outputFeature][position][bank]`.
-The conversion does not identify the VTMG key as a particular renderer-stage
-descriptor; that binding must still be recovered from the render-state setup.
+The decompiled `FUN_1800c6390` contract is:
+
+- `param_1[0]`: input feature count;
+- `param_1[1]`: output feature count;
+- `param_1[2]`: bank count;
+- `param_1[3]`: bias enable flag;
+- `param_1 + 4`: pointer to bank descriptors, each 0x18 bytes apart;
+- `param_1 + 8`: pointer to output-feature bias values;
+- the input tensor's position count is read at byte offset `+0x1c`.
+
+For each bank, the function runs row-major GEMM with
+`M=outputFeatures`, `N=positions`, and `K=inputFeatures`, then places
+the bank's result in `[outputFeature][position][bank]` order. If bias is
+enabled, one bias per output feature is broadcast across all positions and
+banks.
+
+The VTMG layer's bank-packed weights are converted by
+`toBankedProjectionPlan()` into the exact matrix layout consumed by this
+operator: `[bank][outputFeature][inputFeature]`, with a row stride of
+`inputFeatures` and bank stride `outputFeatures * inputFeatures`. The plan
+passes the per-output bias and invokes the existing native banked projection
+bridge. This is a strong layout-level match for layers whose VTMG descriptor
+has the same input/output feature dimensions and bank count (for example,
+the three-bank 64-by-32 conv tensors).
+
+The conversion does not identify a VTMG key as a particular renderer-stage
+descriptor. That key-to-stage binding must still be recovered from the
+render-state setup.
