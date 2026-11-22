@@ -374,7 +374,95 @@ class S5VtmgBaseGraphTest {
         }
     }
 
-    @Test,    fun rendererProjectionPlanSelectsBankedLinearOrUpsampleFromModeByte() {,        val layer = S5VtmgPackedGraphLayerWeights(,            layerName = "conv-runtime-probe",,            matrices = FloatArray(3 * 2 * 8) { index ->,                val tap = index / 16,                val within = index % 16,                val input = within / 8,                val output = within % 8,                if (output < 2) tap * 100f + input * 10f + output else 0f,            },,            bias = floatArrayOf(0.25f, -0.5f),,            axis0Count = 2, axis1Count = 2, matrixCount = 3, paddedAxis0Count = 8,        ),        val plan = layer.toRendererProjectionPlan { packed, out, input, padded, banks ->,            assertEquals(2, out),            assertEquals(2, input),            assertEquals(8, padded),            assertEquals(3, banks),            FloatArray(out * input * banks) { idx ->,                val bank = idx / (out * input),                val within = idx % (out * input),                val outputIndex = within / input,                val inputIndex = within % input,                packed[(bank * input + inputIndex) * padded + outputIndex],            },        },        val input = floatArrayOf(1f, 2f, 3f, 4f),        var bankedCalled = false,        var upsampleCalled = false,        val bankedOutput = plan.project(,            rawModeFlag = 0, input = input, positions = 2,,            executeBanked = { weights, rowStride, bankStride, x, bias, inCount, outCount, frames, banks ->,                bankedCalled = true,                assertEquals(plan.banked.weights.toList(), weights.toList()),                assertEquals(2, rowStride),                assertEquals(4, bankStride),                assertEquals(input.toList(), x.toList()),                assertEquals(2, inCount),                assertEquals(2, outCount),                assertEquals(2, frames),                assertEquals(3, banks),                assertEquals(plan.banked.bias.toList(), bias.toList()),                FloatArray(2 * 2 * 3) { it.toFloat() },            },,            executeUpsample = { _, _, _, _, _, _ ->,                upsampleCalled = true,                FloatArray(8),            },        ),        assertEquals(true, bankedCalled),        assertEquals(false, upsampleCalled),        assertEquals(12, bankedOutput.size),,        bankedCalled = false,        upsampleCalled = false,        val upsampleOutput = plan.project(,            rawModeFlag = 1, input = input, positions = 2,,            executeBanked = { _, _, _, _, _, _, _, _, _ ->,                bankedCalled = true,                FloatArray(12),            },,            executeUpsample = { x, weights, bias, inCount, outCount, frames ->,                upsampleCalled = true,                assertEquals(input.toList(), x.toList()),                assertEquals(plan.temporal.weights.toList(), weights.toList()),                assertEquals(plan.temporal.bias.toList(), bias?.toList()),                assertEquals(2, inCount),                assertEquals(2, outCount),                assertEquals(2, frames),                FloatArray(8) { it.toFloat() },            },        ),        assertEquals(false, bankedCalled),        assertEquals(true, upsampleCalled),        assertEquals(8, upsampleOutput.size),,        assertThrows(IllegalArgumentException::class.java) {,            plan.project(256, input, 2),        },    },    @Test
+    @Test
+    fun rendererProjectionPlanSelectsBankedLinearOrUpsampleFromModeByte() {
+        val layer = S5VtmgPackedGraphLayerWeights(
+            layerName = "conv-runtime-probe",
+            matrices = FloatArray(3 * 2 * 8) { index ->
+                val tap = index / 16
+                val within = index % 16
+                val input = within / 8
+                val output = within % 8
+                if (output < 2) tap * 100f + input * 10f + output else 0f
+            },
+            bias = floatArrayOf(0.25f, -0.5f),
+            axis0Count = 2,
+            axis1Count = 2,
+            matrixCount = 3,
+            paddedAxis0Count = 8
+        )
+        val plan = layer.toRendererProjectionPlan { packed, out, input, padded, banks ->
+            assertEquals(2, out)
+            assertEquals(2, input)
+            assertEquals(8, padded)
+            assertEquals(3, banks)
+            FloatArray(out * input * banks) { idx ->
+                val bank = idx / (out * input)
+                val within = idx % (out * input)
+                val outputIndex = within / input
+                val inputIndex = within % input
+                packed[(bank * input + inputIndex) * padded + outputIndex]
+            }
+        }
+        val input = floatArrayOf(1f, 2f, 3f, 4f)
+        var bankedCalled = false
+        var upsampleCalled = false
+        val bankedOutput = plan.project(
+            rawModeFlag = 0,
+            input = input,
+            positions = 2,
+            executeBanked = { weights, rowStride, bankStride, x, bias, inCount, outCount, frames, banks ->
+                bankedCalled = true
+                assertEquals(plan.banked.weights.toList(), weights.toList())
+                assertEquals(2, rowStride)
+                assertEquals(4, bankStride)
+                assertEquals(input.toList(), x.toList())
+                assertEquals(2, inCount)
+                assertEquals(2, outCount)
+                assertEquals(2, frames)
+                assertEquals(3, banks)
+                assertEquals(plan.banked.bias.toList(), bias.toList())
+                FloatArray(2 * 2 * 3) { it.toFloat() }
+            },
+            executeUpsample = { _, _, _, _, _, _ ->
+                upsampleCalled = true
+                FloatArray(8)
+            }
+        )
+        assertEquals(true, bankedCalled)
+        assertEquals(false, upsampleCalled)
+        assertEquals(12, bankedOutput.size)
+
+        bankedCalled = false
+        upsampleCalled = false
+        val upsampleOutput = plan.project(
+            rawModeFlag = 1,
+            input = input,
+            positions = 2,
+            executeBanked = { _, _, _, _, _, _, _, _, _ ->
+                bankedCalled = true
+                FloatArray(12)
+            },
+            executeUpsample = { x, weights, bias, inCount, outCount, frames ->
+                upsampleCalled = true
+                assertEquals(input.toList(), x.toList())
+                assertEquals(plan.temporal.weights.toList(), weights.toList())
+                assertEquals(plan.temporal.bias.toList(), bias?.toList())
+                assertEquals(2, inCount)
+                assertEquals(2, outCount)
+                assertEquals(2, frames)
+                FloatArray(8) { it.toFloat() }
+            }
+        )
+        assertEquals(false, bankedCalled)
+        assertEquals(true, upsampleCalled)
+        assertEquals(8, upsampleOutput.size)
+
+        assertThrows(IllegalArgumentException::class.java) {
+            plan.project(256, input, 2)
+        }
+    }
+    @Test
     fun temporalProjectionPlanCallsTheExplicitStrideAndUpsampleOperators() {
         val layer = S5VtmgPackedGraphLayerWeights(
             layerName = "conv-probe",
