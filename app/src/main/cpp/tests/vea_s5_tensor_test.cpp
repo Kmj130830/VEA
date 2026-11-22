@@ -612,6 +612,61 @@ int main() {
         raw_file, VEA_S5_CONTAINER_PREFIX_SIZE - 1u, decoded,
         sizeof(decoded), &decoded_size) == VEA_S5_CONTAINER_STATUS_INVALID_LENGTH);
 
+    // FUN_1800c67e0: append blocks to a fixed ring and expose oldest-to-newest history.
+    VeaS5HistoryRing* history = nullptr;
+    assert(vea_s5_history_ring_create(1, 3, 7, &history) == VEA_S5_TENSOR_STATUS_OK);
+    assert(history != nullptr);
+    assert(vea_s5_history_ring_block_size(history) == 3);
+    assert(vea_s5_history_ring_row_count(history) == 7);
+    float history_snapshot[21] = {};
+    assert(vea_s5_history_ring_copy_chronological(
+        history, history_snapshot, 21) == VEA_S5_TENSOR_STATUS_OK);
+    for (float value : history_snapshot) assert(value == 0.0f);
+
+    const float history_block_1[] = {1.0f, 1.5f, 2.0f};
+    const float history_block_2[] = {3.0f, 3.5f, 4.0f};
+    assert(vea_s5_history_ring_append(history, history_block_1, 3) == VEA_S5_TENSOR_STATUS_OK);
+    assert(vea_s5_history_ring_copy_chronological(
+        history, history_snapshot, 21) == VEA_S5_TENSOR_STATUS_OK);
+    for (size_t i = 0; i < 18; ++i) assert(history_snapshot[i] == 0.0f);
+    assert(history_snapshot[18] == 1.0f && history_snapshot[19] == 1.5f &&
+        history_snapshot[20] == 2.0f);
+
+    assert(vea_s5_history_ring_append(history, history_block_2, 3) == VEA_S5_TENSOR_STATUS_OK);
+    assert(vea_s5_history_ring_copy_chronological(
+        history, history_snapshot, 21) == VEA_S5_TENSOR_STATUS_OK);
+    for (size_t i = 0; i < 15; ++i) assert(history_snapshot[i] == 0.0f);
+    assert(history_snapshot[15] == 1.0f && history_snapshot[16] == 1.5f &&
+        history_snapshot[17] == 2.0f);
+    assert(history_snapshot[18] == 3.0f && history_snapshot[19] == 3.5f &&
+        history_snapshot[20] == 4.0f);
+
+    for (size_t block = 3; block <= 9; ++block) {
+        const float values[] = {
+            static_cast<float>(block),
+            static_cast<float>(block) + 0.5f,
+            static_cast<float>(block) + 1.0f
+        };
+        assert(vea_s5_history_ring_append(history, values, 3) == VEA_S5_TENSOR_STATUS_OK);
+    }
+    assert(vea_s5_history_ring_copy_chronological(
+        history, history_snapshot, 21) == VEA_S5_TENSOR_STATUS_OK);
+    for (size_t row = 0; row < 7; ++row) {
+        const float block = static_cast<float>(row + 3);
+        assert(history_snapshot[row * 3] == block);
+        assert(history_snapshot[row * 3 + 1] == block + 0.5f);
+        assert(history_snapshot[row * 3 + 2] == block + 1.0f);
+    }
+    assert(vea_s5_history_ring_append(history, history_block_1, 2) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_history_ring_copy_chronological(
+        history, history_snapshot, 20) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_history_ring_reset(history) == VEA_S5_TENSOR_STATUS_OK);
+    assert(vea_s5_history_ring_copy_chronological(
+        history, history_snapshot, 21) == VEA_S5_TENSOR_STATUS_OK);
+    for (float value : history_snapshot) assert(value == 0.0f);
+    vea_s5_history_ring_destroy(history);
+
     vea_s5_arena_reset(arena);
     assert(vea_s5_arena_used(arena) == 0);
     vea_s5_arena_destroy(arena);
