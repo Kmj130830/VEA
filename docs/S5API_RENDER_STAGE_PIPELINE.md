@@ -66,10 +66,14 @@ The reverse loop uses `iVar29` from zero to
 `stageCount - 1`. It enters the projection and c5d50 block section only when
 `iVar29 > 0`. Inside that section:
 
-- `reverseStageCount = stageCount - iVar29`;
-- the projected stage index is `reverseStageCount - 1`;
-- each block's flattened parameter index is
-  `(reverseStageCount - 1) * blockCount + blockIndex`.
+- the selected projection descriptor index is `iVar29 - 1`;
+- the c5d50 parameter stage index is `stageCount - iVar29 - 1`;
+- each block's flattened c5d50 parameter index is
+  `(stageCount - iVar29 - 1) * blockCount + blockIndex`.
+
+Thus projection descriptors advance in forward order (0, 1, 2), while the
+c5d50 parameter groups execute in reverse order (2, 1, 0). These are distinct
+index spaces and must not be conflated.
 
 For the decoded Megpoid values (4 stages, 2 blocks per stage), this gives the
 confirmed c5d50 invocation sequence:
@@ -231,26 +235,39 @@ VTB2 loader object with the final `+0xb8` render-state vector.
 The decompiled `FUN_1800c7ad0` makes the stage control flow more precise
 than the six-call c5d50 schedule alone:
 
+The renderer entry is decompiled with `param_1: int*`. Therefore
+`param_1 + N` means a 32-bit slot index (byte offset `4*N`), not byte offset
+`N`. The byte flag at `(uint8_t*)param_1 + 0x59` is a separate raw-byte
+address. The exact slot-to-byte mapping is listed in the descriptor table
+above.
+
 1. A forward loop runs `FUN_1800c5440` for each stage transition from
-   `0` through `stageCount - 2`. It reads descriptors from the array at
-   object offset `+0x94` with `0x30`-byte elements.
+   `0` through `stageCount - 2`. It reads descriptors through slot
+   `param_1 + 0x94` (byte offset `0x250`) with `0x30`-byte elements.
 2. A reverse-stage loop then selects one projection operator based on the
-   byte flag at object offset `+0x59`:
-   - flag `0`: `FUN_1800c6390`, using descriptors at `+0xa0`, stride `0x30`;
-   - flag nonzero: `FUN_1800c72d0`, using descriptors at `+0xac`, stride `0x28`.
+   raw byte flag at byte offset `0x59`:
+   - flag `0`: `FUN_1800c6390`, using slot `param_1 + 0xa0`
+     (byte offset `0x280`), stride `0x30`;
+   - flag nonzero: `FUN_1800c72d0`, using slot `param_1 + 0xac`
+     (byte offset `0x2b0`), stride `0x28`.
 3. Each reverse stage then executes `blockCount` c5d50 blocks. Their
-   descriptors are read from `+0xb8` with `0x100`-byte elements.
+   descriptors are read through slot `param_1 + 0xb8` (byte offset
+   `0x2e0`) with `0x100`-byte elements.
 
 `param_1[5]` is the stage count and `param_1[6]` is the block count per
 stage in this function. The forward and reverse stage operators use the
-per-stage activation buffers held in the `+0xda` and `+0xe0` pointer arrays.
+per-stage activation buffers through slots `param_1 + 0xda` and
+`param_1 + 0xe0` (byte offsets `0x368` and `0x380`). The alternate
+activation array is at slot `param_1 + 0xe6` (byte offset `0x398`).
 The exact semantics of their ring/window subfields still require the
 corresponding descriptor constructors.
 
 `FUN_1800cdbb0` copies all four descriptor vectors into a render-state clone:
-`+0x94` (`0x30` stride), `+0xa0` (`0x30` stride), `+0xac` (`0x28` stride),
-and `+0xb8` (`0x100` stride). This is strong evidence that these arrays belong
-to the renderer configuration object consumed by c7ad0.
+destination slots `+0x94`, `+0xa0`, `+0xac`, and `+0xb8`, corresponding
+to byte offsets `0x250`, `0x280`, `0x2b0`, and `0x2e0`. The element
+strides are respectively `0x30`, `0x30`, `0x28`, and `0x100` bytes.
+This is strong evidence that these arrays belong to the renderer
+configuration object consumed by c7ad0.
 
 The VTMG file contains nine named tensors, but there is still no verified
 one-to-one mapping from those tensor names to the three operator descriptor
@@ -258,6 +275,32 @@ arrays at `+0x94`, `+0xa0`, and `+0xac`. VEA therefore exposes generic
 stride-2, banked-linear, and upsample-2 operators without hard-coding a
 VTMG layer-to-stage assignment. The `+0x59` mode flag must also be read from
 the actual model configuration, not assumed from the default initializer.
+
+## State-buffer sizing is separate from model-weight loading
+
+`FUN_1800d5a00(int* state)` is called at the end of `FUN_1800cdbb0` after
+the descriptor vectors and scalar settings have been copied. Its body
+sizes/clears renderer-owned memory from the current dimensions; it does not
+decode VTB2 tensors or assign VTMG tensor names to operator descriptors.
+
+Recovered allocation requirements include:
+
+- `stageCount - 1` entries for the forward `c5440` auxiliary vector at slot
+  `+0x9a` (each entry `0x18` bytes);
+- `stageCount - 1` entries for the active projection auxiliary vector at
+  slot `+0xa6` when the mode flag is zero, or `+0xb2` when nonzero
+  (each entry `0x18` bytes);
+- `stageCount * blockCount` residual-block workspace entries at slot
+  `+0xbe`, each `0x88` bytes, initialized from the local workspace template;
+- `stageCount` activation descriptors for each of slots `+0xda`, `+0xe0`,
+  and `+0xe6`, with sample-buffer lengths derived from the stage
+  dimension arrays.
+
+For the decoded Megpoid configuration (4 stages, 2 blocks), the state
+therefore allocates 3 forward auxiliary entries, 3 projection auxiliary
+entries for the selected mode, and 8 residual workspace entries. This
+allocation count is separate from the six c5d50 calls made by the current
+c7ad0 loop.
 
 ## Explicit VTMG temporal operator boundary
 
