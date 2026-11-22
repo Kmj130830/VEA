@@ -219,10 +219,10 @@ frame routine:
   unresolved because the vendor ABI prototypes are incomplete.
 
 `FUN_1800cdbb0` is especially relevant to the stage descriptors: it copies
-the vector at object offset `+0xb8` using an element stride of `0x100` bytes.
-The renderer later indexes that same `+0xb8` vector with a `0x100`-byte
-stride for each c5d50 call. This ties the copied render-state array to the
-per-block objects consumed by `FUN_1800c5d50`.
+the vector at int32 slot `+0xb8` (byte offset `0x2e0`) using an element
+stride of `0x100` bytes. The renderer later indexes that same slot vector
+with a `0x100`-byte stride for each c5d50 call. This ties the copied
+render-state array to the per-block objects consumed by `FUN_1800c5d50`.
 
 The VTB2 entry `FUN_180127220` calls `FUN_1800af170`, which prepares a
 temporary loader object, calls `FUN_1800ced10`, and then passes the result
@@ -271,10 +271,21 @@ configuration object consumed by c7ad0.
 
 The VTMG file contains nine named tensors, but there is still no verified
 one-to-one mapping from those tensor names to the three operator descriptor
-arrays at `+0x94`, `+0xa0`, and `+0xac`. VEA therefore exposes generic
+arrays at slots `+0x94`, `+0xa0`, and `+0xac`. VEA therefore exposes generic
 stride-2, banked-linear, and upsample-2 operators without hard-coding a
-VTMG layer-to-stage assignment. The `+0x59` mode flag must also be read from
-the actual model configuration, not assumed from the default initializer.
+VTMG layer-to-stage assignment. The raw byte at `0x59` must be read from the
+actual model configuration, not assumed from the default initializer.
+
+For a VTMG layer with three matrix banks, `toRendererProjectionPlan()` now
+prepares both layouts from the same decoded tensor:
+- bank-major `[bank][output][input]` weights for c6390;
+- temporal `[output][input][tap]` weights for c72d0.
+
+Its `project(rawModeFlag, ...)` selects c6390 when the unsigned mode byte is
+zero, and c72d0 when it is nonzero. The plan also validates tensor dimensions
+and output lengths. This closes the decoded-tensor-to-operator call boundary
+for either projection mode, but it intentionally does not choose which of
+`conv1`, `conv2`, or `conv3` belongs to a specific descriptor index.
 
 ## State-buffer sizing is separate from model-weight loading
 
