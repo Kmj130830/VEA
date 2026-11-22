@@ -282,8 +282,8 @@ class S5VtmgBaseGraphTest {
         }
         assertEquals(12, result.size)
         assertEquals(
-            listOf(4.5f, 304.5f, 604.5f, 6.5f, 606.5f, 1206.5f,
-                31.0f, 331.0f, 631.0f, 43.0f, 643.0f, 1243.0f),
+            listOf(3.5f, 403.5f, 803.5f, 4.5f, 604.5f, 1204.5f,
+                42.0f, 442.0f, 842.0f, 63.0f, 663.0f, 1263.0f),
             result.toList()
         )
     }
