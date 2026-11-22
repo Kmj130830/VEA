@@ -97,7 +97,8 @@ class S5Vtb2RepeatedBlockParameterLoaderTest {
         val weightKey = S5Vtb2RepeatedBlockParameterLoader.WEIGHT_FIELD_KEY
         val biasKey = S5Vtb2RepeatedBlockParameterLoader.BIAS_FIELD_KEY
         val entries = (0 until 9).joinToString(",") { index ->
-            val duplicate = if (index == 0) ", \\"$weightKey\\":\\"*F32duplicate_w\\"" else ""
+            val quote = '"'
+            val duplicate = if (index == 0) ", $quote$weightKey$quote:$quote*F32duplicate_w$quote" else ""
             """{"$bankedKey":{"$weightKey":"*F32b${index}_w"$duplicate,"$biasKey":"*F32b${index}_b"},"$singleKey":{"$weightKey":"*F32b${index}_o"}}"""
         }
         val json = """{"$rootConfigKey":{"$configEntryKey":{"${S5Vtb2RepeatedBlockParameterLoader.DECLARED_BLOCK_COUNT_KEY}":9}},"$modelKey":{"$parameterKey":{"$arrayKey":[$entries]}}}"""
