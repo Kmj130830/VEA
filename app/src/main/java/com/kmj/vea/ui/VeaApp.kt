@@ -35,6 +35,7 @@ enum class EditorMode {
 @Composable
 fun VeaApp() {
     val context = LocalContext.current
+    val megpoidVoicebankInfo = remember(context) { VoicebankCatalog.loadMegpoid(context) }
     var modeName by rememberSaveable { mutableStateOf(EditorMode.ARRANGEMENT.name) }
     val mode = EditorMode.valueOf(modeName)
 
@@ -76,6 +77,8 @@ fun VeaApp() {
         megpoidInstallCheckComplete = true
     }
 
+    val installedMegpoidDescriptor = installedMegpoidPackage?.toVoicebankDescriptor()
+
     val history = remember(project.id) { ProjectHistory(project, limit = 200) }
 
     var selectedTrackId by rememberSaveable {
@@ -89,6 +92,31 @@ fun VeaApp() {
     fun commitProject(next: VeaProject) {
         if (next == project) return
         project = history.push(next)
+    }
+
+    // Newly created and previously unassigned vocal tracks use the bundled
+    // Megpoid voice by default. Existing explicit singer assignments are kept.
+    LaunchedEffect(installedMegpoidDescriptor?.sourceUri) {
+        val defaultVoice = installedMegpoidDescriptor ?: return@LaunchedEffect
+        val defaultStyleId = megpoidVoicebankInfo.defaultStyleId
+        val nextTracks = project.tracks.map { track ->
+            if (track.kind != "AUDIO" &&
+                track.singerId.isBlank() &&
+                track.singerSourceUri.isBlank()
+            ) {
+                track.copy(
+                    singerId = defaultVoice.id,
+                    singerName = defaultVoice.displayName,
+                    singerStyleId = defaultStyleId,
+                    singerSourceUri = defaultVoice.sourceUri
+                )
+            } else {
+                track
+            }
+        }
+        if (nextTracks != project.tracks) {
+            commitProject(project.copy(tracks = nextTracks))
+        }
     }
 
     fun undoProject() {
@@ -210,11 +238,20 @@ fun VeaApp() {
                         modeName = EditorMode.PIANO_ROLL.name
                     },
                     onAddTrack = {
+                        val defaultVoice = installedMegpoidDescriptor
                         val track = VeaTrack(
                             name = "Vocal " + (project.tracks.size + 1),
                             kind = "VOCAL_AI",
                             language = "jpn",
-                            color = 0xFF8C74C7
+                            singerId = defaultVoice?.id.orEmpty(),
+                            singerName = defaultVoice?.displayName.orEmpty(),
+                            singerStyleId = if (defaultVoice != null) {
+                                megpoidVoicebankInfo.defaultStyleId
+                            } else {
+                                ""
+                            },
+                            color = 0xFF8C74C7,
+                            singerSourceUri = defaultVoice?.sourceUri.orEmpty()
                         )
                         commitProject(project.copy(tracks = project.tracks + track))
                         selectedTrackId = track.id
