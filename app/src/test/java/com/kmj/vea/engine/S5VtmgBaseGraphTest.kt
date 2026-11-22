@@ -232,6 +232,62 @@ class S5VtmgBaseGraphTest {
         assertEquals(listOf(0.25f, -0.5f), plan.bias.toList())
     }
 
+
+    @Test
+    fun packedVtmgProjectionProducesC6390FeaturePositionBankOrder() {
+        val packed = FloatArray(3 * 2 * 8)
+        for (bank in 0 until 3) {
+            for (inputFeature in 0 until 2) {
+                for (outputFeature in 0 until 2) {
+                    packed[(bank * 2 + inputFeature) * 8 + outputFeature] =
+                        bank * 100.0f + outputFeature * 10.0f + inputFeature
+                }
+            }
+        }
+        val layer = S5VtmgPackedGraphLayerWeights(
+            layerName = "conv-test",
+            matrices = packed,
+            bias = floatArrayOf(0.5f, -1.0f),
+            axis0Count = 2,
+            axis1Count = 2,
+            matrixCount = 3,
+            paddedAxis0Count = 8
+        )
+        val plan = layer.toBankedProjectionPlan { source, output, input, padded, banks ->
+            FloatArray(output * input * banks) { index ->
+                val bank = index / (output * input)
+                val out = (index % (output * input)) / input
+                val inFeature = index % input
+                source[(bank * input + inFeature) * padded + out]
+            }
+        }
+        val x = floatArrayOf(1.0f, 2.0f, 3.0f, 4.0f) // [2 input features][2 positions]
+        val result = plan.project(x, 2) { weights, rowStride, bankStride, input, bias,
+            inFeatures, outFeatures, positions, banks ->
+            val output = FloatArray(outFeatures * positions * banks)
+            for (out in 0 until outFeatures) {
+                for (position in 0 until positions) {
+                    for (bank in 0 until banks) {
+                        var sum = bias[out]
+                        for (feature in 0 until inFeatures) {
+                            val a = weights[bank * bankStride + out * rowStride + feature]
+                            val b = input[feature * positions + position]
+                            sum += a * b
+                        }
+                        output[(out * positions + position) * banks + bank] = sum
+                    }
+                }
+            }
+            output
+        }
+        assertEquals(12, result.size)
+        assertEquals(
+            listOf(4.5f, 304.5f, 604.5f, 6.5f, 606.5f, 1206.5f,
+                31.0f, 331.0f, 631.0f, 43.0f, 643.0f, 1243.0f),
+            result.toList()
+        )
+    }
+
     @Test
     fun packedLayerConvertsBankMajorWeightsToOutputInputTapOrder() {
         val outputFeatures = 2

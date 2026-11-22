@@ -190,7 +190,26 @@ data class S5VtmgBankedProjectionPlan(
     val weightBankStride: Int
         get() = outputFeatures * inputFeatures
 
-    fun project(input: FloatArray, positions: Int): FloatArray {
+    fun project(
+        input: FloatArray,
+        positions: Int,
+        execute: (
+            FloatArray, Int, Int, FloatArray, FloatArray,
+            Int, Int, Int, Int
+        ) -> FloatArray = { w, rowStride, bankStride, x, b, inCount, outCount, frameCount, bankCount ->
+            NativeS5TensorBridge.applyBankedLinearProjection(
+                weights = w,
+                weightRowStride = rowStride,
+                weightBankStride = bankStride,
+                input = x,
+                bias = b,
+                inputFeatures = inCount,
+                outputFeatures = outCount,
+                positions = frameCount,
+                banks = bankCount
+            )
+        }
+    ): FloatArray {
         require(positions > 0)
         val expectedInput = inputFeatures.toLong() * positions
         require(expectedInput == input.size.toLong()) {
@@ -200,17 +219,18 @@ data class S5VtmgBankedProjectionPlan(
         require(outputPerBank <= Int.MAX_VALUE.toLong() / banks.toLong()) {
             "Banked projection output exceeds the supported array size."
         }
-        return NativeS5TensorBridge.applyBankedLinearProjection(
-            weights = weights,
-            weightRowStride = weightRowStride,
-            weightBankStride = weightBankStride,
-            input = input,
-            bias = bias,
-            inputFeatures = inputFeatures,
-            outputFeatures = outputFeatures,
-            positions = positions,
-            banks = banks
+        val output = execute(
+            weights, weightRowStride, weightBankStride, input, bias,
+            inputFeatures, outputFeatures, positions, banks
         )
+        val expectedOutput = outputPerBank * banks
+        require(output.size.toLong() == expectedOutput) {
+            "Banked projection returned an invalid output tensor length."
+        }
+        require(output.all { it.isFinite() }) {
+            "Banked projection returned a non-finite value."
+        }
+        return output
     }
 }
 
