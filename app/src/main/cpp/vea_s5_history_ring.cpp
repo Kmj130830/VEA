@@ -4,6 +4,7 @@
 #include <cstring>
 #include <limits>
 #include <new>
+#include <stdexcept>
 #include <vector>
 
 struct VeaS5HistoryRing {
