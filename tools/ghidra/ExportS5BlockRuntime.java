@@ -57,6 +57,7 @@ public class ExportS5BlockRuntime extends GhidraScript {
         "180040630", "180135270", "1801347a0",
         "1801360c0", "180135670", "180135b90",
         "18013a850", "1800789b0", "1800780b0"
+    };
 
     private static final String[] CONTEXT_CALL_SITES = {
         // Caller of the SPP phase/vocoder sample processor.
