@@ -24,7 +24,8 @@ public class ExportS5BlockRuntime extends GhidraScript {
 
         // Megpoid stage/block tensor descriptor construction.
         "1800ced10", "1800d4bf0", "1800d4a90",
-        "1800d4610", "1800c0320",
+        "1800d4610", "1800c0320", "1800c3740",
+        "1800c1a30", "1800ccdb0", "1801361f0",
 
         // Renderer-state construction, descriptor copying, and VTMG binding.
         "1800ccce0", "1800cdbb0", "1800c4730",
