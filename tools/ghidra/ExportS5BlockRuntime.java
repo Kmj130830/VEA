@@ -16,9 +16,22 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class ExportS5BlockRuntime extends GhidraScript {
-    private static final int MAX_FUNCTIONS = 130;
+    private static final int MAX_FUNCTIONS = 220;
     private static final String[] TARGETS = {
-        "1800c5d50", "1800c67e0", "1800c6390", "1800c72d0",
+        // Render orchestration and the four implemented operator families.
+        "1800c7ad0", "1800c5440", "1800c6390", "1800c72d0",
+        "1800c5d50", "1800c67e0",
+
+        // Megpoid stage/block tensor descriptor construction.
+        "1800ced10", "1800d4bf0", "1800d4a90",
+        "1800d4610", "1800c0320",
+
+        // Renderer-state construction, descriptor copying, and VTMG binding.
+        "1800ccce0", "1800cdbb0", "1800c4730",
+        "1800c47a0", "18005cba0", "180068190",
+        "180064670",
+
+        // Scalar math, dispatchers, and kernels already under investigation.
         "18012cb50", "18012cbb2", "18012ca50",
         "1800df720", "1800d84e0", "1800d8720",
         "18012d460", "18012e0d0", "18012f280",
@@ -34,7 +47,7 @@ public class ExportS5BlockRuntime extends GhidraScript {
 
         LinkedHashMap<Address, Function> selected = new LinkedHashMap<>();
         try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(output.toPath(), StandardCharsets.UTF_8))) {
-            out.println("# S5API depthwise-normalization-residual runtime block");
+            out.println("# S5API Megpoid renderer-state and residual-block binding analysis");
             out.println();
             out.println("> Static analysis only. Vendor PE code is never executed.");
             out.println();
@@ -42,7 +55,7 @@ public class ExportS5BlockRuntime extends GhidraScript {
             out.println("- Image base: " + currentProgram.getImageBase());
             out.println();
 
-            out.println("## Primary targets and all recovered direct callers");
+            out.println("## Renderer-state, stage-binding, and block-descriptor targets");
             out.println();
             for (String hex : TARGETS) {
                 monitor.checkCancelled();
