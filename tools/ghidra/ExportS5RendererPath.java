@@ -67,6 +67,11 @@ public class ExportS5RendererPath extends GhidraScript {
             }
 
             String[] internalSeeds = {
+                // Trace the S5 renderer state factory and its caller-side adapter.
+                "18005a980", "180055a70", "1800aecba", "1800aeea0", "1800925f0",
+                // Re-check model constructors and the render-stage call sequence.
+                "180068190", "180064670", "1800c7ad0", "1800c5d50",
+                "1800c5440", "1800c6390", "1800c72d0",
                 "1801361f0", "180131fa0", "1801269f0", "1801270a0",
                 "1801272b0", "180127120", "180127330", "180126c20",
                 "180126e30", "180126d40", "1801271a0",
@@ -125,7 +130,10 @@ public class ExportS5RendererPath extends GhidraScript {
 
             out.println("## Direct callers of model and render object factories");
             out.println();
-            for (String targetHex : new String[] { "18008d470", "180097ff0", "18005a980" }) {
+            for (String targetHex : new String[] {
+                    "18008d470", "180097ff0", "18005a980", "1800c7ad0",
+                    "1800aec40", "1800c5d50", "1800c5440", "1800c6390", "1800c72d0"
+            }) {
                 Address targetAddress = toAddr(targetHex);
                 ReferenceIterator targetRefs =
                     currentProgram.getReferenceManager().getReferencesTo(targetAddress);
