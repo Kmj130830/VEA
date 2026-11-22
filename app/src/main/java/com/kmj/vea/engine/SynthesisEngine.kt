@@ -158,6 +158,32 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
     }
 
     /**
+     * Loads the eight VTB2 c5d50 descriptor sets for bundled Megpoid.
+     * All decoded descriptors are retained; only the six calls in the
+     * recovered c7ad0 schedule are activated by S5Vtb2C5d50BlockProcessorBank.
+     */
+    fun loadMegpoidC5d50StageBlockParameters(
+        voicebank: VoicebankDescriptor
+    ): S5Vtb2C5d50StageBlockParameterSet {
+        require(voicebank.id == "ai_megpoid_v7" && voicebank.engineFamily == "VOCALOID7") {
+            "The c5d50 stage/block loader currently targets AI Megpoid V7."
+        }
+        val modelDirectory = File(URI(voicebank.sourceUri))
+        return S5Vtb2C5d50StageBlockParameterLoader.load(
+            File(modelDirectory, "AI_Megpoid.vtb2")
+        )
+    }
+
+    /**
+     * Creates a stateful c5d50 processor bank for the exact reverse-stage
+     * invocation order recovered from FUN_1800c7ad0.
+     */
+    fun createMegpoidC5d50ProcessorBank(
+        voicebank: VoicebankDescriptor
+    ): S5Vtb2C5d50BlockProcessorBank =
+        S5Vtb2C5d50BlockProcessorBank(loadMegpoidC5d50StageBlockParameters(voicebank))
+
+    /**
      * Loads the shared VTMG tensors and converts every layer to the padded
      * matrix-bank descriptors used by S5API FUN_180064670.
      */
@@ -204,7 +230,7 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
             "The Megpoid VTB2 record collection is incomplete."
         }
 
-        val c5d50Parameters = S5Vtb2C5d50StageBlockParameterLoader.load(vtb2File)
+        val c5d50Parameters = loadMegpoidC5d50StageBlockParameters(voicebank)
         require(c5d50Parameters.blocks.size == 8) {
             "The Megpoid VTB2 c5d50 stage/block parameter collection is incomplete."
         }
