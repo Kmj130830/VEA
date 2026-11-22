@@ -69,6 +69,27 @@ data class S5VtmgPackedGraphLayerWeights(
 ) {
     val matrixStride: Int
         get() = axis1Count * paddedAxis0Count
+
+    /**
+     * Converts this layer's VTMG-packed banks to row-major v0_naive GEMM A
+     * matrices: [bank][outputFeature][inputFeature].
+     */
+    fun toV0NaiveGemmWeights(
+        convert: (FloatArray, Int, Int, Int, Int) -> FloatArray =
+            NativeS5TensorBridge::convertVtmgBankWeightsForV0Naive
+    ): FloatArray {
+        val converted = convert(
+            matrices, axis0Count, axis1Count, paddedAxis0Count, matrixCount
+        )
+        val expected = axis0Count.toLong() * axis1Count * matrixCount
+        require(expected == converted.size.toLong()) {
+            "VTMG layer '$layerName' conversion returned an invalid GEMM weight length."
+        }
+        require(converted.all { it.isFinite() }) {
+            "VTMG layer '$layerName' converted weights contain a non-finite value."
+        }
+        return converted
+    }
 }
 
 data class S5VtmgPackedBaseGraphWeights(
