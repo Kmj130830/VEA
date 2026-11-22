@@ -23,10 +23,12 @@ yet assigned to these stage descriptors.
   `FUN_1800c5d50`, one per residual DW-MLP block. The block index is
   flattened with the reverse-stage index as
   `(reverseStageIndex * blockCount + blockIndex)`.
-- When the optional history/skip path is enabled, the render loop copies
-  stage activations into per-stage circular buffers and adds the retained
-  activation back after the projection. This path is separately gated by
-  the byte at `(uint8_t*)param_1 + 0xd52`.
+- The optional history/skip path copies stage activations into per-stage
+  circular buffers and adds the retained activation back after the projection
+  when the low byte of `param_1[0xd52]` is zero. Because the first argument
+  is `int*`, this field is at byte offset `0x3548`, not byte offset
+  `0xd52`. This is distinct from the raw byte flag at
+  `(uint8_t*)param_1 + 0x59` used to choose the projection function.
 
 ## Descriptor arrays observed at the call sites
 
