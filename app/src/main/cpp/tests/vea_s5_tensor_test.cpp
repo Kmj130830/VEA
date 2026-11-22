@@ -796,6 +796,47 @@ int main() {
     assert(vea_s5_history_ring_copy_chronological(
         history, history_snapshot, 21) == VEA_S5_TENSOR_STATUS_OK);
     for (float value : history_snapshot) assert(value == 0.0f);
+
+    // Direct native transpose: chronological [row][channel][position] to
+    // channel-major [channel][row][position], including wraparound.
+    VeaS5HistoryRing* channel_major_history = nullptr;
+    assert(vea_s5_history_ring_create(2, 2, 3, &channel_major_history) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    const float cm_block_0[] = {1.0f, 2.0f, 101.0f, 102.0f};
+    const float cm_block_1[] = {3.0f, 4.0f, 103.0f, 104.0f};
+    const float cm_block_2[] = {5.0f, 6.0f, 105.0f, 106.0f};
+    const float cm_block_3[] = {7.0f, 8.0f, 107.0f, 108.0f};
+    assert(vea_s5_history_ring_append(channel_major_history, cm_block_0, 4) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(vea_s5_history_ring_append(channel_major_history, cm_block_1, 4) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(vea_s5_history_ring_append(channel_major_history, cm_block_2, 4) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(vea_s5_history_ring_append(channel_major_history, cm_block_3, 4) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    const float expected_chronological[] = {
+        3.0f, 4.0f, 103.0f, 104.0f,
+        5.0f, 6.0f, 105.0f, 106.0f,
+        7.0f, 8.0f, 107.0f, 108.0f
+    };
+    float cm_chronological[12] = {};
+    assert(vea_s5_history_ring_copy_chronological(
+        channel_major_history, cm_chronological, 12) == VEA_S5_TENSOR_STATUS_OK);
+    assert(std::memcmp(cm_chronological, expected_chronological,
+        sizeof(expected_chronological)) == 0);
+    const float expected_channel_major[] = {
+        3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f,
+        103.0f, 104.0f, 105.0f, 106.0f, 107.0f, 108.0f
+    };
+    float cm_output[12] = {};
+    assert(vea_s5_history_ring_copy_channel_major(
+        channel_major_history, cm_output, 12) == VEA_S5_TENSOR_STATUS_OK);
+    assert(std::memcmp(cm_output, expected_channel_major,
+        sizeof(expected_channel_major)) == 0);
+    assert(vea_s5_history_ring_copy_channel_major(
+        channel_major_history, cm_output, 11) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    vea_s5_history_ring_destroy(channel_major_history);
+
     vea_s5_history_ring_destroy(history);
 
     vea_s5_arena_reset(arena);
