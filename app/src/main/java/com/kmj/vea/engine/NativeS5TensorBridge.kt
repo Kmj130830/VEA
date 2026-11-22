@@ -189,6 +189,41 @@ object NativeS5TensorBridge {
     }
 
     /**
+     * Executes one c5d50 block directly from its decoded VTB2 tensors.
+     * The native layer derives the two expanded GELU affine vectors using
+     * the transform recovered in FUN_1800d4bf0 before running the block.
+     */
+    fun runVtb2C5d50StageBlock(
+        historyRows: FloatArray,
+        parameters: S5Vtb2C5d50StageBlockParameters,
+        residualInput: FloatArray,
+        positions: Int,
+        epsilon: Float
+    ): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        val channels = S5Vtb2C5d50StageBlockParameters.CHANNEL_COUNT
+        val expandedFeatures = S5Vtb2C5d50StageBlockParameters.EXPANDED_CHANNEL_COUNT
+        require(positions >= 7)
+        require(historyRows.size.toLong() == channels.toLong() * 7L * positions)
+        require(residualInput.size.toLong() == channels.toLong() * positions)
+        require(parameters.blockVectorA.size == channels && parameters.blockVectorB.size == channels)
+        require(parameters.expansionWeights.size == expandedFeatures * channels)
+        require(parameters.expansionBias.size == expandedFeatures)
+        require(parameters.projectionWeights.size == channels * expandedFeatures)
+        require(parameters.projectionBias.size == channels && parameters.blockVectorC.size == channels)
+        require(epsilon.isFinite() && epsilon >= 0.0f)
+        return nativeRunVtb2C5d50Block(
+            historyRows, parameters.depthwiseKernel, parameters.blockVectorA,
+            parameters.blockVectorB, parameters.expansionWeights, parameters.expansionBias,
+            parameters.projectionWeights, parameters.projectionBias, parameters.blockVectorC,
+            residualInput, channels, positions, expandedFeatures, epsilon
+        ) ?: throw IllegalArgumentException(
+            "VTB2 c5d50 stage " + parameters.stageIndex + " block " + parameters.blockIndex +
+                " execution failed."
+        )
+    }
+
+    /**
      * Converts VTMG [bank][input][paddedOutput] matrices into row-major
      * [bank][output][input] weights for VEA's v0_naive GEMM port.
      *
@@ -494,6 +529,14 @@ object NativeS5TensorBridge {
         expandWeights: FloatArray, expandedBiasA: FloatArray, expandedBiasB: FloatArray,
         projectWeights: FloatArray, residualInput: FloatArray,
         residualScale: FloatArray, residualBias: FloatArray?,
+        channels: Int, positions: Int, expandedFeatures: Int, epsilon: Float
+    ): FloatArray?
+    private external fun nativeRunVtb2C5d50Block(
+        historyRows: FloatArray, depthwiseWeights: FloatArray,
+        blockVectorA: FloatArray, blockVectorB: FloatArray,
+        expansionWeights: FloatArray, expansionBias: FloatArray,
+        projectionWeights: FloatArray, projectionBias: FloatArray,
+        blockVectorC: FloatArray, residualInput: FloatArray,
         channels: Int, positions: Int, expandedFeatures: Int, epsilon: Float
     ): FloatArray?
     private external fun nativeApplyBankedLinear(
