@@ -165,7 +165,8 @@ public class ExportS5RendererPath extends GhidraScript {
             out.println("## Decompile caller functions for render-context constructors");
             out.println();
             for (String targetHex : new String[] {
-                    "1800c47a0", "1800c4730", "180097ff0", "18008d470", "1800aec40"
+                    "1800c47a0", "1800c4730", "1800aee20", "180126850",
+                    "180097ff0", "18008d470", "1800aec40"
             }) {
                 Address targetAddress = toAddr(targetHex);
                 ReferenceIterator callerRefs =
