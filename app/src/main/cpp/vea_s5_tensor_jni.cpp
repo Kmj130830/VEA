@@ -941,6 +941,88 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeRunResidualDwMlpBlock(
 
 
 extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeRunVtb2C5d50Block(
+    JNIEnv* env, jobject,
+    jfloatArray history_array, jfloatArray dw_weights_array,
+    jfloatArray vector_a_array, jfloatArray vector_b_array,
+    jfloatArray expansion_weights_array, jfloatArray expansion_bias_array,
+    jfloatArray projection_weights_array, jfloatArray projection_bias_array,
+    jfloatArray block_vector_c_array, jfloatArray residual_array,
+    jint channels, jint positions, jint expanded_features, jfloat epsilon) {
+    if (history_array == nullptr || dw_weights_array == nullptr ||
+        vector_a_array == nullptr || vector_b_array == nullptr ||
+        expansion_weights_array == nullptr || expansion_bias_array == nullptr ||
+        projection_weights_array == nullptr || projection_bias_array == nullptr ||
+        block_vector_c_array == nullptr || residual_array == nullptr ||
+        channels <= 0 || positions < 7 || expanded_features <= 0 ||
+        !std::isfinite(epsilon) || epsilon < 0.0f) return nullptr;
+
+    size_t history_required=0, dw_required=0, expand_required=0,
+           project_required=0, output_required=0;
+    if (MultiplyOverflow(static_cast<size_t>(channels), 7u, &history_required) ||
+        MultiplyOverflow(history_required, static_cast<size_t>(positions), &history_required) ||
+        MultiplyOverflow(static_cast<size_t>(channels), 49u, &dw_required) ||
+        MultiplyOverflow(static_cast<size_t>(expanded_features), static_cast<size_t>(channels), &expand_required) ||
+        MultiplyOverflow(static_cast<size_t>(channels), static_cast<size_t>(expanded_features), &project_required) ||
+        MultiplyOverflow(static_cast<size_t>(channels), static_cast<size_t>(positions), &output_required) ||
+        output_required > static_cast<size_t>(std::numeric_limits<jsize>::max())) return nullptr;
+
+    const size_t channel_count = static_cast<size_t>(channels);
+    const size_t expanded_count = static_cast<size_t>(expanded_features);
+    auto enough = [&](jfloatArray array, size_t required) -> bool {
+        return array != nullptr && static_cast<size_t>(env->GetArrayLength(array)) >= required;
+    };
+    if (!enough(history_array, history_required) ||
+        !enough(dw_weights_array, dw_required) ||
+        !enough(vector_a_array, channel_count) ||
+        !enough(vector_b_array, channel_count) ||
+        !enough(expansion_weights_array, expand_required) ||
+        !enough(expansion_bias_array, expanded_count) ||
+        !enough(projection_weights_array, project_required) ||
+        !enough(projection_bias_array, channel_count) ||
+        !enough(block_vector_c_array, channel_count) ||
+        !enough(residual_array, output_required) || env->ExceptionCheck()) return nullptr;
+
+    try {
+        auto copy = [&](jfloatArray array, size_t count, std::vector<float>* dst) -> bool {
+            dst->resize(count);
+            if (count != 0u) env->GetFloatArrayRegion(array, 0, static_cast<jsize>(count), dst->data());
+            return !env->ExceptionCheck();
+        };
+        std::vector<float> history, dw, vector_a, vector_b, expansion_weights,
+            expansion_bias, projection_weights, projection_bias, block_vector_c,
+            residual, output(output_required);
+        if (!copy(history_array, history_required, &history) ||
+            !copy(dw_weights_array, dw_required, &dw) ||
+            !copy(vector_a_array, channel_count, &vector_a) ||
+            !copy(vector_b_array, channel_count, &vector_b) ||
+            !copy(expansion_weights_array, expand_required, &expansion_weights) ||
+            !copy(expansion_bias_array, expanded_count, &expansion_bias) ||
+            !copy(projection_weights_array, project_required, &projection_weights) ||
+            !copy(projection_bias_array, channel_count, &projection_bias) ||
+            !copy(block_vector_c_array, channel_count, &block_vector_c) ||
+            !copy(residual_array, output_required, &residual)) return nullptr;
+
+        const VeaS5TensorStatus status = vea_s5_run_vtb2_c5d50_block_f32(
+            history.data(), dw.data(), vector_a.data(), vector_b.data(),
+            expansion_weights.data(), expansion_bias.data(),
+            projection_weights.data(), projection_bias.data(),
+            block_vector_c.data(), residual.data(), output.data(),
+            channel_count, static_cast<size_t>(positions), expanded_count, epsilon);
+        if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+        jfloatArray result = env->NewFloatArray(static_cast<jsize>(output.size()));
+        if (result != nullptr && !output.empty()) {
+            env->SetFloatArrayRegion(result, 0, static_cast<jsize>(output.size()), output.data());
+        }
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+extern "C" JNIEXPORT jfloatArray JNICALL
 Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeStride2Conv1dProjection(
     JNIEnv* env, jobject,
     jfloatArray input_array, jfloatArray weights_array, jfloatArray bias_array,
