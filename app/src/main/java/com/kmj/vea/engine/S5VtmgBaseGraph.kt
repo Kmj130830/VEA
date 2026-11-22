@@ -90,6 +90,46 @@ data class S5VtmgPackedGraphLayerWeights(
         }
         return converted
     }
+
+    /**
+     * Converts packed matrix banks to the row-major temporal-kernel layout
+     * consumed by S5API's c5440/c72d0 projections:
+     * [outputFeature][inputFeature][kernelTap].
+     *
+     * This is valid only when the model's matrix-bank axis represents kernel
+     * taps; callers must establish that from the render-state descriptor.
+     */
+    fun toTemporalConv1dWeights(kernelWidth: Int = matrixCount): FloatArray {
+        require(kernelWidth > 0 && kernelWidth == matrixCount) {
+            "VTMG matrix-bank count must equal the temporal kernel width."
+        }
+        require(axis0Count > 0 && axis1Count > 0 && paddedAxis0Count >= axis0Count)
+        val expectedPacked = axis1Count.toLong() * paddedAxis0Count * matrixCount
+        require(expectedPacked == matrices.size.toLong()) {
+            "VTMG layer '$layerName' has an invalid packed matrix-bank length."
+        }
+        val expected = axis0Count.toLong() * axis1Count * kernelWidth
+        require(expected <= Int.MAX_VALUE.toLong()) {
+            "VTMG layer '$layerName' temporal weights exceed the supported array size."
+        }
+
+        val converted = FloatArray(expected.toInt())
+        for (output in 0 until axis0Count) {
+            for (input in 0 until axis1Count) {
+                for (tap in 0 until kernelWidth) {
+                    val sourceIndex =
+                        (tap * axis1Count + input) * paddedAxis0Count + output
+                    val targetIndex =
+                        (output * axis1Count + input) * kernelWidth + tap
+                    converted[targetIndex] = matrices[sourceIndex]
+                }
+            }
+        }
+        require(converted.all { it.isFinite() }) {
+            "VTMG layer '$layerName' temporal weights contain a non-finite value."
+        }
+        return converted
+    }
 }
 
 data class S5VtmgPackedBaseGraphWeights(

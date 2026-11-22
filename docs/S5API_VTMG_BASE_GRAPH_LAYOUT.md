@@ -113,3 +113,11 @@ waveform decoder remain incomplete. The app must continue to report singing
 synthesis as unavailable and must not emit a generated-vocal success state
 until a real Megpoid request produces PCM/WAV on Android and passes reference
 validation.
+## Temporal convolution weight conversion
+
+The VTMG packed form is `[bank][inputFeature][paddedOutputFeature]`.
+The `toTemporalConv1dWeights()` helper converts this to the S5 temporal
+projection GEMM's `[outputFeature][inputFeature][kernelTap]` row-major
+matrix when the bank count is explicitly confirmed to represent kernel taps.
+The conversion itself is generic; it does not assert that a particular VTMG
+layer is wired to a specific `FUN_1800c5440` or `FUN_1800c72d0` stage.

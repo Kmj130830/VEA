@@ -194,6 +194,47 @@ class S5VtmgBaseGraphTest {
         }
         return result
     }
+
+    @Test
+    fun packedLayerConvertsBankMajorWeightsToOutputInputTapOrder() {
+        val outputFeatures = 2
+        val inputFeatures = 2
+        val kernelWidth = 3
+        val paddedOutputFeatures = 8
+        val packed = FloatArray(kernelWidth * inputFeatures * paddedOutputFeatures)
+        for (tap in 0 until kernelWidth) {
+            for (input in 0 until inputFeatures) {
+                for (output in 0 until outputFeatures) {
+                    packed[(tap * inputFeatures + input) * paddedOutputFeatures + output] =
+                        tap * 100.0f + input * 10.0f + output
+                }
+            }
+        }
+        val layer = S5VtmgPackedGraphLayerWeights(
+            layerName = "conv-test",
+            matrices = packed,
+            bias = floatArrayOf(0.0f, 0.0f),
+            axis0Count = outputFeatures,
+            axis1Count = inputFeatures,
+            matrixCount = kernelWidth,
+            paddedAxis0Count = paddedOutputFeatures
+        )
+
+        val converted = layer.toTemporalConv1dWeights()
+        assertEquals(12, converted.size)
+        assertEquals(
+            listOf(0.0f, 100.0f, 200.0f, 10.0f, 110.0f, 210.0f),
+            converted.take(6)
+        )
+        assertEquals(
+            listOf(1.0f, 101.0f, 201.0f, 11.0f, 111.0f, 211.0f),
+            converted.drop(6)
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            layer.toTemporalConv1dWeights(kernelWidth = 2)
+        }
+    }
+
     @Test
     fun packedLayerCanConvertToV0NaiveGemmWeightOrder() {
         val outputFeatures = 2
