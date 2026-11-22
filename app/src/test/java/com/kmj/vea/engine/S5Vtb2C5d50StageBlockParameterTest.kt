@@ -50,7 +50,7 @@ class S5Vtb2C5d50StageBlockParameterLoaderTest {
             append("\"").append(config).append("\":{").append(configJson).append("},")
             append("\"").append(stageConfig).append("\":{")
             append(tensorObjects.joinToString(","))
-            append("}}}")
+            append("}}}}")
         }
         val scan = S5ModelJsonScanner.scanForObjectKeys(StringReader(json), setOf(root))
         val decoded = S5Vtb2C5d50StageBlockParameterLoader.decode(
