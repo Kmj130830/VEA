@@ -96,9 +96,12 @@ data class S5VtmgPackedGraphLayerWeights(
      * Weight conversion is [bank][output][input]; stage assignment is left
      * to the recovered renderer binding layer.
      */
-    fun toBankedProjectionPlan(): S5VtmgBankedProjectionPlan =
+    fun toBankedProjectionPlan(
+        convert: (FloatArray, Int, Int, Int, Int) -> FloatArray =
+            NativeS5TensorBridge::convertVtmgBankWeightsForV0Naive
+    ): S5VtmgBankedProjectionPlan =
         S5VtmgBankedProjectionPlan(
-            weights = toV0NaiveGemmWeights(),
+            weights = toV0NaiveGemmWeights(convert),
             bias = bias.copyOf(),
             inputFeatures = axis1Count,
             outputFeatures = axis0Count,

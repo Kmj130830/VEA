@@ -213,7 +213,14 @@ class S5VtmgBaseGraphTest {
             matrixCount = 3,
             paddedAxis0Count = 8
         )
-        val plan = layer.toBankedProjectionPlan()
+        val plan = layer.toBankedProjectionPlan { source, output, input, padded, banks ->
+            FloatArray(output * input * banks) { index ->
+                val bank = index / (output * input)
+                val outputFeature = (index % (output * input)) / input
+                val inputFeature = index % input
+                source[(bank * input + inputFeature) * padded + outputFeature]
+            }
+        }
         assertEquals(2, plan.inputFeatures)
         assertEquals(2, plan.outputFeatures)
         assertEquals(3, plan.banks)
