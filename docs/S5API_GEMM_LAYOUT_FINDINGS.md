@@ -110,6 +110,30 @@ per-render layer entries consumed by `FUN_1800c6390` are separated by an
 additional object/initialization boundary. The constructor or binding routine
 that populates those render-layer entries remains to be identified.
 
+## Model-to-render state factory: Func_b3549a42
+
+The analysis of the factory at `FUN_180097ff0` resolves a key object
+boundary:
+
+1. It allocates a render-owner object of `0x1e78` bytes.
+2. It allocates an 8 MiB, 32-byte-aligned arena for that owner.
+3. It initializes the owner's general render subobject with
+   `FUN_180012030`.
+4. It initializes the large frame/render-state subobject at
+   `owner + 0x2a0` with `FUN_180013c00`.
+5. When the model type requires the optional preprocessing path, it first
+   calls `FUN_180055d60`.
+6. It then calls `FUN_18005a980`, passing the initialized frame-state
+   subobject as its first argument and a broad set of model, timing, track,
+   and render configuration fields from the model/context object.
+
+This establishes the construction sequence
+`model/context -> render-owner -> frame-state -> FUN_18005a980 binding`.
+The final function is now a direct analysis target because it is the most
+promising place to recover how model-owned VTMG matrices become the 0x18-byte
+per-bank entries consumed by `FUN_1800c6390`. Until that function is fully
+traced, the individual layer pointer mapping remains open.
+
 ## Unresolved runtime pointer bridge
 
 The contracts above do not describe the same flat A-buffer layout:
