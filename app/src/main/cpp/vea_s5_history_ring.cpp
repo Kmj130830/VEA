@@ -100,6 +100,29 @@ extern "C" VeaS5TensorStatus vea_s5_history_ring_copy_chronological(
     return VEA_S5_TENSOR_STATUS_OK;
 }
 
+extern "C" VeaS5TensorStatus vea_s5_history_ring_copy_channel_major(
+    const VeaS5HistoryRing* ring, float* output, size_t output_count) {
+    if (ring == nullptr || output == nullptr ||
+        output_count != ring->storage.size()) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    // Reorder chronological [row][channel][position] directly into
+    // [channel][row][position], avoiding a second Kotlin-side allocation.
+    for (size_t row = 0; row < ring->history_rows; ++row) {
+        const size_t source_row = (ring->next_write_row + row) % ring->history_rows;
+        const float* source_base = ring->storage.data() + source_row * ring->block_size;
+        for (size_t channel = 0; channel < ring->channels; ++channel) {
+            const size_t source_offset = channel * ring->positions;
+            const size_t destination_offset =
+                (channel * ring->history_rows + row) * ring->positions;
+            std::memcpy(
+                output + destination_offset,
+                source_base + source_offset,
+                ring->positions * sizeof(float));
+        }
+    }
+    return VEA_S5_TENSOR_STATUS_OK;
+}
 extern "C" size_t vea_s5_history_ring_block_size(const VeaS5HistoryRing* ring) {
     return ring == nullptr ? 0u : ring->block_size;
 }
