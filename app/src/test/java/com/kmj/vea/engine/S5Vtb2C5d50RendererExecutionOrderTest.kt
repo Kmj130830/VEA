@@ -54,6 +54,10 @@ class S5Vtb2C5d50RendererExecutionOrderTest {
         assertEquals(8, layout.residualWorkspaceCount)
         assertEquals(6, layout.activeResidualDescriptorCount)
         assertEquals(
+            listOf(4, 5, 2, 3, 0, 1),
+            layout.invocations.map { it.flattenedResidualDescriptorIndex(2) }
+        )
+        assertEquals(
             listOf(
                 S5RendererStageInvocation(1, 0, 2, 0),
                 S5RendererStageInvocation(1, 0, 2, 1),
