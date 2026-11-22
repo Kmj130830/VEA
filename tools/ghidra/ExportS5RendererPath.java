@@ -123,6 +123,30 @@ public class ExportS5RendererPath extends GhidraScript {
             if (callerCount == 0) out.println("- No direct references recovered at the exact entry address.");
             out.println();
 
+            out.println("## Direct callers of model and render object factories");
+            out.println();
+            for (String targetHex : new String[] { "18008d470", "180097ff0", "18005a980" }) {
+                Address targetAddress = toAddr(targetHex);
+                ReferenceIterator targetRefs =
+                    currentProgram.getReferenceManager().getReferencesTo(targetAddress);
+                int targetCallerCount = 0;
+                out.println("### " + targetHex);
+                while (targetRefs.hasNext()) {
+                    Reference ref = targetRefs.next();
+                    Function caller =
+                        currentProgram.getFunctionManager().getFunctionContaining(ref.getFromAddress());
+                    if (caller != null) {
+                        targetCallerCount++;
+                        out.printf("- %s at %s, call site %s%n",
+                            caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+                    }
+                }
+                if (targetCallerCount == 0) {
+                    out.println("- No direct references recovered at the exact entry address.");
+                }
+                out.println();
+            }
+
             while (!queue.isEmpty() && selected.size() < MAX_FUNCTIONS) {
                 monitor.checkCancelled();
                 Work work = queue.removeFirst();
