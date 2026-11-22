@@ -54,6 +54,71 @@ class S5Vtb2RepeatedBlockParameterLoaderTest {
     }
 
     @Test
+    fun rejectsAnExtraRepeatedRecordBeyondTheDeclaredNine() {
+        val modelKey = S5Vtb2RepeatedBlockParameterLoader.MODEL_OBJECT_KEY
+        val rootConfigKey = S5Vtb2RepeatedBlockParameterLoader.ROOT_MODEL_CONFIG_OBJECT_KEY
+        val configEntryKey = S5Vtb2RepeatedBlockParameterLoader.MODEL_CONFIG_ENTRY_KEY
+        val parameterKey = S5Vtb2RepeatedBlockParameterLoader.MODEL_PARAMETER_OBJECT_KEY
+        val arrayKey = S5Vtb2RepeatedBlockParameterLoader.BLOCK_ARRAY_KEY
+        val bankedKey = S5Vtb2RepeatedBlockParameterLoader.BANKED_PARAMETER_OBJECT_KEY
+        val singleKey = S5Vtb2RepeatedBlockParameterLoader.SINGLE_PARAMETER_OBJECT_KEY
+        val weightKey = S5Vtb2RepeatedBlockParameterLoader.WEIGHT_FIELD_KEY
+        val biasKey = S5Vtb2RepeatedBlockParameterLoader.BIAS_FIELD_KEY
+        val entries = (0 until 10).joinToString(",") { index ->
+            """{"$bankedKey":{"$weightKey":"*F32b${index}_w","$biasKey":"*F32b${index}_b"},"$singleKey":{"$weightKey":"*F32b${index}_o"}}"""
+        }
+        val json = """{"$rootConfigKey":{"$configEntryKey":{"${S5Vtb2RepeatedBlockParameterLoader.DECLARED_BLOCK_COUNT_KEY}":9}},"$modelKey":{"$parameterKey":{"$arrayKey":[$entries]}}}"""
+        val scan = S5ModelJsonScanner.scanForObjectKeys(
+            StringReader(json), setOf(rootConfigKey, modelKey)
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            S5Vtb2RepeatedBlockParameterLoader.decode(
+                scan,
+                decodeFloatArray = { encoded ->
+                    when {
+                        encoded.contains("_w") -> FloatArray(24_576)
+                        encoded.contains("_b") -> FloatArray(128)
+                        else -> FloatArray(8_192)
+                    }
+                }
+            )
+        }
+    }
+
+    @Test
+    fun rejectsDuplicateTensorFieldsInsideRepeatedArrayEntry() {
+        val modelKey = S5Vtb2RepeatedBlockParameterLoader.MODEL_OBJECT_KEY
+        val rootConfigKey = S5Vtb2RepeatedBlockParameterLoader.ROOT_MODEL_CONFIG_OBJECT_KEY
+        val configEntryKey = S5Vtb2RepeatedBlockParameterLoader.MODEL_CONFIG_ENTRY_KEY
+        val parameterKey = S5Vtb2RepeatedBlockParameterLoader.MODEL_PARAMETER_OBJECT_KEY
+        val arrayKey = S5Vtb2RepeatedBlockParameterLoader.BLOCK_ARRAY_KEY
+        val bankedKey = S5Vtb2RepeatedBlockParameterLoader.BANKED_PARAMETER_OBJECT_KEY
+        val singleKey = S5Vtb2RepeatedBlockParameterLoader.SINGLE_PARAMETER_OBJECT_KEY
+        val weightKey = S5Vtb2RepeatedBlockParameterLoader.WEIGHT_FIELD_KEY
+        val biasKey = S5Vtb2RepeatedBlockParameterLoader.BIAS_FIELD_KEY
+        val entries = (0 until 9).joinToString(",") { index ->
+            val duplicate = if (index == 0) """, "$weightKey":"*F32duplicate_w"""" else ""
+            """{"$bankedKey":{"$weightKey":"*F32b${index}_w"$duplicate,"$biasKey":"*F32b${index}_b"},"$singleKey":{"$weightKey":"*F32b${index}_o"}}"""
+        }
+        val json = """{"$rootConfigKey":{"$configEntryKey":{"${S5Vtb2RepeatedBlockParameterLoader.DECLARED_BLOCK_COUNT_KEY}":9}},"$modelKey":{"$parameterKey":{"$arrayKey":[$entries]}}}"""
+        val scan = S5ModelJsonScanner.scanForObjectKeys(
+            StringReader(json), setOf(rootConfigKey, modelKey)
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            S5Vtb2RepeatedBlockParameterLoader.decode(
+                scan,
+                decodeFloatArray = { encoded ->
+                    when {
+                        encoded.contains("_w") -> FloatArray(24_576)
+                        encoded.contains("_b") -> FloatArray(128)
+                        else -> FloatArray(8_192)
+                    }
+                }
+            )
+        }
+    }
+
+    @Test
     fun rejectsMissingNinthRecord() {
         val rootConfigKey = S5Vtb2RepeatedBlockParameterLoader.ROOT_MODEL_CONFIG_OBJECT_KEY
         val configEntryKey = S5Vtb2RepeatedBlockParameterLoader.MODEL_CONFIG_ENTRY_KEY

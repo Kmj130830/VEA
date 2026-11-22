@@ -52,3 +52,9 @@ unrelated VTB2 tensors.
 `VocaloidAiEngineAdapter.render()` now runs this validation alongside VTMG
 loading before returning the existing explicit unsupported-render status.
 It does not claim to execute these block tensors or generate audio.
+
+Loader integrity checks additionally require exactly 27 typed tensor leaves
+under the repeated array (three per record), reject duplicate full JSON value
+paths, and reject extra/missing array records. Identical leaf hashes elsewhere
+in the VTB2 document are not conflated because each selected tensor is matched
+by its complete array-indexed path.

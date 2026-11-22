@@ -48,6 +48,7 @@ data class S5Vtb2RepeatedBlockParameterPack(
         const val SINGLE_OUTPUT_WIDTH = 64
         const val SINGLE_INPUT_WIDTH = 128
         const val SINGLE_WEIGHT_COUNT = SINGLE_OUTPUT_WIDTH * SINGLE_INPUT_WIDTH
+        const val TENSORS_PER_BLOCK = 3
     }
 }
 
@@ -147,8 +148,24 @@ object S5Vtb2RepeatedBlockParameterLoader {
 
         val arrayPrefix =
             "$.$MODEL_OBJECT_KEY.$MODEL_PARAMETER_OBJECT_KEY.$BLOCK_ARRAY_KEY"
-        val tensorMatches = scan.matchedTensorStrings[MODEL_OBJECT_KEY].orEmpty()
-            .associateBy { it.valuePath }
+        val allTensorMatches = scan.matchedTensorStrings[MODEL_OBJECT_KEY].orEmpty()
+        val repeatedBlockPrefix = "$arrayPrefix["
+        val repeatedBlockTensorMatches = allTensorMatches.filter {
+            it.valuePath.startsWith(repeatedBlockPrefix)
+        }
+        val expectedRepeatedTensorCount =
+            declaredCount * S5Vtb2RepeatedBlockParameterPack.TENSORS_PER_BLOCK
+        require(repeatedBlockTensorMatches.size == expectedRepeatedTensorCount) {
+            "VTB2 repeated parameter array contains ${repeatedBlockTensorMatches.size} typed tensors; " +
+                "expected $expectedRepeatedTensorCount."
+        }
+        val duplicatePaths = repeatedBlockTensorMatches.groupBy { it.valuePath }
+            .filterValues { it.size != 1 }
+            .keys
+        require(duplicatePaths.isEmpty()) {
+            "VTB2 repeated parameter array contains duplicate tensor paths: ${duplicatePaths.sorted().joinToString()}."
+        }
+        val tensorMatches = repeatedBlockTensorMatches.associateBy { it.valuePath }
 
         fun decodeTensor(path: String, expectedCount: Int): FloatArray {
             val match = tensorMatches[path]
