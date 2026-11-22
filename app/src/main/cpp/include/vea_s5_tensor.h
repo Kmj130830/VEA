@@ -234,6 +234,17 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_gemm_row_major_f32(
  * output is [out_feature][position][bank] (bank-interleaved positions).
  * bias is optional and contains one value per output feature.
  */
+/*
+ * VEA-side adapter: converts VTMG [bank][input][paddedOutput] storage into
+ * the row-major [bank][output][input] A layout consumed by v0_naive GEMM.
+ * This is not a claim that Yamaha performs this conversion at this boundary.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_vtmg_bank_to_v0_naive_a_f32(
+    const float* packed_vtmg, size_t packed_count,
+    size_t output_features, size_t input_features,
+    size_t padded_output_features, size_t banks,
+    float* gemm_a, size_t gemm_a_count);
+
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_banked_linear_projection_f32(
     const float* weights, size_t weight_row_stride, size_t weight_bank_stride,
     const float* input, const float* bias, float* output,
