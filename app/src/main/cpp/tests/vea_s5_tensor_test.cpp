@@ -634,7 +634,48 @@ int main() {
         block_output, block_channels, block_positions, block_expanded, 0.25f) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
-        // S5API FUN_18002aa90: 16-byte prefix, seeded body transform, opaque trailer.
+            // Model-facing c5d50 path: convert 32-wide A/B vectors into expanded GELU affine vectors.
+    const float condition_a[] = {2.0f};
+    const float condition_b[] = {3.0f};
+    const float stored_expansion_bias[] = {0.5f, -0.25f};
+    float expanded_bias_a[2] = {};
+    float expanded_bias_b[2] = {};
+    assert(vea_s5_prepare_c5d50_expansion_bias_f32(
+        block_expand_weights, condition_a, condition_b, stored_expansion_bias,
+        expanded_bias_a, expanded_bias_b, 1, 2) == VEA_S5_TENSOR_STATUS_OK);
+    assert(expanded_bias_a[0] == 3.5f && expanded_bias_a[1] == 5.75f);
+    assert(expanded_bias_b[0] == 2.0f && expanded_bias_b[1] == 4.0f);
+    assert(vea_s5_prepare_c5d50_expansion_bias_f32(
+        block_expand_weights, nullptr, condition_b, stored_expansion_bias,
+        expanded_bias_a, expanded_bias_b, 1, 2) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
+    float model_block_output[7] = {};
+    assert(vea_s5_run_vtb2_c5d50_block_f32(
+        block_history, block_dw_weights, condition_a, condition_b,
+        block_expand_weights, stored_expansion_bias, block_project_weights,
+        block_residual_bias, block_residual_scale, block_residual,
+        model_block_output, block_channels, block_positions, block_expanded, 0.25f) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    for (size_t pos = 0; pos < block_positions; ++pos) {
+        const float base = static_cast<float>(pos + 1u);
+        const float x1 = base * block_inv_std + expanded_bias_a[0] -
+            block_inv_std * 4.0f * expanded_bias_b[0];
+        const float x2 = 2.0f * base * block_inv_std + expanded_bias_a[1] -
+            block_inv_std * 4.0f * expanded_bias_b[1];
+        const float model_gelu1 = x1 / (1.0f + std::exp(-((x1*x1*x1*0.044715f + x1)*1.5957692f)));
+        const float model_gelu2 = x2 / (1.0f + std::exp(-((x2*x2*x2*0.044715f + x2)*1.5957692f)));
+        const float model_expected = (model_gelu1 + 0.5f * model_gelu2 + 0.25f) * 2.0f + 0.5f;
+        assert(std::fabs(model_block_output[pos] - model_expected) < 1.0e-5f);
+    }
+    assert(vea_s5_run_vtb2_c5d50_block_f32(
+        block_history, block_dw_weights, condition_a, condition_b,
+        block_expand_weights, stored_expansion_bias, block_project_weights,
+        block_residual_bias, block_residual_scale, nullptr,
+        model_block_output, block_channels, block_positions, block_expanded, 0.25f) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
+// S5API FUN_18002aa90: 16-byte prefix, seeded body transform, opaque trailer.
     constexpr size_t kPrefixBytes = VEA_S5_CONTAINER_PREFIX_SIZE;
     constexpr size_t kDecodedBytes = 13;
     constexpr size_t kTrailerBytes = 128;
