@@ -28,6 +28,82 @@ bool Align32(size_t value, size_t* out) {
 }  // namespace
 
 
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeCreateHistoryRing(
+    JNIEnv*, jobject, jint channels, jint positions, jint history_rows) {
+    if (channels <= 0 || positions <= 0 || history_rows <= 0) return 0;
+    VeaS5HistoryRing* ring = nullptr;
+    const VeaS5TensorStatus status = vea_s5_history_ring_create(
+        static_cast<size_t>(channels), static_cast<size_t>(positions),
+        static_cast<size_t>(history_rows), &ring);
+    if (status != VEA_S5_TENSOR_STATUS_OK || ring == nullptr) return 0;
+    return reinterpret_cast<jlong>(ring);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeDestroyHistoryRing(
+    JNIEnv*, jobject, jlong handle) {
+    if (handle == 0) return;
+    vea_s5_history_ring_destroy(reinterpret_cast<VeaS5HistoryRing*>(handle));
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeResetHistoryRing(
+    JNIEnv*, jobject, jlong handle) {
+    if (handle == 0) return JNI_FALSE;
+    const VeaS5TensorStatus status = vea_s5_history_ring_reset(
+        reinterpret_cast<VeaS5HistoryRing*>(handle));
+    return status == VEA_S5_TENSOR_STATUS_OK ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeAppendHistoryRing(
+    JNIEnv* env, jobject, jlong handle, jfloatArray block_array) {
+    if (handle == 0 || block_array == nullptr) return JNI_FALSE;
+    const jsize count = env->GetArrayLength(block_array);
+    if (count <= 0) return JNI_FALSE;
+    try {
+        std::vector<float> block(static_cast<size_t>(count));
+        env->GetFloatArrayRegion(block_array, 0, count, block.data());
+        if (env->ExceptionCheck()) return JNI_FALSE;
+        const VeaS5TensorStatus status = vea_s5_history_ring_append(
+            reinterpret_cast<VeaS5HistoryRing*>(handle), block.data(), block.size());
+        return status == VEA_S5_TENSOR_STATUS_OK ? JNI_TRUE : JNI_FALSE;
+    } catch (const std::bad_alloc&) {
+        return JNI_FALSE;
+    } catch (...) {
+        return JNI_FALSE;
+    }
+}
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeCopyChronologicalHistoryRing(
+    JNIEnv* env, jobject, jlong handle) {
+    if (handle == 0) return nullptr;
+    const auto* ring = reinterpret_cast<const VeaS5HistoryRing*>(handle);
+    const size_t block_size = vea_s5_history_ring_block_size(ring);
+    const size_t row_count = vea_s5_history_ring_row_count(ring);
+    if (block_size == 0u || row_count == 0u ||
+        block_size > std::numeric_limits<size_t>::max() / row_count) return nullptr;
+    const size_t count = block_size * row_count;
+    if (count > static_cast<size_t>(std::numeric_limits<jsize>::max())) return nullptr;
+    try {
+        std::vector<float> output(count);
+        const VeaS5TensorStatus status = vea_s5_history_ring_copy_chronological(
+            ring, output.data(), output.size());
+        if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+        jfloatArray result = env->NewFloatArray(static_cast<jsize>(count));
+        if (result != nullptr && count != 0u) {
+            env->SetFloatArrayRegion(result, 0, static_cast<jsize>(count), output.data());
+        }
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeBuildRecurrentParameterName(
     JNIEnv* env, jobject, jstring base_string, jstring suffix_string,
