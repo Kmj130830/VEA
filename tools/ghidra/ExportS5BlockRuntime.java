@@ -61,7 +61,10 @@ public class ExportS5BlockRuntime extends GhidraScript {
         // Public model/resource initialization and render entry wrappers.
         "180126850", "180126940", "1801269f0",
         "180126c20", "180127220",
-        "180127020", "180127120", "1801272b0"
+        "180127020", "180127120", "1801272b0",
+
+        // VTB2 temporary loader and object registration/cleanup helpers.
+        "1800b8f60", "1800dc4b0", "1800d5a00",
     };
 
     private static final String[] CONTEXT_CALL_SITES = {
