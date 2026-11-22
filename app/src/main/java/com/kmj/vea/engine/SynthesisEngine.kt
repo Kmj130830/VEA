@@ -167,6 +167,16 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
         val rawGraph = loadSharedVtmgBaseGraph(voicebank)
         return S5VtmgBaseGraphPacker.pack(rawGraph)
     }
+    /**
+     * Converts all nine shared VTMG layers to the matrix layout consumed by
+     * S5API FUN_1800c6390. The returned map retains the source layer names;
+     * renderer-stage assignment is intentionally left to the later binding
+     * step after the render-state factory is fully recovered.
+     */
+    fun prepareSharedVtmgProjectionPlans(
+        voicebank: VoicebankDescriptor
+    ): Map<String, S5VtmgBankedProjectionPlan> =
+        prepareSharedVtmgBaseGraph(voicebank).toBankedProjectionPlans()
 
     override suspend fun render(
         project: VeaProject,
@@ -192,9 +202,9 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
 
         // VTMG supplies the shared S5 base graph. It is independent of the
         // optional RNN feature branch stored in the bank's VTB2 object.
-        val baseGraph = prepareSharedVtmgBaseGraph(voicebank)
-        require(baseGraph.layers.size == S5VtmgGraphTensorCatalog.layers.size) {
-            "The shared VTMG base graph is incomplete."
+        val projectionPlans = prepareSharedVtmgProjectionPlans(voicebank)
+        require(projectionPlans.keys == S5VtmgGraphTensorCatalog.layers.map { it.layerName }.toSet()) {
+            "The shared VTMG projection-plan set is incomplete."
         }
 
         val recurrentStatus = if (modelFeatures.recurrentBranch) {
@@ -209,10 +219,11 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
         }
 
         throw UnsupportedOperationException(
-            "Loaded and packed the shared VOCALOID7.vtmg base graph: ${baseGraph.layers.size} layers, " +
-                "${baseGraph.totalFloatCount} packed float parameters in S5API matrix-bank layout " +
+            "Loaded the shared VOCALOID7.vtmg base graph and converted its " +
+                "${projectionPlans.size} named layers to c6390-compatible banked projection plans " +
                 "(pre1/pre2, conv1/cond1, conv2/cond2, conv3/cond3, linear). " +
-                "$recurrentStatus $pairedStatus The base-graph forward operators, " +
+                "These plans are not yet assigned to renderer stages. " +
+                "$recurrentStatus $pairedStatus The remaining stage binding, base-graph forward operators, " +
                 "voicebank-specific VTB2 conditioning, Yamaha G2P, and acoustic waveform decoder are not " +
                 "complete; no WAV was generated."
         )
