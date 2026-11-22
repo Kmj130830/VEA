@@ -14,6 +14,30 @@ The function receives C channels and N positions. Its observed execution order i
 6. FUN_1800c3740 projects expanded features back to C channels.
 7. The selected residual implementation performs dst = (dst + bias[c])*scale[c] + residual[c] for each channel row.
 
+## VTB2 descriptor-to-block affine preparation
+
+The stage-block constructor `FUN_1800d4bf0` does not pass the stored 32-element
+block vectors directly to GELU. It multiplies both vectors by the
+`[expanded_features][channels]` expansion matrix and prepares two
+expanded-feature bias arrays:
+
+- `expanded_bias_a = expansion_weights × block_vector_b + expansion_bias`
+- `expanded_bias_b = expansion_weights × block_vector_a`
+
+The `FUN_1800c5d50` GELU call then uses
+`bias = expanded_bias_a - inverse_std × mean × expanded_bias_b`.
+At the output end, the stored projection bias is the affine bias and
+`block_vector_c` is the per-channel scale used by the residual update.
+
+VEA now exposes `vea_s5_prepare_c5d50_expansion_bias_f32` for the two
+precomputed arrays and `vea_s5_run_vtb2_c5d50_block_f32` to accept the
+model's stored tensors directly. The JNI/Kotlin bridge offers
+`runVtb2C5d50StageBlock`, so a decoded stage/block descriptor can enter this
+native operator without hand-constructed expanded bias arrays.
+
+This is a static reconstruction of the descriptor-building and block call
+sequence. It has not yet been matched against a live Yamaha render or a
+reference waveform.
 ## Android scalar block API
 
 VEA now exposes vea_s5_run_residual_dw_mlp_block_f32 and Kotlin NativeS5TensorBridge.runResidualDepthwiseMlpBlock. The input is an explicit seven-row history tensor per channel, with a separate 7x7 filter per channel. Expansion and projection matrices are row-major. Statistics are global over the depthwise output tensor. The function uses the recovered affine GELU parameter expression and residual update.
