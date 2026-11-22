@@ -147,6 +147,22 @@ data class S5VtmgPackedGraphLayerWeights(
         }
         return converted
     }
+
+    /**
+     * Creates an operator-ready temporal projection plan.
+     * This does not infer which renderer stage owns this VTMG layer.
+     */
+    fun toTemporalProjectionPlan(kernelWidth: Int = matrixCount): S5VtmgTemporalProjectionPlan {
+        val temporalWeights = toTemporalConv1dWeights(kernelWidth)
+        return S5VtmgTemporalProjectionPlan(
+            layerName = layerName,
+            weights = temporalWeights,
+            bias = bias.copyOf(),
+            inputChannels = axis1Count,
+            outputChannels = axis0Count,
+            kernelWidth = kernelWidth
+        )
+    }
 }
 
 
@@ -234,6 +250,96 @@ data class S5VtmgBankedProjectionPlan(
     }
 }
 
+/**
+ * Operator-ready temporal projection parameters for the recovered c5440 and
+ * c72d0 primitives. The caller must select the operation explicitly:
+ * - projectStride2() invokes FUN_1800c5440.
+ * - projectUpsample2() invokes FUN_1800c72d0 and requires a three-tap kernel.
+ *
+ * The plan preserves the source layer name for diagnostics only. It does not
+ * assign any VTMG layer to a renderer stage.
+ */
+data class S5VtmgTemporalProjectionPlan(
+    val layerName: String,
+    val weights: FloatArray,
+    val bias: FloatArray,
+    val inputChannels: Int,
+    val outputChannels: Int,
+    val kernelWidth: Int
+) {
+    init {
+        require(layerName.isNotBlank())
+        require(inputChannels > 0 && outputChannels > 0 && kernelWidth > 0)
+        val expectedWeights = outputChannels.toLong() * inputChannels * kernelWidth
+        require(expectedWeights == weights.size.toLong()) {
+            "Temporal projection '" + layerName + "' has an invalid weight element count."
+        }
+        require(bias.size == outputChannels) {
+            "Temporal projection '" + layerName + "' must have one bias per output channel."
+        }
+        require(weights.all { it.isFinite() } && bias.all { it.isFinite() }) {
+            "Temporal projection '" + layerName + "' contains a non-finite parameter."
+        }
+    }
+
+    fun projectStride2(
+        input: FloatArray,
+        positions: Int,
+        execute: (FloatArray, FloatArray?, Int, Int, Int, Int) -> FloatArray =
+            NativeS5TensorBridge::applyStride2Conv1dProjection
+    ): FloatArray {
+        require(positions > 0)
+        val expectedInput = inputChannels.toLong() * positions
+        require(expectedInput == input.size.toLong()) {
+            "Temporal projection '" + layerName + "' expects [inputChannel][position] input."
+        }
+        val expectedOutputPositions = (positions - (kernelWidth % 2)) / 2 + 1
+        val expectedOutput = outputChannels.toLong() * expectedOutputPositions
+        require(expectedOutput in 1..Int.MAX_VALUE.toLong()) {
+            "Stride-2 projection '" + layerName + "' output size is invalid."
+        }
+        val output = execute(
+            input, weights, bias, inputChannels, outputChannels, positions, kernelWidth
+        )
+        require(output.size.toLong() == expectedOutput) {
+            "Stride-2 projection '" + layerName + "' returned " + output.size +
+                " values; expected " + expectedOutput + "."
+        }
+        require(output.all { it.isFinite() }) {
+            "Stride-2 projection '" + layerName + "' returned a non-finite value."
+        }
+        return output
+    }
+
+    fun projectUpsample2(
+        input: FloatArray,
+        positions: Int,
+        execute: (FloatArray, FloatArray, FloatArray?, Int, Int, Int) -> FloatArray =
+            NativeS5TensorBridge::applyUpsample2Conv3Projection
+    ): FloatArray {
+        require(kernelWidth == 3) {
+            "The c72d0 2x upsample projection requires a three-tap kernel."
+        }
+        require(positions > 0)
+        val expectedInput = inputChannels.toLong() * positions
+        require(expectedInput == input.size.toLong()) {
+            "Temporal projection '" + layerName + "' expects [inputChannel][position] input."
+        }
+        val expectedOutput = outputChannels.toLong() * positions * 2L
+        require(expectedOutput <= Int.MAX_VALUE.toLong()) {
+            "Upsample projection '" + layerName + "' output exceeds the supported array size."
+        }
+        val output = execute(input, weights, bias, inputChannels, outputChannels, positions)
+        require(output.size.toLong() == expectedOutput) {
+            "Upsample projection '" + layerName + "' returned " + output.size +
+                " values; expected " + expectedOutput + "."
+        }
+        require(output.all { it.isFinite() }) {
+            "Upsample projection '" + layerName + "' returned a non-finite value."
+        }
+        return output
+    }
+}
 data class S5VtmgPackedBaseGraphWeights(
     val layers: List<S5VtmgPackedGraphLayerWeights>
 ) {
