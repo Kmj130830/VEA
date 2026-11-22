@@ -56,7 +56,12 @@ public class ExportS5BlockRuntime extends GhidraScript {
         // SPP FFT/IFFT, window, spectral-peak and interpolation helpers.
         "180040630", "180135270", "1801347a0",
         "1801360c0", "180135670", "180135b90",
-        "18013a850", "1800789b0", "1800780b0"
+        "18013a850", "1800789b0", "1800780b0",
+
+        // Public model/resource initialization and render entry wrappers.
+        "180126850", "180126940", "1801269f0",
+        "180126c20", "180127220",
+        "180127020", "180127120", "1801272b0"
     };
 
     private static final String[] CONTEXT_CALL_SITES = {
@@ -65,8 +70,10 @@ public class ExportS5BlockRuntime extends GhidraScript {
         // Caller which binds the shared VTMG graph returned by FUN_180068190.
         "18008d5b2",
         // Caller which reaches the VTB2 Megpoid configuration loader FUN_1800af170.
-        "18012729d"
-    };
+        "18012729d",
+        // Calls that create, expose, or invoke the loaded model objects.
+        "1801268a1", "180126990", "180126a6c", "180126cde",
+        "180127093", "180127193", "180127323"
 
     @Override
     public void run() throws Exception {
