@@ -70,6 +70,31 @@ For pre1, the recovered loader dimensions are axis0=32, axis1=82 and
 bankCount=1. The resulting packed storage is therefore
 `[bank][82][32]`, with 32 output lanes contiguous for each input index.
 
+## Observed bank-entry indirection in the render layer object
+
+Within `FUN_1800c6390`, the weight pointer is not read as a direct field
+from a 24-byte VTMG matrix descriptor. The decompiled access sequence is:
+
+```text
+bankArrayBase = **(int64_t**)(layer + 0x10)
+bankWeightPtr = *(int64_t*)(bankArrayBase + bankIndex * 0x18)
+```
+
+The bank loop advances the entry address by `0x18` bytes and passes the
+first qword of each entry as GEMM's A pointer. A separate field at
+`layer + 0x20` supplies the bias-vector data. This establishes an
+intermediate per-bank entry indirection in the render-layer object. The
+24-byte stride is consistent with a three-qword C++ container/view object,
+but the exact source-level type is not asserted from this access alone.
+
+```text
+VTMG descriptor array (24-byte descriptors)
+    -> [intermediate construction/ownership step not yet recovered]
+    -> render layer object (+0x10 bank-entry array)
+    -> first qword per 0x18-byte entry
+    -> GEMM A pointer
+```
+
 ## Unresolved runtime pointer bridge
 
 The contracts above do not describe the same flat A-buffer layout:
