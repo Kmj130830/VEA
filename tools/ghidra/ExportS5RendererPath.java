@@ -81,7 +81,9 @@ public class ExportS5RendererPath extends GhidraScript {
                 "18008d470", "18008d650", "1800aec40", "1800c1a30",
                 // Callers that initialize render-context pointer fields used by c7ad0.
                 "1800122ec", "180013d80", "180018954", "180058efb",
-                "180085006", "1800bcc86", "18013218d"
+                "180085006", "1800bcc86", "18013218d",
+                // Model-to-render-state factory and its model-binding routines.
+                "180097ff0", "18005a980", "180055d60", "180011680", "180011a30"
             };
             out.println("## Explicit internal call targets");
             out.println();
