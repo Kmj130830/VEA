@@ -456,6 +456,38 @@ int main() {
         gemm_a, gemm_b, nullptr, 1, 2, 3, 1.0f, 3, 2, 0.0f, 2) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
+    // VEA-side layout adapter: VTMG [bank][input][paddedOutput] -> v0_naive [bank][output][input].
+    const float packed_for_v0_naive[] = {
+        0.0f, 1.0f, 90.0f, 91.0f, 92.0f, 93.0f, 94.0f, 95.0f,
+        10.0f, 11.0f, 90.0f, 91.0f, 92.0f, 93.0f, 94.0f, 95.0f,
+        20.0f, 21.0f, 90.0f, 91.0f, 92.0f, 93.0f, 94.0f, 95.0f,
+        100.0f, 101.0f, 90.0f, 91.0f, 92.0f, 93.0f, 94.0f, 95.0f,
+        110.0f, 111.0f, 90.0f, 91.0f, 92.0f, 93.0f, 94.0f, 95.0f,
+        120.0f, 121.0f, 90.0f, 91.0f, 92.0f, 93.0f, 94.0f, 95.0f
+    };
+    float v0_naive_weights[12] = {};
+    assert(vea_s5_vtmg_bank_to_v0_naive_a_f32(
+        packed_for_v0_naive, 48, 2, 3, 8, 2,
+        v0_naive_weights, 12) == VEA_S5_TENSOR_STATUS_OK);
+    const float expected_v0_naive_weights[] = {
+        0.0f, 10.0f, 20.0f,
+        1.0f, 11.0f, 21.0f,
+        100.0f, 110.0f, 120.0f,
+        101.0f, 111.0f, 121.0f
+    };
+    for (size_t i = 0; i < 12; ++i) {
+        assert(v0_naive_weights[i] == expected_v0_naive_weights[i]);
+    }
+    assert(vea_s5_vtmg_bank_to_v0_naive_a_f32(
+        packed_for_v0_naive, 47, 2, 3, 8, 2,
+        v0_naive_weights, 12) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_vtmg_bank_to_v0_naive_a_f32(
+        packed_for_v0_naive, 48, 2, 3, 4, 2,
+        v0_naive_weights, 12) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_vtmg_bank_to_v0_naive_a_f32(
+        packed_for_v0_naive, 48, 2, 3, 8, 2,
+        v0_naive_weights, 11) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
     // FUN_1800c6390: run one GEMM per bank, scatter to [feature][position][bank],
     // then add the shared per-output-feature bias.
     const float banked_weights[] = {
