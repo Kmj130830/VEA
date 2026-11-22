@@ -75,6 +75,8 @@ public class ExportS5RendererPath extends GhidraScript {
                 "1800ccce0", "1800cdbb0", "1800bca40", "1800becd0",
                 // JSON-driven renderer-state initialisation and parsed setting application.
                 "180126940", "180127220", "180127630",
+                // JSON request dispatchers called by the V7 settings wrappers.
+                "1800af170", "1800af230",
                 // Follow the neural render-state lookup used by the public render entry.
                 "1800c4730",
                 "1800c47a0",
@@ -172,7 +174,8 @@ public class ExportS5RendererPath extends GhidraScript {
                     "1800c47a0", "1800c4730", "1800aee20", "180126850",
                     "180097ff0", "18008d470", "1800aec40",
                     "1800ccce0", "1800cdbb0", "1800bca40",
-                    "180126940", "180127220", "180127630"
+                    "180126940", "180127220", "180127630",
+                    "1800af170", "1800af230"
             }) {
                 Address targetAddress = toAddr(targetHex);
                 ReferenceIterator callerRefs =
