@@ -10,6 +10,22 @@ completed Megpoid graph mapping. In particular, the nine VTMG tensor pairs
 `pre1/pre2`, `conv1/cond1`, `conv2/cond2`, `conv3/cond3`, and `linear` are not
 yet assigned to these stage descriptors.
 
+## Render entry gate
+
+`FUN_1800aec40` is the direct caller of `FUN_1800c7ad0`. Before entering
+the frame renderer it:
+
+- resolves the internal object through `FUN_1800c4730`;
+- rejects the call when the signed 32-bit value at internal-object offset
+  `+0x624` is less than one;
+- copies that value to offset `+0x624` in the renderer-side object;
+- calls `FUN_1800c7ad0` with the render-state pointer and the three request
+  arguments passed to the wrapper.
+
+This is an entry precondition/state handoff. The `+0x624` value has not yet
+been proven to be the renderer's `stageCount` (`param_1[5]`); these fields
+must remain distinct until the state-factory path confirms the relationship.
+
 ## Confirmed control flow
 
 - `param_1[5]` is the stage count. `param_1[6]` is the repeated residual
