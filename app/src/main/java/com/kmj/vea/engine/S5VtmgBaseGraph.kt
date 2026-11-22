@@ -149,6 +149,24 @@ data class S5VtmgPackedGraphLayerWeights(
     }
 
     /**
+     * Builds both recovered c6390 and c72d0 parameter layouts from this banked
+     * VTMG layer. Runtime mode selection is deferred until the renderer's
+     * raw mode byte (byte offset 0x59) is available.
+     */
+    fun toRendererProjectionPlan(
+        convertBanked: (FloatArray, Int, Int, Int, Int) -> FloatArray =
+            NativeS5TensorBridge::convertVtmgBankWeightsForV0Naive
+    ): S5VtmgRendererProjectionPlan {
+        require(matrixCount == 3) {
+            "The recovered c6390/c72d0 projection pair requires three VTMG matrix banks."
+        }
+        return S5VtmgRendererProjectionPlan(
+            layerName = layerName,
+            banked = toBankedProjectionPlan(convertBanked),
+            temporal = toTemporalProjectionPlan(kernelWidth = 3)
+        )
+    }
+    /**
      * Creates an operator-ready temporal projection plan.
      * This does not infer which renderer stage owns this VTMG layer.
      */
@@ -259,6 +277,50 @@ data class S5VtmgBankedProjectionPlan(
  * The plan preserves the source layer name for diagnostics only. It does not
  * assign any VTMG layer to a renderer stage.
  */
+/**
+ * Mode-selected projection using a VTMG layer's three matrix banks.
+ *
+ * rawModeFlag == 0: c6390 banked-linear projection.
+ * rawModeFlag != 0: c72d0 2x upsample + 3-tap temporal projection.
+ *
+ * The plan binds a decoded layer to the selected operator but deliberately
+ * does not decide which descriptor index or stage receives that layer.
+ */
+data class S5VtmgRendererProjectionPlan(
+    val layerName: String,
+    val banked: S5VtmgBankedProjectionPlan,
+    val temporal: S5VtmgTemporalProjectionPlan
+) {
+    init {
+        require(layerName.isNotBlank())
+        require(banked.banks == 3 && temporal.kernelWidth == 3)
+        require(banked.inputFeatures == temporal.inputChannels)
+        require(banked.outputFeatures == temporal.outputChannels)
+    }
+
+    fun project(
+        rawModeFlag: Int,
+        input: FloatArray,
+        positions: Int,
+        executeBanked: (
+            FloatArray, Int, Int, FloatArray, FloatArray, Int, Int, Int, Int
+        ) -> FloatArray = { w, row, bankStride, x, bias, inCount, outCount, frames, banks ->
+            NativeS5TensorBridge.applyBankedLinearProjection(
+                weights = w, weightRowStride = row, weightBankStride = bankStride,
+                input = x, bias = bias, inputFeatures = inCount,
+                outputFeatures = outCount, positions = frames, banks = banks
+            )
+        },
+        executeUpsample: (FloatArray, FloatArray, FloatArray?, Int, Int, Int) -> FloatArray =
+            NativeS5TensorBridge::applyUpsample2Conv3Projection
+    ): FloatArray {
+        require(rawModeFlag in 0..255) { "Projection mode flag must be an unsigned byte." }
+        return when (rawModeFlag) {
+            0 -> banked.project(input, positions, executeBanked)
+            else -> temporal.projectUpsample2(input, positions, executeUpsample)
+        }
+    }
+}
 data class S5VtmgTemporalProjectionPlan(
     val layerName: String,
     val weights: FloatArray,
