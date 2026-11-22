@@ -32,6 +32,14 @@ public class ExportS5BlockRuntime extends GhidraScript {
         "1800c47a0", "18005cba0", "180068190",
         "180064670",
 
+        // Config/model binding and render-state construction callers.
+        "1800aec40", "1800af170", "1800bca40",
+        "1800aee20", "1800ae700", "1800ae770",
+        "1800ae7e0", "1800ae860", "1800ae8e0",
+        "1800ae950", "1800ae9e0", "1800c0670",
+        "1800c06c0", "1800c0910", "1800d44b0",
+        "1800d47c0",
+
         // Scalar math, dispatchers, and kernels already under investigation.
         "18012cb50", "18012cbb2", "18012ca50",
         "1800df720", "1800d84e0", "1800d8720",
