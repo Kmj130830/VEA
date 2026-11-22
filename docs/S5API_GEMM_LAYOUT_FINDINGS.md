@@ -134,6 +134,21 @@ runtime object from `FUN_180068190` through layer construction to
 `FUN_1800c6390`, then verify the resolved address and stride contract with
 a synthetic tensor whose values encode both indices.
 
+## VEA packed-weight adapter
+
+VEA now provides `vea_s5_vtmg_bank_to_v0_naive_a_f32` and the Kotlin
+wrapper `convertVtmgBankWeightsForV0Naive`. The adapter takes the recovered
+VTMG bank buffer `[bank][input][paddedOutput]` and explicitly constructs the
+row-major A matrices `[bank][output][input]` required by VEA's scalar
+`v0_naive` GEMM implementation. Padding lanes are skipped.
+
+This converter has native index-pattern tests for multiple banks, non-square
+dimensions and padded lanes, plus a Kotlin packed-layer API test. It is an
+explicit VEA-side data-layout bridge for the already-known GEMM primitive; it
+does **not** establish that the original Yamaha renderer performs this
+conversion at the same point, nor does it wire the nine-layer graph into
+`FUN_1800c7ad0`.
+
 ## Implementation status
 
 VEA already has independent scalar GEMM and banked-linear primitives, plus
