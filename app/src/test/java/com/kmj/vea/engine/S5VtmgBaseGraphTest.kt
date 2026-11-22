@@ -375,6 +375,92 @@ class S5VtmgBaseGraphTest {
     }
 
     @Test
+    fun temporalProjectionPlanCallsTheExplicitStrideAndUpsampleOperators() {
+        val layer = S5VtmgPackedGraphLayerWeights(
+            layerName = "conv-probe",
+            matrices = FloatArray(3 * 2 * 8) { index ->
+                val tap = index / (2 * 8)
+                val within = index % (2 * 8)
+                val input = within / 8
+                val output = within % 8
+                if (output < 2) tap * 100.0f + input * 10.0f + output else 0.0f
+            },
+            bias = floatArrayOf(0.25f, -0.5f),
+            axis0Count = 2,
+            axis1Count = 2,
+            matrixCount = 3,
+            paddedAxis0Count = 8
+        )
+        val plan = layer.toTemporalProjectionPlan()
+        assertEquals("conv-probe", plan.layerName)
+        assertEquals(2, plan.inputChannels)
+        assertEquals(2, plan.outputChannels)
+        assertEquals(3, plan.kernelWidth)
+        assertEquals(
+            listOf(
+                0.0f, 100.0f, 200.0f, 10.0f, 110.0f, 210.0f,
+                1.0f, 101.0f, 201.0f, 11.0f, 111.0f, 211.0f
+            ),
+            plan.weights.toList()
+        )
+
+        val input = floatArrayOf(1f, 2f, 3f, 4f)
+        var strideCalled = false
+        val strideOutput = plan.projectStride2(input, positions = 2) {
+                receivedInput, receivedWeights, receivedBias,
+                inputChannels, outputChannels, positions, kernelWidth ->
+            strideCalled = true
+            assertEquals(input.toList(), receivedInput.toList())
+            assertEquals(plan.weights.toList(), receivedWeights.toList())
+            assertEquals(plan.bias.toList(), receivedBias?.toList())
+            assertEquals(2, inputChannels)
+            assertEquals(2, outputChannels)
+            assertEquals(2, positions)
+            assertEquals(3, kernelWidth)
+            floatArrayOf(10f, 20f)
+        }
+        assertEquals(true, strideCalled)
+        assertEquals(listOf(10f, 20f), strideOutput.toList())
+
+        var upsampleCalled = false
+        val upsampleOutput = plan.projectUpsample2(input, positions = 2) {
+                receivedInput, receivedWeights, receivedBias,
+                inputChannels, outputChannels, positions ->
+            upsampleCalled = true
+            assertEquals(input.toList(), receivedInput.toList())
+            assertEquals(plan.weights.toList(), receivedWeights.toList())
+            assertEquals(plan.bias.toList(), receivedBias?.toList())
+            assertEquals(2, inputChannels)
+            assertEquals(2, outputChannels)
+            assertEquals(2, positions)
+            FloatArray(8) { it.toFloat() }
+        }
+        assertEquals(true, upsampleCalled)
+        assertEquals(8, upsampleOutput.size)
+    }
+
+    @Test
+    fun temporalUpsamplePlanRejectsNonThreeTapKernelAndWrongOutputSize() {
+        val plan = S5VtmgTemporalProjectionPlan(
+            layerName = "two-tap",
+            weights = FloatArray(2 * 2 * 2),
+            bias = floatArrayOf(0f, 0f),
+            inputChannels = 2,
+            outputChannels = 2,
+            kernelWidth = 2
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            plan.projectUpsample2(FloatArray(4), positions = 2) { _, _, _, _, _, _ ->
+                FloatArray(8)
+            }
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            plan.projectStride2(FloatArray(4), positions = 2) { _, _, _, _, _, _, _ ->
+                FloatArray(3)
+            }
+        }
+    }
+    @Test
     fun packedLayerCanConvertToV0NaiveGemmWeightOrder() {
         val outputFeatures = 2
         val inputFeatures = 3
