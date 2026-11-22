@@ -78,7 +78,10 @@ public class ExportS5RendererPath extends GhidraScript {
                 // Generic v0_naive implementation and its blocked inner kernel.
                 "180143460", "180142b80",
                 // Trace VTMG model-object construction and the frame-render caller.
-                "18008d470", "1800aec40", "1800c1a30"
+                "18008d470", "1800aec40", "1800c1a30",
+                // Callers that initialize render-context pointer fields used by c7ad0.
+                "1800122ec", "180013d80", "180018954", "180058efb",
+                "180085006", "1800bcc86", "18013218d"
             };
             out.println("## Explicit internal call targets");
             out.println();
