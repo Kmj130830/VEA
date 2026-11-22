@@ -121,3 +121,13 @@ projection GEMM's `[outputFeature][inputFeature][kernelTap]` row-major
 matrix when the bank count is explicitly confirmed to represent kernel taps.
 The conversion itself is generic; it does not assert that a particular VTMG
 layer is wired to a specific `FUN_1800c5440` or `FUN_1800c72d0` stage.
+## Banked projection handoff
+
+The VTMG layer's bank-packed weights are also converted by
+`toBankedProjectionPlan()` into the exact matrix layout expected by
+`FUN_1800c6390`: `[bank][outputFeature][inputFeature]`, with a row stride
+of `inputFeatures` and bank stride `outputFeatures * inputFeatures`.
+The plan passes the per-output bias and invokes the existing native banked
+projection bridge, whose result layout is `[outputFeature][position][bank]`.
+The conversion does not identify the VTMG key as a particular renderer-stage
+descriptor; that binding must still be recovered from the render-state setup.

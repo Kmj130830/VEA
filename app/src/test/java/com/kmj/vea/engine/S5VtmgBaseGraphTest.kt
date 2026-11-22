@@ -195,6 +195,36 @@ class S5VtmgBaseGraphTest {
         return result
     }
 
+
+    @Test
+    fun packedVtmgLayerBuildsExactC6390ProjectionPlan() {
+        val layer = S5VtmgPackedGraphLayerWeights(
+            layerName = "conv-test",
+            matrices = FloatArray(3 * 2 * 8) { index ->
+                val bank = index / (2 * 8)
+                val withinBank = index % (2 * 8)
+                val input = withinBank / 8
+                val output = withinBank % 8
+                if (output < 2) bank * 100.0f + output * 10.0f + input else 0.0f
+            },
+            bias = floatArrayOf(0.25f, -0.5f),
+            axis0Count = 2,
+            axis1Count = 2,
+            matrixCount = 3,
+            paddedAxis0Count = 8
+        )
+        val plan = layer.toBankedProjectionPlan()
+        assertEquals(2, plan.inputFeatures)
+        assertEquals(2, plan.outputFeatures)
+        assertEquals(3, plan.banks)
+        assertEquals(2, plan.weightRowStride)
+        assertEquals(4, plan.weightBankStride)
+        assertEquals(12, plan.weights.size)
+        assertEquals(listOf(0.0f, 1.0f, 10.0f, 11.0f, 100.0f, 101.0f,
+            110.0f, 111.0f, 200.0f, 201.0f, 210.0f, 211.0f), plan.weights.toList())
+        assertEquals(listOf(0.25f, -0.5f), plan.bias.toList())
+    }
+
     @Test
     fun packedLayerConvertsBankMajorWeightsToOutputInputTapOrder() {
         val outputFeatures = 2

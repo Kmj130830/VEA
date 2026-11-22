@@ -92,6 +92,20 @@ data class S5VtmgPackedGraphLayerWeights(
     }
 
     /**
+     * Creates an explicit banked-projection plan for FUN_1800c6390.
+     * Weight conversion is [bank][output][input]; stage assignment is left
+     * to the recovered renderer binding layer.
+     */
+    fun toBankedProjectionPlan(): S5VtmgBankedProjectionPlan =
+        S5VtmgBankedProjectionPlan(
+            weights = toV0NaiveGemmWeights(),
+            bias = bias.copyOf(),
+            inputFeatures = axis1Count,
+            outputFeatures = axis0Count,
+            banks = matrixCount
+        )
+
+    /**
      * Converts packed matrix banks to the row-major temporal-kernel layout
      * consumed by S5API's c5440/c72d0 projections:
      * [outputFeature][inputFeature][kernelTap].
@@ -129,6 +143,67 @@ data class S5VtmgPackedGraphLayerWeights(
             "VTMG layer '$layerName' temporal weights contain a non-finite value."
         }
         return converted
+    }
+}
+
+
+/**
+ * Ready-to-call parameters for S5API FUN_1800c6390 / the VEA banked linear
+ * projection bridge. This is a tensor-layout plan only; it does not assign a
+ * VTMG layer to a particular renderer stage.
+ *
+ * weights: [bank][outputFeature][inputFeature]
+ * bias: [outputFeature]
+ * result: [outputFeature][position][bank]
+ */
+data class S5VtmgBankedProjectionPlan(
+    val weights: FloatArray,
+    val bias: FloatArray,
+    val inputFeatures: Int,
+    val outputFeatures: Int,
+    val banks: Int
+) {
+    init {
+        require(inputFeatures > 0 && outputFeatures > 0 && banks > 0)
+        val bankStride = outputFeatures.toLong() * inputFeatures
+        require(bankStride <= Int.MAX_VALUE.toLong()) {
+            "Banked projection matrix stride exceeds the supported array size."
+        }
+        val expectedWeights = bankStride * banks
+        require(expectedWeights == weights.size.toLong()) {
+            "Banked projection weights have an invalid element count."
+        }
+        require(bias.size == outputFeatures) {
+            "Banked projection bias must contain one value per output feature."
+        }
+        require(weights.all { it.isFinite() } && bias.all { it.isFinite() }) {
+            "Banked projection parameters contain a non-finite value."
+        }
+    }
+
+    val weightRowStride: Int
+        get() = inputFeatures
+
+    val weightBankStride: Int
+        get() = outputFeatures * inputFeatures
+
+    fun project(input: FloatArray, positions: Int): FloatArray {
+        require(positions > 0)
+        val expectedInput = inputFeatures.toLong() * positions
+        require(expectedInput == input.size.toLong()) {
+            "Input length must match [inputFeature][position]."
+        }
+        return NativeS5TensorBridge.applyBankedLinearProjection(
+            weights = weights,
+            weightRowStride = weightRowStride,
+            weightBankStride = weightBankStride,
+            input = input,
+            bias = bias,
+            inputFeatures = inputFeatures,
+            outputFeatures = outputFeatures,
+            positions = positions,
+            banks = banks
+        )
     }
 }
 
