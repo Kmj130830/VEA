@@ -311,6 +311,36 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_run_residual_dw_mlp_block_f32(
     size_t channels, size_t positions, size_t expanded_features,
     float epsilon);
 
+/*
+ * Precomputes the expanded GELU affine vectors built by FUN_1800d4bf0.
+ * expansion_weights: [expanded_features][channels]
+ * block_vector_a/b: [channels]
+ * expansion_bias and outputs: [expanded_features]
+ *
+ * Recovered mapping:
+ *   expanded_bias_a = expansion_weights * block_vector_b + expansion_bias
+ *   expanded_bias_b = expansion_weights * block_vector_a
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_prepare_c5d50_expansion_bias_f32(
+    const float* expansion_weights, const float* block_vector_a,
+    const float* block_vector_b, const float* expansion_bias,
+    float* expanded_bias_a, float* expanded_bias_b,
+    size_t channels, size_t expanded_features);
+
+/*
+ * Executes one VTB2 c5d50 block using the tensors as stored in the model.
+ * This entry point derives the two expanded GELU affine vectors from
+ * block_vector_a/b and expansion_bias before executing the block.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_run_vtb2_c5d50_block_f32(
+    const float* history_rows, const float* depthwise_weights,
+    const float* block_vector_a, const float* block_vector_b,
+    const float* expansion_weights, const float* expansion_bias,
+    const float* projection_weights, const float* projection_bias,
+    const float* block_vector_c, const float* residual_input,
+    float* output, size_t channels, size_t positions,
+    size_t expanded_features, float epsilon);
+
 /* Ports the MRW_LNSTATS reduction output: sum(input) and sum(input * input). */
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_reduce_sum_sumsq_f32(
     const float* input, size_t count, float* out_sum, float* out_sum_squares);
