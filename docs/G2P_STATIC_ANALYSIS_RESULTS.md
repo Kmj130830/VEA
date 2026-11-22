@@ -97,7 +97,69 @@ The first pass does not yet establish:
 - thread-safety for all per-note operations;
 - parity against authorized reference outputs.
 
-A follow-up Ghidra pass now scans read-only data addresses referenced directly by each G2PACreateManager factory, emits candidate vtable function-pointer runs, and adds those methods to the decompilation set. Its report must be reviewed before implementing the native interface.
+A second Ghidra pass has now scanned read-only data addresses referenced directly by the JPN and KOR `G2PACreateManager` factories, emitted candidate language-manager vtables, and decompiled their virtual method targets.
+
+- Second-pass workflow: https://github.com/Kmj130830/VEA/actions/runs/45037284998
+- Artifact: `VEA-G2P-decompilation-reports`
+- Artifact digest: `sha256:44ce3723830905ad88c2912cdc3e2819801bc4b50837785457a1d7836c674a3f`
+- The KOR and JPN reports include the factory-referenced virtual targets. No language DLL was executed.
+
+The next native interface work can use the method map below as a candidate contract, but the note/container interfaces and ownership rules still need independent recovery.
+
+## 6A. Second-pass JPN/KOR manager-vtable findings
+
+The second pass recovered language-specific vtable candidate tables from the factory return objects. This is separate from the host-facing `G2PAManagerIF` object and its wrapper thunk offsets.
+
+| Language DLL | Factory entry | Allocation | Candidate vtable address |
+|---|---:|---:|---:|
+| JPN | `G2PACreateManager` at `0x180003300` | `0x18` | `0x180019bc0` |
+| KOR | `G2PACreateManager` at `0x180005170` | `0x48` | `0x18000e918` |
+
+Both vtables contain targets at the same early virtual byte offsets as the host wrapper's dispatch contract, but the language-specific function bodies and object fields are not the same as the host object.
+
+### Korean candidate methods
+
+| Language-vtable byte offset | Target | Size | Directly observed behavior |
+|---:|---:|---:|---|
+| `0x00` | destructor | — | Releases the internal-module object and copied path before freeing the manager |
+| `0x08` | status/default helper | — | Returns a manager status/error field |
+| `0x10` | default lyric | 15 B | Returns a static wide-character lyric and clears status |
+| `0x18` | inputting-lyrics helper | 10 B | Small state helper; full semantics not established |
+| `0x20` | `FUN_1800052a0` | 1,210 B | Parses UTF-16 lyric text into intermediate segments and writes generated phoneme strings to note objects |
+| `0x28` | `FUN_180005760` | 22 B | Candidate `canConvert` method; current body returns false rather than demonstrating conversion |
+| `0x30` | `FUN_180005780` | 98 B | Sets a phoneme string on a note through the note object's `+0x40` virtual method |
+| `0x38` | `FUN_1800057f0` | 15 B | Clears an output count; no syllable-array construction is established by this body alone |
+| `0x40` | `FUN_180005800` | 186 B | Candidate note-delete method; checks note language and calls a container operation |
+| `0x48` | `FUN_1800058c0` | 2,164 B | Traverses note entries, builds an internal sequence from lyric text, compares phoneme data, and conditionally writes updated note phonemes |
+| `0x50` | `FUN_180006140` | 97 B | Forwards a note/container operation to the helper at its own vtable `+0x48`; likely the ranged-normalization wrapper path, but exact semantics are not proved |
+| `0x58` | `FUN_1800061b0` | 25 B | Clears status and returns success for non-null input; it does not show a full all-lyrics normalization pass |
+
+`FUN_1800052a0` accepts a note/container interface, a UTF-16 lyric string, a mode byte, an additional argument and an output-count pointer. It clears the manager error field at object offset `+0x40`; invalid arguments set error `1`. It lazily constructs the `G2PAInternalModule` and converter, canonicalizes U+30FC (`ー`) and U+2212 (`−`) to U+002D (`-`), then calls `FUN_180001ad0` to prepare intermediate segments. It walks the note sequence, retrieves the generated phoneme text, and updates the note through a virtual setter. A failed note update sets error `4`. The exact structures behind the note and segment vtables remain unresolved.
+
+`FUN_1800058c0` also performs the two character substitutions. It enumerates note entries, builds a sequence from selected lyrics, invokes the internal conversion path, compares generated text with the stored phoneme string, and writes changed phoneme values through the note interface. This is stronger evidence of a note-normalization/reconciliation pass than a simple string replacement, but the exact correspondence to `normalizeAllPhonemes` versus `normalizeAllLyrics` still requires the host wrapper's call path to be followed.
+
+### Japanese candidate methods
+
+| Language-vtable byte offset | Target | Size | Evidence
+|---:|---:|---:|
+| `0x00` | `FUN_180003340` | 10 B | destructor/helper slot
+| `0x08` | `FUN_180003350` | 4 B | status helper
+| `0x10` | `FUN_180003b80` | 15 B | default-lyric helper
+| `0x18` | `FUN_180003b90` | 5,359 B | large input-state/processing helper
+| `0x20` | `FUN_180005090` | 3,166 B | principal Japanese lyric-processing candidate
+| `0x28` | `FUN_180005cf0` | 1,343 B | language-specific helper; full contract not yet mapped
+| `0x30` | `FUN_180006240` | 135 B | language-specific phoneme/update helper candidate
+| `0x38` | `FUN_1800062d0` | 581 B | syllable/note helper candidate
+| `0x40` | `FUN_180006520` | 266 B | note-operation candidate
+| `0x48` | `FUN_180006630` | 516 B | normalization candidate
+| `0x50` | `FUN_180006840` | 457 B | ranged operation candidate
+| `0x58` | `FUN_180006f70` | 25 B | small validation/state helper
+
+`FUN_180005090` normalizes ideographic space U+3000 to U+0020 and lowercases its intermediate text before invoking parser/converter helpers. This is direct Japanese-path behavior in this build; it is not evidence that the same normalization applies to Korean.
+
+### ABI and implementation boundary
+
+The vtable entries are recovered from factory-referenced read-only data and their bodies are decompiled static evidence. They are not a public Yamaha C++ header. Do not copy the `0x18` or `0x48` MSVC object layouts into Android, and do not call Windows x64 function addresses from the Android process. The Android port still requires a portable note-container model, explicit UTF-8/UTF-16 conversion, owned output buffers and per-language differential tests.
 
 ## 7. Android port decision
 
