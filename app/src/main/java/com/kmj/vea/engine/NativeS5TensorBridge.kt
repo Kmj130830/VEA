@@ -220,6 +220,48 @@ object NativeS5TensorBridge {
     }
 
     /**
+     * Executes the stride-2 Conv1D projection recovered from FUN_1800c5440.
+     * Input is [inputChannel][position], weights are
+     * [outputChannel][inputChannel][kernelTap], and output is
+     * [outputChannel][ceil(positionCount/2)] for odd kernels >= 3.
+     */
+    fun applyStride2Conv1dProjection(
+        input: FloatArray,
+        weights: FloatArray,
+        bias: FloatArray?,
+        inputChannels: Int,
+        outputChannels: Int,
+        positions: Int,
+        kernelWidth: Int
+    ): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(inputChannels > 0 && outputChannels > 0 && positions > 0)
+        require(kernelWidth > 0 && kernelWidth % 2 == 1) {
+            "The recovered stride-2 Conv1D path supports odd kernel widths only."
+        }
+        val expectedInput = inputChannels.toLong() * positions
+        val expectedWeights = outputChannels.toLong() * inputChannels * kernelWidth
+        val outputPositions = if (kernelWidth == 1) positions / 2 + 1
+            else positions / 2 + positions % 2
+        val expectedOutput = outputChannels.toLong() * outputPositions
+        require(expectedInput == input.size.toLong()) {
+            "Input length does not match [inputChannel][position]."
+        }
+        require(expectedWeights == weights.size.toLong()) {
+            "Weight length does not match [outputChannel][inputChannel][kernelTap]."
+        }
+        require(bias == null || bias.size == outputChannels) {
+            "Bias must contain one value per output channel."
+        }
+        require(expectedOutput <= Int.MAX_VALUE.toLong()) {
+            "Stride-2 Conv1D output exceeds the supported array size."
+        }
+        return nativeStride2Conv1dProjection(
+            input, weights, bias, inputChannels, outputChannels, positions, kernelWidth
+        ) ?: throw IllegalArgumentException("S5 stride-2 Conv1D projection failed.")
+    }
+
+    /**
      * Runs the banked linear projection recovered in FUN_1800c6390.
      * Weights are [bank][outputFeature][inputFeature]; input is [inputFeature][position].
      * Output is [outputFeature][position][bank]. Bias may be null.
