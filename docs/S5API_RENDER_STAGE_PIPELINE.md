@@ -87,10 +87,11 @@ confirmed c5d50 invocation sequence:
 (stage 0, block 1)
 ```
 
-The two descriptors for stage 3 are loaded and validated by the VTB2 loader,
-but this `FUN_1800c7ad0` call path does not pass them to `FUN_1800c5d50`.
-Their use in a separate render path or configuration remains unknown. The
-runtime schedule must therefore distinguish loaded descriptors from the six
+The two descriptors for stage 3 are loaded and retained in the renderer
+configuration's `+0xb8` vector, but this `FUN_1800c7ad0` call path starts its
+reverse loop at index 1 and does not pass stage 3 to `FUN_1800c5d50`. Their
+use in a separate render path or configuration remains unknown. The runtime
+schedule therefore distinguishes the eight parsed descriptors from the six
 blocks invoked by this specific renderer loop.
 
 `FUN_18010d550(stage, block)` selects a 32-character JSON property key from
@@ -224,11 +225,35 @@ stride of `0x100` bytes. The renderer later indexes that same slot vector
 with a `0x100`-byte stride for each c5d50 call. This ties the copied
 render-state array to the per-block objects consumed by `FUN_1800c5d50`.
 
-The VTB2 entry `FUN_180127220` calls `FUN_1800af170`, which prepares a
-temporary loader object, calls `FUN_1800ced10`, and then passes the result
-through `FUN_1800dc4b0`. The exact ownership/registration semantics of
-`FUN_1800dc4b0` are still under analysis; do not yet equate the temporary
-VTB2 loader object with the final `+0xb8` render-state vector.
+The VTB2 load path is now linked directly to the renderer descriptor
+vector:
+
+1. `FUN_180127220` enters `FUN_1800af170` with the destination renderer
+   configuration object.
+2. `FUN_1800af170` builds a temporary parsed JSON tree, then calls
+   `FUN_1800ced10(destinationConfig, parsedTree)`.
+3. `FUN_1800ced10` reads the 4-stage/2-block configuration and iterates
+   `stageIndex = 0..3`, then `blockIndex = 0..1`. For each pair it retrieves
+   eight F32 tensors and passes them to `FUN_1800d4bf0`.
+4. `FUN_1800d4bf0` constructs one 0x100-byte c5d50 descriptor. It stores
+   the depthwise kernel, the A/B conditioning vectors, expansion
+   weights/bias, projection weights/bias, and C scale vector. It also
+   prepares the per-descriptor auxiliary vectors and writes the recovered
+   epsilon bit pattern `0x358637bd` (1e-6).
+5. The completed descriptor is appended directly to the destination
+   configuration's int32 slot `+0xb8` (byte offset `0x2e0`) with a
+   `0x100`-byte stride. The append path advances the vector end pointer by
+   `0x100` for each record.
+6. Only after `FUN_1800ced10` has populated the destination does
+   `FUN_1800af170` call `FUN_1800dc4b0`. That function recursively clears
+   the temporary typed JSON tree and its nested vectors/strings; it is not
+   a renderer registration function.
+
+This confirms the VTB2 parser-to-renderer link: the stage-major descriptors
+loaded by `S5Vtb2C5d50StageBlockParameterLoader` correspond to the same
+`+0xb8` vector consumed by `FUN_1800c7ad0`. The parser's ascending layout is
+`(0,0),(0,1),(1,0),(1,1),(2,0),(2,1),(3,0),(3,1)`; the renderer then indexes
+the groups in reverse stage order and invokes only stages 2, 1 and 0.
 
 ## Confirmed operator order and descriptor-array layout in c7ad0
 
