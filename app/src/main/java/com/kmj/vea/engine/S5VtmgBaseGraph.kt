@@ -285,7 +285,7 @@ data class S5VtmgTemporalProjectionPlan(
     fun projectStride2(
         input: FloatArray,
         positions: Int,
-        execute: (FloatArray, FloatArray?, Int, Int, Int, Int) -> FloatArray =
+        execute: (FloatArray, FloatArray, FloatArray?, Int, Int, Int, Int) -> FloatArray =
             NativeS5TensorBridge::applyStride2Conv1dProjection
     ): FloatArray {
         require(positions > 0)
