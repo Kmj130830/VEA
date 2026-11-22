@@ -136,3 +136,34 @@ Before any language is marked ready:
 7. Validate performance and memory use on Android ARM64.
 
 G2P is only lyric/phoneme preparation. It does not synthesize audio. The VOCALOID7 AI renderer, model loading/runtime and audio-render interface remain separate unresolved work.
+
+## 7. Second-pass factory-referenced JPN/KOR vtables
+
+The second-pass artifact is attached to [G2P static decompilation run 45037284998](https://github.com/Kmj130830/VEA/actions/runs/45037284998). Artifact digest: `sha256:44ce3723830905ad88c2912cdc3e2819801bc4b50837785457a1d7836c674a3f`.
+
+The pass found factory-referenced candidate vtables at:
+
+| Language | Factory | Object size | Candidate vtable |
+|---|---|---:|---:|
+| JPN | `G2PACreateManager` at `0x180003300` | `0x18` | `0x180019bc0` |
+| KOR | `G2PACreateManager` at `0x180005170` | `0x48` | `0x18000e918` |
+
+These are per-language manager vtables, not the common host `G2PAManagerIF` vtable.
+
+### Korean function-body observations
+
+- Vtable byte offset `0x20` resolves to `FUN_1800052a0` (1,210 bytes). It accepts a note/container, a UTF-16 lyric string, a mode byte, another argument and an output-count pointer. It lazily creates the internal converter, canonicalizes U+30FC and U+2212 to ASCII hyphen-minus, calls `FUN_180001ad0` to build intermediate segments, and applies the resulting phoneme strings through note virtual methods. A failed note update sets manager error field `+0x40` to 4; invalid input sets it to 1.
+- Vtable byte offset `0x30` resolves to `FUN_180005780` (98 bytes), which forwards a phoneme string to the note object's virtual setter at `+0x40`.
+- Vtable byte offset `0x48` resolves to `FUN_1800058c0` (2,164 bytes). It enumerates notes, normalizes lyric text, builds an internal segment sequence, compares generated phoneme data with stored text and writes changed values. Exact host-facing normalize method identity is not yet proved.
+- Vtable byte offset `0x50` resolves to `FUN_180006140` (97 bytes), which obtains the first note from a supplied container and forwards to the object's own vtable `+0x48`. This looks like a ranged wrapper, but the full range structure and semantics are not yet recovered.
+- Vtable byte offset `0x58` resolves to `FUN_1800061b0` (25 bytes), which only clears error state and returns success for a non-null argument. It does not implement a visible all-lyrics traversal in this body.
+
+### Japanese function-body observations
+
+The Japanese factory creates a `0x18`-byte object with a candidate vtable at `0x180019bc0`. Its `+0x20` target is `FUN_180005090` (3,166 bytes), a substantial lyric-processing method. Its visible pre-processing changes ideographic space U+3000 to ordinary space and applies `towlower` to the intermediate text before continuing to parser helpers. This should not be applied to Korean or other languages without their own evidence.
+
+The JPN table also contains large helper targets at `+0x18` (5,359 bytes) and `+0x28` (1,343 bytes). Their names and complete contracts have not yet been recovered.
+
+### Porting boundary
+
+The recovered virtual offsets align with the host wrapper's early method sequence, but this does not make the language object binary-compatible with the host object. The Android implementation must expose a new C ABI and portable note/segment structures. Do not copy the Windows MSVC object size, vtable pointers or ownership rules into the ARM64 library.
