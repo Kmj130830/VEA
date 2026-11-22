@@ -7,6 +7,7 @@ on:
       - "Editor.zip"
       - "tools/inspect_s5_model_payload.py"
       - "tools/inspect_s5_all_model_payloads.py"
+      - "tools/probe_s5_layer_config_objects.py"
       - "app/src/main/cpp/vea_s5_container.cpp"
       - "tools/ghidra/ExportS5ContainerAndHash.java"
       - ".github/workflows/s5api-container-hash-analysis.yml"
@@ -69,6 +70,9 @@ jobs:
 
       - name: Inspect all bundled Megpoid and shared VOCALOID7 model resources
         run: python3 tools/inspect_s5_all_model_payloads.py
+
+      - name: Probe hashed layer-configuration objects and child schemas
+        run: python3 tools/probe_s5_layer_config_objects.py
 
       - name: Download and verify Ghidra 12.2
         shell: bash
