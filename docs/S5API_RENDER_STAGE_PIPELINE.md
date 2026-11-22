@@ -62,15 +62,32 @@ The VTB2 loader confirms **4 stage indices × 2 block indices = 8
 c5d50 parameter descriptors**. This is distinct from the separate nine-record
 VTB2 array documented in `S5API_VTB2_REPEATED_BLOCK_TENSORS.md`.
 
-There is an execution-count discrepancy that must remain explicit: the
-decompiled reverse-stage loop in `FUN_1800c7ad0` enters the projection and
-c5d50 block section only when its reverse-loop index is greater than zero.
-With the currently decoded stage count of 4, that control flow appears to
-execute c5d50 for three reverse stages (six block calls per frame), while the
-model loader exposes eight descriptors. The exact relationship between the
-configured stage count, the first/last stage boundary, and the two additional
-parameter descriptors is not yet reconciled. The eight loaded descriptors
-must not be interpreted as proof that all eight run in one render pass.
+The reverse loop uses `iVar29` from zero to
+`stageCount - 1`. It enters the projection and c5d50 block section only when
+`iVar29 > 0`. Inside that section:
+
+- `reverseStageCount = stageCount - iVar29`;
+- the projected stage index is `reverseStageCount - 1`;
+- each block's flattened parameter index is
+  `(reverseStageCount - 1) * blockCount + blockIndex`.
+
+For the decoded Megpoid values (4 stages, 2 blocks per stage), this gives the
+confirmed c5d50 invocation sequence:
+
+```text
+(stage 2, block 0)
+(stage 2, block 1)
+(stage 1, block 0)
+(stage 1, block 1)
+(stage 0, block 0)
+(stage 0, block 1)
+```
+
+The two descriptors for stage 3 are loaded and validated by the VTB2 loader,
+but this `FUN_1800c7ad0` call path does not pass them to `FUN_1800c5d50`.
+Their use in a separate render path or configuration remains unknown. The
+runtime schedule must therefore distinguish loaded descriptors from the six
+blocks invoked by this specific renderer loop.
 
 `FUN_18010d550(stage, block)` selects a 32-character JSON property key from
 the table at `0x1801cbc20`, with 0x20-byte string entries indexed by
