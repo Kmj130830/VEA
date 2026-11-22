@@ -19,6 +19,45 @@ bool MultiplyOverflow(size_t a, size_t b, size_t* out) {
 }
 }  // namespace
 
+extern "C" VeaS5TensorStatus vea_s5_vtmg_bank_to_v0_naive_a_f32(
+    const float* packed_vtmg, size_t packed_count,
+    size_t output_features, size_t input_features,
+    size_t padded_output_features, size_t banks,
+    float* gemm_a, size_t gemm_a_count) {
+    if (packed_vtmg == nullptr || gemm_a == nullptr ||
+        output_features == 0u || input_features == 0u || banks == 0u ||
+        padded_output_features < output_features ||
+        (padded_output_features % VEA_S5_MATRIX_AXIS0_ALIGNMENT) != 0u) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+
+    size_t source_bank_stride = 0u;
+    size_t expected_source_count = 0u;
+    size_t destination_bank_stride = 0u;
+    size_t expected_destination_count = 0u;
+    if (MultiplyOverflow(input_features, padded_output_features, &source_bank_stride) ||
+        MultiplyOverflow(source_bank_stride, banks, &expected_source_count) ||
+        MultiplyOverflow(output_features, input_features, &destination_bank_stride) ||
+        MultiplyOverflow(destination_bank_stride, banks, &expected_destination_count)) {
+        return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
+    }
+    if (packed_count != expected_source_count || gemm_a_count != expected_destination_count) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+
+    for (size_t bank = 0; bank < banks; ++bank) {
+        const float* source_bank = packed_vtmg + bank * source_bank_stride;
+        float* destination_bank = gemm_a + bank * destination_bank_stride;
+        for (size_t output = 0; output < output_features; ++output) {
+            float* destination_row = destination_bank + output * input_features;
+            for (size_t input = 0; input < input_features; ++input) {
+                destination_row[input] = source_bank[input * padded_output_features + output];
+            }
+        }
+    }
+    return VEA_S5_TENSOR_STATUS_OK;
+}
+
 extern "C" VeaS5TensorStatus vea_s5_banked_linear_projection_f32(
     const float* weights, size_t weight_row_stride, size_t weight_bank_stride,
     const float* input, const float* bias, float* output,
