@@ -103,6 +103,55 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeCopyChronologicalHistoryRing(
     }
 }
 
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeVtmgBankToV0NaiveA(
+    JNIEnv* env, jobject, jfloatArray packed_array,
+    jint output_features, jint input_features, jint padded_output_features, jint banks) {
+    if (packed_array == nullptr || output_features <= 0 || input_features <= 0 ||
+        padded_output_features <= 0 || banks <= 0) return nullptr;
+
+    size_t source_bank_stride = 0u;
+    size_t source_count = 0u;
+    size_t destination_bank_stride = 0u;
+    size_t destination_count = 0u;
+    if (MultiplyOverflow(static_cast<size_t>(input_features),
+            static_cast<size_t>(padded_output_features), &source_bank_stride) ||
+        MultiplyOverflow(source_bank_stride, static_cast<size_t>(banks), &source_count) ||
+        MultiplyOverflow(static_cast<size_t>(output_features),
+            static_cast<size_t>(input_features), &destination_bank_stride) ||
+        MultiplyOverflow(destination_bank_stride, static_cast<size_t>(banks), &destination_count) ||
+        source_count > static_cast<size_t>(std::numeric_limits<jsize>::max()) ||
+        destination_count > static_cast<size_t>(std::numeric_limits<jsize>::max()) ||
+        env->GetArrayLength(packed_array) != static_cast<jsize>(source_count)) {
+        return nullptr;
+    }
+
+    try {
+        std::vector<float> output(destination_count);
+        auto* source = static_cast<jfloat*>(
+            env->GetPrimitiveArrayCritical(packed_array, nullptr));
+        if (source == nullptr) return nullptr;
+
+        const VeaS5TensorStatus status = vea_s5_vtmg_bank_to_v0_naive_a_f32(
+            source, source_count,
+            static_cast<size_t>(output_features), static_cast<size_t>(input_features),
+            static_cast<size_t>(padded_output_features), static_cast<size_t>(banks),
+            output.data(), output.size());
+        env->ReleasePrimitiveArrayCritical(packed_array, source, JNI_ABORT);
+        if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+
+        jfloatArray result = env->NewFloatArray(static_cast<jsize>(destination_count));
+        if (result == nullptr) return nullptr;
+        env->SetFloatArrayRegion(
+            result, 0, static_cast<jsize>(destination_count), output.data());
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeBuildRecurrentParameterName(
     JNIEnv* env, jobject, jstring base_string, jstring suffix_string,
