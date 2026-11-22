@@ -74,6 +74,7 @@ public class ExportS5BlockRuntime extends GhidraScript {
         // Calls that create, expose, or invoke the loaded model objects.
         "1801268a1", "180126990", "180126a6c", "180126cde",
         "180127093", "180127193", "180127323"
+    };
 
     @Override
     public void run() throws Exception {
