@@ -66,6 +66,12 @@ or swaps these activation buffers between operator stages.
 
 ## Descriptor-copy boundary and source layout
 
+`FUN_1800c4730` resolves the source config from a wrapper handle: it requires
+the wrapper's `+0x38` object pointer and that object's `+0x10` inner-state
+pointer to be non-null, then returns the inner-state pointer in `RAX` (the
+decompiler's inferred return type is incomplete). `FUN_1800ccce0` passes that
+inner-state pointer as the source argument to `FUN_1800cdbb0`.
+
 `FUN_1800ccce0` allocates a fresh `0x37a0` execution state, runs the
 `FUN_1800bca40` initializer, obtains the inner config pointer through
 `FUN_1800c4730`, then passes that config to `FUN_1800cdbb0`.
