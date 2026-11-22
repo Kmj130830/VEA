@@ -472,6 +472,16 @@ object NativeS5TensorBridge {
     private external fun nativeAppendHistoryRing(handle: Long, block: FloatArray): Boolean
     private external fun nativeCopyChronologicalHistoryRing(handle: Long): FloatArray?
 
+    private external fun nativeUpsample2Conv3Projection(
+        input: FloatArray, weights: FloatArray, bias: FloatArray?,
+        inputChannels: Int, outputChannels: Int, positions: Int
+    ): FloatArray?
+
+    private external fun nativeStride2Conv1dProjection(
+        input: FloatArray, weights: FloatArray, bias: FloatArray?,
+        inputChannels: Int, outputChannels: Int, positions: Int, kernelWidth: Int
+    ): FloatArray?
+
     private external fun nativeVtmgBankToV0NaiveA(
         packedWeights: FloatArray,
         outputFeatures: Int,
