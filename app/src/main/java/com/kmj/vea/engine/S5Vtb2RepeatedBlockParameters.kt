@@ -3,7 +3,7 @@ package com.kmj.vea.engine
 import java.io.File
 
 /**
- * One repeated VTB2 parameter record from the nine-element model array.
+ * One VTB2 parameter record from the separate nine-element model array.
  *
  * The source tensor lengths are exact. The dimensional factorisation
  * [bankedWeightValues = 3 * 128 * 64] and
@@ -12,7 +12,7 @@ import java.io.File
  * order and the exact c5d50 descriptor field consuming each tensor are not
  * asserted here.
  */
-data class S5Vtb2RepeatedBlockParameterPack(
+data class S5Vtb2RepeatedParameterPack(
     val index: Int,
     val bankedWeightValues: FloatArray,
     val bankedBiasValues: FloatArray,
@@ -52,9 +52,9 @@ data class S5Vtb2RepeatedBlockParameterPack(
     }
 }
 
-data class S5Vtb2RepeatedBlockParameterSet(
+data class S5Vtb2RepeatedParameterSet(
     val declaredBlockCount: Int,
-    val blocks: List<S5Vtb2RepeatedBlockParameterPack>
+    val blocks: List<S5Vtb2RepeatedParameterPack>
 ) {
     init {
         require(declaredBlockCount > 0)
@@ -85,7 +85,7 @@ data class S5Vtb2RepeatedBlockParameterSet(
  * Hashed leaf field names are reused throughout the container, so each tensor
  * is selected by its complete path rather than a bare field hash.
  */
-object S5Vtb2RepeatedBlockParameterLoader {
+object S5Vtb2RepeatedParameterLoader {
     const val ROOT_MODEL_CONFIG_OBJECT_KEY = "a4ba655a061e6151f80574e6088492a0"
     const val MODEL_CONFIG_ENTRY_KEY = "b4a5a1d9f51f573d714597f1e5e64f17"
     const val DECLARED_BLOCK_COUNT_KEY = "d31a34cf5e8888d62df2d9b4e32b80f1"
@@ -102,7 +102,7 @@ object S5Vtb2RepeatedBlockParameterLoader {
         vtb2File: File,
         decodeFloatArray: (String) -> FloatArray = NativeS5TensorBridge::decodeTypedFloatArray,
         decodeInt32Array: (String) -> IntArray = NativeS5TensorBridge::decodeTypedInt32Array
-    ): S5Vtb2RepeatedBlockParameterSet {
+    ): S5Vtb2RepeatedParameterSet {
         require(vtb2File.isFile) { "The Megpoid VTB2 resource does not exist." }
         check(NativeS5TensorBridge.isLoaded) {
             "The native S5API container and typed-tensor decoders are not loaded."
@@ -120,7 +120,7 @@ object S5Vtb2RepeatedBlockParameterLoader {
         decodeInt32Array: (String) -> IntArray = {
             throw IllegalArgumentException("The repeated VTB2 block tensors are expected to be float32.")
         }
-    ): S5Vtb2RepeatedBlockParameterSet {
+    ): S5Vtb2RepeatedParameterSet {
         require(ROOT_MODEL_CONFIG_OBJECT_KEY in scan.matchedObjectKeys) {
             "The Megpoid VTB2 root model configuration object was not found."
         }
@@ -134,13 +134,13 @@ object S5Vtb2RepeatedBlockParameterLoader {
             .orEmpty()
             .singleOrNull { it.valuePath == blockCountPath }
             ?: throw IllegalArgumentException(
-                "The VTB2 repeated-block count field is missing or duplicated."
+                "The VTB2 repeated-parameter count field is missing or duplicated."
             )
         require(countMatch.kind == S5JsonScalarKind.NUMBER) {
-            "The VTB2 repeated-block count is not numeric."
+            "The VTB2 repeated-parameter count is not numeric."
         }
         val declaredCount = countMatch.value?.toIntOrNull()
-            ?: throw IllegalArgumentException("The VTB2 repeated-block count is invalid.")
+            ?: throw IllegalArgumentException("The VTB2 repeated-parameter count is invalid.")
         require(declaredCount == EXPECTED_BLOCK_COUNT) {
             "This Megpoid VTB2 model declares $declaredCount repeated parameters; " +
                 "expected $EXPECTED_BLOCK_COUNT."
@@ -154,9 +154,9 @@ object S5Vtb2RepeatedBlockParameterLoader {
             it.valuePath.startsWith(repeatedBlockPrefix)
         }
         val expectedRepeatedTensorCount =
-            declaredCount * S5Vtb2RepeatedBlockParameterPack.TENSORS_PER_BLOCK
+            declaredCount * S5Vtb2RepeatedParameterPack.TENSORS_PER_BLOCK
         require(repeatedBlockTensorMatches.size == expectedRepeatedTensorCount) {
-            "VTB2 repeated parameter array contains ${repeatedBlockTensorMatches.size} typed tensors; " +
+            "VTB2 separate parameter array contains ${repeatedBlockTensorMatches.size} typed tensors; " +
                 "expected $expectedRepeatedTensorCount."
         }
         val duplicatePaths = repeatedBlockTensorMatches.groupBy { it.valuePath }
@@ -190,23 +190,23 @@ object S5Vtb2RepeatedBlockParameterLoader {
             val itemPath = "$arrayPrefix[$index]"
             val bankedPath = "$itemPath.$BANKED_PARAMETER_OBJECT_KEY"
             val singlePath = "$itemPath.$SINGLE_PARAMETER_OBJECT_KEY"
-            S5Vtb2RepeatedBlockParameterPack(
+            S5Vtb2RepeatedParameterPack(
                 index = index,
                 bankedWeightValues = decodeTensor(
                     "$bankedPath.$WEIGHT_FIELD_KEY",
-                    S5Vtb2RepeatedBlockParameterPack.BANKED_WEIGHT_COUNT
+                    S5Vtb2RepeatedParameterPack.BANKED_WEIGHT_COUNT
                 ),
                 bankedBiasValues = decodeTensor(
                     "$bankedPath.$BIAS_FIELD_KEY",
-                    S5Vtb2RepeatedBlockParameterPack.BANKED_BIAS_COUNT
+                    S5Vtb2RepeatedParameterPack.BANKED_BIAS_COUNT
                 ),
                 singleWeightValues = decodeTensor(
                     "$singlePath.$WEIGHT_FIELD_KEY",
-                    S5Vtb2RepeatedBlockParameterPack.SINGLE_WEIGHT_COUNT
+                    S5Vtb2RepeatedParameterPack.SINGLE_WEIGHT_COUNT
                 )
             )
         }
-        return S5Vtb2RepeatedBlockParameterSet(declaredCount, blocks)
+        return S5Vtb2RepeatedParameterSet(declaredCount, blocks)
     }
 
     const val EXPECTED_BLOCK_COUNT = 9

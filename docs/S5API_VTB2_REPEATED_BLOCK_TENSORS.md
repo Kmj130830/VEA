@@ -1,4 +1,4 @@
-# AI Megpoid VTB2 repeated parameter tensor collection
+# AI Megpoid VTB2 separate parameter tensor collection
 
 Date: 2026-11-22
 
@@ -30,7 +30,7 @@ Every entry has two child objects:
 All 27 tensors (9 × 3) decode as finite float32 values. Tensor paths, not
 the repeated leaf hash alone, are used to associate them with an array index.
 
-## Relationship to c5d50
+## Relationship to renderer c5d50
 
 The counts are compatible with the renderer block's observed 64-channel
 and 128-expanded-feature dimensions: `128 × 64` for an expansion matrix and
@@ -38,12 +38,13 @@ and 128-expanded-feature dimensions: `128 × 64` for an expansion matrix and
 of three. However, `FUN_1800c5d50` passes a single matrix pointer to its
 first GEMM call, and the exact runtime selection/consumption of the three
 banks is not established by tensor sizes alone. These objects are therefore
-loaded as repeated VTB2 parameter packs, but are **not yet wired** to the
-`c5d50` descriptor's `+0x32` / `+0x26` fields.
+loaded as a separate VTB2 parameter collection. The active c5d50 config uses
+stage/block-indexed JSON keys, so this nine-item array is **not** treated as
+the c5d50 block list and is not wired to its descriptor fields.
 
 ## Android implementation
 
-`S5Vtb2RepeatedBlockParameterLoader` scans only the `a4ba...` and `6dbe...`
+`S5Vtb2RepeatedParameterLoader` scans only the `a4ba...` and `6dbe...`
 objects, decodes the 27 selected F32 tensors by their complete JSON paths,
 checks the declared block count and exact element counts, and keeps the
 per-entry raw arrays. It does not build a full JSONObject tree or decode

@@ -199,8 +199,8 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
             )
         )
         val modelFeatures = S5ModelFeatureFlagReader.decode(featureScan)
-        val repeatedBlockParameters = S5Vtb2RepeatedBlockParameterLoader.load(vtb2File)
-        require(repeatedBlockParameters.blocks.size == repeatedBlockParameters.declaredBlockCount) {
+        val repeatedParameters = S5Vtb2RepeatedParameterLoader.load(vtb2File)
+        require(repeatedParameters.blocks.size == repeatedParameters.declaredBlockCount) {
             "The Megpoid VTB2 repeated parameter collection is incomplete."
         }
 
@@ -225,7 +225,7 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
         throw UnsupportedOperationException(
             "Loaded the shared VOCALOID7.vtmg base graph and converted its " +
                 "${projectionPlans.size} named layers to c6390-compatible banked projection plans " +
-                "and ${repeatedBlockParameters.blocks.size} repeated VTB2 parameter packs " +
+                "and ${repeatedParameters.blocks.size} repeated VTB2 parameter packs " +
                 "(tensor-path/shape validation only; no c5d50 descriptor binding yet). " +
                 "(pre1/pre2, conv1/cond1, conv2/cond2, conv3/cond3, linear). " +
                 "These plans are not yet assigned to renderer stages. " +
