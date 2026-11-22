@@ -80,6 +80,8 @@ public class ExportS5RendererPath extends GhidraScript {
                 // Explicit callees of the JSON request dispatchers, kept ahead
                 // of the broad renderer call-graph expansion.
                 "1800b8f60", "1800ced10", "1800dc4b0", "180129240",
+                // Build and decode per-stage / per-block JSON descriptors inside ced10.
+                "1800d4bf0", "18010d550", "1800ea000", "1800b6a20", "1800c0a40",
                 // Follow the neural render-state lookup used by the public render entry.
                 "1800c4730",
                 "1800c47a0",
@@ -179,7 +181,8 @@ public class ExportS5RendererPath extends GhidraScript {
                     "1800ccce0", "1800cdbb0", "1800bca40",
                     "180126940", "180127220", "180127630",
                     "1800af170", "1800af230",
-                    "1800b8f60", "1800ced10", "1800dc4b0", "180129240"
+                    "1800b8f60", "1800ced10", "1800dc4b0", "180129240",
+                    "1800d4bf0", "18010d550", "1800ea000", "1800b6a20", "1800c0a40"
             }) {
                 Address targetAddress = toAddr(targetHex);
                 ReferenceIterator callerRefs =
