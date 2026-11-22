@@ -66,6 +66,8 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_history_ring_append(
     VeaS5HistoryRing* ring, const float* block, size_t block_count);
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_history_ring_copy_chronological(
     const VeaS5HistoryRing* ring, float* output, size_t output_count);
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_history_ring_copy_channel_major(
+    const VeaS5HistoryRing* ring, float* output, size_t output_count);
 VEA_S5_TENSOR_API size_t vea_s5_history_ring_block_size(const VeaS5HistoryRing* ring);
 VEA_S5_TENSOR_API size_t vea_s5_history_ring_row_count(const VeaS5HistoryRing* ring);
 
