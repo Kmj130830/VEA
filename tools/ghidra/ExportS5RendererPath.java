@@ -71,6 +71,8 @@ public class ExportS5RendererPath extends GhidraScript {
                 "18005a980", "180055a70", "1800aecba", "1800aeea0", "1800925f0",
                 // Re-check model constructors and the render-stage call sequence.
                 "180068190", "180064670", "1800c7ad0", "1800c5d50",
+                // Model-resource to inference-state binding and engine object factory.
+                "1800ccce0", "1800cdbb0", "1800bca40", "1800becd0",
                 // Follow the neural render-state lookup used by the public render entry.
                 "1800c4730",
                 "1800c47a0",
@@ -166,7 +168,8 @@ public class ExportS5RendererPath extends GhidraScript {
             out.println();
             for (String targetHex : new String[] {
                     "1800c47a0", "1800c4730", "1800aee20", "180126850",
-                    "180097ff0", "18008d470", "1800aec40"
+                    "180097ff0", "18008d470", "1800aec40",
+                    "1800ccce0", "1800cdbb0", "1800bca40"
             }) {
                 Address targetAddress = toAddr(targetHex);
                 ReferenceIterator callerRefs =
