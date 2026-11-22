@@ -17,11 +17,12 @@ class S5Vtb2RepeatedBlockParameterLoaderTest {
         val singleKey = S5Vtb2RepeatedBlockParameterLoader.SINGLE_PARAMETER_OBJECT_KEY
         val weightKey = S5Vtb2RepeatedBlockParameterLoader.WEIGHT_FIELD_KEY
         val biasKey = S5Vtb2RepeatedBlockParameterLoader.BIAS_FIELD_KEY
+        val blockCountKey = S5Vtb2RepeatedBlockParameterLoader.DECLARED_BLOCK_COUNT_KEY
 
         val entries = (0 until 9).joinToString(",") { index ->
             """{"$bankedKey":{"$weightKey":"*F32b${index}_w","$biasKey":"*F32b${index}_b"},"$singleKey":{"$weightKey":"*F32b${index}_o"}}"""
         }
-        val json = """{"$rootConfigKey":{"$configEntryKey":{"$S5Vtb2RepeatedBlockParameterLoader.DECLARED_BLOCK_COUNT_KEY":9,"$modelKey":{"$parameterKey":{"$arrayKey":[$entries]}}}}}"""
+        val json = """{"$rootConfigKey":{"$configEntryKey":{"$blockCountKey":9,"$modelKey":{"$parameterKey":{"$arrayKey":[$entries]}}}}}"""
         val scan = S5ModelJsonScanner.scanForObjectKeys(
             StringReader(json),
             setOf(rootConfigKey, modelKey)
@@ -41,7 +42,7 @@ class S5Vtb2RepeatedBlockParameterLoaderTest {
 
         assertEquals(9, decoded.declaredBlockCount)
         assertEquals(9, decoded.blocks.size)
-        assertEquals(295_?L, decoded.totalFloatCount)
+        assertEquals(296_064L, decoded.totalFloatCount)
         assertEquals(0, decoded.blocks.first().index)
         assertEquals(8, decoded.blocks.last().index)
         assertEquals(24_576, decoded.blocks[4].bankedWeightValues.size)
@@ -63,10 +64,11 @@ class S5Vtb2RepeatedBlockParameterLoaderTest {
         val singleKey = S5Vtb2RepeatedBlockParameterLoader.SINGLE_PARAMETER_OBJECT_KEY
         val weightKey = S5Vtb2RepeatedBlockParameterLoader.WEIGHT_FIELD_KEY
         val biasKey = S5Vtb2RepeatedBlockParameterLoader.BIAS_FIELD_KEY
+        val blockCountKey = S5Vtb2RepeatedBlockParameterLoader.DECLARED_BLOCK_COUNT_KEY
         val entries = (0 until 8).joinToString(",") { index ->
             """{"$bankedKey":{"$weightKey":"*F32b${index}_w","$biasKey":"*F32b${index}_b"},"$singleKey":{"$weightKey":"*F32b${index}_o"}}"""
         }
-        val json = """{"$rootConfigKey":{"$configEntryKey":{"$S5Vtb2RepeatedBlockParameterLoader.DECLARED_BLOCK_COUNT_KEY":9,"$modelKey":{"$parameterKey":{"$arrayKey":[$entries]}}}}}"""
+        val json = """{"$rootConfigKey":{"$configEntryKey":{"$blockCountKey":9,"$modelKey":{"$parameterKey":{"$arrayKey":[$entries]}}}}}"""
         val scan = S5ModelJsonScanner.scanForObjectKeys(StringReader(json), setOf(rootConfigKey, modelKey))
 
         assertThrows(IllegalArgumentException::class.java) {
