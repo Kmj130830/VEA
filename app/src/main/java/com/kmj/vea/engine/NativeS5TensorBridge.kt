@@ -258,7 +258,7 @@ object NativeS5TensorBridge {
      * Executes the stride-2 Conv1D projection recovered from FUN_1800c5440.
      * Input is [inputChannel][position], weights are
      * [outputChannel][inputChannel][kernelTap], and output is
-     * [outputChannel][ceil(positionCount/2)] for odd kernels >= 3.
+     * [outputChannel][floor((positionCount - (kernelWidth mod 2))/2) + 1].
      */
     fun applyStride2Conv1dProjection(
         input: FloatArray,
@@ -271,13 +271,12 @@ object NativeS5TensorBridge {
     ): FloatArray {
         check(loaded) { "Native S5 tensor library is not loaded." }
         require(inputChannels > 0 && outputChannels > 0 && positions > 0)
-        require(kernelWidth > 0 && kernelWidth % 2 == 1) {
-            "The recovered stride-2 Conv1D path supports odd kernel widths only."
+        require(kernelWidth > 0) {
+            "Kernel width must be positive."
         }
         val expectedInput = inputChannels.toLong() * positions
         val expectedWeights = outputChannels.toLong() * inputChannels * kernelWidth
-        val outputPositions = if (kernelWidth == 1) positions / 2 + 1
-            else positions / 2 + positions % 2
+        val outputPositions = (positions - (kernelWidth % 2)) / 2 + 1
         val expectedOutput = outputChannels.toLong() * outputPositions
         require(expectedInput == input.size.toLong()) {
             "Input length does not match [inputChannel][position]."

@@ -947,15 +947,14 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeStride2Conv1dProjection(
     jint input_channels, jint output_channels, jint positions, jint kernel_width) {
     if (input_array == nullptr || weights_array == nullptr ||
         input_channels <= 0 || output_channels <= 0 || positions <= 0 ||
-        kernel_width <= 0 || (kernel_width & 1) == 0) return nullptr;
+        kernel_width <= 0) return nullptr;
 
     const size_t input_channels_size = static_cast<size_t>(input_channels);
     const size_t output_channels_size = static_cast<size_t>(output_channels);
     const size_t positions_size = static_cast<size_t>(positions);
     const size_t kernel_width_size = static_cast<size_t>(kernel_width);
-    const size_t output_positions = kernel_width == 1
-        ? positions_size / 2u + 1u
-        : positions_size / 2u + positions_size % 2u;
+    const size_t output_positions =
+        (positions_size - (kernel_width_size & 1u)) / 2u + 1u;
 
     size_t input_required = 0u;
     size_t inner_features = 0u;

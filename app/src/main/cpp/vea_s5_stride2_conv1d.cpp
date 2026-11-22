@@ -26,17 +26,16 @@ extern "C" VeaS5TensorStatus vea_s5_stride2_conv1d_projection_f32(
     size_t kernel_width) {
     if (input == nullptr || weights == nullptr || output == nullptr ||
         input_channels == 0u || output_channels == 0u || positions == 0u ||
-        kernel_width == 0u || (kernel_width & 1u) == 0u) {
+        kernel_width == 0u) {
         return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
     }
 
     // Match FUN_1800c5440's output-length expression:
     // ((floor(kernel/2)*2 - kernel + positions) / 2) + 1.
-    // Odd kernels >= 3 therefore produce ceil(positions/2); kernel=1
-    // produces floor(positions/2)+1, as in the original integer expression.
-    const size_t output_positions = kernel_width == 1u
-        ? positions / 2u + 1u
-        : positions / 2u + positions % 2u;
+    // Exact integer form of ((2*floor(kernel/2)-kernel+positions)/2)+1.
+    // Even K: floor(positions/2)+1; odd K: floor((positions-1)/2)+1.
+    const size_t output_positions =
+        (positions - (kernel_width & 1u)) / 2u + 1u;
     const size_t radius = kernel_width / 2u;
     const uint64_t signed_max = static_cast<uint64_t>(std::numeric_limits<int64_t>::max());
     if (kernel_width > signed_max ||
@@ -67,13 +66,6 @@ extern "C" VeaS5TensorStatus vea_s5_stride2_conv1d_projection_f32(
             for (size_t tap = 0; tap < kernel_width; ++tap) {
                 const size_t row = channel * kernel_width + tap;
                 for (size_t out_pos = 0; out_pos < output_positions; ++out_pos) {
-                    // Bound the signed arithmetic before forming 2*out_pos.
-                    if (out_pos > static_cast<size_t>(std::numeric_limits<int64_t>::max() / 2)) {
-                        return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
-                    }
-                    if (radius > static_cast<size_t>(std::numeric_limits<int64_t>::max())) {
-                        return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
-                    }
                     const int64_t input_pos =
                         static_cast<int64_t>(out_pos * 2u) +
                         static_cast<int64_t>(tap) -

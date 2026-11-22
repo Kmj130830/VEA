@@ -573,9 +573,20 @@ int main() {
     assert(stride2_point_output[1] == 10.0f);
     assert(stride2_point_output[2] == 0.0f);
 
+    // Even kernel widths use floor(N/2)+1 outputs, matching the source formula.
+    const float stride2_even_input[] = {2.0f, 3.0f, 5.0f, 7.0f};
+    const float stride2_even_weights[] = {1.0f, 10.0f};
+    float stride2_even_output[3] = {};
+    assert(vea_s5_stride2_conv1d_projection_f32(
+        stride2_even_input, stride2_even_weights, nullptr, stride2_even_output,
+        1, 1, 4, 2) == VEA_S5_TENSOR_STATUS_OK);
+    assert(stride2_even_output[0] == 20.0f);
+    assert(stride2_even_output[1] == 53.0f);
+    assert(stride2_even_output[2] == 7.0f);
+
     assert(vea_s5_stride2_conv1d_projection_f32(
         stride2_input, stride2_weights, nullptr, stride2_output,
-        1, 1, 5, 2) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+        1, 1, 5, 0) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
     assert(vea_s5_stride2_conv1d_projection_f32(
         stride2_input, stride2_weights, nullptr, stride2_output,
         0, 1, 5, 3) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);

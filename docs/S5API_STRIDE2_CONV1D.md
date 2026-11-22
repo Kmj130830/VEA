@@ -13,7 +13,7 @@ window into a matrix and invokes the row-major GEMM wrapper
 - temporal kernel width: `param_1[2]`;
 - input position count: the integer at `param_2 + 0x1c`.
 
-For odd kernel widths, the output count follows the original integer
+For every positive kernel width, the output count follows the original integer
 expression:
 
 ```text
@@ -21,9 +21,10 @@ half = floor(kernel_width / 2)
 output_positions = floor((2 * half - kernel_width + positions) / 2) + 1
 ```
 
-Thus kernels wider than one produce `ceil(positions / 2)`. The width-one
-case follows the literal source expression and produces
-`floor(positions / 2) + 1`.
+This simplifies to `floor((positions - (kernel_width mod 2)) / 2) + 1`.
+Even widths therefore produce `floor(positions / 2) + 1`, while odd widths
+produce `ceil(positions / 2)`. The width-one case naturally follows the
+same expression.
 
 The window matrix is `[input_channel * kernel_tap][output_position]`.
 For each output position `p` and kernel tap `t`, the source
@@ -40,8 +41,8 @@ every temporal position.
 and reuses the existing row-major GEMM primitive. The JNI entry point and
 `NativeS5TensorBridge.applyStride2Conv1dProjection()` expose the same
 contract to Kotlin. Native tests cover edge zero-padding, stride-two center
-positions, bias broadcast, the width-one length expression, and invalid even
-kernel widths.
+positions, bias broadcast, the width-one length expression, even-width
+output sizing, and invalid zero kernel widths.
 
 ## Integration boundary
 
