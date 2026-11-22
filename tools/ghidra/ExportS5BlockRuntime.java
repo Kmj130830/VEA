@@ -16,7 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class ExportS5BlockRuntime extends GhidraScript {
-    private static final int MAX_FUNCTIONS = 220;
+    private static final int MAX_FUNCTIONS = 280;
     private static final String[] TARGETS = {
         // Render orchestration and the four implemented operator families.
         "1800c7ad0", "1800c5440", "1800c6390", "1800c72d0",
@@ -51,8 +51,12 @@ public class ExportS5BlockRuntime extends GhidraScript {
         "180133ac0", "180133ba0", "180133fd0",
         "1801343c0", "180135490", "180138480",
         "180138e10", "1801397d0", "180139870",
-        "18013aa00"
-    };
+        "18013aa00",
+
+        // SPP FFT/IFFT, window, spectral-peak and interpolation helpers.
+        "180040630", "180135270", "1801347a0",
+        "1801360c0", "180135670", "180135b90",
+        "18013a850", "1800789b0", "1800780b0"
 
     private static final String[] CONTEXT_CALL_SITES = {
         // Caller of the SPP phase/vocoder sample processor.
