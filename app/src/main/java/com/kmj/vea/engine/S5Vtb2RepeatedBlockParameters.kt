@@ -59,7 +59,7 @@ data class S5Vtb2RepeatedParameterSet(
     init {
         require(declaredRecordCount > 0)
         require(records.size == declaredRecordCount) {
-            "VTB2 declares $declaredRecordCount record records but " +
+            "VTB2 declares $declaredRecordCount records but " +
                 "${records.size} tensor records were decoded."
         }
         require(records.map { it.index } == (0 until declaredRecordCount).toList()) {
