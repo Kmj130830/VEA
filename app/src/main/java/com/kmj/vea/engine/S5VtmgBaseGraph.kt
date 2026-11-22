@@ -196,6 +196,10 @@ data class S5VtmgBankedProjectionPlan(
         require(expectedInput == input.size.toLong()) {
             "Input length must match [inputFeature][position]."
         }
+        val outputPerBank = outputFeatures.toLong() * positions
+        require(outputPerBank <= Int.MAX_VALUE.toLong() / banks.toLong()) {
+            "Banked projection output exceeds the supported array size."
+        }
         return NativeS5TensorBridge.applyBankedLinearProjection(
             weights = weights,
             weightRowStride = weightRowStride,
