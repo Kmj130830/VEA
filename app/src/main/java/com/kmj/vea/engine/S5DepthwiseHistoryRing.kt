@@ -45,6 +45,21 @@ class S5DepthwiseHistoryRing(
         return NativeS5TensorBridge.copyHistoryRingChronological(handle)
     }
 
+    /**
+     * Returns [channel][history row][position], the exact layout accepted by
+     * vea_s5_run_vtb2_c5d50_block_f32. The native ring's public snapshot is
+     * intentionally kept in chronological [row][channel][position] order.
+     */
+    @Synchronized
+    fun snapshotChannelMajor(): FloatArray {
+        val chronological = snapshotChronological()
+        return toChannelMajor(
+            chronological,
+            channels = channels,
+            historyRows = historyRows,
+            positions = positions
+        )
+    }
     @Synchronized
     fun reset() {
         check(handle != 0L) { "S5 history ring is already closed." }
@@ -57,6 +72,41 @@ class S5DepthwiseHistoryRing(
         if (current != 0L) {
             handle = 0L
             NativeS5TensorBridge.destroyHistoryRing(current)
+        }
+    }
+    companion object {
+        /**
+         * Transposes [history row][channel][position] to
+         * [channel][history row][position] without changing chronological order.
+         */
+        internal fun toChannelMajor(
+            chronological: FloatArray,
+            channels: Int,
+            historyRows: Int,
+            positions: Int
+        ): FloatArray {
+            require(channels > 0 && historyRows > 0 && positions > 0)
+            val expected = Math.multiplyExact(
+                Math.multiplyExact(channels, historyRows),
+                positions
+            )
+            require(chronological.size == expected) {
+                "Expected $expected history values, received ${chronological.size}."
+            }
+            val result = FloatArray(expected)
+            for (row in 0 until historyRows) {
+                for (channel in 0 until channels) {
+                    val source = (row * channels + channel) * positions
+                    val destination = (channel * historyRows + row) * positions
+                    chronological.copyInto(
+                        result,
+                        destinationOffset = destination,
+                        startIndex = source,
+                        endIndex = source + positions
+                    )
+                }
+            }
+            return result
         }
     }
 }
