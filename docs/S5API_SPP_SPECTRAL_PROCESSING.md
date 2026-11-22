@@ -1,0 +1,76 @@
+# S5API SPP spectral-processing path
+
+Date: 2026-11-22
+
+## Scope
+
+This note records the optional SPP path reached from the frame-processing
+routine `Func_92864e29` at `0x1800925f0`. It is a spectral/time-domain
+processing stage. It is not, by itself, proof of the complete Megpoid
+neural renderer or final WAV encoder.
+
+## Entry and bypass
+
+`Func_92864e29` checks the process environment variable
+`MRW_DISABLE_SPP`. Unless it is set to the character `1`, the frame routine
+calls `FUN_1801361f0` with its persistent SPP state and two local transfer
+buffers. If disabled, the caller copies the existing 80-float transfer
+regions through the same local buffers and clears the secondary buffer.
+After either path, the caller copies the transfer buffers back into its
+persistent state areas and continues processing.
+
+This is direct evidence that SPP is an optional stage in the enclosing
+frame-processing path, not an isolated sample utility.
+
+## Confirmed spectral operations in `FUN_1801361f0`
+
+- The path maintains several ring-buffered state streams, including pitch,
+  phase/phase accumulation, and voiced/unvoiced control data.
+- Pitch in cents is converted to a frequency ratio using `exp2(cents / 1200)`.
+- `MRW_SPP_VUV_XFADE_MS` controls the voiced/unvoiced crossfade duration.
+- The analysis frame length is selected from the pitch/range state and
+  bounded by the recovered maximum of 4096 samples.
+- A windowed time-domain frame is transformed by `FUN_180040630` with its
+  direction flag set to `0` (analysis/forward call site).
+- The complex spectrum is converted to magnitude/phase data. The normal
+  path calls `FUN_1801343c0` for local spectral-peak selection; the
+  `MRW_SPP_LAZYPHASE` branch uses `FUN_180133ba0` instead.
+- Frequency/peak locations are adjusted using pitch and phase state.
+  The path also includes a deterministic-state PRNG helper at
+  `FUN_180135490` for spectral phase/noise handling.
+- The synthesis spectrum is passed to `FUN_180040630` with direction flag
+  `1` (inverse call site), normalized, circularly shifted by
+  `FUN_180133fd0`, and copied into an overlap/history buffer.
+- The frame routine then invokes `FUN_1801334b0` on one or more spectral
+  transfer buffers to apply additional frame-domain processing.
+
+The above operation order is based on decompiled call sites and data flow;
+exact FFT scaling, window coefficients, peak interpolation, and all state
+field meanings still require dedicated helper decompilation and tests.
+
+## Helper functions requiring exact ports
+
+| Function | Current evidence | Still required |
+|---|---|---|
+| `FUN_180040630` | Called with direction 0 and 1 for forward/inverse transforms | FFT layout, scaling, normalization, supported sizes |
+| `FUN_180139870` | Supplies the analysis window coefficient | Window family, parameter mapping, edge behavior |
+| `FUN_1801397d0` | Applies scalar normalization to a frame buffer | Full vector/count semantics and exact scaling |
+| `FUN_1801343c0` | Selects/interpolates peaks from a magnitude/phase spectrum | Peak threshold, neighborhood and interpolation details |
+| `FUN_180133ba0` | Alternative peak selection used by lazy-phase mode | Exact branch equivalence and output contract |
+| `FUN_180135490` | Advances a four-word PRNG state and generates signed/complex spectral values | Seed initialization and complete output interpretation |
+| `FUN_180133fd0` | Circularly shifts a float buffer | Exact buffer ownership and aliasing contract |
+| `FUN_1801334b0` | Runs an inverse transform and writes frame-domain results | Input spectrum contract, windowing and overlap semantics |
+
+`FUN_180040630`, `FUN_1801347a0`, `FUN_180135270`, `FUN_1801360c0`,
+`FUN_180135670`, and `FUN_180135b90` have been added as explicit Ghidra
+analysis targets so their prototypes and implementations can be recovered
+rather than guessed from call sites.
+
+## VEA boundary
+
+VEA does not yet execute this SPP path. The current implementation has
+validated c5d50 residual blocks and their per-block temporal state, but the
+complete VTMG stage binding, VTB2 conditioning graph, SPP operator chain,
+Yamaha G2P, and final PCM/WAV path are still incomplete. No generated vocal
+audio is claimed.
+
