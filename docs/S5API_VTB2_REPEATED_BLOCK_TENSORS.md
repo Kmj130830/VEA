@@ -32,21 +32,17 @@ the repeated leaf hash alone, are used to associate them with an array index.
 
 ## Separation from renderer c5d50
 
-The counts are compatible with the renderer block's observed 64-channel
-and 128-expanded-feature dimensions: `128 × 64` for an expansion matrix and
-`64 × 128` for a return matrix. The first tensor has an additional factor
-of three. However, `FUN_1800c5d50` passes a tensor C pointer to its
-first GEMM call, and the exact runtime selection/consumption of the three
-banks is not established by tensor sizes alone. These objects are therefore
-loaded as a separate VTB2 parameter collection. The active c5d50 config uses
-stage/block-indexed JSON keys, so this nine-item array is **not** treated as
-the c5d50 block list and is not wired to its descriptor fields.
+This nine-record array is stored under a separate model object and is not
+selected by the stage/block-indexed JSON key generators used by
+`FUN_1800ced10`. Its tensor lengths are recorded without assigning semantic
+roles from their factorisation alone. It is therefore loaded as a separate
+VTB2 collection and is **not** treated as the c5d50 block descriptor list.
 
 ## Android implementation
 
 `S5Vtb2RepeatedParameterLoader` scans only the `a4ba...` and `6dbe...`
 objects, decodes the 27 selected F32 tensors by their complete JSON paths,
-checks the declared block count and exact element counts, and keeps the
+checks the declared record count and exact element counts, and keeps the
 per-entry raw arrays. It does not build a full JSONObject tree or decode
 unrelated VTB2 tensors.
 

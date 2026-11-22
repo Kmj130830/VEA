@@ -7,20 +7,20 @@ import org.junit.Test
 
 class S5Vtb2RepeatedParameterLoaderTest {
     @Test
-    fun decodesNineRepeatedVtb2RecordsByFullValuePath() {
+    fun decodesNineSeparateVtb2RecordsByFullValuePath() {
         val modelKey = S5Vtb2RepeatedParameterLoader.MODEL_OBJECT_KEY
         val rootConfigKey = S5Vtb2RepeatedParameterLoader.ROOT_MODEL_CONFIG_OBJECT_KEY
         val configEntryKey = S5Vtb2RepeatedParameterLoader.MODEL_CONFIG_ENTRY_KEY
         val parameterKey = S5Vtb2RepeatedParameterLoader.MODEL_PARAMETER_OBJECT_KEY
         val arrayKey = S5Vtb2RepeatedParameterLoader.RECORD_ARRAY_KEY
-        val tensor AKey = S5Vtb2RepeatedParameterLoader.TENSOR_A_OBJECT_KEY
+        val tensorAKey = S5Vtb2RepeatedParameterLoader.TENSOR_A_OBJECT_KEY
         val singleKey = S5Vtb2RepeatedParameterLoader.TENSOR_C_OBJECT_KEY
         val weightKey = S5Vtb2RepeatedParameterLoader.WEIGHT_FIELD_KEY
         val biasKey = S5Vtb2RepeatedParameterLoader.BIAS_FIELD_KEY
         val blockCountKey = S5Vtb2RepeatedParameterLoader.DECLARED_RECORD_COUNT_KEY
 
         val entries = (0 until 9).joinToString(",") { index ->
-            """{"$tensor AKey":{"$weightKey":"*F32b${index}_w","$biasKey":"*F32b${index}_b"},"$singleKey":{"$weightKey":"*F32b${index}_o"}}"""
+            """{"$tensorAKey":{"$weightKey":"*F32b${index}_w","$biasKey":"*F32b${index}_b"},"$singleKey":{"$weightKey":"*F32b${index}_o"}}"""
         }
         val json = """{"$rootConfigKey":{"$configEntryKey":{"$blockCountKey":9}},"$modelKey":{"$parameterKey":{"$arrayKey":[$entries]}}}"""
         val scan = S5ModelJsonScanner.scanForObjectKeys(
@@ -54,18 +54,18 @@ class S5Vtb2RepeatedParameterLoaderTest {
     }
 
     @Test
-    fun rejectsAnExtraRepeatedRecordBeyondTheDeclaredNine() {
+    fun rejectsAnExtraRecordBeyondTheDeclaredNine() {
         val modelKey = S5Vtb2RepeatedParameterLoader.MODEL_OBJECT_KEY
         val rootConfigKey = S5Vtb2RepeatedParameterLoader.ROOT_MODEL_CONFIG_OBJECT_KEY
         val configEntryKey = S5Vtb2RepeatedParameterLoader.MODEL_CONFIG_ENTRY_KEY
         val parameterKey = S5Vtb2RepeatedParameterLoader.MODEL_PARAMETER_OBJECT_KEY
         val arrayKey = S5Vtb2RepeatedParameterLoader.RECORD_ARRAY_KEY
-        val tensor AKey = S5Vtb2RepeatedParameterLoader.TENSOR_A_OBJECT_KEY
+        val tensorAKey = S5Vtb2RepeatedParameterLoader.TENSOR_A_OBJECT_KEY
         val singleKey = S5Vtb2RepeatedParameterLoader.TENSOR_C_OBJECT_KEY
         val weightKey = S5Vtb2RepeatedParameterLoader.WEIGHT_FIELD_KEY
         val biasKey = S5Vtb2RepeatedParameterLoader.BIAS_FIELD_KEY
         val entries = (0 until 10).joinToString(",") { index ->
-            """{"$tensor AKey":{"$weightKey":"*F32b${index}_w","$biasKey":"*F32b${index}_b"},"$singleKey":{"$weightKey":"*F32b${index}_o"}}"""
+            """{"$tensorAKey":{"$weightKey":"*F32b${index}_w","$biasKey":"*F32b${index}_b"},"$singleKey":{"$weightKey":"*F32b${index}_o"}}"""
         }
         val json = """{"$rootConfigKey":{"$configEntryKey":{"${S5Vtb2RepeatedParameterLoader.DECLARED_RECORD_COUNT_KEY}":9}},"$modelKey":{"$parameterKey":{"$arrayKey":[$entries]}}}"""
         val scan = S5ModelJsonScanner.scanForObjectKeys(
@@ -92,14 +92,14 @@ class S5Vtb2RepeatedParameterLoaderTest {
         val configEntryKey = S5Vtb2RepeatedParameterLoader.MODEL_CONFIG_ENTRY_KEY
         val parameterKey = S5Vtb2RepeatedParameterLoader.MODEL_PARAMETER_OBJECT_KEY
         val arrayKey = S5Vtb2RepeatedParameterLoader.RECORD_ARRAY_KEY
-        val tensor AKey = S5Vtb2RepeatedParameterLoader.TENSOR_A_OBJECT_KEY
+        val tensorAKey = S5Vtb2RepeatedParameterLoader.TENSOR_A_OBJECT_KEY
         val singleKey = S5Vtb2RepeatedParameterLoader.TENSOR_C_OBJECT_KEY
         val weightKey = S5Vtb2RepeatedParameterLoader.WEIGHT_FIELD_KEY
         val biasKey = S5Vtb2RepeatedParameterLoader.BIAS_FIELD_KEY
         val entries = (0 until 9).joinToString(",") { index ->
             val quote = '"'
             val duplicate = if (index == 0) ", $quote$weightKey$quote:$quote*F32duplicate_w$quote" else ""
-            """{"$tensor AKey":{"$weightKey":"*F32b${index}_w"$duplicate,"$biasKey":"*F32b${index}_b"},"$singleKey":{"$weightKey":"*F32b${index}_o"}}"""
+            """{"$tensorAKey":{"$weightKey":"*F32b${index}_w"$duplicate,"$biasKey":"*F32b${index}_b"},"$singleKey":{"$weightKey":"*F32b${index}_o"}}"""
         }
         val json = """{"$rootConfigKey":{"$configEntryKey":{"${S5Vtb2RepeatedParameterLoader.DECLARED_RECORD_COUNT_KEY}":9}},"$modelKey":{"$parameterKey":{"$arrayKey":[$entries]}}}"""
         val scan = S5ModelJsonScanner.scanForObjectKeys(
@@ -126,13 +126,13 @@ class S5Vtb2RepeatedParameterLoaderTest {
         val modelKey = S5Vtb2RepeatedParameterLoader.MODEL_OBJECT_KEY
         val parameterKey = S5Vtb2RepeatedParameterLoader.MODEL_PARAMETER_OBJECT_KEY
         val arrayKey = S5Vtb2RepeatedParameterLoader.RECORD_ARRAY_KEY
-        val tensor AKey = S5Vtb2RepeatedParameterLoader.TENSOR_A_OBJECT_KEY
+        val tensorAKey = S5Vtb2RepeatedParameterLoader.TENSOR_A_OBJECT_KEY
         val singleKey = S5Vtb2RepeatedParameterLoader.TENSOR_C_OBJECT_KEY
         val weightKey = S5Vtb2RepeatedParameterLoader.WEIGHT_FIELD_KEY
         val biasKey = S5Vtb2RepeatedParameterLoader.BIAS_FIELD_KEY
         val blockCountKey = S5Vtb2RepeatedParameterLoader.DECLARED_RECORD_COUNT_KEY
         val entries = (0 until 8).joinToString(",") { index ->
-            """{"$tensor AKey":{"$weightKey":"*F32b${index}_w","$biasKey":"*F32b${index}_b"},"$singleKey":{"$weightKey":"*F32b${index}_o"}}"""
+            """{"$tensorAKey":{"$weightKey":"*F32b${index}_w","$biasKey":"*F32b${index}_b"},"$singleKey":{"$weightKey":"*F32b${index}_o"}}"""
         }
         val json = """{"$rootConfigKey":{"$configEntryKey":{"$blockCountKey":9}},"$modelKey":{"$parameterKey":{"$arrayKey":[$entries]}}}"""
         val scan = S5ModelJsonScanner.scanForObjectKeys(StringReader(json), setOf(rootConfigKey, modelKey))

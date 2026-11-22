@@ -46,6 +46,48 @@ must remain distinct until the state-factory path confirms the relationship.
   `0xd52`. This is distinct from the raw byte flag at
   `(uint8_t*)param_1 + 0x59` used to choose the projection function.
 
+## Confirmed Megpoid renderer counts and JSON key tables
+
+The values read by `FUN_1800ced10` and copied into the renderer-state
+configuration resolve the runtime dimensions as follows:
+
+| Renderer config index | Value | Meaning |
+|---:|---:|---|
+| `param_1[3]` | 320 | frame hop / step |
+| `param_1[4]` | 32000 | sample rate |
+| `param_1[5]` | 4 | renderer stage count |
+| `param_1[6]` | 2 | residual DW-MLP block count per stage |
+
+Consequently, `FUN_1800c7ad0` traverses **4 stages × 2 residual blocks = 8
+c5d50 descriptors**. This is distinct from the separate nine-record VTB2
+array documented in `S5API_VTB2_REPEATED_BLOCK_TENSORS.md`.
+
+`FUN_18010d550(stage, block)` selects a 32-character JSON property key from
+the table at `0x1801cbc20`, with 0x20-byte string entries indexed by
+`stage * 16 + block`. `FUN_1800ea000(stage, block)` selects another key
+from the table at `0x1801c5bf0`, using the same index and entry stride.
+
+| Stage | Block | `FUN_18010d550` key | `FUN_1800ea000` key |
+|---:|---:|---|---|
+| 0 | 0 | `2be3c647a25538e9536d6757202f82c4` | `8abf41425bad2554193a661080753070` |
+| 0 | 1 | `de282d6c923b674399f1c1c72c628baf` | `fbaf01274f7d7328e85fe2606636e54a` |
+| 1 | 0 | `b1465ea6660173b4a49fc88d6cebf333` | `78ab983f61c5c58ff84d45113026ad8a` |
+| 1 | 1 | `a15cd1ac0be5abbba27a53fe03786820` | `0f551cb9b37ff307437be80b2f80961d` |
+| 2 | 0 | `207f5586069747df3328b61d143fd74c` | `771075dad8a161731f1ec7849ffccccc` |
+| 2 | 1 | `633af40060c0bd27f5637d7a495522a6` | `0beaee9f704f4ac85d8f87a10cfeadc1` |
+| 3 | 0 | `763f264fbcf91eb0ee4f198e3c7668f4` | `b639196457944060e60e66b234e2a5e1` |
+| 3 | 1 | `224d0c06603f0018052fa9e634fafde1` | `3294d2ee186d6fedf65089d86b78b302` |
+
+For each key pair above, the VTB2 child object selected by the first key
+contains a dimension vector `[64,32,1,1]` and one F32 tensor of 2,048
+values (64 × 32). The child object selected by the second key contains a
+dimension vector `[32,1,7,7]` and one F32 tensor of 1,568 values
+(32 × 7 × 7). These are the confirmed per-stage/per-block tensor shapes for
+those two fields. Other c5d50 fields (projection return matrix, biases,
+affine vectors and state inputs) still require their own helper-key and
+descriptor-field mapping; this section does not claim the complete block
+is bound.
+
 ## Descriptor arrays observed at the call sites
 
 The renderer's first argument is decompiled as `int*`. The `param_1 + N`

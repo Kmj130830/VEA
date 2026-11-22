@@ -224,9 +224,9 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
 
         throw UnsupportedOperationException(
             "Loaded the shared VOCALOID7.vtmg base graph and converted its " +
-                "${projectionPlans.size} named layers to c6390-compatible tensor A projection plans " +
+                "${projectionPlans.size} named layers to c6390-compatible banked projection plans " +
                 "and ${repeatedParameters.records.size} separate VTB2 tensor records " +
-                "(tensor-path/shape validation only; no c5d50 descriptor binding yet). " +
+                "(tensor-path/shape validation only; not the c5d50 stage/block descriptor collection). " +
                 "(pre1/pre2, conv1/cond1, conv2/cond2, conv3/cond3, linear). " +
                 "These plans are not yet assigned to renderer stages. " +
                 "$recurrentStatus $pairedStatus The remaining stage binding, base-graph forward operators, " +
