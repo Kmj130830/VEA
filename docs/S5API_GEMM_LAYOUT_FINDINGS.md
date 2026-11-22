@@ -95,6 +95,21 @@ VTMG descriptor array (24-byte descriptors)
     -> GEMM A pointer
 ```
 
+## Model object versus per-render state
+
+The model factory `Func_4cd84bb7` at `FUN_18008d470` allocates a
+small owner object and a separate 32-byte-aligned 0x40000-byte arena, then
+calls `FUN_180068190` with the model's parameter block. The loader stores
+the nine VTMG layer descriptor arrays in that model object.
+
+The VSM wrapper `FUN_1800aec40` follows a different pointer chain to obtain
+the active render-state object and passes that object to `FUN_1800c7ad0`.
+The wrapper does not pass the VTMG model owner directly as the frame function's
+first argument. This confirms that model-owned VTMG descriptors and the
+per-render layer entries consumed by `FUN_1800c6390` are separated by an
+additional object/initialization boundary. The constructor or binding routine
+that populates those render-layer entries remains to be identified.
+
 ## Unresolved runtime pointer bridge
 
 The contracts above do not describe the same flat A-buffer layout:
