@@ -23,15 +23,10 @@ object S5Vtb2C5d50RendererExecutionOrder {
         require(stageCount >= 1) { "Stage count must be positive." }
         require(blocksPerStage >= 1) { "Block count per stage must be positive." }
 
-        return buildList {
-            // iVar29 = 1 .. stageCount-1 in FUN_1800c7ad0.
-            for (reverseIndex in 1 until stageCount) {
-                val stageIndex = stageCount - reverseIndex - 1
-                for (blockIndex in 0 until blocksPerStage) {
-                    add(S5Vtb2C5d50BlockCoordinate(stageIndex, blockIndex))
-                }
-            }
-        }
+        return S5RendererStageExecutionLayout.create(
+            stageCount = stageCount,
+            blocksPerStage = blocksPerStage
+        ).invocations.map { it.blockCoordinate }
     }
 
     fun notCalledByC7ad0(
