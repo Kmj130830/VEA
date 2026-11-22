@@ -22,7 +22,7 @@ class S5Vtb2RepeatedBlockParameterLoaderTest {
         val entries = (0 until 9).joinToString(",") { index ->
             """{"$bankedKey":{"$weightKey":"*F32b${index}_w","$biasKey":"*F32b${index}_b"},"$singleKey":{"$weightKey":"*F32b${index}_o"}}"""
         }
-        val json = """{"$rootConfigKey":{"$configEntryKey":{"$blockCountKey":9,"$modelKey":{"$parameterKey":{"$arrayKey":[$entries]}}}}}"""
+        val json = """{"$rootConfigKey":{"$configEntryKey":{"$blockCountKey":9}},"$modelKey":{"$parameterKey":{"$arrayKey":[$entries]}}}"""
         val scan = S5ModelJsonScanner.scanForObjectKeys(
             StringReader(json),
             setOf(rootConfigKey, modelKey)
@@ -68,7 +68,7 @@ class S5Vtb2RepeatedBlockParameterLoaderTest {
         val entries = (0 until 8).joinToString(",") { index ->
             """{"$bankedKey":{"$weightKey":"*F32b${index}_w","$biasKey":"*F32b${index}_b"},"$singleKey":{"$weightKey":"*F32b${index}_o"}}"""
         }
-        val json = """{"$rootConfigKey":{"$configEntryKey":{"$blockCountKey":9,"$modelKey":{"$parameterKey":{"$arrayKey":[$entries]}}}}}"""
+        val json = """{"$rootConfigKey":{"$configEntryKey":{"$blockCountKey":9}},"$modelKey":{"$parameterKey":{"$arrayKey":[$entries]}}}"""
         val scan = S5ModelJsonScanner.scanForObjectKeys(StringReader(json), setOf(rootConfigKey, modelKey))
 
         assertThrows(IllegalArgumentException::class.java) {
