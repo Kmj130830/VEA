@@ -120,7 +120,7 @@ dimensions alone.
 ## VEA implementation boundary
 
 VEA now has independent, tested ports of the stride-2 projection
-`FUN_1800c5440`, the banked projection `FUN_1800c6390`, the 2x upsample
+`FUN_1800c5440`, the tensor A projection `FUN_1800c6390`, the 2x upsample
 projection `FUN_1800c72d0`, and the residual DW-MLP block `FUN_1800c5d50`.
 Their descriptor construction and model-tensor binding remain separate work.
 The public engine status therefore stays unavailable and `render()` does not

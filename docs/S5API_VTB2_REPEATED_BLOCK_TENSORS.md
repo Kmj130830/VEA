@@ -30,12 +30,12 @@ Every entry has two child objects:
 All 27 tensors (9 × 3) decode as finite float32 values. Tensor paths, not
 the repeated leaf hash alone, are used to associate them with an array index.
 
-## Relationship to renderer c5d50
+## Separation from renderer c5d50
 
 The counts are compatible with the renderer block's observed 64-channel
 and 128-expanded-feature dimensions: `128 × 64` for an expansion matrix and
 `64 × 128` for a return matrix. The first tensor has an additional factor
-of three. However, `FUN_1800c5d50` passes a single matrix pointer to its
+of three. However, `FUN_1800c5d50` passes a tensor C pointer to its
 first GEMM call, and the exact runtime selection/consumption of the three
 banks is not established by tensor sizes alone. These objects are therefore
 loaded as a separate VTB2 parameter collection. The active c5d50 config uses
@@ -52,10 +52,10 @@ unrelated VTB2 tensors.
 
 `VocaloidAiEngineAdapter.render()` now runs this validation alongside VTMG
 loading before returning the existing explicit unsupported-render status.
-It does not claim to execute these block tensors or generate audio.
+It does not claim to execute these separate collection tensors or generate audio.
 
 Loader integrity checks additionally require exactly 27 typed tensor leaves
-under the repeated array (three per record), reject duplicate full JSON value
+under the separate record array (three per record), reject duplicate full JSON value
 paths, and reject extra/missing array records. Identical leaf hashes elsewhere
 in the VTB2 document are not conflated because each selected tensor is matched
 by its complete array-indexed path.
