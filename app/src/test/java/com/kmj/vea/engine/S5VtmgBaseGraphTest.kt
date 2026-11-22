@@ -194,4 +194,50 @@ class S5VtmgBaseGraphTest {
         }
         return result
     }
+    @Test
+    fun packedLayerCanConvertToV0NaiveGemmWeightOrder() {
+        val outputFeatures = 2
+        val inputFeatures = 3
+        val paddedOutputFeatures = 8
+        val banks = 2
+        val packed = FloatArray(banks * inputFeatures * paddedOutputFeatures)
+        for (bank in 0 until banks) {
+            for (input in 0 until inputFeatures) {
+                for (output in 0 until outputFeatures) {
+                    packed[(bank * inputFeatures + input) * paddedOutputFeatures + output] =
+                        bank * 100.0f + input * 10.0f + output
+                }
+            }
+        }
+        val layer = S5VtmgPackedGraphLayerWeights(
+            layerName = "test",
+            matrices = packed,
+            bias = floatArrayOf(0.0f, 0.0f),
+            axis0Count = outputFeatures,
+            axis1Count = inputFeatures,
+            matrixCount = banks,
+            paddedAxis0Count = paddedOutputFeatures
+        )
+        val converted = layer.toV0NaiveGemmWeights { source, output, input, padded, count ->
+            assertEquals(outputFeatures, output)
+            assertEquals(inputFeatures, input)
+            assertEquals(paddedOutputFeatures, padded)
+            assertEquals(banks, count)
+            FloatArray(count * output * input) { index ->
+                val bank = index / (output * input)
+                val outputFeature = (index % (output * input)) / input
+                val inputFeature = index % input
+                source[(bank * input + inputFeature) * padded + outputFeature]
+            }
+        }
+        assertEquals(12, converted.size)
+        assertEquals(0.0f, converted[0], 0.0f)
+        assertEquals(10.0f, converted[1], 0.0f)
+        assertEquals(20.0f, converted[2], 0.0f)
+        assertEquals(1.0f, converted[3], 0.0f)
+        assertEquals(100.0f, converted[6], 0.0f)
+        assertEquals(121.0f, converted[11], 0.0f)
+    }
+
+
 }
