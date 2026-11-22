@@ -226,6 +226,39 @@ through `FUN_1800dc4b0`. The exact ownership/registration semantics of
 `FUN_1800dc4b0` are still under analysis; do not yet equate the temporary
 VTB2 loader object with the final `+0xb8` render-state vector.
 
+## Confirmed operator order and descriptor-array layout in c7ad0
+
+The decompiled `FUN_1800c7ad0` makes the stage control flow more precise
+than the six-call c5d50 schedule alone:
+
+1. A forward loop runs `FUN_1800c5440` for each stage transition from
+   `0` through `stageCount - 2`. It reads descriptors from the array at
+   object offset `+0x94` with `0x30`-byte elements.
+2. A reverse-stage loop then selects one projection operator based on the
+   byte flag at object offset `+0x59`:
+   - flag `0`: `FUN_1800c6390`, using descriptors at `+0xa0`, stride `0x30`;
+   - flag nonzero: `FUN_1800c72d0`, using descriptors at `+0xac`, stride `0x28`.
+3. Each reverse stage then executes `blockCount` c5d50 blocks. Their
+   descriptors are read from `+0xb8` with `0x100`-byte elements.
+
+`param_1[5]` is the stage count and `param_1[6]` is the block count per
+stage in this function. The forward and reverse stage operators use the
+per-stage activation buffers held in the `+0xda` and `+0xe0` pointer arrays.
+The exact semantics of their ring/window subfields still require the
+corresponding descriptor constructors.
+
+`FUN_1800cdbb0` copies all four descriptor vectors into a render-state clone:
+`+0x94` (`0x30` stride), `+0xa0` (`0x30` stride), `+0xac` (`0x28` stride),
+and `+0xb8` (`0x100` stride). This is strong evidence that these arrays belong
+to the renderer configuration object consumed by c7ad0.
+
+The VTMG file contains nine named tensors, but there is still no verified
+one-to-one mapping from those tensor names to the three operator descriptor
+arrays at `+0x94`, `+0xa0`, and `+0xac`. VEA therefore exposes generic
+stride-2, banked-linear, and upsample-2 operators without hard-coding a
+VTMG layer-to-stage assignment. The `+0x59` mode flag must also be read from
+the actual model configuration, not assumed from the default initializer.
+
 ## Explicit VTMG temporal operator boundary
 
 `S5VtmgPackedGraphLayerWeights.toTemporalProjectionPlan()` converts one
