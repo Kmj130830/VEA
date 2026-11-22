@@ -120,3 +120,82 @@ extern "C" VeaS5TensorStatus vea_s5_run_residual_dw_mlp_block_f32(
     }
     return VEA_S5_TENSOR_STATUS_OK;
 }
+
+
+/*
+ * FUN_1800d4bf0 prepares the expanded GELU affine vectors from the stored
+ * VTB2 block vectors. The matrix is [expanded_feature][channel].
+ */
+extern "C" VeaS5TensorStatus vea_s5_prepare_c5d50_expansion_bias_f32(
+    const float* expansion_weights, const float* block_vector_a,
+    const float* block_vector_b, const float* expansion_bias,
+    float* expanded_bias_a, float* expanded_bias_b,
+    size_t channels, size_t expanded_features) {
+    if (expansion_weights == nullptr || block_vector_a == nullptr ||
+        block_vector_b == nullptr || expansion_bias == nullptr ||
+        expanded_bias_a == nullptr || expanded_bias_b == nullptr ||
+        channels == 0u || expanded_features == 0u) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    size_t weight_count = 0u;
+    if (MulOverflow(channels, expanded_features, &weight_count)) {
+        return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
+    }
+    if (!FiniteVector(expansion_weights, weight_count) ||
+        !FiniteVector(block_vector_a, channels) ||
+        !FiniteVector(block_vector_b, channels) ||
+        !FiniteVector(expansion_bias, expanded_features)) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    for (size_t feature = 0; feature < expanded_features; ++feature) {
+        float dot_a = 0.0f;
+        float dot_b = 0.0f;
+        const float* row = expansion_weights + feature * channels;
+        for (size_t channel = 0; channel < channels; ++channel) {
+            const float weight = row[channel];
+            dot_a += weight * block_vector_a[channel];
+            dot_b += weight * block_vector_b[channel];
+        }
+        expanded_bias_a[feature] = dot_b + expansion_bias[feature];
+        expanded_bias_b[feature] = dot_a;
+    }
+    return VEA_S5_TENSOR_STATUS_OK;
+}
+
+/* Higher-level VTB2 entry point: derive affine vectors, then execute c5d50. */
+extern "C" VeaS5TensorStatus vea_s5_run_vtb2_c5d50_block_f32(
+    const float* history_rows, const float* depthwise_weights,
+    const float* block_vector_a, const float* block_vector_b,
+    const float* expansion_weights, const float* expansion_bias,
+    const float* projection_weights, const float* projection_bias,
+    const float* block_vector_c, const float* residual_input,
+    float* output, size_t channels, size_t positions,
+    size_t expanded_features, float epsilon) {
+    if (history_rows == nullptr || depthwise_weights == nullptr ||
+        block_vector_a == nullptr || block_vector_b == nullptr ||
+        expansion_weights == nullptr || expansion_bias == nullptr ||
+        projection_weights == nullptr || projection_bias == nullptr ||
+        block_vector_c == nullptr || residual_input == nullptr || output == nullptr ||
+        channels == 0u || positions < 7u || expanded_features == 0u ||
+        positions > std::numeric_limits<uint32_t>::max() ||
+        !std::isfinite(epsilon) || epsilon < 0.0f) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    try {
+        std::vector<float> expanded_bias_a(expanded_features, 0.0f);
+        std::vector<float> expanded_bias_b(expanded_features, 0.0f);
+        const VeaS5TensorStatus prepare_status = vea_s5_prepare_c5d50_expansion_bias_f32(
+            expansion_weights, block_vector_a, block_vector_b, expansion_bias,
+            expanded_bias_a.data(), expanded_bias_b.data(), channels, expanded_features);
+        if (prepare_status != VEA_S5_TENSOR_STATUS_OK) return prepare_status;
+        return vea_s5_run_residual_dw_mlp_block_f32(
+            history_rows, depthwise_weights, expansion_weights,
+            expanded_bias_a.data(), expanded_bias_b.data(),
+            projection_weights, residual_input, block_vector_c, projection_bias,
+            output, channels, positions, expanded_features, epsilon);
+    } catch (const std::bad_alloc&) {
+        return VEA_S5_TENSOR_STATUS_OUT_OF_MEMORY;
+    } catch (const std::length_error&) {
+        return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
+    }
+}
