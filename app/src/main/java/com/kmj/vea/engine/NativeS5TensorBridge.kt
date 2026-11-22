@@ -15,6 +15,7 @@ data class S5ContainerHeaderInfo(
  * and packs already-decoded tensor values into the recovered matrix layout.
  */
 object NativeS5TensorBridge {
+    private const val MATRIX_AXIS0_ALIGNMENT = 8
     private val loaded: Boolean = runCatching {
         System.loadLibrary("veas5tensor")
         true
@@ -185,6 +186,37 @@ object NativeS5TensorBridge {
             projectWeights, residualInput, residualScale, residualBias,
             channels, positions, expandedFeatures, epsilon
         ) ?: throw IllegalArgumentException("S5 residual depthwise/MLP block failed.")
+    }
+
+    /**
+     * Converts VTMG [bank][input][paddedOutput] matrices into row-major
+     * [bank][output][input] weights for VEA's v0_naive GEMM port.
+     *
+     * This adapter bridges two confirmed data layouts. It does not assert
+     * that Yamaha uses this exact conversion in its internal object builder.
+     */
+    fun convertVtmgBankWeightsForV0Naive(
+        packedWeights: FloatArray,
+        outputFeatures: Int,
+        inputFeatures: Int,
+        paddedOutputFeatures: Int,
+        banks: Int
+    ): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(outputFeatures > 0 && inputFeatures > 0 && banks > 0)
+        require(paddedOutputFeatures >= outputFeatures &&
+            paddedOutputFeatures % MATRIX_AXIS0_ALIGNMENT == 0)
+        val expectedSource = banks.toLong() * inputFeatures * paddedOutputFeatures
+        val expectedDestination = banks.toLong() * outputFeatures * inputFeatures
+        require(expectedSource == packedWeights.size.toLong()) {
+            "Packed VTMG matrix length does not match its dimensions."
+        }
+        require(expectedDestination <= Int.MAX_VALUE.toLong()) {
+            "Converted GEMM weights exceed the supported array size."
+        }
+        return nativeVtmgBankToV0NaiveA(
+            packedWeights, outputFeatures, inputFeatures, paddedOutputFeatures, banks
+        ) ?: throw IllegalArgumentException("Could not convert VTMG weights to v0_naive layout.")
     }
 
     /**
@@ -362,6 +394,14 @@ object NativeS5TensorBridge {
     private external fun nativeResetHistoryRing(handle: Long): Boolean
     private external fun nativeAppendHistoryRing(handle: Long, block: FloatArray): Boolean
     private external fun nativeCopyChronologicalHistoryRing(handle: Long): FloatArray?
+
+    private external fun nativeVtmgBankToV0NaiveA(
+        packedWeights: FloatArray,
+        outputFeatures: Int,
+        inputFeatures: Int,
+        paddedOutputFeatures: Int,
+        banks: Int
+    ): FloatArray?
 
     private external fun nativeRunResidualDwMlpBlock(
         historyRows: FloatArray, depthwiseWeights: FloatArray,
