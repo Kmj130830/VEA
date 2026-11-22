@@ -18,7 +18,28 @@ The function receives C channels and N positions. Its observed execution order i
 
 VEA now exposes vea_s5_run_residual_dw_mlp_block_f32 and Kotlin NativeS5TensorBridge.runResidualDepthwiseMlpBlock. The input is an explicit seven-row history tensor per channel, with a separate 7x7 filter per channel. Expansion and projection matrices are row-major. Statistics are global over the depthwise output tensor. The function uses the recovered affine GELU parameter expression and residual update.
 
-The API intentionally accepts history rows explicitly rather than duplicating the original VSM/ring-buffer state manager. VSM timing, block scheduling, cache evolution and exact model-descriptor integration remain separate.
+The stateless block API accepts history rows explicitly. A separate
+`VeaS5HistoryRing` state object now ports the block-cache behavior observed in
+`FUN_1800c67e0`:
+
+- storage contains `historyRows * channels * positions` float values;
+- each append writes one complete `[channel][position]` block at the next slot;
+- the write slot advances and wraps at `historyRows`;
+- snapshots start at the next write slot and return the slots in
+  oldest-to-newest order, including zero-initialized rows before the cache fills;
+- reset clears the storage and resets the write slot.
+
+The C API is exposed to Android through JNI and wrapped by
+`S5DepthwiseHistoryRing` (`append`, `snapshotChronological`, `reset`,
+`close`). The ring has a fixed position count; a render-state owner must
+recreate it when the frame-block position count changes, as the original
+renderer resets its cache when this dimension changes.
+
+The source call site also shows that the seven-row optimized depthwise kernel
+is selected when the kernel width and history-row count are both seven. The
+current ring provides that chronological seven-row input, while VSM timing,
+full block scheduling, model-descriptor wiring and the complete renderer
+remain separate.
 
 ## Verification scope
 
