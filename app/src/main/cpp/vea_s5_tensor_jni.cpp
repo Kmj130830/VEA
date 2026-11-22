@@ -104,6 +104,31 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeCopyChronologicalHistoryRing(
 }
 
 extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeCopyChannelMajorHistoryRing(
+    JNIEnv* env, jobject, jlong handle) {
+    if (handle == 0) return nullptr;
+    const auto* ring = reinterpret_cast<const VeaS5HistoryRing*>(handle);
+    const size_t block_size = vea_s5_history_ring_block_size(ring);
+    const size_t row_count = vea_s5_history_ring_row_count(ring);
+    if (block_size == 0u || row_count == 0u ||
+        block_size > std::numeric_limits<size_t>::max() / row_count) return nullptr;
+    const size_t count = block_size * row_count;
+    if (count > static_cast<size_t>(std::numeric_limits<jsize>::max())) return nullptr;
+
+    jfloatArray result = env->NewFloatArray(static_cast<jsize>(count));
+    if (result == nullptr) return nullptr;
+    auto* destination = static_cast<jfloat*>(
+        env->GetPrimitiveArrayCritical(result, nullptr));
+    if (destination == nullptr) return nullptr;
+
+    // No JNI calls or allocations occur while the result array is pinned.
+    const VeaS5TensorStatus status = vea_s5_history_ring_copy_channel_major(
+        ring, destination, count);
+    env->ReleasePrimitiveArrayCritical(result, destination, 0);
+    return status == VEA_S5_TENSOR_STATUS_OK && !env->ExceptionCheck() ? result : nullptr;
+}
+
+extern "C" JNIEXPORT jfloatArray JNICALL
 Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeVtmgBankToV0NaiveA(
     JNIEnv* env, jobject, jfloatArray packed_array,
     jint output_features, jint input_features, jint padded_output_features, jint banks) {
