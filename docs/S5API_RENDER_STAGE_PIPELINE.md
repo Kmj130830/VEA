@@ -195,6 +195,37 @@ Their descriptor construction and model-tensor binding remain separate work.
 The public engine status therefore stays unavailable and `render()` does not
 claim success until a complete Megpoid render produces validated PCM/WAV.
 
+## Render-state object lifecycle and c5d50 descriptor ownership
+
+The latest Ghidra report exposes the public object wrappers around the core
+frame routine:
+
+- `FUN_180126940` allocates an 8-byte handle and a zeroed `0x37a0`-byte
+  render-state object, then initializes it with `FUN_1800bca40`.
+- `FUN_1801269f0(handle)` obtains the shared config through `FUN_1800c4730`,
+  creates another `0x37a0`-byte state, initializes it, and copies the source
+  configuration with `FUN_1800cdbb0`.
+- `FUN_180126c20(...)` is the render entry wrapper. It resolves the context
+  with `FUN_1800c4730`, checks the positive frame/block count at `+0x624`,
+  copies that count to the render state, and calls `FUN_1800c7ad0`.
+- `FUN_180126850(a, b)` validates two non-null handles and delegates to
+  `FUN_1800aee20`, which reaches `FUN_1800c47a0`. The latter copies many
+  arrays and scalar settings between the two large objects. The precise
+  semantic names and source/destination roles of every copied field remain
+  unresolved because the vendor ABI prototypes are incomplete.
+
+`FUN_1800cdbb0` is especially relevant to the stage descriptors: it copies
+the vector at object offset `+0xb8` using an element stride of `0x100` bytes.
+The renderer later indexes that same `+0xb8` vector with a `0x100`-byte
+stride for each c5d50 call. This ties the copied render-state array to the
+per-block objects consumed by `FUN_1800c5d50`.
+
+The VTB2 entry `FUN_180127220` calls `FUN_1800af170`, which prepares a
+temporary loader object, calls `FUN_1800ced10`, and then passes the result
+through `FUN_1800dc4b0`. The exact ownership/registration semantics of
+`FUN_1800dc4b0` are still under analysis; do not yet equate the temporary
+VTB2 loader object with the final `+0xb8` render-state vector.
+
 ## Explicit VTMG temporal operator boundary
 
 `S5VtmgPackedGraphLayerWeights.toTemporalProjectionPlan()` converts one
