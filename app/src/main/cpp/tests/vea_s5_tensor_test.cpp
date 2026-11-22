@@ -533,6 +533,37 @@ int main() {
         banked_weights, 1, 4, banked_input, nullptr, banked_output, 2, 2, 3, 2) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
+    // FUN_1800c5440: stride-2 Conv1D lowered to [channel*tap][outputPosition] GEMM input.
+    const float stride2_input[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+    const float stride2_weights[] = {1.0f, 10.0f, 100.0f};
+    const float stride2_bias[] = {0.5f};
+    float stride2_output[3] = {};
+    assert(vea_s5_stride2_conv1d_projection_f32(
+        stride2_input, stride2_weights, stride2_bias, stride2_output,
+        1, 1, 5, 3) == VEA_S5_TENSOR_STATUS_OK);
+    const float stride2_expected[] = {210.5f, 432.5f, 54.5f};
+    for (size_t i = 0; i < 3; ++i) {
+        assert(std::fabs(stride2_output[i] - stride2_expected[i]) < 1.0e-6f);
+    }
+
+    // Kernel width 1 follows the exact original output-length expression.
+    const float stride2_point_input[] = {2.0f, 3.0f, 5.0f, 7.0f};
+    const float stride2_point_weight[] = {2.0f};
+    float stride2_point_output[3] = {};
+    assert(vea_s5_stride2_conv1d_projection_f32(
+        stride2_point_input, stride2_point_weight, nullptr, stride2_point_output,
+        1, 1, 4, 1) == VEA_S5_TENSOR_STATUS_OK);
+    assert(stride2_point_output[0] == 4.0f);
+    assert(stride2_point_output[1] == 10.0f);
+    assert(stride2_point_output[2] == 0.0f);
+
+    assert(vea_s5_stride2_conv1d_projection_f32(
+        stride2_input, stride2_weights, nullptr, stride2_output,
+        1, 1, 5, 2) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_stride2_conv1d_projection_f32(
+        stride2_input, stride2_weights, nullptr, stride2_output,
+        0, 1, 5, 3) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
     // Integrated scalar block: 7x7 depthwise -> global stats -> expand/GELU/project -> residual.
     constexpr size_t block_channels = 1;
     constexpr size_t block_positions = 7;
