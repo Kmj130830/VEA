@@ -24,6 +24,9 @@ extern "C" {
 
 typedef struct VeaS5Arena VeaS5Arena;
 
+/* Stateful chronological block history used by FUN_1800c67e0. */
+typedef struct VeaS5HistoryRing VeaS5HistoryRing;
+
 /*
  * Recovered 0x18-byte S5API matrix descriptor.
  * axis0 is stored at +0, axis1 at +4, padded_axis0 at +8,
@@ -53,6 +56,18 @@ typedef enum VeaS5TensorStatus {
 } VeaS5TensorStatus;
 
 VEA_S5_TENSOR_API uint32_t vea_s5_tensor_abi_version(void);
+
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_history_ring_create(
+    size_t channels, size_t positions, size_t history_rows,
+    VeaS5HistoryRing** out_ring);
+VEA_S5_TENSOR_API void vea_s5_history_ring_destroy(VeaS5HistoryRing* ring);
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_history_ring_reset(VeaS5HistoryRing* ring);
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_history_ring_append(
+    VeaS5HistoryRing* ring, const float* block, size_t block_count);
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_history_ring_copy_chronological(
+    const VeaS5HistoryRing* ring, float* output, size_t output_count);
+VEA_S5_TENSOR_API size_t vea_s5_history_ring_block_size(const VeaS5HistoryRing* ring);
+VEA_S5_TENSOR_API size_t vea_s5_history_ring_row_count(const VeaS5HistoryRing* ring);
 
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_arena_create(
     size_t capacity_bytes,
