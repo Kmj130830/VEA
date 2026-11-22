@@ -27,6 +27,19 @@ The convolution/conditioning layers use axis0 count 64.
 The bias copy path consumes `param_5` values, so each layer bias has
 `axis0Count` elements.
 
+The renderer call site `FUN_1800c6390` resolves the VTMG axes for the
+banked linear layers:
+
+- `axis0Count` is the output-feature width and the bias length;
+- `axis1Count` is the input-feature width;
+- the renderer invokes GEMM with `M=axis0Count`, `K=axis1Count`, and
+  `N=positions`;
+- the resulting temporary matrix is `[outputFeature][position]`, then
+  scattered into `[outputFeature][position][bank]`.
+
+For `pre1`, this is 32 output features by 82 input features. This semantic
+mapping comes from the render call site, not from the neutral loader API.
+
 
 The VTMG object stores the 18 member keys as conventional lowercase MD5 digest
 bytes for `layerName + ".weight"` / `layerName + ".bias"` followed by the
@@ -50,9 +63,12 @@ and keeps the other formatter unchanged for its existing callers.
 
 The total raw parameter count is 27,619 float32 values.
 
-Axis names are intentionally neutral. The descriptor layout and dimensions
-are grounded in the loader call sites and payload lengths; this table does
-not assign every axis to a higher-level acoustic feature semantic.
+The descriptor fields retain the neutral names `axis0` and `axis1`
+because the same low-level loader serves multiple tensor classes. For the
+banked linear projections described by `FUN_1800c6390`, the semantic
+assignment is output feature = axis0 and input feature = axis1. Other layer
+types must be mapped from their own call sites rather than inheriting that
+assignment automatically.
 
 ## S5API matrix-bank storage
 
