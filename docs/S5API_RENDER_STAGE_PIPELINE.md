@@ -58,9 +58,19 @@ configuration resolve the runtime dimensions as follows:
 | `param_1[5]` | 4 | renderer stage count |
 | `param_1[6]` | 2 | residual DW-MLP block count per stage |
 
-Consequently, `FUN_1800c7ad0` traverses **4 stages × 2 residual blocks = 8
-c5d50 descriptors**. This is distinct from the separate nine-record VTB2
-array documented in `S5API_VTB2_REPEATED_BLOCK_TENSORS.md`.
+The VTB2 loader confirms **4 stage indices × 2 block indices = 8
+c5d50 parameter descriptors**. This is distinct from the separate nine-record
+VTB2 array documented in `S5API_VTB2_REPEATED_BLOCK_TENSORS.md`.
+
+There is an execution-count discrepancy that must remain explicit: the
+decompiled reverse-stage loop in `FUN_1800c7ad0` enters the projection and
+c5d50 block section only when its reverse-loop index is greater than zero.
+With the currently decoded stage count of 4, that control flow appears to
+execute c5d50 for three reverse stages (six block calls per frame), while the
+model loader exposes eight descriptors. The exact relationship between the
+configured stage count, the first/last stage boundary, and the two additional
+parameter descriptors is not yet reconciled. The eight loaded descriptors
+must not be interpreted as proof that all eight run in one render pass.
 
 `FUN_18010d550(stage, block)` selects a 32-character JSON property key from
 the table at `0x1801cbc20`, with 0x20-byte string entries indexed by
