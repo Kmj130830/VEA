@@ -245,6 +245,24 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_vtmg_bank_to_v0_naive_a_f32(
     size_t padded_output_features, size_t banks,
     float* gemm_a, size_t gemm_a_count);
 
+/*
+ * Reconstructs the stride-2 Conv1D projection in S5API FUN_1800c5440.
+ *
+ * input: [input_channel][input_position]
+ * weights: [output_channel][input_channel * kernel_tap], row-major
+ * bias: optional [output_channel]
+ * output: [output_channel][output_position]
+ *
+ * Odd kernel widths only. For kernel>=3, output_positions=ceil(positions/2).
+ * The lowered window matrix uses [input_channel * kernel_tap][output_position],
+ * samples input at 2*output_position + kernel_tap - floor(kernel_width/2),
+ * and inserts zero for out-of-range input positions.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_stride2_conv1d_projection_f32(
+    const float* input, const float* weights, const float* bias, float* output,
+    size_t input_channels, size_t output_channels, size_t positions,
+    size_t kernel_width);
+
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_banked_linear_projection_f32(
     const float* weights, size_t weight_row_stride, size_t weight_bank_stride,
     const float* input, const float* bias, float* output,
