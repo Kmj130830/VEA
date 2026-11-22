@@ -44,7 +44,19 @@ public class ExportS5BlockRuntime extends GhidraScript {
         "18012cb50", "18012cbb2", "18012ca50",
         "1800df720", "1800d84e0", "1800d8720",
         "18012d460", "18012e0d0", "18012f280",
-        "180130b70", "180130ce0", "180130d90"
+        "180130b70", "180130ce0", "180130d90",
+
+        // Phase-vocoder, oscillator, FFT/window and spectral synthesis helpers.
+        "1801314f0", "1801334b0", "180133680",
+        "180133ac0", "180133ba0", "180133fd0",
+        "1801343c0", "180135490", "180138480",
+        "180138e10", "1801397d0", "180139870",
+        "18013aa00"
+    };
+
+    private static final String[] CONTEXT_CALL_SITES = {
+        // Caller of the SPP phase/vocoder sample processor.
+        "180096051"
     };
 
     @Override
@@ -64,6 +76,17 @@ public class ExportS5BlockRuntime extends GhidraScript {
             out.println("- Image base: " + currentProgram.getImageBase());
             out.println();
 
+            out.println("## Additional caller context");
+            out.println();
+            for (String hex : CONTEXT_CALL_SITES) {
+                monitor.checkCancelled();
+                Address callSite = toAddr(hex);
+                Function caller = currentProgram.getFunctionManager().getFunctionContaining(callSite);
+                out.println("- Call site 0x" + hex + ": " +
+                    (caller == null ? "<no containing function>" : caller.getName() + " at " + caller.getEntryPoint()));
+                if (caller != null) selected.put(caller.getEntryPoint(), caller);
+            }
+            out.println();
             out.println("## Renderer-state, stage-binding, and block-descriptor targets");
             out.println();
             for (String hex : TARGETS) {
