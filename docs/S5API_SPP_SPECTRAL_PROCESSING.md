@@ -82,6 +82,30 @@ complex FFT kernels. The small-size butterflies, data preparation and
 direction-specific output stages are therefore part of the porting contract;
 calling a generic complex FFT and only copying the result is not equivalent.
 
+## Generated FFT plan-record arrays
+
+`FUN_180010110` selects inclusive plan indices
+`floor(log2(minSize)) .. floor(log2(maxSize))` and stores one 0x18-byte
+record for each size `1 << index`. Each record contains:
+
+- the FFT size at byte offset `+0x00`;
+- a pointer at `+0x08` to a compact uint32 stage/decomposition schedule;
+- a pointer at `+0x10` to `N/2` float coefficient values.
+
+`FUN_18004ec80` allocates both backing buffers at 32-byte alignment. The
+first buffer contains the recursively generated split schedule from
+`FUN_180082220`; its required count is `int(sqrt(N/2) + 2)`. The second
+buffer combines the staged cosine/sine recurrence with the terminal
+quarter-wave coefficient table. `S5SppFftPlanBuilder` now ports those
+two array builders to the native S5 library and returns a validated
+logical Kotlin `S5SppFftPlan` copy.
+
+Native tests check sizes 4, 8, 16, 32 and 256, including the generated split
+schedule for 256 and representative float coefficients. The two arrays
+match the recovered plan-record contents, but the full FFT kernels have not
+yet been connected to consume these plans or verified against reference
+audio output.
+
 ## Implemented SPP buffer primitives
 
 Two buffer-level operations in the recovered SPP path are now ported to the
@@ -136,11 +160,17 @@ magnitude/phase entry points. Tests cover periodic wrap, both sides of the
 weighting region, both scan layouts, changed peak ranking, first-wins tie
 behavior, and invalid input preservation.
 
-This recovers candidate-index selection only. `FUN_1801343c0` additionally
-interpolates the local maximum and phase between neighboring bins, while
-`FUN_180133ba0` uses the original complex spectrum for its lazy-phase
-variant. Those refinement/output steps are not yet implemented as a complete
-peak extractor.
+Candidate-index selection is followed by a separate local-maximum
+refinement. VEA now also ports the core interpolation in `FUN_1801343c0`:
+it fits a three-bin parabola to refine magnitude/sub-bin offset and unwraps
+the neighboring phase delta into the shortest `[-pi, pi]` interval before
+interpolating phase. `NativeS5TensorBridge.interpolateSppPeak()` exposes
+that operator and tests cover both offset directions, phase wrap, edge bins,
+non-local maxima and invalid samples.
+
+The surrounding peak-list loops in `FUN_1801343c0` and the separate
+`FUN_180133ba0` lazy-phase branch still require a full state/descriptor
+binding and render-side integration.
 
 ## Deterministic spectral phase-noise generation
 
