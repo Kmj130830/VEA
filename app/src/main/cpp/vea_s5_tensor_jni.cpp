@@ -1352,3 +1352,70 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeGenerateSppPhaseNoise(
     }
 }
 
+
+extern "C" JNIEXPORT jfloat JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeSppPeakWeight(
+    JNIEnv* env, jobject, jfloatArray config_array, jfloat coordinate) {
+    if (config_array == nullptr || !std::isfinite(coordinate) ||
+        env->GetArrayLength(config_array) != 5 || env->ExceptionCheck()) {
+        return std::numeric_limits<jfloat>::quiet_NaN();
+    }
+    float config[5] = {};
+    env->GetFloatArrayRegion(config_array, 0, 5, config);
+    if (env->ExceptionCheck()) return std::numeric_limits<jfloat>::quiet_NaN();
+    float output = 0.0f;
+    const VeaS5TensorStatus status =
+        vea_s5_spp_peak_weight_f32(config, coordinate, &output);
+    return status == VEA_S5_TENSOR_STATUS_OK
+        ? output
+        : std::numeric_limits<jfloat>::quiet_NaN();
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeFindSppWeightedPeak(
+    JNIEnv* env, jobject, jfloatArray values_array, jint value_stride,
+    jint start_index, jint end_index, jfloat bin_spacing, jfloat denominator,
+    jfloatArray weight_config_array) {
+    constexpr jint kFailure = std::numeric_limits<jint>::min();
+    if (values_array == nullptr || weight_config_array == nullptr ||
+        (value_stride != 1 && value_stride != 2) ||
+        start_index < 0 || end_index < start_index ||
+        !std::isfinite(bin_spacing) || bin_spacing < 0.0f ||
+        !std::isfinite(denominator) || denominator <= 0.0f ||
+        env->GetArrayLength(weight_config_array) != 5 || env->ExceptionCheck()) {
+        return kFailure;
+    }
+
+    const jsize value_length = env->GetArrayLength(values_array);
+    if (value_length < 0 || value_length % value_stride != 0 ||
+        end_index >= value_length / value_stride) return kFailure;
+    try {
+        std::vector<float> values(static_cast<size_t>(value_length));
+        float weight_config[5] = {};
+        if (value_length > 0) {
+            env->GetFloatArrayRegion(values_array, 0, value_length, values.data());
+            if (env->ExceptionCheck()) return kFailure;
+        }
+        env->GetFloatArrayRegion(weight_config_array, 0, 5, weight_config);
+        if (env->ExceptionCheck()) return kFailure;
+
+        size_t peak_index = 0u;
+        float peak_score = 0.0f;
+        const VeaS5TensorStatus status = vea_s5_spp_find_weighted_peak_f32(
+            values.empty() ? nullptr : values.data(),
+            values.size() / static_cast<size_t>(value_stride),
+            static_cast<size_t>(value_stride),
+            static_cast<size_t>(start_index), static_cast<size_t>(end_index),
+            bin_spacing, denominator, weight_config, &peak_index, &peak_score);
+        if (status != VEA_S5_TENSOR_STATUS_OK ||
+            peak_index > static_cast<size_t>(std::numeric_limits<jint>::max())) {
+            return kFailure;
+        }
+        return static_cast<jint>(peak_index);
+    } catch (const std::bad_alloc&) {
+        return kFailure;
+    } catch (...) {
+        return kFailure;
+    }
+}
+
