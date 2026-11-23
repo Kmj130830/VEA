@@ -176,6 +176,34 @@ public class ExportS5RendererPath extends GhidraScript {
                 out.println();
             }
 
+            // Include data references as well as direct calls. Factories may be
+            // installed in callback/constructor tables rather than invoked by
+            // a statically encoded CALL instruction.
+            out.println("## All code and data references to renderer/model factories");
+            out.println();
+            for (String targetHex : new String[] {
+                    "18008d470", "180097ff0", "180068190",
+                    "1800aec40", "1800af170", "1800ced10",
+                    "1800c7ad0", "18005a980", "180055d60",
+                    "18005a980", "180055a70", "18005cba0"
+            }) {
+                Address targetAddress = toAddr(targetHex);
+                ReferenceIterator allRefs = currentProgram.getReferenceManager().getReferencesTo(targetAddress);
+                int referenceCount = 0;
+                out.println("### References to " + targetHex);
+                while (allRefs.hasNext()) {
+                    Reference ref = allRefs.next();
+                    Function owner = currentProgram.getFunctionManager().getFunctionContaining(ref.getFromAddress());
+                    String ownerText = owner == null ? "<no containing function>" :
+                        owner.getName() + " at " + owner.getEntryPoint();
+                    out.printf("- source=%s type=%s call=%s owner=%s%n",
+                        ref.getFromAddress(), ref.getReferenceType(),
+                        ref.getReferenceType().isCall(), ownerText);
+                    referenceCount++;
+                }
+                if (referenceCount == 0) out.println("- No code or data references found.");
+                out.println();
+            }
             // Decompile the functions that instantiate or copy render contexts,
             // not just print their symbol names. Their bodies populate the arrays
             // consumed later by FUN_1800c7ad0.
