@@ -1452,3 +1452,43 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeInterpolateSppPeak(
     }
 }
 
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeBuildSppFftPlan(
+    JNIEnv* env, jobject, jint fft_size, jintArray split_table_array,
+    jfloatArray coefficients_array) {
+    if (fft_size < 4 || split_table_array == nullptr || coefficients_array == nullptr) {
+        return JNI_FALSE;
+    }
+    const jsize split_length = env->GetArrayLength(split_table_array);
+    const jsize coefficient_length = env->GetArrayLength(coefficients_array);
+    if (env->ExceptionCheck() || split_length <= 0 || coefficient_length <= 0) {
+        return JNI_FALSE;
+    }
+
+    try {
+        std::vector<uint32_t> split_table(static_cast<size_t>(split_length));
+        std::vector<float> coefficients(static_cast<size_t>(coefficient_length));
+        const VeaS5TensorStatus status = vea_s5_spp_fft_build_plan_f32(
+            static_cast<uint32_t>(fft_size),
+            split_table.data(), split_table.size(),
+            coefficients.data(), coefficients.size());
+        if (status != VEA_S5_TENSOR_STATUS_OK) return JNI_FALSE;
+
+        std::vector<jint> split_output(split_table.size());
+        for (size_t index = 0; index < split_table.size(); ++index) {
+            split_output[index] = std::bit_cast<jint>(split_table[index]);
+        }
+        env->SetIntArrayRegion(
+            split_table_array, 0, split_length, split_output.data());
+        if (env->ExceptionCheck()) return JNI_FALSE;
+        env->SetFloatArrayRegion(
+            coefficients_array, 0, coefficient_length, coefficients.data());
+        return env->ExceptionCheck() ? JNI_FALSE : JNI_TRUE;
+    } catch (const std::bad_alloc&) {
+        return JNI_FALSE;
+    } catch (...) {
+        return JNI_FALSE;
+    }
+}
+
