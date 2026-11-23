@@ -97,8 +97,9 @@ object S5VtmgMegpoidGraphPlanBuilder {
             NativeS5TensorBridge::convertVtmgBankWeightsForV0Naive
     ): S5VtmgMegpoidGraphPlan {
         val expectedNames = S5VtmgGraphTensorCatalog.layers.map { it.layerName }.toSet()
-        require(packed.layers.map { it.layerName }.toSet() == expectedNames) {
-            "The packed VTMG graph does not contain the exact nine-layer Megpoid key set."
+        val providedNames = packed.layers.map { it.layerName }
+        require(providedNames.size == expectedNames.size && providedNames.toSet() == expectedNames) {
+            "The packed VTMG graph does not contain exactly one of each of the nine Megpoid layers."
         }
 
         val pre1 = packed.requireLayer("pre1").toBankedProjectionPlan(convertBanked)
