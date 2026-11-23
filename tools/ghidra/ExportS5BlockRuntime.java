@@ -61,6 +61,8 @@ public class ExportS5BlockRuntime extends GhidraScript {
         // Leaf FFT permutations, radix stages, twiddle butterflies and packing.
         "18007e140", "18007db00", "18007cb90", "18007f170",
         "18007fff0", "1800800c0", "180081080", "18007c1c0", "18007b930",
+        // Sub-butterflies and radix-4/stride helpers used by the 64+ paths.
+        "18007ddc0", "18007e820", "1800803f0", "180080940",
         // Plan/context builders and additional real-FFT call sites.
         "18006d5d0", "180035b70", "180034cc0",
         "180030730", "1800356e0",
@@ -79,7 +81,9 @@ public class ExportS5BlockRuntime extends GhidraScript {
 
     private static final String[] FORCE_FUNCTION_TARGETS = {
         // Direct callees observed inside FUN_180082a30.
-        "18007d700", "18007fca0"
+        "18007d700", "18007fca0",
+        // Direct leaf/helper functions used by the 64+ FFT dispatchers.
+        "18007ddc0", "18007e820", "1800803f0", "180080940"
     };
     private static final String[] CONTEXT_CALL_SITES = {
         // Caller of the SPP phase/vocoder sample processor.
