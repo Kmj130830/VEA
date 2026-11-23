@@ -20,6 +20,48 @@ bool IsAligned(const void* pointer, uintptr_t alignment) {
 int main() {
     assert(vea_s5_tensor_abi_version() == VEA_S5_TENSOR_ABI_VERSION);
 
+    // FUN_180133fd0: circular frame-buffer rotation (positive = left, negative = right).
+    float rotate_left[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+    assert(vea_s5_spp_rotate_circular_f32(rotate_left, 5, 2) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    const float expected_left[] = {3.0f, 4.0f, 5.0f, 1.0f, 2.0f};
+    assert(std::memcmp(rotate_left, expected_left, sizeof(expected_left)) == 0);
+
+    float rotate_right[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+    assert(vea_s5_spp_rotate_circular_f32(rotate_right, 5, -2) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    const float expected_right[] = {4.0f, 5.0f, 1.0f, 2.0f, 3.0f};
+    assert(std::memcmp(rotate_right, expected_right, sizeof(expected_right)) == 0);
+
+    float rotate_wrapped[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+    assert(vea_s5_spp_rotate_circular_f32(rotate_wrapped, 5, 7) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(std::memcmp(rotate_wrapped, expected_left, sizeof(expected_left)) == 0);
+    assert(vea_s5_spp_rotate_circular_f32(nullptr, 0, -100) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(vea_s5_spp_rotate_circular_f32(nullptr, 5, 1) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
+    // FUN_1801397d0: frame-wide multiplication; invalid input is not partially mutated.
+    float scaled_frame[] = {2.0f, -4.0f, 6.0f, 0.5f};
+    assert(vea_s5_spp_scale_buffer_f32(scaled_frame, 4, 0.5f) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    const float expected_scaled[] = {1.0f, -2.0f, 3.0f, 0.25f};
+    assert(std::memcmp(scaled_frame, expected_scaled, sizeof(expected_scaled)) == 0);
+    const float before_invalid_scale[] = {1.0f, 2.0f};
+    float invalid_scale[] = {before_invalid_scale[0], before_invalid_scale[1]};
+    assert(vea_s5_spp_scale_buffer_f32(
+        invalid_scale, 2, std::numeric_limits<float>::infinity()) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(invalid_scale[0] == before_invalid_scale[0] &&
+        invalid_scale[1] == before_invalid_scale[1]);
+    float non_finite_frame[] = {1.0f, std::numeric_limits<float>::quiet_NaN()};
+    assert(vea_s5_spp_scale_buffer_f32(non_finite_frame, 2, 0.5f) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_spp_scale_buffer_f32(nullptr, 0, 0.0f) ==
+        VEA_S5_TENSOR_STATUS_OK);
+
+
     VeaS5Arena* arena = nullptr;
     assert(vea_s5_arena_create(8192, &arena) == VEA_S5_TENSOR_STATUS_OK);
     assert(arena != nullptr);
