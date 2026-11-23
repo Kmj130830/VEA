@@ -68,7 +68,13 @@ not inferred here.
 
 The two core branches have now been recovered as functions. Both contain
 dedicated kernels for lengths 4 and 8. Length 16 uses
-`FUN_18007db00`; length 32 uses `FUN_18007e140`. For lengths above 32:
+`FUN_18007db00`; length 32 uses `FUN_18007e140`. VEA now ports all four
+leaf sizes through `vea_s5_spp_fft_leaf_f32`: the 16/32 paths consume the
+generated plan coefficients and apply the distinct direction-specific output
+permutations recovered from `FUN_18007d700` and `FUN_18007fca0`. Native
+tests compare both signs against an independent direct complex-DFT reference.
+
+For lengths above 32:
 
 - the negative-direction path prepares data through `FUN_18007cb90`;
 - the positive-direction path prepares data through `FUN_18007f170`;
@@ -78,9 +84,11 @@ dedicated kernels for lengths 4 and 8. Length 16 uses
   or `FUN_18007b930`.
 
 `FUN_180082a30` also performs real/complex edge-bin packing around those
-complex FFT kernels. The small-size butterflies, data preparation and
+complex FFT kernels. The 4/8/16/32 leaf butterflies, data preparation and
 direction-specific output stages are therefore part of the porting contract;
 calling a generic complex FFT and only copying the result is not equivalent.
+The full real-FFT wrapper and the stage kernels for lengths above 32 remain
+unported.
 
 ## Generated FFT plan-record arrays
 
@@ -101,10 +109,11 @@ two array builders to the native S5 library and returns a validated
 logical Kotlin `S5SppFftPlan` copy.
 
 Native tests check sizes 4, 8, 16, 32 and 256, including the generated split
-schedule for 256 and representative float coefficients. The two arrays
-match the recovered plan-record contents, but the full FFT kernels have not
-yet been connected to consume these plans or verified against reference
-audio output.
+schedule for 256 and representative float coefficients. The 4/8/16/32 leaf
+operator consumes the generated twiddle coefficients; the 16/32 branches are
+also checked against a direct DFT reference for both transform directions.
+The full real-FFT wrapper, stage kernels above 32, and reference-audio
+validation remain outstanding.
 
 ## Implemented SPP buffer primitives
 
