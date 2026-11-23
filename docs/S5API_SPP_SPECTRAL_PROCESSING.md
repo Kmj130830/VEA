@@ -315,10 +315,12 @@ polynomial is kept in its original arithmetic order:
 VEA exposes this as `vea_s5_spp_cubic_segment_f32()` in the native tensor
 library and `NativeS5TensorBridge.interpolateSppCubicSegment()` in Kotlin.
 `S5SppCubicSegmentPlan` validates and owns the four control values before
-sampling. Native and JVM tests cover both endpoints, the midpoint, invalid
-positions and non-finite/short control vectors. The larger `FUN_1801314f0`
-curve search, edge extension and cached-segment selection remain separate
-from this exact cubic primitive.
+sampling. `S5SppCurveSegmentCache` implements the recovered fast-path guard:
+the cached segment index must match and local position must lie in
+`[0,1)`; otherwise it returns a cache miss so the caller can use the normal
+curve-table lookup path. Native and JVM tests cover endpoints, midpoint,
+cache hit/miss, invalid positions and non-finite/short control vectors. The
+full `FUN_1801314f0` table search and edge-extension logic remain separate.
 
 ## Inverse-frame post-processing plan
 
@@ -334,11 +336,13 @@ from this exact cubic primitive.
 5. Accumulate output samples from the shifted frame, the prepared partial/
    window contribution, and a descriptor-provided amplitude stream.
 
-`S5SppInverseFramePlan` now implements steps 2–4 in that order. It validates
-the FFT size and offset, copies the packed spectrum before invoking the
-inverse transform, and checks the length/finite-value contract at every
-boundary. Its JVM test verifies the exact call order and parameters:
-`direction=1`, `scale=1/frameSize`, `shift=-offset`.
+`S5SppInverseFramePlan` implements steps 2–4 in that order, and
+`S5SppFftPlan.postProcessInverseFrame()` exposes the same sequence directly
+from a size-indexed FFT plan. The operation validates the FFT size and offset,
+copies the packed spectrum before invoking the inverse transform, and checks
+the length/finite-value contract at every boundary. JVM tests verify the
+exact call order and parameters: `direction=1`, `scale=1/frameSize`,
+`shift=-offset`.
 
 The later sample accumulation (step 5) is deliberately outside the plan.
 The decompilation reads a separate partial/window buffer, a double-table
