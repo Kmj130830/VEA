@@ -12,18 +12,23 @@ package com.kmj.vea.engine
  * populates this configuration. It can be constructed after that source
  * field has been recovered.
  */
-data class S5SppWindowLookupPlan(
-    val table: DoubleArray,
+class S5SppWindowLookupPlan(
+    table: DoubleArray,
     val segmentCount: Int,
     val scale: Double,
     val fallbackValue: Double
 ) {
+    private val tableData = table.copyOf()
+
+    val table: DoubleArray
+        get() = tableData.copyOf()
+
     init {
         require(segmentCount in 0 until Int.MAX_VALUE)
-        require(table.size.toLong() >= segmentCount.toLong() + if (segmentCount > 0) 1L else 0L) {
+        require(tableData.size.toLong() >= segmentCount.toLong() + if (segmentCount > 0) 1L else 0L) {
             "SPP window table requires segmentCount + 1 values."
         }
-        require(table.all { it.isFinite() })
+        require(tableData.all { it.isFinite() })
         require(scale.isFinite() && scale >= 0.0)
         require(fallbackValue.isFinite())
     }
@@ -34,6 +39,6 @@ data class S5SppWindowLookupPlan(
             NativeS5TensorBridge::lookupSppWindowTable
     ): Double {
         require(x.isFinite())
-        return lookup(table, segmentCount, scale, fallbackValue, x)
+        return lookup(tableData.copyOf(), segmentCount, scale, fallbackValue, x)
     }
 }
