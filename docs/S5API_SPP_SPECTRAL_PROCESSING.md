@@ -102,11 +102,12 @@ lanes in the interleaved complex buffer, not complex samples:
 | 128 | 4 × 32 floats | `e140`, `e820`, `e140`, `e140` |
 
 The `ddc0` and `e820` alternate sub-block butterflies are ported as
-private native kernels. The stage uses the exact plan-pointer offsets seen
-in the parent function: `N/2 - 8` for the `db00/e140` chunks and, for the
-128-lane alternate `e820` chunk, `N/2 - 32`. The caller's data is copied
-to bounded scratch storage before the sub-blocks are executed, so malformed
-parameters leave the original buffer unchanged.
+private native kernels. The stage receives `param_3 = split_table[0] = N/4` from the FFT
+plan record. Its exact pointer offsets are therefore `N/4 - 8` for the
+`db00/e140` chunks and, for the 128-lane alternate `e820` chunk,
+`N/4 - 32`. The caller's data is copied to bounded scratch storage before
+the sub-blocks are executed, so malformed parameters leave the original
+buffer unchanged.
 
 `NativeS5TensorBridge.applySppFftRadixStage()` and
 `S5SppFftPlan.transformRadixStage()` expose the operation. Native tests
@@ -115,6 +116,35 @@ rejection. This stage is only the inner `FUN_18007fff0` subroutine: the
 root's direction-specific input preparation (`cb90/f170`), recursive
 larger-stage dispatch (`0800c0/081080`), final reorder (`c1c0/b930`),
 and real-spectrum packing in `FUN_180082a30` are not yet joined.
+
+## Ported 256/512-lane large radix stage
+
+`FUN_1800800c0` is now ported as
+`vea_s5_spp_fft_large_radix_stage_f32(fft_size, mode, ...)`. The `fft_size`
+argument counts interleaved float lanes; the two supported sizes are 256
+and 512. The stage divides the input into four contiguous groups and calls
+the two recovered outer kernels `FUN_1800803f0` and `FUN_180080940`, then
+the previously ported `db00/ddc0/e140/e820` sub-block butterflies.
+
+| Float lanes | Outer group sequence | Local leaf chunks |
+|---:|---|---|
+| 256 | `803f0`, `0940`, `803f0`, mode-selected `0940/803f0` | 4 × 16 floats per group, mixing `db00` and `ddc0` |
+| 512 | `803f0`, `0940`, `803f0`, mode-selected `0940/803f0` | 4 × 32 floats per group, mixing `e140` and `e820` |
+
+The plan pointer passed to the decompiled routine is `N/4`. Therefore
+the 256-lane branch uses coefficient bases `N/4-32` (`803f0`),
+`N/4-8` (`db00/ddc0`) and `N/4-64` (`0940`). The 512-lane branch uses
+`N/4-64` (`803f0`), `N/4-8` (`e140/e820`), `N/4-32` (`e820`) and
+`N/4-128` (`0940`). The raw mode byte selects which outer kernel and
+terminal leaf handle the last group; the other three groups are unchanged.
+
+`NativeS5TensorBridge.applySppFftLargeRadixStage()` and
+`S5SppFftPlan.transformLargeRadixStage()` expose the stage. Native tests
+build the 256/512 plan arrays, execute both modes, check repeatability and
+finite output, and reject short coefficient tables and unsupported sizes.
+This remains an inner FFT stage: the root direction-specific pre-permutation,
+the final inverse/forward reorder, and the real-spectrum boundary packing
+have not yet been composed into `FUN_180040630`.
 
 ## Generated FFT plan-record arrays
 
