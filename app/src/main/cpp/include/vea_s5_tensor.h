@@ -475,6 +475,22 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_lookup_table_f64(
     const double* table, size_t table_count, size_t segment_count,
     double scale, double fallback_value, double x, double* out_value);
 
+/**
+ * Batch implementation of the final sample loop in FUN_1801334b0.
+ * For sample j:
+ *   index = base_index - offset + j
+ *   x = float(index - (window_span >> 1)) / float(window_span)
+ *   output[j] = (source_frame[j] / lookup(window_table,x)) *
+ *               partial_window_buffer[index]
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_accumulate_frame_samples_f32(
+    const float* source_frame, size_t source_count,
+    const float* partial_window_buffer, size_t partial_count,
+    int32_t base_index, int32_t offset, uint32_t window_span,
+    const double* window_table, size_t table_count, size_t segment_count,
+    double window_scale, double window_fallback,
+    float* output, size_t output_count);
+
 /** Ports the frame-wide scalar normalization in FUN_1801397d0. */
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_scale_buffer_f32(
     float* values, size_t count, float scale);
