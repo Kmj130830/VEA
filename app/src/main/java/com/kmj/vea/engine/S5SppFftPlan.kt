@@ -6,6 +6,10 @@ package com.kmj.vea.engine
  * The native 0x18-byte record stores the FFT size and pointers to two
  * separately 32-byte-aligned buffers. This class stores only their logical
  * contents; it is not itself a native record and does not expose raw pointers.
+ *
+ * Execution support is currently ported through the 512-lane inner radix
+ * stage. This does not mean the complete real-FFT wrapper or final renderer
+ * spectral pipeline is available.
  */
 class S5SppFftPlan internal constructor(
     val fftSize: Int,
