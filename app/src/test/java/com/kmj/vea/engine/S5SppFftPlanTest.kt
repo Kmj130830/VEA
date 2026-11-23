@@ -156,6 +156,34 @@ class S5SppFftPlanTest {
         }
     }
     @Test
+    fun `real FFT plan dispatches the packed forward and inverse modes`() {
+        for (size in listOf(4, 8, 16, 32, 64, 128, 256, 512)) {
+            val plan = S5SppFftPlanBuilder.build(size) { requested, split, coefficients ->
+                assertEquals(size, requested)
+                split[0] = size / 4
+                split[1] = size / 4
+                true
+            }
+            val input = FloatArray(size) { (it % 17 - 8) * 0.0625f }
+            for (direction in listOf(-1, 1)) {
+                var called = false
+                val output = plan.transformReal(direction, input) { requestedSize, requestedDirection, frame ->
+                    called = true
+                    assertEquals(size, requestedSize)
+                    assertEquals(direction, requestedDirection)
+                    assertArrayEquals(input, frame, 0f)
+                    FloatArray(size) { (it + 1) * direction.toFloat() }
+                }
+                assertEquals(true, called)
+                assertArrayEquals(
+                    FloatArray(size) { (it + 1) * direction.toFloat() },
+                    output,
+                    0f
+                )
+            }
+        }
+    }
+    @Test
     fun `larger FFT plan refuses small leaf shortcut`() {
         val plan = S5SppFftPlanBuilder.build(16) { size, split, coefficients ->
             split[0] = size / 4
