@@ -100,6 +100,27 @@ class S5SppFftPlan internal constructor(
         return execute(fftSize, mode, interleavedValues, coefficientData.copyOf())
     }
     /**
+     * Runs the confirmed FUN_1801334b0 inverse-frame subsequence:
+     * inverse real FFT -> 1/fftSize normalization -> -offset circular shift.
+     * The later partial/window sample accumulation is not included.
+     */
+    fun postProcessInverseFrame(
+        offset: Int,
+        packedSpectrum: FloatArray,
+        inverseTransform: (Int, Int, FloatArray) -> FloatArray =
+            NativeS5TensorBridge::applySppRealFft,
+        normalize: (FloatArray, Float) -> FloatArray =
+            NativeS5TensorBridge::scaleSppBuffer,
+        rotate: (FloatArray, Int) -> FloatArray =
+            NativeS5TensorBridge::rotateSppCircularBuffer
+    ): FloatArray = S5SppInverseFramePlan(fftSize, offset).process(
+        packedSpectrum = packedSpectrum,
+        inverseTransform = inverseTransform,
+        normalize = normalize,
+        rotate = rotate
+    )
+
+    /**
      * Runs the complete portable real-FFT boundary for this plan size.
      * Negative direction returns packed real-spectrum bins; non-negative
      * direction reconstructs the real frame with the unnormalized N/2 scale.
