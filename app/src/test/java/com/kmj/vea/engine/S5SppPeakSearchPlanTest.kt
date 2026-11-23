@@ -19,7 +19,7 @@ class S5SppPeakSearchPlanTest {
                 strides += stride
                 assertEquals(32000f, denominator, 0f)
                 assertEquals(0.5f, spacing, 0f)
-                assertArrayEquals(config, weights, 0f)
+                assertArrayEquals(floatArrayOf(10f, 2f, 4f, 6f, 3f), weights, 0f)
                 assertEquals(0f, values[start * stride + 1].takeIf { stride == 2 } ?: 0f, 0f)
                 end
             }
