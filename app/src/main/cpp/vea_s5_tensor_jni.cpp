@@ -1242,3 +1242,37 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeScaleSppBuffer(
     }
 }
 
+
+extern "C" JNIEXPORT jdoubleArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeLookupSppWindowTable(
+    JNIEnv* env, jobject, jdoubleArray table_array, jint segment_count,
+    jdouble scale, jdouble fallback_value, jdouble x) {
+    if (table_array == nullptr || segment_count < 0 ||
+        !std::isfinite(scale) || scale < 0.0 ||
+        !std::isfinite(fallback_value) || !std::isfinite(x)) return nullptr;
+
+    const jsize table_length = env->GetArrayLength(table_array);
+    if (env->ExceptionCheck() || table_length < 0 ||
+        table_length < segment_count + (segment_count > 0 ? 1 : 0)) return nullptr;
+
+    try {
+        std::vector<double> table(static_cast<size_t>(table_length));
+        if (table_length > 0) {
+            env->GetDoubleArrayRegion(table_array, 0, table_length, table.data());
+            if (env->ExceptionCheck()) return nullptr;
+        }
+        double output = 0.0;
+        const VeaS5TensorStatus status = vea_s5_spp_lookup_table_f64(
+            table.empty() ? nullptr : table.data(), table.size(),
+            static_cast<size_t>(segment_count), scale, fallback_value, x, &output);
+        if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+        jdoubleArray result = env->NewDoubleArray(1);
+        if (result != nullptr) env->SetDoubleArrayRegion(result, 0, 1, &output);
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
