@@ -306,6 +306,63 @@ int main() {
         32u, fft64_stage_unchanged, 64u, fft64_coefficients, 32u) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
+    // FUN_1800800c0: 256/512-lane large mixed-radix stages.
+    for (const uint32_t fft_size : {256u, 512u}) {
+        const size_t split_count = static_cast<size_t>(
+            std::sqrt(static_cast<double>(fft_size / 2u))) + 2u;
+        const size_t coefficient_count = fft_size / 2u;
+        std::vector<uint32_t> split_table(split_count);
+        std::vector<float> coefficients(coefficient_count);
+        assert(vea_s5_spp_fft_build_plan_f32(
+            fft_size, split_table.data(), split_table.size(),
+            coefficients.data(), coefficients.size()) ==
+            VEA_S5_TENSOR_STATUS_OK);
+
+        std::vector<float> input(fft_size);
+        for (size_t index = 0; index < input.size(); ++index) {
+            input[index] = static_cast<float>(
+                static_cast<int>((index * 13u + 7u) % 31u) - 15) * 0.03125f;
+        }
+        std::vector<float> mode_zero_a = input;
+        std::vector<float> mode_zero_b = input;
+        std::vector<float> mode_one = input;
+        assert(vea_s5_spp_fft_large_radix_stage_f32(
+            fft_size, 0u, mode_zero_a.data(), mode_zero_a.size(),
+            coefficients.data(), coefficients.size()) ==
+            VEA_S5_TENSOR_STATUS_OK);
+        assert(vea_s5_spp_fft_large_radix_stage_f32(
+            fft_size, 0u, mode_zero_b.data(), mode_zero_b.size(),
+            coefficients.data(), coefficients.size()) ==
+            VEA_S5_TENSOR_STATUS_OK);
+        assert(vea_s5_spp_fft_large_radix_stage_f32(
+            fft_size, 1u, mode_one.data(), mode_one.size(),
+            coefficients.data(), coefficients.size()) ==
+            VEA_S5_TENSOR_STATUS_OK);
+        assert(std::memcmp(mode_zero_a.data(), mode_zero_b.data(),
+            mode_zero_a.size() * sizeof(float)) == 0);
+        assert(std::memcmp(mode_zero_a.data(), input.data(),
+            input.size() * sizeof(float)) != 0);
+        assert(std::memcmp(mode_zero_a.data(), mode_one.data(),
+            mode_zero_a.size() * sizeof(float)) != 0);
+        for (float value : mode_zero_a) assert(std::isfinite(value));
+        for (float value : mode_one) assert(std::isfinite(value));
+
+        std::vector<float> unchanged = input;
+        assert(vea_s5_spp_fft_large_radix_stage_f32(
+            fft_size, 0u, unchanged.data(), unchanged.size(),
+            coefficients.data(), coefficients.size() - 1u) ==
+            VEA_S5_TENSOR_STATUS_BUFFER_TOO_SMALL);
+        assert(std::memcmp(unchanged.data(), input.data(),
+            input.size() * sizeof(float)) == 0);
+        assert(vea_s5_spp_fft_large_radix_stage_f32(
+            fft_size, 2u, unchanged.data(), unchanged.size(),
+            coefficients.data(), coefficients.size()) ==
+            VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+        assert(vea_s5_spp_fft_large_radix_stage_f32(
+            128u, 0u, unchanged.data(), unchanged.size(),
+            coefficients.data(), coefficients.size()) ==
+            VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    }
     // FUN_18007a000: FFT plan index is floor(log2(N)); zero maps to -1.
     int32_t fft_plan_index = 123;
     assert(vea_s5_spp_fft_log2_floor_u32(0u, &fft_plan_index) ==
