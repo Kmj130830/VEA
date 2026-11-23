@@ -433,6 +433,35 @@ int main() {
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
     assert(invalid_rfft_frame[0] == 1.0f && invalid_rfft_frame[1] == 2.0f &&
         std::isnan(invalid_rfft_frame[2]) && invalid_rfft_frame[3] == 4.0f);
+    // FUN_1801360c0: cubic pitch/phase curve interpolation.
+    const float cubic_controls[] = {2.0f, 4.0f, 8.0f, 16.0f};
+    float cubic_value = -1.0f;
+    assert(vea_s5_spp_cubic_segment_f32(
+        0.0f, cubic_controls, &cubic_value) == VEA_S5_TENSOR_STATUS_OK);
+    assert(cubic_value == 2.0f);
+    assert(vea_s5_spp_cubic_segment_f32(
+        1.0f, cubic_controls, &cubic_value) == VEA_S5_TENSOR_STATUS_OK);
+    assert(cubic_value == 8.0f);
+    assert(vea_s5_spp_cubic_segment_f32(
+        0.5f, cubic_controls, &cubic_value) == VEA_S5_TENSOR_STATUS_OK);
+    assert(std::fabs(cubic_value - 6.0f) < 1.0e-6f);
+    assert(vea_s5_spp_cubic_segment_f32(
+        -0.01f, cubic_controls, &cubic_value) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_spp_cubic_segment_f32(
+        1.01f, cubic_controls, &cubic_value) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_spp_cubic_segment_f32(
+        0.5f, nullptr, &cubic_value) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_spp_cubic_segment_f32(
+        0.5f, cubic_controls, nullptr) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    float bad_cubic_controls[] = {2.0f, 4.0f,
+        std::numeric_limits<float>::quiet_NaN(), 16.0f};
+    assert(vea_s5_spp_cubic_segment_f32(
+        0.5f, bad_cubic_controls, &cubic_value) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
     // FUN_18007a000: FFT plan index is floor(log2(N)); zero maps to -1.
     int32_t fft_plan_index = 123;
     assert(vea_s5_spp_fft_log2_floor_u32(0u, &fft_plan_index) ==
