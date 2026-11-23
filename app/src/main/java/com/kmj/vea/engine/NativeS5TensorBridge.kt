@@ -560,6 +560,24 @@ object NativeS5TensorBridge {
             ?: throw IllegalArgumentException("S5 large FFT radix stage execution failed.")
     }
 
+    /**
+     * Executes the portable SPP real-FFT wrapper.
+     * direction < 0: real frame -> packed [DC, Nyquist, Re/Im bins].
+     * direction >= 0: packed spectrum -> real frame, with N/2 scaling.
+     */
+    fun applySppRealFft(
+        fftSize: Int,
+        direction: Int,
+        frame: FloatArray
+    ): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(fftSize in 4..65536 && (fftSize and (fftSize - 1)) == 0)
+        require(frame.size == fftSize)
+        require(frame.all { it.isFinite() })
+        return nativeSppRealFft(fftSize, direction, frame)
+            ?: throw IllegalArgumentException("SPP real FFT execution failed.")
+    }
+
     /** Returns the floor(log2(N)) plan-table index used by FUN_180040630. */
     fun sppFftLog2PlanIndex(size: Int): Int {
         check(loaded) { "Native S5 tensor library is not loaded." }
@@ -792,6 +810,7 @@ object NativeS5TensorBridge {
     private external fun nativeSppFftLeaf(fftSize: Int, direction: Int, values: FloatArray, coefficients: FloatArray): FloatArray?
     private external fun nativeSppFftRadixStage(fftSize: Int, values: FloatArray, coefficients: FloatArray): FloatArray?
     private external fun nativeSppFftLargeRadixStage(fftSize: Int, mode: Int, values: FloatArray, coefficients: FloatArray): FloatArray?
+    private external fun nativeSppRealFft(fftSize: Int, direction: Int, frame: FloatArray): FloatArray?
     private external fun nativeBuildSppFftPlan(fftSize: Int, splitTable: IntArray, coefficients: FloatArray): Boolean
     private external fun nativeGenerateSppPhaseNoise(magnitudes: FloatArray, state: IntArray, edgeMode: Int): FloatArray?
     private external fun nativeInterpolateSppPeak(magnitudePhase: FloatArray, binCount: Int, peakIndex: Int): FloatArray?
