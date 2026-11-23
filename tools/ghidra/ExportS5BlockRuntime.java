@@ -56,6 +56,9 @@ public class ExportS5BlockRuntime extends GhidraScript {
         // SPP FFT/IFFT, window, spectral-peak and interpolation helpers.
         "180040630", "180082a30", "18007a000",
         "18007d700", "18007fca0",
+        // Plan/context builders and additional real-FFT call sites.
+        "18006d5d0", "180035b70", "180034cc0",
+        "180030730", "1800356e0",
         "180135270", "1801347a0",
         "1801360c0", "180135670", "180135b90",
         "18013a850", "1800789b0", "1800780b0",
