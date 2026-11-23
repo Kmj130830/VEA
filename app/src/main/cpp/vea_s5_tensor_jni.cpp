@@ -1517,3 +1517,54 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeSppFftSmallLeaf(
     }
 }
 
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeSppFftLeaf(
+    JNIEnv* env, jobject, jint fft_size, jint direction,
+    jfloatArray values_array, jfloatArray coefficients_array) {
+    if (values_array == nullptr ||
+        (fft_size != 4 && fft_size != 8 && fft_size != 16 && fft_size != 32)) {
+        return nullptr;
+    }
+    const jsize value_length = env->GetArrayLength(values_array);
+    if (env->ExceptionCheck() || value_length != fft_size) return nullptr;
+
+    const jsize coefficient_length = coefficients_array == nullptr
+        ? 0
+        : env->GetArrayLength(coefficients_array);
+    if (env->ExceptionCheck()) return nullptr;
+    if (fft_size >= 16 && (coefficients_array == nullptr ||
+        coefficient_length < (fft_size == 16 ? 2 : 4))) {
+        return nullptr;
+    }
+
+    try {
+        std::vector<float> values(static_cast<size_t>(value_length));
+        std::vector<float> coefficients(static_cast<size_t>(coefficient_length));
+        env->GetFloatArrayRegion(values_array, 0, value_length, values.data());
+        if (env->ExceptionCheck()) return nullptr;
+        if (coefficient_length > 0) {
+            env->GetFloatArrayRegion(
+                coefficients_array, 0, coefficient_length, coefficients.data());
+            if (env->ExceptionCheck()) return nullptr;
+        }
+
+        const VeaS5TensorStatus status = vea_s5_spp_fft_leaf_f32(
+            static_cast<uint32_t>(fft_size), direction,
+            values.data(), values.size(),
+            coefficients.empty() ? nullptr : coefficients.data(),
+            coefficients.size());
+        if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+
+        jfloatArray result = env->NewFloatArray(value_length);
+        if (result != nullptr) {
+            env->SetFloatArrayRegion(result, 0, value_length, values.data());
+        }
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
