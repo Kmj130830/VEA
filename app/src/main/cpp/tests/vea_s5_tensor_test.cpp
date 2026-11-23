@@ -62,6 +62,36 @@ int main() {
         VEA_S5_TENSOR_STATUS_OK);
 
 
+    // FUN_180139870: absolute-position table lookup with linear interpolation.
+    const double spp_window_table[] = {0.0, 1.0, 4.0, 9.0, 16.0};
+    double spp_window_value = 0.0;
+    assert(vea_s5_spp_lookup_table_f64(
+        spp_window_table, 5, 4, 2.0, -99.0, 0.75, &spp_window_value) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(std::fabs(spp_window_value - 2.5) < 1.0e-12);
+    assert(vea_s5_spp_lookup_table_f64(
+        spp_window_table, 5, 4, 1.0, -99.0, -2.5, &spp_window_value) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(std::fabs(spp_window_value - 6.5) < 1.0e-12);
+    assert(vea_s5_spp_lookup_table_f64(
+        spp_window_table, 5, 4, 1.0, -99.0, 4.0, &spp_window_value) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(spp_window_value == -99.0);
+    assert(vea_s5_spp_lookup_table_f64(
+        nullptr, 0, 0, 1.0, 12.0, 0.25, &spp_window_value) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(spp_window_value == 12.0);
+    assert(vea_s5_spp_lookup_table_f64(
+        spp_window_table, 4, 4, 1.0, -99.0, 0.5, &spp_window_value) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_spp_lookup_table_f64(
+        spp_window_table, 5, 4, -1.0, -99.0, 0.5, &spp_window_value) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_spp_lookup_table_f64(
+        spp_window_table, 5, 4, 1.0, -99.0, 0.5, nullptr) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
+
     VeaS5Arena* arena = nullptr;
     assert(vea_s5_arena_create(8192, &arena) == VEA_S5_TENSOR_STATUS_OK);
     assert(arena != nullptr);
