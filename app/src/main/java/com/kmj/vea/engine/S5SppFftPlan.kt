@@ -39,6 +39,24 @@ class S5SppFftPlan internal constructor(
         return execute(fftSize, direction, interleavedValues)
     }
 
+    /**
+     * Executes the recovered 4-, 8-, 16- or 32-point complex leaf.
+     * The 16/32-point butterflies consume this plan's generated twiddle table.
+     */
+    fun transformLeaf(
+        direction: Int,
+        interleavedValues: FloatArray,
+        execute: (Int, Int, FloatArray, FloatArray) -> FloatArray =
+            NativeS5TensorBridge::applySppFftLeaf
+    ): FloatArray {
+        require(fftSize == 4 || fftSize == 8 || fftSize == 16 || fftSize == 32) {
+            "Only the recovered 4-, 8-, 16- and 32-point FFT leaves are available."
+        }
+        require(interleavedValues.size == fftSize)
+        require(interleavedValues.all { it.isFinite() })
+        return execute(fftSize, direction, interleavedValues, coefficientData.copyOf())
+    }
+
     init {
         require(fftSize >= 4 && (fftSize and (fftSize - 1)) == 0)
         val expectedSplitCount = kotlin.math.sqrt(fftSize / 2.0).toInt() + 2
