@@ -4,6 +4,7 @@
 #include <jni.h>
 
 #include <cmath>
+#include <bit>
 
 #include <cstddef>
 #include <cstdint>
@@ -1288,5 +1289,66 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeSppFftLog2Floor(
     return status == VEA_S5_TENSOR_STATUS_OK
         ? static_cast<jint>(index)
         : std::numeric_limits<jint>::min();
+}
+
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeGenerateSppPhaseNoise(
+    JNIEnv* env, jobject, jfloatArray magnitudes_array,
+    jintArray state_array, jint edge_mode) {
+    if (magnitudes_array == nullptr || state_array == nullptr ||
+        edge_mode < 0 || edge_mode > 255) return nullptr;
+    if (env->GetArrayLength(state_array) != 4 || env->ExceptionCheck()) return nullptr;
+
+    const jsize count = env->GetArrayLength(magnitudes_array);
+    if (count < 0 || static_cast<size_t>(count) >
+        static_cast<size_t>(std::numeric_limits<jsize>::max()) / 2u) return nullptr;
+    const size_t output_count = static_cast<size_t>(count) * 2u;
+
+    try {
+        std::vector<float> magnitudes(static_cast<size_t>(count));
+        std::vector<float> output(output_count, 0.0f);
+        jint incoming_state[4] = {};
+        env->GetIntArrayRegion(state_array, 0, 4, incoming_state);
+        if (env->ExceptionCheck()) return nullptr;
+        if (count > 0) {
+            env->GetFloatArrayRegion(
+                magnitudes_array, 0, count, magnitudes.data());
+            if (env->ExceptionCheck()) return nullptr;
+        }
+
+        uint32_t native_state[4] = {};
+        for (size_t index = 0; index < 4u; ++index) {
+            native_state[index] = std::bit_cast<uint32_t>(
+                static_cast<int32_t>(incoming_state[index]));
+        }
+
+        const VeaS5TensorStatus status = vea_s5_spp_generate_phase_noise_f32(
+            magnitudes.empty() ? nullptr : magnitudes.data(),
+            magnitudes.size(), static_cast<uint8_t>(edge_mode),
+            native_state, output.empty() ? nullptr : output.data(),
+            output.size());
+        if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+
+        jfloatArray result = env->NewFloatArray(static_cast<jsize>(output_count));
+        if (result == nullptr) return nullptr;
+        if (output_count > 0u) {
+            env->SetFloatArrayRegion(
+                result, 0, static_cast<jsize>(output_count), output.data());
+            if (env->ExceptionCheck()) return nullptr;
+        }
+
+        jint updated_state[4] = {};
+        for (size_t index = 0; index < 4u; ++index) {
+            updated_state[index] = static_cast<jint>(
+                std::bit_cast<int32_t>(native_state[index]));
+        }
+        env->SetIntArrayRegion(state_array, 0, 4, updated_state);
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
 }
 
