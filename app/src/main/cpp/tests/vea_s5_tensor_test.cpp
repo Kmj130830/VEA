@@ -62,6 +62,32 @@ int main() {
         VEA_S5_TENSOR_STATUS_OK);
 
 
+    // FUN_18007a000: FFT plan index is floor(log2(N)); zero maps to -1.
+    int32_t fft_plan_index = 123;
+    assert(vea_s5_spp_fft_log2_floor_u32(0u, &fft_plan_index) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(fft_plan_index == -1);
+    assert(vea_s5_spp_fft_log2_floor_u32(1u, &fft_plan_index) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(fft_plan_index == 0);
+    assert(vea_s5_spp_fft_log2_floor_u32(2u, &fft_plan_index) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(fft_plan_index == 1);
+    assert(vea_s5_spp_fft_log2_floor_u32(3u, &fft_plan_index) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(fft_plan_index == 1);
+    assert(vea_s5_spp_fft_log2_floor_u32(4u, &fft_plan_index) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(fft_plan_index == 2);
+    assert(vea_s5_spp_fft_log2_floor_u32(512u, &fft_plan_index) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(fft_plan_index == 9);
+    assert(vea_s5_spp_fft_log2_floor_u32(UINT32_MAX, &fft_plan_index) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(fft_plan_index == 31);
+    assert(vea_s5_spp_fft_log2_floor_u32(8u, nullptr) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
     // FUN_180139870: absolute-position table lookup with linear interpolation.
     const double spp_window_table[] = {0.0, 1.0, 4.0, 9.0, 16.0};
     double spp_window_value = 0.0;
