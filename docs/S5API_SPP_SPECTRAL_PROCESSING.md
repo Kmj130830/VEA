@@ -101,6 +101,36 @@ Native tests cover both rotation directions, wraparound shifts, zero-length
 buffers, invalid pointers, scale factors, NaN input and failure atomicity.
 These are isolated DSP primitives, not the complete SPP pipeline.
 
+## Deterministic spectral phase-noise generation
+
+`FUN_180135490` advances a four-word xorshift state and converts magnitude
+bins to interleaved real/imaginary values. The update sequence is:
+
+```text
+t = state[0] ^ (state[0] << 11)
+next = (((state[3] >> 11) ^ t) >> 8) ^ state[3] ^ t
+state = [state[1], state[2], state[3], next]
+```
+
+The sign of the generated 32-bit word determines the real-only DC sign or
+the real-only terminal-bin sign. Interior bins use
+`angle = float(word >> 8) * 3.7450704e-7`, then
+`real = magnitude * cos(angle)` and `imag = magnitude * sin(angle)`. The
+magnitude is therefore preserved while the bin receives a deterministic
+phase.
+
+`edgeMode & 1` selects the terminal-bin treatment. With bit 0 clear, the
+last bin is emitted as real-only; with bit 0 set, it is processed as a
+phase-rotated complex bin. The first bin is always real-only.
+
+VEA now implements `vea_s5_spp_generate_phase_noise_f32` in native C++,
+exposes it through `nativeGenerateSppPhaseNoise`, and provides
+`NativeS5TensorBridge.generateSppPhaseNoise(magnitudes, state, edgeMode)`.
+The mutable four-word `IntArray` carries the updated PRNG state between
+frames. Tests cover deterministic output/state advancement, magnitude
+preservation, both terminal-bin modes and failure atomicity for invalid
+magnitude inputs.
+
 ## Window-table coefficient lookup
 
 `FUN_180139870(double* config, double x)` is the SPP window-coefficient
