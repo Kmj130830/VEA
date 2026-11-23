@@ -460,6 +460,24 @@ object NativeS5TensorBridge {
         return nativeGenerateSppPhaseNoise(magnitudes, state, edgeMode)
             ?: throw IllegalArgumentException("SPP phase-noise generation failed.")
     }
+    /**
+     * Fills the recovered S5 real-FFT split schedule and coefficient table.
+     * The arrays are logical Kotlin copies; native renderer state will own
+     * separately aligned storage when a plan is bound to the FFT executor.
+     */
+    fun buildSppFftPlanTables(
+        fftSize: Int,
+        splitTable: IntArray,
+        coefficients: FloatArray
+    ): Boolean {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(fftSize >= 4 && fftSize.countOneBits() == 1)
+        require(splitTable.isNotEmpty() && coefficients.size == fftSize / 2)
+        val expectedSplitCount = kotlin.math.sqrt(fftSize / 2.0).toInt() + 2
+        require(splitTable.size >= expectedSplitCount)
+        return nativeBuildSppFftPlan(fftSize, splitTable, coefficients)
+    }
+
     /** Returns the floor(log2(N)) plan-table index used by FUN_180040630. */
     fun sppFftLog2PlanIndex(size: Int): Int {
         check(loaded) { "Native S5 tensor library is not loaded." }
@@ -688,6 +706,7 @@ object NativeS5TensorBridge {
     private external fun nativeScaleSppBuffer(values: FloatArray, scale: Float): FloatArray?
     private external fun nativeLookupSppWindowTable(table: DoubleArray, segmentCount: Int, scale: Double, fallbackValue: Double, x: Double): DoubleArray?
     private external fun nativeSppFftLog2Floor(size: Int): Int
+    private external fun nativeBuildSppFftPlan(fftSize: Int, splitTable: IntArray, coefficients: FloatArray): Boolean
     private external fun nativeGenerateSppPhaseNoise(magnitudes: FloatArray, state: IntArray, edgeMode: Int): FloatArray?
     private external fun nativeInterpolateSppPeak(magnitudePhase: FloatArray, binCount: Int, peakIndex: Int): FloatArray?
     private external fun nativeSppPeakWeight(config: FloatArray, coordinate: Float): Float
