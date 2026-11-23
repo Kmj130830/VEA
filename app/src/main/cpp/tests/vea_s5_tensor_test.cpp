@@ -88,7 +88,64 @@ int main() {
     assert(vea_s5_spp_fft_log2_floor_u32(8u, nullptr) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
-        // FUN_180135490: deterministic xorshift phase assignment from magnitude bins.
+            // FUN_180136150: periodic SPP frequency weighting.
+    const float peak_weight_config[] = {10.0f, 2.0f, 4.0f, 6.0f, 3.0f};
+    float peak_weight = 99.0f;
+    assert(vea_s5_spp_peak_weight_f32(peak_weight_config, 1.0f, &peak_weight) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(peak_weight == 0.0f);
+    assert(vea_s5_spp_peak_weight_f32(peak_weight_config, 3.0f, &peak_weight) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(std::fabs(peak_weight - (-1.5f)) < 1.0e-6f);
+    assert(vea_s5_spp_peak_weight_f32(peak_weight_config, 13.0f, &peak_weight) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(std::fabs(peak_weight - (-1.5f)) < 1.0e-6f);
+    assert(vea_s5_spp_peak_weight_f32(peak_weight_config, -7.0f, &peak_weight) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(std::fabs(peak_weight - (-1.5f)) < 1.0e-6f);
+    assert(vea_s5_spp_peak_weight_f32(peak_weight_config, 6.0f, &peak_weight) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(peak_weight == 0.0f);
+
+    // FUN_180135b90: stride-1 weighted argmax; the frequency penalty changes the winner.
+    const float peak_values[] = {0.0f, 1.0f, 4.0f, 4.9f, 7.0f};
+    size_t selected_peak = 99u;
+    float selected_score = 0.0f;
+    assert(vea_s5_spp_find_weighted_peak_f32(
+        peak_values, 5, 1, 0, 4, 1.0f, 1.0f, peak_weight_config,
+        &selected_peak, &selected_score) == VEA_S5_TENSOR_STATUS_OK);
+    assert(selected_peak == 2u);
+    assert(std::fabs(selected_score - 4.0f) < 1.0e-6f);
+
+    // FUN_180135670: stride-2 [magnitude,phase] records; only lane zero is ranked.
+    const float interleaved_peak_values[] = {
+        0.0f, 1.0f, 1.0f, 2.0f, 4.0f, 3.0f, 4.9f, 4.0f, 7.0f, 5.0f
+    };
+    selected_peak = 99u;
+    assert(vea_s5_spp_find_weighted_peak_f32(
+        interleaved_peak_values, 5, 2, 0, 4, 1.0f, 1.0f, peak_weight_config,
+        &selected_peak, &selected_score) == VEA_S5_TENSOR_STATUS_OK);
+    assert(selected_peak == 2u);
+
+    // Forward scan preserves the first index when scores tie.
+    const float tied_peak_values[] = {0.0f, 4.0f, 4.0f, 0.0f};
+    const float no_weight_config[] = {10.0f, 2.0f, 4.0f, 6.0f, 0.0f};
+    assert(vea_s5_spp_find_weighted_peak_f32(
+        tied_peak_values, 4, 1, 1, 2, 0.0f, 1.0f, no_weight_config,
+        &selected_peak, &selected_score) == VEA_S5_TENSOR_STATUS_OK);
+    assert(selected_peak == 1u);
+
+    // Invalid SPP peak requests must not overwrite result outputs.
+    selected_peak = 77u;
+    selected_score = 88.0f;
+    assert(vea_s5_spp_find_weighted_peak_f32(
+        peak_values, 5, 3, 0, 4, 1.0f, 1.0f, peak_weight_config,
+        &selected_peak, &selected_score) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(selected_peak == 77u && selected_score == 88.0f);
+    assert(vea_s5_spp_peak_weight_f32(
+        peak_weight_config, 2.0f, nullptr) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
+// FUN_180135490: deterministic xorshift phase assignment from magnitude bins.
     const float spp_magnitudes[] = {1.0f, 2.0f, 3.0f, 4.0f};
     const uint32_t initial_phase_state[] = {0x12345678u, 0x9abcdef0u, 0x31415926u, 0x27182818u};
     uint32_t phase_state_a[4] = {
