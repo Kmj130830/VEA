@@ -45,6 +45,21 @@ class S5SppWindowLookupPlanTest {
     }
 
     @Test
+    fun `window plan copies caller and returned table arrays`() {
+        val source = doubleArrayOf(0.0, 1.0, 4.0)
+        val plan = S5SppWindowLookupPlan(source, 2, 1.0, -1.0)
+        source[1] = 99.0
+        assertEquals(listOf(0.0, 1.0, 4.0), plan.table.toList())
+        val exposed = plan.table
+        exposed[2] = 99.0
+        assertEquals(listOf(0.0, 1.0, 4.0), plan.table.toList())
+        val sampled = plan.coefficient(0.5) { values, _, _, _, _ ->
+            assertEquals(listOf(0.0, 1.0, 4.0), values.toList())
+            values[0]
+        }
+        assertEquals(0.0, sampled, 0.0)
+    }
+    @Test
     fun `window plan rejects non finite table and coordinate`() {
         assertThrows(IllegalArgumentException::class.java) {
             S5SppWindowLookupPlan(doubleArrayOf(0.0, Double.NaN), 1, 1.0, 0.0)
