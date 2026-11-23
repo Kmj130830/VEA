@@ -369,6 +369,16 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_find_weighted_peak_f32(
     const float weight_config[5], size_t* out_peak_index, float* out_peak_score);
 
 /**
+ * Parabolic interpolation for one spectral peak from interleaved
+ * [magnitude,phase] bins, following FUN_1801343c0.
+ * Non-interior or non-local-maximum bins are returned without interpolation.
+ * The phase interpolation unwraps the adjacent phase delta to [-pi,pi].
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_interpolate_peak_f32(
+    const float* magnitude_phase, size_t bin_count, size_t peak_index,
+    float* out_magnitude, float* out_phase);
+
+/**
  * Ports FUN_180135490: deterministic xorshift phase assignment for SPP bins.
  * output_complex is interleaved [real,imag] and must contain count*2 floats.
  * state is four mutable uint32 words; edge_mode bit 0 selects whether the
