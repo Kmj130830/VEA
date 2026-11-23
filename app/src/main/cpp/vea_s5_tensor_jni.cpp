@@ -1186,3 +1186,59 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeUpsample2Conv3Projection(
         return nullptr;
     }
 }
+
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeRotateSppCircularBuffer(
+    JNIEnv* env, jobject, jfloatArray input_array, jint shift) {
+    if (input_array == nullptr) return nullptr;
+    const jsize count = env->GetArrayLength(input_array);
+    if (count < 0 || env->ExceptionCheck()) return nullptr;
+    try {
+        std::vector<float> values(static_cast<size_t>(count));
+        if (count > 0) {
+            env->GetFloatArrayRegion(input_array, 0, count, values.data());
+            if (env->ExceptionCheck()) return nullptr;
+        }
+        const VeaS5TensorStatus status = vea_s5_spp_rotate_circular_f32(
+            values.data(), values.size(), static_cast<int32_t>(shift));
+        if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+        jfloatArray result = env->NewFloatArray(count);
+        if (result != nullptr && count > 0) {
+            env->SetFloatArrayRegion(result, 0, count, values.data());
+        }
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeScaleSppBuffer(
+    JNIEnv* env, jobject, jfloatArray input_array, jfloat scale) {
+    if (input_array == nullptr || !std::isfinite(scale)) return nullptr;
+    const jsize count = env->GetArrayLength(input_array);
+    if (count < 0 || env->ExceptionCheck()) return nullptr;
+    try {
+        std::vector<float> values(static_cast<size_t>(count));
+        if (count > 0) {
+            env->GetFloatArrayRegion(input_array, 0, count, values.data());
+            if (env->ExceptionCheck()) return nullptr;
+        }
+        const VeaS5TensorStatus status = vea_s5_spp_scale_buffer_f32(
+            values.data(), values.size(), scale);
+        if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+        jfloatArray result = env->NewFloatArray(count);
+        if (result != nullptr && count > 0) {
+            env->SetFloatArrayRegion(result, 0, count, values.data());
+        }
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
