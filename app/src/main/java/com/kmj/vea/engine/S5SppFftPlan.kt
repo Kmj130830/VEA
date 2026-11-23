@@ -57,6 +57,23 @@ class S5SppFftPlan internal constructor(
         return execute(fftSize, direction, interleavedValues, coefficientData.copyOf())
     }
 
+    /**
+     * Runs the recovered internal 64/128-lane stage for a plan of matching
+     * size. It does not claim to execute the surrounding FFT preparation
+     * and final direction-specific output stages.
+     */
+    fun transformRadixStage(
+        interleavedValues: FloatArray,
+        execute: (Int, FloatArray, FloatArray) -> FloatArray =
+            NativeS5TensorBridge::applySppFftRadixStage
+    ): FloatArray {
+        require(fftSize == 64 || fftSize == 128) {
+            "Only 64- and 128-lane radix stages are available."
+        }
+        require(interleavedValues.size == fftSize)
+        require(interleavedValues.all { it.isFinite() })
+        return execute(fftSize, interleavedValues, coefficientData.copyOf())
+    }
     init {
         require(fftSize >= 4 && (fftSize and (fftSize - 1)) == 0)
         val expectedSplitCount = kotlin.math.sqrt(fftSize / 2.0).toInt() + 2
