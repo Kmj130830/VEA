@@ -352,6 +352,16 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_rotate_circular_f32(
     float* values, size_t count, int32_t shift);
 
 /**
+ * Ports FUN_180135490: deterministic xorshift phase assignment for SPP bins.
+ * output_complex is interleaved [real,imag] and must contain count*2 floats.
+ * state is four mutable uint32 words; edge_mode bit 0 selects whether the
+ * final bin is emitted as a real-only boundary bin.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_generate_phase_noise_f32(
+    const float* magnitudes, size_t count, uint8_t edge_mode,
+    uint32_t state[4], float* output_complex, size_t output_float_count);
+
+/**
  * Returns floor(log2(value)) for non-zero uint32 values, and -1 for zero.
  * This is the size-index helper FUN_18007a000 used by the real FFT wrapper.
  */
