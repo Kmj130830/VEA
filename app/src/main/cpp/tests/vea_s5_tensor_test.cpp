@@ -371,6 +371,68 @@ int main() {
             coefficients.data(), coefficients.size()) ==
             VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
     }
+    // SPP real FFT wrapper: compare packed forward output to a direct real DFT,
+    // then verify that the unnormalized inverse returns (N/2) * input.
+    for (const uint32_t fft_size : {4u, 8u, 16u, 32u, 64u, 128u, 256u, 512u}) {
+        std::vector<float> input(fft_size);
+        for (size_t index = 0; index < input.size(); ++index) {
+            input[index] = static_cast<float>(
+                static_cast<int>((index * 17u + 3u) % 37u) - 18) * 0.03125f;
+        }
+        std::vector<float> packed = input;
+        assert(vea_s5_spp_real_fft_f32(
+            fft_size, -1, packed.data(), packed.size()) ==
+            VEA_S5_TENSOR_STATUS_OK);
+        double expected_dc = 0.0;
+        double expected_nyquist = 0.0;
+        for (size_t sample = 0; sample < input.size(); ++sample) {
+            expected_dc += input[sample];
+            expected_nyquist += (sample & 1u) == 0u ? input[sample] : -input[sample];
+        }
+        assert(std::fabs(static_cast<double>(packed[0]) - expected_dc) <
+            2.0e-4 * (1.0 + std::fabs(expected_dc)));
+        assert(std::fabs(static_cast<double>(packed[1]) - expected_nyquist) <
+            2.0e-4 * (1.0 + std::fabs(expected_nyquist)));
+        for (size_t bin = 1u; bin < fft_size / 2u; ++bin) {
+            double expected_real = 0.0;
+            double expected_imag = 0.0;
+            for (size_t sample = 0; sample < input.size(); ++sample) {
+                const double angle = 6.283185307179586476925286766559 *
+                    static_cast<double>(bin * sample) / static_cast<double>(fft_size);
+                expected_real += static_cast<double>(input[sample]) * std::cos(angle);
+                expected_imag -= static_cast<double>(input[sample]) * std::sin(angle);
+            }
+            assert(std::fabs(static_cast<double>(packed[bin * 2u]) - expected_real) <
+                3.0e-4 * (1.0 + std::fabs(expected_real)));
+            assert(std::fabs(static_cast<double>(packed[bin * 2u + 1u]) - expected_imag) <
+                3.0e-4 * (1.0 + std::fabs(expected_imag)));
+        }
+
+        std::vector<float> reconstructed = packed;
+        assert(vea_s5_spp_real_fft_f32(
+            fft_size, 1, reconstructed.data(), reconstructed.size()) ==
+            VEA_S5_TENSOR_STATUS_OK);
+        for (size_t index = 0; index < input.size(); ++index) {
+            const double expected = static_cast<double>(input[index]) *
+                static_cast<double>(fft_size / 2u);
+            assert(std::fabs(static_cast<double>(reconstructed[index]) - expected) <
+                4.0e-4 * (1.0 + std::fabs(expected)));
+        }
+    }
+
+    float invalid_rfft_frame[] = {1.0f, 2.0f, 3.0f, 4.0f};
+    const float invalid_rfft_copy[] = {1.0f, 2.0f, 3.0f, 4.0f};
+    assert(vea_s5_spp_real_fft_f32(
+        4u, -1, invalid_rfft_frame, 3u) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(std::memcmp(invalid_rfft_frame, invalid_rfft_copy,
+        sizeof(invalid_rfft_copy)) == 0);
+    invalid_rfft_frame[2] = std::numeric_limits<float>::quiet_NaN();
+    assert(vea_s5_spp_real_fft_f32(
+        4u, -1, invalid_rfft_frame, 4u) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(invalid_rfft_frame[0] == 1.0f && invalid_rfft_frame[1] == 2.0f &&
+        std::isnan(invalid_rfft_frame[2]) && invalid_rfft_frame[3] == 4.0f);
     // FUN_18007a000: FFT plan index is floor(log2(N)); zero maps to -1.
     int32_t fft_plan_index = 123;
     assert(vea_s5_spp_fft_log2_floor_u32(0u, &fft_plan_index) ==
