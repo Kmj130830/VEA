@@ -67,6 +67,28 @@ Native tests cover both rotation directions, wraparound shifts, zero-length
 buffers, invalid pointers, scale factors, NaN input and failure atomicity.
 These are isolated DSP primitives, not the complete SPP pipeline.
 
+## Window-table coefficient lookup
+
+`FUN_180139870(double* config, double x)` is the SPP window-coefficient
+lookup used while assembling the FFT analysis frame. The config contains:
+
+- `config[0]`: non-negative coordinate scale;
+- `config[2]`: fallback coefficient;
+- the 32-bit segment count at byte offset `0x18`;
+- `config[4]`: pointer to `segmentCount + 1` double table values.
+
+The lookup computes `scaled = abs(x) * scale`, selects
+`index = floor(scaled)`, and linearly interpolates between
+`table[index]` and `table[index + 1]`. When `scaled >= segmentCount`, it
+returns the fallback coefficient. The implementation uses double precision
+to match the original helper's double table and interpolation arithmetic.
+
+VEA now exposes `vea_s5_spp_lookup_table_f64` in C++,
+`nativeLookupSppWindowTable` through JNI, and
+`NativeS5TensorBridge.lookupSppWindowTable()` in Kotlin. Tests cover
+interpolation, negative coordinate symmetry, exact upper boundary, fallback,
+empty table, short table and invalid scale/pointer inputs.
+
 ## Real FFT wrapper and core
 
 `FUN_180040630` is a real-FFT wrapper, not the butterfly implementation.
