@@ -426,6 +426,28 @@ object NativeS5TensorBridge {
             ?: throw IllegalArgumentException("SPP circular buffer rotation failed.")
     }
 
+    /**
+     * Looks up/interpolates the SPP window table as in FUN_180139870.
+     * table contains segmentCount+1 double values; fallback is used outside.
+     */
+    fun lookupSppWindowTable(
+        table: DoubleArray,
+        segmentCount: Int,
+        scale: Double,
+        fallbackValue: Double,
+        x: Double
+    ): Double {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(segmentCount >= 0)
+        require(table.size >= segmentCount + if (segmentCount > 0) 1 else 0)
+        require(scale.isFinite() && scale >= 0.0)
+        require(fallbackValue.isFinite() && x.isFinite())
+        val result = nativeLookupSppWindowTable(
+            table, segmentCount, scale, fallbackValue, x
+        ) ?: throw IllegalArgumentException("SPP window-table lookup failed.")
+        check(result.size == 1)
+        return result[0]
+    }
     /** Applies the frame-wide scalar normalization in FUN_1801397d0. */
     fun scaleSppBuffer(values: FloatArray, scale: Float): FloatArray {
         check(loaded) { "Native S5 tensor library is not loaded." }
@@ -580,6 +602,7 @@ object NativeS5TensorBridge {
     private external fun nativeApplyGelu(values: FloatArray, scale: Float, bias: Float): FloatArray?
     private external fun nativeRotateSppCircularBuffer(values: FloatArray, shift: Int): FloatArray?
     private external fun nativeScaleSppBuffer(values: FloatArray, scale: Float): FloatArray?
+    private external fun nativeLookupSppWindowTable(table: DoubleArray, segmentCount: Int, scale: Double, fallbackValue: Double, x: Double): DoubleArray?
     private external fun nativeComputeMeanInvStd(sum: Float, sumSquares: Float, count: Int, epsilon: Float): FloatArray?
     private external fun nativeReduceSumAndSquares(values: FloatArray): FloatArray?
     private external fun nativeApplyGatedActivation(planes: FloatArray, count: Int, mode: Int): FloatArray?
