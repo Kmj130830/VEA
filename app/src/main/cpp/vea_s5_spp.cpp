@@ -1,6 +1,7 @@
 #include "vea_s5_tensor.h"
 
 #include <cmath>
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -100,5 +101,13 @@ extern "C" VeaS5TensorStatus vea_s5_spp_lookup_table_f64(
     const double result = (right - left) * fraction + left;
     if (!std::isfinite(result)) return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
     *out_value = result;
+    return VEA_S5_TENSOR_STATUS_OK;
+}
+extern "C" VeaS5TensorStatus vea_s5_spp_fft_log2_floor_u32(
+    uint32_t value, int32_t* out_index) {
+    if (out_index == nullptr) return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    *out_index = value == 0u
+        ? -1
+        : static_cast<int32_t>(std::bit_width(value) - 1u);
     return VEA_S5_TENSOR_STATUS_OK;
 }
