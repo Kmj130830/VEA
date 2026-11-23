@@ -352,6 +352,23 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_rotate_circular_f32(
     float* values, size_t count, int32_t shift);
 
 /**
+ * Ports FUN_180136150's periodic frequency-domain peak-weight function.
+ * config[0..4] = {period, lowEdge, center, highEdge, amplitude}.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_peak_weight_f32(
+    const float config[5], float coordinate, float* out_weight);
+
+/**
+ * Shared weighted argmax used by FUN_180135b90 (stride 1) and
+ * FUN_180135670 (stride 2, magnitude in the first lane).
+ * The first maximum wins ties, matching the original forward scan.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_find_weighted_peak_f32(
+    const float* values, size_t value_count, size_t value_stride,
+    size_t start_index, size_t end_index, float bin_spacing, float denominator,
+    const float weight_config[5], size_t* out_peak_index, float* out_peak_score);
+
+/**
  * Ports FUN_180135490: deterministic xorshift phase assignment for SPP bins.
  * output_complex is interleaved [real,imag] and must contain count*2 floats.
  * state is four mutable uint32 words; edge_mode bit 0 selects whether the
