@@ -21,6 +21,24 @@ class S5SppFftPlan internal constructor(
     val coefficients: FloatArray
         get() = coefficientData.copyOf()
 
+    /**
+     * Runs the recovered small-size complex leaf selected by this plan.
+     * Larger plans remain table-only until their stage kernels are ported.
+     */
+    fun transformSmallLeaf(
+        direction: Int,
+        interleavedValues: FloatArray,
+        execute: (Int, Int, FloatArray) -> FloatArray =
+            NativeS5TensorBridge::applySppFftSmallLeaf
+    ): FloatArray {
+        require(fftSize == 4 || fftSize == 8) {
+            "Only the recovered 4- and 8-size FFT leaf kernels are available."
+        }
+        require(interleavedValues.size == fftSize)
+        require(interleavedValues.all { it.isFinite() })
+        return execute(fftSize, direction, interleavedValues)
+    }
+
     init {
         require(fftSize >= 4 && (fftSize and (fftSize - 1)) == 0)
         val expectedSplitCount = kotlin.math.sqrt(fftSize / 2.0).toInt() + 2
