@@ -117,6 +117,30 @@ root's direction-specific input preparation (`cb90/f170`), recursive
 larger-stage dispatch (`0800c0/081080`), final reorder (`c1c0/b930`),
 and real-spectrum packing in `FUN_180082a30` are not yet joined.
 
+## Portable real-FFT wrapper
+
+`vea_s5_spp_real_fft_f32()` provides the full SPP real-spectrum boundary
+for power-of-two frame sizes from 4 through 65536. It packs adjacent real
+samples into a half-size complex vector, runs an iterative radix-2 complex
+FFT, then emits the packed real spectrum:
+
+- forward (`direction < 0`): `[DC, Nyquist, Re(X1), Im(X1), ...]`;
+- inverse (`direction >= 0`): reconstructs real samples from that packed
+  spectrum and retains the source S5 unnormalized inverse scale of `N/2`.
+
+The portable wrapper is mathematically equivalent at the real-spectrum
+boundary and is validated against an independent direct real DFT plus an
+inverse round-trip. It does not claim bit-for-bit identity with Yamaha's
+specialized `FUN_180082a30` / `FUN_18007d700` / `FUN_18007fca0` butterfly
+schedule. The lower-level vendor-layout kernels through 512 lanes remain
+available as separate primitives for comparison and future replacement.
+
+`NativeS5TensorBridge.applySppRealFft()` and
+`S5SppFftPlan.transformReal()` expose this transform. The larger voicebank
+render path still needs spectral envelope/noise processing, phase-vocoder
+state integration, and waveform reconstruction before it can produce a
+complete singing WAV.
+
 ## Ported 256/512-lane large radix stage
 
 `FUN_1800800c0` is now ported as
