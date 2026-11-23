@@ -11,6 +11,9 @@ extern "C" VeaS5TensorStatus vea_s5_spp_rotate_circular_f32(
     float* values, size_t count, int32_t shift) {
     if (count == 0u) return VEA_S5_TENSOR_STATUS_OK;
     if (values == nullptr) return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    if (count > static_cast<size_t>(std::numeric_limits<int64_t>::max())) {
+        return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
+    }
 
     for (size_t index = 0; index < count; ++index) {
         if (!std::isfinite(values[index])) {
