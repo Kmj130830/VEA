@@ -2,6 +2,7 @@ package com.kmj.vea.engine
 
 /** Projection operator selected by the raw renderer byte at byte offset 0x59. */
 enum class S5RendererProjectionOperator {
+    STRIDE2_CONV1D_C5440,
     BANKED_LINEAR_C6390,
     UPSAMPLE_2X_C72D0
 }
