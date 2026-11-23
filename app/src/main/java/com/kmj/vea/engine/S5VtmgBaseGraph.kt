@@ -298,6 +298,35 @@ data class S5VtmgRendererProjectionPlan(
         require(banked.outputFeatures == temporal.outputChannels)
     }
 
+    /**
+     * Executes this decoded conv layer with an explicitly selected recovered
+     * S5API primitive. Stage/descriptor assignment remains the caller's job.
+     */
+    fun projectWithOperator(
+        operator: S5RendererProjectionOperator,
+        input: FloatArray,
+        positions: Int,
+        executeStride2: (FloatArray, FloatArray, FloatArray?, Int, Int, Int, Int) -> FloatArray =
+            NativeS5TensorBridge::applyStride2Conv1dProjection,
+        executeBanked: (
+            FloatArray, Int, Int, FloatArray, FloatArray, Int, Int, Int, Int
+        ) -> FloatArray = { w, row, bankStride, x, bias, inCount, outCount, frames, banks ->
+            NativeS5TensorBridge.applyBankedLinearProjection(
+                weights = w, weightRowStride = row, weightBankStride = bankStride,
+                input = x, bias = bias, inputFeatures = inCount,
+                outputFeatures = outCount, positions = frames, banks = banks
+            )
+        },
+        executeUpsample: (FloatArray, FloatArray, FloatArray?, Int, Int, Int) -> FloatArray =
+            NativeS5TensorBridge::applyUpsample2Conv3Projection
+    ): FloatArray = when (operator) {
+        S5RendererProjectionOperator.STRIDE2_CONV1D_C5440 ->
+            temporal.projectStride2(input, positions, executeStride2)
+        S5RendererProjectionOperator.BANKED_LINEAR_C6390 ->
+            banked.project(input, positions, executeBanked)
+        S5RendererProjectionOperator.UPSAMPLE_2X_C72D0 ->
+            temporal.projectUpsample2(input, positions, executeUpsample)
+    }
     fun project(
         rawModeFlag: Int,
         input: FloatArray,
