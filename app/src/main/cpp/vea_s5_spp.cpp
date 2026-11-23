@@ -588,3 +588,319 @@ extern "C" VeaS5TensorStatus vea_s5_spp_fft_small_leaf_f32(
     return VEA_S5_TENSOR_STATUS_OK;
 }
 
+
+/**
+ * The native 16-complex-point leaf is shared by both direction branches.
+ * Its direction-dependent output permutation is applied by the dispatcher.
+ */
+static void vea_s5_spp_fft16_butterfly(float* p, float twiddle) {
+    float f3 = p[4] + p[12];
+    float f4 = p[4] - p[12];
+    float f8 = p[1] - p[9];
+    float f10 = p[1] + p[9];
+    float f6 = p[0] - p[8];
+    float f12 = p[0] + p[8];
+    float f1 = f3 + f12;
+    f12 = f12 - f3;
+    f3 = p[5] + p[13];
+    float f14 = p[3] - p[11];
+    float f19 = p[5] - p[13];
+    float f17 = p[3] + p[11];
+    float f2 = f3 + f10;
+    f10 = f10 - f3;
+    float f16 = f4 + f8;
+    f8 = f8 - f4;
+    float f15 = f6 - f19;
+    f4 = p[6] + p[14];
+    float f5 = p[6] - p[14];
+    f19 = f19 + f6;
+    float f11 = p[2] - p[10];
+    float f18 = p[2] + p[10];
+    f6 = p[7] + p[15];
+    float f9 = p[7] - p[15];
+    float f13 = f4 + f18;
+    float f7 = f5 + f14;
+    f18 = f18 - f4;
+    f4 = f11 - f9;
+    f9 = f9 + f11;
+    f14 = f14 - f5;
+    f11 = f6 + f17;
+    f17 = f17 - f6;
+    f6 = (f4 - f7) * twiddle;
+    f5 = (f7 + f4) * twiddle;
+    f4 = (f9 - f14) * twiddle;
+    f3 = (f14 + f9) * twiddle;
+
+    p[8] = f6 + f15;
+    p[10] = f15 - f6;
+    p[9] = f5 + f16;
+    p[12] = f19 - f3;
+    p[11] = f16 - f5;
+    p[14] = f3 + f19;
+    p[15] = f8 - f4;
+    p[13] = f4 + f8;
+    p[0] = f13 + f1;
+    p[2] = f1 - f13;
+    p[1] = f11 + f2;
+    p[3] = f2 - f11;
+    p[5] = f18 + f10;
+    p[7] = f10 - f18;
+    p[4] = f12 - f17;
+    p[6] = f17 + f12;
+}
+
+/**
+ * The native 32-complex-point leaf is shared by both direction branches.
+ * Its direction-dependent output permutation is applied by the dispatcher.
+ */
+static void vea_s5_spp_fft32_butterfly(
+    float* p, float twiddle_pi_over_4,
+    float twiddle_pi_over_8_cos, float twiddle_pi_over_8_sin) {
+    float f8 = p[8] + p[24];
+    float f11 = p[8] - p[24];
+    float f5 = p[9] + p[25];
+    float f15 = p[9] - p[25];
+    float f31 = p[1] + p[17];
+    float f28 = p[0] + p[16];
+    float f13 = p[0] - p[16];
+    float f19 = p[1] - p[17];
+    float f1 = f5 + f31;
+    float f2 = f8 + f28;
+    f28 = f28 - f8;
+    f31 = f31 - f5;
+    f5 = f13 - f15;
+    f15 = f15 + f13;
+    float f3 = f11 + f19;
+    f19 = f19 - f11;
+    f11 = p[11] + p[27];
+    float f14 = p[11] - p[27];
+    f8 = p[10] + p[26];
+    float f12 = p[10] - p[26];
+    float f29 = p[2] + p[18];
+    float f16 = p[2] - p[18];
+    float f32 = p[3] + p[19];
+    float f20 = p[3] - p[19];
+    float f4 = f8 + f29;
+    f29 = f29 - f8;
+    f13 = f16 - f14;
+    f8 = f11 + f32;
+    f32 = f32 - f11;
+    f11 = f12 + f20;
+    f20 = f20 - f12;
+    f14 = f14 + f16;
+    float f6 = f13 * twiddle_pi_over_8_cos -
+        f11 * twiddle_pi_over_8_sin;
+    float f9 = f13 * twiddle_pi_over_8_sin +
+        f11 * twiddle_pi_over_8_cos;
+    float f24 = p[4] + p[20];
+    float f17 = p[4] - p[20];
+    float f21 = f20 * twiddle_pi_over_8_sin +
+        f14 * twiddle_pi_over_8_cos;
+    f16 = f14 * twiddle_pi_over_8_sin -
+        f20 * twiddle_pi_over_8_cos;
+    float f10 = p[12] + p[28];
+    float f7 = p[13] + p[29];
+    f13 = p[12] - p[28];
+    f12 = p[13] - p[29];
+    float f22 = p[5] - p[21];
+    float f26 = p[5] + p[21];
+    f11 = f10 + f24;
+    f24 = f24 - f10;
+    float f35 = f13 + f22;
+    f22 = f22 - f13;
+    float f14 = p[14] + p[30];
+    float f20 = p[14] - p[30];
+    f13 = f7 + f26;
+    f26 = f26 - f7;
+    f7 = f17 - f12;
+    f12 = f12 + f17;
+    f10 = p[15] + p[31];
+    float f27 = p[15] - p[31];
+    float f23 = (f22 - f12) * twiddle_pi_over_4;
+    float f34 = (f7 - f35) * twiddle_pi_over_4;
+    float f36 = (f35 + f7) * twiddle_pi_over_4;
+    float f38 = p[7] + p[23];
+    f35 = p[7] - p[23];
+    float f33 = (f22 + f12) * twiddle_pi_over_4;
+    float f37 = p[6] + p[22];
+    f7 = p[6] - p[22];
+    f12 = f14 + f37;
+    f17 = f7 - f27;
+    f27 = f27 + f7;
+    f22 = f20 + f35;
+    f35 = f35 - f20;
+    f37 = f37 - f14;
+    f14 = f10 + f38;
+    f38 = f38 - f10;
+    float f25 = f17 * twiddle_pi_over_8_sin -
+        f22 * twiddle_pi_over_8_cos;
+    float f30 = f22 * twiddle_pi_over_8_sin +
+        f17 * twiddle_pi_over_8_cos;
+    f22 = f27 * twiddle_pi_over_8_cos -
+        f35 * twiddle_pi_over_8_sin;
+    f35 = f27 * twiddle_pi_over_8_sin +
+        f35 * twiddle_pi_over_8_cos;
+    f17 = f15 - f33;
+    f33 = f33 + f15;
+    f20 = f19 - f23;
+    f23 = f23 + f19;
+    f7 = f16 - f22;
+    f10 = f21 - f35;
+    f35 = f35 + f21;
+    f22 = f22 + f16;
+
+    p[24] = f7 + f17;
+    p[25] = f10 + f20;
+    p[26] = f17 - f7;
+    p[27] = f20 - f10;
+    p[30] = f35 + f33;
+    f17 = f36 + f3;
+    f3 = f3 - f36;
+    f16 = f34 + f5;
+    p[28] = f33 - f35;
+    p[31] = f23 - f22;
+    f5 = f5 - f34;
+    f7 = f25 + f6;
+    p[29] = f22 + f23;
+    f6 = f6 - f25;
+    f10 = f30 + f9;
+    f9 = f9 - f30;
+    p[16] = f7 + f16;
+    p[18] = f16 - f7;
+    p[17] = f10 + f17;
+    p[20] = f5 - f9;
+    p[19] = f17 - f10;
+    p[22] = f9 + f5;
+    f16 = f37 + f32;
+    f32 = f32 - f37;
+    p[21] = f6 + f3;
+    p[23] = f3 - f6;
+    f7 = f29 - f38;
+    f38 = f38 + f29;
+    f10 = f24 + f31;
+    f31 = f31 - f24;
+    f3 = (f7 - f16) * twiddle_pi_over_4;
+    f5 = (f38 - f32) * twiddle_pi_over_4;
+    f17 = (f32 + f38) * twiddle_pi_over_4;
+    float f18 = (f16 + f7) * twiddle_pi_over_4;
+    f7 = f28 - f26;
+    f26 = f26 + f28;
+    p[9] = f18 + f10;
+    p[11] = f10 - f18;
+    p[8] = f3 + f7;
+    p[10] = f7 - f3;
+    p[13] = f5 + f31;
+    p[15] = f31 - f5;
+    p[14] = f17 + f26;
+    f5 = f13 + f1;
+    p[12] = f26 - f17;
+    f18 = f11 + f2;
+    f2 = f2 - f11;
+    f1 = f1 - f13;
+    f10 = f14 + f8;
+    f8 = f8 - f14;
+    f7 = f12 + f4;
+    f4 = f4 - f12;
+    p[1] = f10 + f5;
+    p[3] = f5 - f10;
+    p[0] = f7 + f18;
+    p[2] = f18 - f7;
+    p[5] = f4 + f1;
+    p[7] = f1 - f4;
+    p[4] = f2 - f8;
+    p[6] = f8 + f2;
+}
+
+extern "C" VeaS5TensorStatus vea_s5_spp_fft_leaf_f32(
+    uint32_t fft_size, int32_t direction,
+    float* interleaved, size_t value_count,
+    const float* coefficients, size_t coefficient_count) {
+    if ((fft_size != 4u && fft_size != 8u && fft_size != 16u && fft_size != 32u) ||
+        interleaved == nullptr || value_count != static_cast<size_t>(fft_size)) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    if (fft_size >= 16u) {
+        const size_t required = fft_size == 16u ? 2u : 4u;
+        if (coefficients == nullptr || coefficient_count < required) {
+            return VEA_S5_TENSOR_STATUS_BUFFER_TOO_SMALL;
+        }
+        for (size_t index = 1u; index < required; ++index) {
+            if (!std::isfinite(coefficients[index])) {
+                return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+            }
+        }
+    }
+
+    float values[32] = {};
+    for (size_t index = 0; index < value_count; ++index) {
+        if (!std::isfinite(interleaved[index])) {
+            return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+        }
+        values[index] = interleaved[index];
+    }
+
+    if (fft_size == 4u || fft_size == 8u) {
+        const VeaS5TensorStatus status = vea_s5_spp_fft_small_leaf_f32(
+            fft_size, direction, values, value_count);
+        if (status != VEA_S5_TENSOR_STATUS_OK) return status;
+    } else if (fft_size == 16u) {
+        vea_s5_spp_fft16_butterfly(values, coefficients[1]);
+        const float raw[16] = {
+            values[0], values[1], values[2], values[3],
+            values[4], values[5], values[6], values[7],
+            values[8], values[9], values[10], values[11],
+            values[12], values[13], values[14], values[15]
+        };
+        static constexpr size_t kNegativeOrder[16] = {
+            0, 1, 14, 15, 6, 7, 10, 11,
+            2, 3, 12, 13, 4, 5, 8, 9
+        };
+        static constexpr size_t kPositiveOrder[16] = {
+            0, 1, 8, 9, 4, 5, 12, 13,
+            2, 3, 10, 11, 6, 7, 14, 15
+        };
+        const size_t* order = direction < 0 ? kNegativeOrder : kPositiveOrder;
+        for (size_t index = 0; index < 16u; ++index) {
+            values[index] = raw[order[index]];
+        }
+    } else {
+        vea_s5_spp_fft32_butterfly(
+            values, coefficients[1], coefficients[2], coefficients[3]);
+        const float raw[32] = {
+            values[0], values[1], values[2], values[3],
+            values[4], values[5], values[6], values[7],
+            values[8], values[9], values[10], values[11],
+            values[12], values[13], values[14], values[15],
+            values[16], values[17], values[18], values[19],
+            values[20], values[21], values[22], values[23],
+            values[24], values[25], values[26], values[27],
+            values[28], values[29], values[30], values[31]
+        };
+        static constexpr size_t kNegativeOrder[32] = {
+            0, 1, 30, 31, 14, 15, 22, 23,
+            6, 7, 26, 27, 10, 11, 18, 19,
+            2, 3, 28, 29, 12, 13, 20, 21,
+            4, 5, 24, 25, 8, 9, 16, 17
+        };
+        static constexpr size_t kPositiveOrder[32] = {
+            0, 1, 16, 17, 8, 9, 24, 25,
+            4, 5, 20, 21, 12, 13, 28, 29,
+            2, 3, 18, 19, 10, 11, 26, 27,
+            6, 7, 22, 23, 14, 15, 30, 31
+        };
+        const size_t* order = direction < 0 ? kNegativeOrder : kPositiveOrder;
+        for (size_t index = 0; index < 32u; ++index) {
+            values[index] = raw[order[index]];
+        }
+    }
+
+    for (size_t index = 0; index < value_count; ++index) {
+        if (!std::isfinite(values[index])) {
+            return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+        }
+    }
+    for (size_t index = 0; index < value_count; ++index) {
+        interleaved[index] = values[index];
+    }
+    return VEA_S5_TENSOR_STATUS_OK;
+}
