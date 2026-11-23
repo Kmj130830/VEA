@@ -297,6 +297,29 @@ preservation, both terminal-bin modes, the one-bin boundary, and failure
 atomicity for invalid magnitude inputs. Kotlin tests cover persistent state,
 checkpoint restore and input validation.
 
+## Pitch/phase cubic curve interpolation
+
+`FUN_1801360c0(position, controls)` is the four-point cubic segment helper
+used by `FUN_1801314f0` when the cached curve segment matches the requested
+interval. The control vector is `[p0,p1,p2,p3]` and the recovered
+polynomial is kept in its original arithmetic order:
+
+`u = position * position`
+
+`b0 = ((2 * position) - 3) * u + 1`
+
+`b1 = ((position - 2) * u) + position`
+
+`result = b1*p1 + b0*p0 + (1-b0)*p2 + (position-1)*u*p3`
+
+VEA exposes this as `vea_s5_spp_cubic_segment_f32()` in the native tensor
+library and `NativeS5TensorBridge.interpolateSppCubicSegment()` in Kotlin.
+`S5SppCubicSegmentPlan` validates and owns the four control values before
+sampling. Native and JVM tests cover both endpoints, the midpoint, invalid
+positions and non-finite/short control vectors. The larger `FUN_1801314f0`
+curve search, edge extension and cached-segment selection remain separate
+from this exact cubic primitive.
+
 ## Inverse-frame post-processing plan
 
 `FUN_1801334b0` has the following confirmed operation sequence:
