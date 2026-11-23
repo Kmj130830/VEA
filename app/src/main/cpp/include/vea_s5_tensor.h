@@ -351,6 +351,16 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_run_vtb2_c5d50_block_f32(
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_rotate_circular_f32(
     float* values, size_t count, int32_t shift);
 
+/**
+ * Table lookup/interpolation used by FUN_180139870.
+ * scaled = abs(x) * scale; index = nearest_integer(scaled), with ties down.
+ * If index < segment_count, interpolate table[index]..table[index+1].
+ * Otherwise return fallback_value. table_count must cover segment_count+1.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_lookup_table_f64(
+    const double* table, size_t table_count, size_t segment_count,
+    double scale, double fallback_value, double x, double* out_value);
+
 /** Ports the frame-wide scalar normalization in FUN_1801397d0. */
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_scale_buffer_f32(
     float* values, size_t count, float scale);
