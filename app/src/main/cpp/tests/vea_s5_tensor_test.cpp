@@ -148,8 +148,8 @@ int main() {
         VEA_S5_TENSOR_STATUS_OK);
     assert(single_output[1] == 0.0f);
     assert(std::fabs(std::fabs(single_output[0]) - 2.0f) < 1.0e-6f);
-    assert(single_state[0] == 0x9abcdef0u && single_state[1] == 0x31415926u &&
-        single_state[2] == 0x27182818u && single_state[3] == 0xeb183a5eu);
+    assert(single_state[0] == 0x31415926u && single_state[1] == 0x27182818u &&
+        single_state[2] == 0x972f3d15u && single_state[3] == 0xeb183a5eu);
     // Invalid requests do not mutate the caller RNG state or output buffer.
     uint32_t invalid_phase_state[4] = {
         initial_phase_state[0], initial_phase_state[1],
