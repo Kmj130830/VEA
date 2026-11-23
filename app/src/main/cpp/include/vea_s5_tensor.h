@@ -389,6 +389,15 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_generate_phase_noise_f32(
     uint32_t state[4], float* output_complex, size_t output_float_count);
 
 /**
+ * Executes the recovered N=4 or N=8 leaf butterfly from FUN_18007d700 /
+ * FUN_18007fca0. The buffer contains N interleaved float lanes representing
+ * N/2 complex values. direction<0 selects FUN_18007d700; otherwise the
+ * FUN_18007fca0 sign/order variant is used.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_fft_small_leaf_f32(
+    uint32_t fft_size, int32_t direction, float* interleaved, size_t value_count);
+
+/**
  * Builds one 0x18-byte S5 real-FFT plan record's two backing arrays.
  * fft_size must be a power of two >= 4. split_table stores the compact
  * stage/decomposition schedule; coefficients stores the recovered float
