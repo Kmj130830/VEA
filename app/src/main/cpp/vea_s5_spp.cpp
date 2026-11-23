@@ -904,3 +904,359 @@ extern "C" VeaS5TensorStatus vea_s5_spp_fft_leaf_f32(
     }
     return VEA_S5_TENSOR_STATUS_OK;
 }
+
+
+/**
+ * Recovered second subblock from the 64-float radix stage (FUN_18007ddc0).
+ * The 16-float input is eight interleaved complex values. The coefficient
+ * pointer is already adjusted by the parent stage to its local twiddle base.
+ */
+static void vea_s5_spp_fft_ddc0_substage(float* p, const float* twiddle) {
+    float f21 = twiddle[1];
+    float f7 = twiddle[3];
+    float f1 = p[0] - p[9];
+    float f5 = p[9] + p[0];
+    float f9 = p[1] - p[8];
+    float f4 = p[1] + p[8];
+    float f8 = twiddle[2];
+    float f10 = p[5] - p[12];
+    float f20 = p[5] + p[12];
+    float f2 = p[4] - p[13];
+    float f6 = p[13] + p[4];
+    float f19 = (f2 - f20) * f21;
+    float f3 = (f6 - f10) * f21;
+    float f11 = (f10 + f6) * f21;
+    f21 = (f20 + f2) * f21;
+    f20 = p[2] - p[11];
+    f6 = p[11] + p[2];
+    f2 = p[3] + p[10];
+    f10 = p[3] - p[10];
+    float f15 = f20 * f8 - f2 * f7;
+    float f16 = f20 * f7 + f2 * f8;
+    f20 = f10 * f7 + f6 * f8;
+    f2 = p[6] - p[15];
+    float f13 = p[7] + p[14];
+    float f18 = f6 * f7 - f10 * f8;
+    f6 = p[7] - p[14];
+    f10 = p[15] + p[6];
+    float f12 = f2 * f7 - f13 * f8;
+    f13 = f13 * f7 + f2 * f8;
+    f2 = f12 + f15;
+    float f14 = f10 * f8 - f6 * f7;
+    float f17 = f10 * f7 + f6 * f8;
+    f7 = f13 + f16;
+    f6 = f19 + f1;
+    f10 = f21 + f4;
+    f15 = f15 - f12;
+    f16 = f16 - f13;
+    f4 = f4 - f21;
+    f1 = f1 - f19;
+    p[0] = f2 + f6;
+    f8 = f20 - f17;
+    p[1] = f7 + f10;
+    f17 = f17 + f20;
+    p[2] = f6 - f2;
+    p[3] = f10 - f7;
+    f21 = f18 - f14;
+    f2 = f3 + f9;
+    p[5] = f15 + f4;
+    p[4] = f1 - f16;
+    f9 = f9 - f3;
+    p[6] = f16 + f1;
+    f14 = f14 + f18;
+    p[7] = f4 - f15;
+    f7 = f5 - f11;
+    f11 = f11 + f5;
+    p[9] = f8 + f2;
+    p[11] = f2 - f8;
+    p[8] = f21 + f7;
+    p[10] = f7 - f21;
+    p[12] = f11 - f17;
+    p[14] = f17 + f11;
+    p[15] = f9 - f14;
+    p[13] = f14 + f9;
+}
+
+/**
+ * Recovered alternate 32-float subblock used by the 128-float radix stage
+ * (FUN_18007e820). The input is sixteen interleaved complex values.
+ */
+static void vea_s5_spp_fft_e820_substage(float* p, const float* twiddle) {
+    float f1;
+    float f2;
+    float f3;
+    float f4;
+    float f5;
+    float f6;
+    float f7;
+    float f8;
+    float f9;
+    float f10;
+    float f11;
+    float f12;
+    float f13;
+    float f14;
+    float f15;
+    float f16;
+    float f17;
+    float f18;
+    float f19;
+    float f20;
+    float f21;
+    float f22;
+    float f23;
+    float f24;
+    float f25;
+    float f26;
+    float f27;
+    float f28;
+    float f29;
+    float f30;
+    float f31;
+    float f32;
+    float f33;
+    float f34;
+    float f35;
+    float f36;
+    float f37;
+    float f38;
+
+    f31 = twiddle[1];
+    f7 = p[9] + p[0x18];
+    f1 = p[8] - p[0x19];
+    f18 = p[0x19] + p[8];
+    f22 = p[0] - p[0x11];
+    f14 = p[9] - p[0x18];
+    f19 = p[0x11] + p[0];
+    f6 = twiddle[4];
+    f2 = twiddle[5];
+    f37 = -twiddle[7];
+    f3 = twiddle[8];
+    f30 = twiddle[9];
+    f4 = (f1 - f7) * f31;
+    f7 = (f7 + f1) * f31;
+    f26 = p[1] + p[0x10];
+    f1 = f4 + f22;
+    f17 = p[1] - p[0x10];
+    f22 = f22 - f4;
+    f4 = f7 + f26;
+    f26 = f26 - f7;
+    f11 = p[2] - p[0x13];
+    f7 = (f18 - f14) * f31;
+    f15 = (f14 + f18) * f31;
+    f8 = f7 + f17;
+    f5 = f19 - f15;
+    f17 = f17 - f7;
+    f15 = f15 + f19;
+    f7 = p[3] + p[0x12];
+    f9 = f11 * f6 - f7 * f2;
+    f27 = p[0x13] + p[2];
+    f23 = p[3] - p[0x12];
+    f14 = p[10] - p[0x1b];
+    f20 = p[0x1b] + p[10];
+    f11 = f11 * f2 + f7 * f6;
+    f7 = p[0xb] + p[0x1a];
+    f18 = f7 * f37 + f14 * twiddle[6];
+    f14 = f14 * f37 - f7 * twiddle[6];
+    f7 = f14 + f9;
+    f9 = f9 - f14;
+    f14 = f18 + f11;
+    f11 = f11 - f18;
+    f19 = p[0xb] - p[0x1a];
+    f28 = f27 * f37 + f23 * twiddle[6];
+    f18 = f27 * twiddle[6] - f23 * f37;
+    f10 = f19 * f2 + f20 * f6;
+    f12 = f19 * f6 - f20 * f2;
+    f2 = f18 - f10;
+    f10 = f10 + f18;
+    f18 = f28 - f12;
+    f12 = f12 + f28;
+    f20 = p[4] - p[0x15];
+    f6 = p[5] + p[0x14];
+    f19 = f20 * f30 + f6 * f3;
+    f34 = f20 * f3 - f6 * f30;
+    f29 = p[5] - p[0x14];
+    f24 = p[0x15] + p[4];
+    f23 = p[0xd] + p[0x1c];
+    f21 = p[0xd] - p[0x1c];
+    f6 = twiddle[6];
+    f20 = p[0xc] - p[0x1d];
+    f27 = f23 * f30 + f20 * f3;
+    f20 = f20 * f30 - f23 * f3;
+    f38 = f27 + f19;
+    f19 = f19 - f27;
+    f36 = f20 + f34;
+    f34 = f34 - f20;
+    f20 = p[0x1d] + p[0xc];
+    f23 = f24 * f30 - f29 * f3;
+    f28 = f20 * f3 - f21 * f30;
+    f13 = f20 * f30 + f21 * f3;
+    f20 = f23 - f28;
+    f28 = f28 + f23;
+    f23 = p[7] + p[0x16];
+    f30 = f29 * f30 + f24 * f3;
+    f3 = f30 - f13;
+    f13 = f13 + f30;
+    f27 = p[6] - p[0x17];
+    f21 = p[0xf] + p[0x1e];
+    f30 = f27 * f37 + f23 * f6;
+    f35 = f27 * f6 - f23 * f37;
+    f27 = p[0xe] - p[0x1f];
+    f25 = p[0xf] - p[0x1e];
+    f24 = p[0x1f] + p[0xe];
+    f29 = p[0x17] + p[6];
+    f16 = f38 + f4;
+    f23 = f27 * twiddle[5] - f21 * twiddle[4];
+    f21 = f21 * twiddle[5] + f27 * twiddle[4];
+    f27 = p[7] - p[0x16];
+    f32 = f23 + f35;
+    f33 = f21 + f30;
+    f30 = f30 - f21;
+    f35 = f35 - f23;
+    f23 = f29 * twiddle[5] + f27 * twiddle[4];
+    f21 = f27 * twiddle[5] - f29 * twiddle[4];
+    f29 = f36 + f1;
+    f27 = f24 * f37 - f25 * f6;
+    f6 = f25 * f37 + f24 * f6;
+    f24 = f33 + f14;
+    f14 = f14 - f33;
+    f33 = f27 + f23;
+    f25 = f6 + f21;
+    f21 = f21 - f6;
+    f23 = f23 - f27;
+    f4 = f4 - f38;
+    f6 = f32 + f7;
+    f7 = f7 - f32;
+    p[1] = f24 + f16;
+    p[3] = f16 - f24;
+    f1 = f1 - f36;
+    p[0] = f6 + f29;
+    p[2] = f29 - f6;
+    p[5] = f7 + f4;
+    p[4] = f1 - f14;
+    p[6] = f14 + f1;
+    f6 = f9 - f30;
+    f30 = f30 + f9;
+    p[7] = f4 - f7;
+    f7 = f22 - f19;
+    f19 = f19 + f22;
+    f4 = f35 + f11;
+    f11 = f11 - f35;
+    f14 = f34 + f26;
+    f1 = (f6 - f4) * f31;
+    f4 = (f4 + f6) * f31;
+    p[8] = f1 + f7;
+    f26 = f26 - f34;
+    f6 = (f30 - f11) * f31;
+    p[9] = f4 + f14;
+    f11 = (f11 + f30) * f31;
+    p[10] = f7 - f1;
+    p[0xb] = f14 - f4;
+    f1 = f20 + f5;
+    f30 = f2 - f33;
+    p[0xd] = f6 + f26;
+    p[0xc] = f19 - f11;
+    f5 = f5 - f20;
+    p[0xf] = f26 - f6;
+    f33 = f33 + f2;
+    p[0xe] = f11 + f19;
+    f6 = f18 - f25;
+    f2 = f3 + f8;
+    f25 = f25 + f18;
+    f8 = f8 - f3;
+    p[0x10] = f30 + f1;
+    p[0x12] = f1 - f30;
+    p[0x11] = f6 + f2;
+    p[0x13] = f2 - f6;
+    f3 = f12 - f23;
+    p[0x14] = f5 - f25;
+    f23 = f23 + f12;
+    p[0x16] = f25 + f5;
+    f6 = f21 + f10;
+    f10 = f10 - f21;
+    p[0x15] = f33 + f8;
+    p[0x17] = f8 - f33;
+    f1 = f28 + f17;
+    f30 = f15 - f13;
+    f13 = f13 + f15;
+    f17 = f17 - f28;
+    f2 = (f6 - f3) * f31;
+    f3 = (f3 + f6) * f31;
+    p[0x18] = f2 + f30;
+    p[0x1a] = f30 - f2;
+    p[0x19] = f3 + f1;
+    f6 = (f10 - f23) * f31;
+    f31 = (f23 + f10) * f31;
+    p[0x1b] = f1 - f3;
+    p[0x1d] = f6 + f17;
+    p[0x1c] = f13 - f31;
+    p[0x1e] = f31 + f13;
+    p[0x1f] = f17 - f6;
+}
+
+/**
+ * Executes the recovered FUN_18007fff0 mixed-radix stage. The size argument
+ * is a float-lane count (interleaved complex input), not a complex-bin count.
+ */
+extern "C" VeaS5TensorStatus vea_s5_spp_fft_radix_stage_f32(
+    uint32_t fft_size, float* interleaved, size_t value_count,
+    const float* coefficients, size_t coefficient_count) {
+    if ((fft_size != 64u && fft_size != 128u) ||
+        interleaved == nullptr || coefficients == nullptr ||
+        value_count != static_cast<size_t>(fft_size)) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    if (coefficient_count < static_cast<size_t>(fft_size / 2u)) {
+        return VEA_S5_TENSOR_STATUS_BUFFER_TOO_SMALL;
+    }
+    for (size_t index = 0; index < value_count; ++index) {
+        if (!std::isfinite(interleaved[index])) {
+            return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+        }
+    }
+    for (size_t index = 0; index < coefficient_count; ++index) {
+        if (!std::isfinite(coefficients[index])) {
+            return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+        }
+    }
+
+    float output[128] = {};
+    for (size_t index = 0; index < value_count; ++index) {
+        output[index] = interleaved[index];
+    }
+
+    if (fft_size == 64u) {
+        const float* local_twiddle = coefficients + (fft_size / 2u - 8u);
+        for (size_t block = 0; block < 4u; ++block) {
+            float* values = output + block * 16u;
+            if (block == 1u) {
+                vea_s5_spp_fft_ddc0_substage(values, local_twiddle);
+            } else {
+                vea_s5_spp_fft16_butterfly(values, local_twiddle[1]);
+            }
+        }
+    } else {
+        const float* fft32_twiddle = coefficients + (fft_size / 2u - 8u);
+        const float* alternate_twiddle = coefficients + (fft_size / 2u - 32u);
+        for (size_t block = 0; block < 4u; ++block) {
+            float* values = output + block * 32u;
+            if (block == 1u) {
+                vea_s5_spp_fft_e820_substage(values, alternate_twiddle);
+            } else {
+                vea_s5_spp_fft32_butterfly(
+                    values, fft32_twiddle[1], fft32_twiddle[2], fft32_twiddle[3]);
+            }
+        }
+    }
+
+    for (size_t index = 0; index < value_count; ++index) {
+        if (!std::isfinite(output[index])) {
+            return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+        }
+    }
+    for (size_t index = 0; index < value_count; ++index) {
+        interleaved[index] = output[index];
+    }
+    return VEA_S5_TENSOR_STATUS_OK;
+}
+
