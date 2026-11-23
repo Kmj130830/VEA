@@ -1888,9 +1888,11 @@ extern "C" VeaS5TensorStatus vea_s5_spp_accumulate_frame_samples_f32(
 
     const int64_t frame_start =
         static_cast<int64_t>(base_index) - static_cast<int64_t>(offset);
-    if (output_count > static_cast<size_t>(std::numeric_limits<int64_t>::max()) ||
-        output_count - 1u > static_cast<size_t>(
-            std::numeric_limits<int64_t>::max() - frame_start)) {
+    if (output_count > static_cast<size_t>(std::numeric_limits<int64_t>::max())) {
+        return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
+    }
+    const int64_t last_sample_offset = static_cast<int64_t>(output_count - 1u);
+    if (frame_start > std::numeric_limits<int64_t>::max() - last_sample_offset) {
         return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
     }
 
