@@ -352,6 +352,13 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_rotate_circular_f32(
     float* values, size_t count, int32_t shift);
 
 /**
+ * Returns floor(log2(value)) for non-zero uint32 values, and -1 for zero.
+ * This is the size-index helper FUN_18007a000 used by the real FFT wrapper.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_fft_log2_floor_u32(
+    uint32_t value, int32_t* out_index);
+
+/**
  * Table lookup/interpolation used by FUN_180139870.
  * scaled = abs(x) * scale; index = floor(scaled) for non-negative inputs.
  * If index < segment_count, interpolate table[index]..table[index+1].
