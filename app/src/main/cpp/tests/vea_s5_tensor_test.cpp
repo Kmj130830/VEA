@@ -88,7 +88,67 @@ int main() {
     assert(vea_s5_spp_fft_log2_floor_u32(8u, nullptr) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
-    // FUN_180139870: absolute-position table lookup with linear interpolation.
+        // FUN_180135490: deterministic xorshift phase assignment from magnitude bins.
+    const float spp_magnitudes[] = {1.0f, 2.0f, 3.0f, 4.0f};
+    const uint32_t initial_phase_state[] = {0x12345678u, 0x9abcdef0u, 0x31415926u, 0x27182818u};
+    uint32_t phase_state_a[4] = {
+        initial_phase_state[0], initial_phase_state[1],
+        initial_phase_state[2], initial_phase_state[3]
+    };
+    uint32_t phase_state_b[4] = {
+        initial_phase_state[0], initial_phase_state[1],
+        initial_phase_state[2], initial_phase_state[3]
+    };
+    float phase_output_a[8] = {};
+    float phase_output_b[8] = {};
+    assert(vea_s5_spp_generate_phase_noise_f32(
+        spp_magnitudes, 4, 0u, phase_state_a, phase_output_a, 8) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(vea_s5_spp_generate_phase_noise_f32(
+        spp_magnitudes, 4, 0u, phase_state_b, phase_output_b, 8) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(std::memcmp(phase_output_a, phase_output_b, sizeof(phase_output_a)) == 0);
+    assert(std::memcmp(phase_state_a, phase_state_b, sizeof(phase_state_a)) == 0);
+    assert(std::memcmp(phase_state_a, initial_phase_state, sizeof(phase_state_a)) != 0);
+    assert(phase_output_a[1] == 0.0f);
+    assert(phase_output_a[7] == 0.0f);
+    assert(std::fabs(std::fabs(phase_output_a[0]) - spp_magnitudes[0]) < 1.0e-6f);
+    assert(std::fabs(std::hypot(phase_output_a[2], phase_output_a[3]) - spp_magnitudes[1]) < 1.0e-5f);
+    assert(std::fabs(std::hypot(phase_output_a[4], phase_output_a[5]) - spp_magnitudes[2]) < 1.0e-5f);
+    assert(std::fabs(std::fabs(phase_output_a[6]) - spp_magnitudes[3]) < 1.0e-6f);
+
+    // Edge mode 1 keeps the terminal bin phase-rotated rather than real-only.
+    uint32_t phase_state_edge[4] = {
+        initial_phase_state[0], initial_phase_state[1],
+        initial_phase_state[2], initial_phase_state[3]
+    };
+    float phase_output_edge[8] = {};
+    assert(vea_s5_spp_generate_phase_noise_f32(
+        spp_magnitudes, 4, 1u, phase_state_edge, phase_output_edge, 8) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(phase_output_edge[1] == 0.0f);
+    assert(std::fabs(std::hypot(phase_output_edge[6], phase_output_edge[7]) -
+        spp_magnitudes[3]) < 1.0e-5f);
+
+    // Invalid requests do not mutate the caller RNG state or output buffer.
+    uint32_t invalid_phase_state[4] = {
+        initial_phase_state[0], initial_phase_state[1],
+        initial_phase_state[2], initial_phase_state[3]
+    };
+    float untouched_phase_output[8] = {9, 9, 9, 9, 9, 9, 9, 9};
+    float invalid_phase_magnitudes[4] = {1.0f, 2.0f, std::numeric_limits<float>::quiet_NaN(), 4.0f};
+    assert(vea_s5_spp_generate_phase_noise_f32(
+        invalid_phase_magnitudes, 4, 0u, invalid_phase_state,
+        untouched_phase_output, 8) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(std::memcmp(invalid_phase_state, initial_phase_state, sizeof(invalid_phase_state)) == 0);
+    for (float value : untouched_phase_output) assert(value == 9.0f);
+    assert(vea_s5_spp_generate_phase_noise_f32(
+        spp_magnitudes, 4, 0u, invalid_phase_state,
+        untouched_phase_output, 7) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(std::memcmp(invalid_phase_state, initial_phase_state, sizeof(invalid_phase_state)) == 0);
+    assert(vea_s5_spp_generate_phase_noise_f32(
+        nullptr, 0, 0u, nullptr, nullptr, 0) == VEA_S5_TENSOR_STATUS_OK);
+// FUN_180139870: absolute-position table lookup with linear interpolation.
     const double spp_window_table[] = {0.0, 1.0, 4.0, 9.0, 16.0};
     double spp_window_value = 0.0;
     assert(vea_s5_spp_lookup_table_f64(
