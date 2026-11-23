@@ -8,6 +8,7 @@
 #include <cmath>
 #include <limits>
 #include <vector>
+#include <initializer_list>
 
 namespace {
 
