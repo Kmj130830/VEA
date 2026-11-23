@@ -111,3 +111,84 @@ extern "C" VeaS5TensorStatus vea_s5_spp_fft_log2_floor_u32(
         : static_cast<int32_t>(std::bit_width(value) - 1u);
     return VEA_S5_TENSOR_STATUS_OK;
 }
+/** Advances the four-word SPP xorshift state and returns the new fourth word. */
+static uint32_t vea_s5_spp_next_random_u32(uint32_t state[4]) {
+    const uint32_t first = state[0];
+    const uint32_t t = (first << 11u) ^ first;
+    const uint32_t last = state[3];
+    const uint32_t next = (((last >> 11u) ^ t) >> 8u) ^ last ^ t;
+    state[0] = state[1];
+    state[1] = state[2];
+    state[2] = last;
+    state[3] = next;
+    return next;
+}
+
+extern "C" VeaS5TensorStatus vea_s5_spp_generate_phase_noise_f32(
+    const float* magnitudes, size_t count, uint8_t edge_mode,
+    uint32_t state[4], float* output_complex, size_t output_float_count) {
+    if (count == 0u) {
+        return output_float_count == 0u
+            ? VEA_S5_TENSOR_STATUS_OK
+            : VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    if (magnitudes == nullptr || state == nullptr || output_complex == nullptr) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    if (count > std::numeric_limits<size_t>::max() / 2u) {
+        return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
+    }
+    const size_t expected_float_count = count * 2u;
+    if (output_float_count != expected_float_count) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    for (size_t index = 0; index < count; ++index) {
+        if (!std::isfinite(magnitudes[index])) {
+            return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+        }
+    }
+
+    // Work on a local state copy so invalid input never advances the caller's RNG.
+    uint32_t local_state[4] = {state[0], state[1], state[2], state[3]};
+    std::vector<float> local_output;
+    try {
+        local_output.resize(expected_float_count);
+    } catch (const std::bad_alloc&) {
+        return VEA_S5_TENSOR_STATUS_OUT_OF_MEMORY;
+    }
+
+    const uint32_t first_word = vea_s5_spp_next_random_u32(local_state);
+    const int first_sign = std::bit_cast<int32_t>(first_word) < 0 ? -1 : 1;
+    local_output[0] = static_cast<float>(first_sign) * magnitudes[0];
+    local_output[1] = 0.0f;
+
+    const bool include_last_bin_in_phase_loop = (edge_mode & 0x01u) != 0u;
+    const size_t phase_loop_end = include_last_bin_in_phase_loop
+        ? count
+        : count - 1u;
+    constexpr float kUniformPhaseScale = 3.7450704e-7f;
+    for (size_t bin = 1u; bin < phase_loop_end; ++bin) {
+        const uint32_t random_word = vea_s5_spp_next_random_u32(local_state);
+        const float angle = static_cast<float>(random_word >> 8u) * kUniformPhaseScale;
+        local_output[bin * 2u] = std::cos(angle) * magnitudes[bin];
+        local_output[bin * 2u + 1u] = std::sin(angle) * magnitudes[bin];
+    }
+
+    if (!include_last_bin_in_phase_loop) {
+        const uint32_t last_word = vea_s5_spp_next_random_u32(local_state);
+        const int last_sign = std::bit_cast<int32_t>(last_word) < 0 ? -1 : 1;
+        local_output[(count - 1u) * 2u] = static_cast<float>(last_sign) * magnitudes[count - 1u];
+        local_output[(count - 1u) * 2u + 1u] = 0.0f;
+    }
+
+    for (size_t index = 0; index < expected_float_count; ++index) {
+        if (!std::isfinite(local_output[index])) {
+            return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+        }
+    }
+    for (size_t index = 0; index < expected_float_count; ++index) {
+        output_complex[index] = local_output[index];
+    }
+    for (size_t index = 0; index < 4u; ++index) state[index] = local_state[index];
+    return VEA_S5_TENSOR_STATUS_OK;
+}
