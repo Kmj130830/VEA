@@ -1796,22 +1796,23 @@ extern "C" VeaS5TensorStatus vea_s5_spp_real_fft_f32(
             for (size_t bin = 1u; bin < complex_count; ++bin) {
                 const float current_real = frame[bin * 2u];
                 const float current_imag = frame[bin * 2u + 1u];
+                // y = conj(X[M-k]); the inverse split uses (y-x)/(2*i*W).
                 const float mirrored_real = frame[(complex_count - bin) * 2u];
-                const float mirrored_imag = frame[(complex_count - bin) * 2u + 1u];
+                const float mirrored_imag = -frame[(complex_count - bin) * 2u + 1u];
                 const float average_real = (current_real + mirrored_real) * 0.5f;
-                const float average_imag = (current_imag - mirrored_imag) * 0.5f;
-                const float difference_real = (current_real - mirrored_real) * 0.5f;
-                const float difference_imag = (current_imag + mirrored_imag) * 0.5f;
+                const float average_imag = (current_imag + mirrored_imag) * 0.5f;
+                const float difference_real = mirrored_real - current_real;
+                const float difference_imag = mirrored_imag - current_imag;
                 const double angle = kTwoPi * static_cast<double>(bin) /
                     static_cast<double>(fft_size);
                 const float sine = static_cast<float>(std::sin(angle));
                 const float cosine = static_cast<float>(std::cos(angle));
 
-                // Z[k] = A + i*exp(-i*angle)*B.
+                // B = (y-x)/(2*i*W) = (y-x)*(sin-i*cos)/2.
                 const float product_real =
-                    sine * difference_real - cosine * difference_imag;
+                    (difference_real * sine + difference_imag * cosine) * 0.5f;
                 const float product_imag =
-                    sine * difference_imag + cosine * difference_real;
+                    (difference_imag * sine - difference_real * cosine) * 0.5f;
                 spectrum[bin] = {
                     average_real + product_real,
                     average_imag + product_imag
