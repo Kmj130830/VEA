@@ -416,6 +416,23 @@ object NativeS5TensorBridge {
      * Applies the recovered S5API scalar GELU operator.
      * x = scale * input + bias; output = x * sigmoid(1.5957692 * (x + 0.044715*x^3)).
      */
+    /**
+     * Rotates the SPP frame buffer as in FUN_180133fd0.
+     * Positive shift rotates left; negative shift rotates right.
+     */
+    fun rotateSppCircularBuffer(values: FloatArray, shift: Int): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        return nativeRotateSppCircularBuffer(values, shift)
+            ?: throw IllegalArgumentException("SPP circular buffer rotation failed.")
+    }
+
+    /** Applies the frame-wide scalar normalization in FUN_1801397d0. */
+    fun scaleSppBuffer(values: FloatArray, scale: Float): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(scale.isFinite())
+        return nativeScaleSppBuffer(values, scale)
+            ?: throw IllegalArgumentException("SPP frame scaling failed.")
+    }
     fun applyGelu(values: FloatArray, scale: Float = 1.0f, bias: Float = 0.0f): FloatArray {
         check(loaded) { "Native S5 tensor library is not loaded." }
         require(values.isNotEmpty())
@@ -561,6 +578,8 @@ object NativeS5TensorBridge {
     private external fun nativeResidualAffineAdd(dst: FloatArray, residual: FloatArray, scale: Float, bias: Float): FloatArray?
     private external fun nativeDepthwiseConv7x7Reflect(inputRows: FloatArray, weights: FloatArray, width: Int): FloatArray?
     private external fun nativeApplyGelu(values: FloatArray, scale: Float, bias: Float): FloatArray?
+    private external fun nativeRotateSppCircularBuffer(values: FloatArray, shift: Int): FloatArray?
+    private external fun nativeScaleSppBuffer(values: FloatArray, scale: Float): FloatArray?
     private external fun nativeComputeMeanInvStd(sum: Float, sumSquares: Float, count: Int, epsilon: Float): FloatArray?
     private external fun nativeReduceSumAndSquares(values: FloatArray): FloatArray?
     private external fun nativeApplyGatedActivation(planes: FloatArray, count: Int, mode: Int): FloatArray?
