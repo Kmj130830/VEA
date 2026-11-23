@@ -29,32 +29,31 @@ data class S5SppFrameSampleAccumulatorPlan(
     fun accumulate(
         sourceFrame: FloatArray,
         partialWindowBuffer: FloatArray,
-        window: S5SppWindowLookupPlan
+        window: S5SppWindowLookupPlan,
+        execute: (
+            FloatArray, FloatArray, Int, Int, Int, DoubleArray, Int, Double, Double
+        ) -> FloatArray = NativeS5TensorBridge::accumulateSppFrameSamples
     ): FloatArray {
         require(sourceFrame.size == sampleCount)
         require(sourceFrame.all { it.isFinite() })
         require(partialWindowBuffer.all { it.isFinite() })
 
-        val frameStart = Math.subtractExact(baseIndex, offset)
-        val halfWindow = windowSpan ushr 1
-        val output = FloatArray(sampleCount)
-        for (sample in 0 until sampleCount) {
-            val frameIndex = Math.addExact(frameStart, sample)
-            require(frameIndex in partialWindowBuffer.indices) {
-                "SPP partial/window buffer does not cover recovered frame index $frameIndex."
-            }
-            val numerator = Math.subtractExact(frameIndex, halfWindow)
-            val coordinate = numerator.toFloat() / windowSpan.toFloat()
-            val coefficient = window.coefficient(coordinate.toDouble()).toFloat()
-            require(coefficient.isFinite() && coefficient != 0.0f) {
-                "SPP window coefficient must be finite and non-zero."
-            }
-            val value = (sourceFrame[sample] / coefficient) * partialWindowBuffer[frameIndex]
-            require(value.isFinite()) {
-                "SPP frame accumulation produced a non-finite sample."
-            }
-            output[sample] = value
+        val output = execute(
+            sourceFrame,
+            partialWindowBuffer,
+            baseIndex,
+            offset,
+            windowSpan,
+            window.table,
+            window.segmentCount,
+            window.scale,
+            window.fallbackValue
+        )
+        require(output.size == sampleCount) {
+            "SPP frame sample accumulator returned an invalid output length."
         }
+        require(output.all { it.isFinite() })
         return output
     }
+
 }
