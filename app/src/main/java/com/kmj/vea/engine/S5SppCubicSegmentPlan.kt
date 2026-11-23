@@ -4,12 +4,15 @@ package com.kmj.vea.engine
  * Four neighboring values consumed by FUN_1801360c0 from the
  * FUN_1801314f0 pitch/phase curve sampler.
  */
-data class S5SppCubicSegmentPlan(
+class S5SppCubicSegmentPlan(controls: FloatArray) {
+    private val controlData = controls.copyOf()
+
     val controls: FloatArray
-) {
+        get() = controlData.copyOf()
+
     init {
-        require(controls.size == 4)
-        require(controls.all { it.isFinite() })
+        require(controlData.size == 4)
+        require(controlData.all { it.isFinite() })
     }
 
     fun sample(
@@ -18,6 +21,6 @@ data class S5SppCubicSegmentPlan(
             NativeS5TensorBridge::interpolateSppCubicSegment
     ): Float {
         require(position.isFinite() && position in 0.0f..1.0f)
-        return interpolate(position, controls.copyOf())
+        return interpolate(position, controlData.copyOf())
     }
 }
