@@ -64,3 +64,38 @@ extern "C" VeaS5TensorStatus vea_s5_spp_scale_buffer_f32(
     }
     return VEA_S5_TENSOR_STATUS_OK;
 }
+
+extern "C" VeaS5TensorStatus vea_s5_spp_lookup_table_f64(
+    const double* table, size_t table_count, size_t segment_count,
+    double scale, double fallback_value, double x, double* out_value) {
+    if (out_value == nullptr || !std::isfinite(scale) || scale < 0.0 ||
+        !std::isfinite(fallback_value) || !std::isfinite(x)) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    if (segment_count > 0u && (table == nullptr || table_count < segment_count + 1u)) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+
+    const double scaled = std::fabs(x) * scale;
+    if (!std::isfinite(scaled)) return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    if (segment_count == 0u || scaled >= static_cast<double>(segment_count)) {
+        *out_value = fallback_value;
+        return VEA_S5_TENSOR_STATUS_OK;
+    }
+
+    // FUN_180139870's conversion is floor(scaled) for non-negative inputs.
+    const size_t index = static_cast<size_t>(std::floor(scaled));
+    if (index >= segment_count || index + 1u >= table_count) {
+        return VEA_S5_TENSOR_STATUS_MALFORMED_DATA;
+    }
+    const double left = table[index];
+    const double right = table[index + 1u];
+    if (!std::isfinite(left) || !std::isfinite(right)) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    const double fraction = scaled - static_cast<double>(index);
+    const double result = (right - left) * fraction + left;
+    if (!std::isfinite(result)) return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    *out_value = result;
+    return VEA_S5_TENSOR_STATUS_OK;
+}
