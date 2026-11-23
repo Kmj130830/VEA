@@ -43,7 +43,7 @@ data class S5SppFrameSampleAccumulatorPlan(
             require(frameIndex in partialWindowBuffer.indices) {
                 "SPP partial/window buffer does not cover recovered frame index $frameIndex."
             }
-            val numerator = frameIndex - halfWindow
+            val numerator = Math.subtractExact(frameIndex, halfWindow)
             val coordinate = numerator.toFloat() / windowSpan.toFloat()
             val coefficient = window.coefficient(coordinate.toDouble()).toFloat()
             require(coefficient.isFinite() && coefficient != 0.0f) {
