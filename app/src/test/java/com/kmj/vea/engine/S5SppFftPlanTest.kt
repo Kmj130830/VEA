@@ -184,6 +184,34 @@ class S5SppFftPlanTest {
         }
     }
     @Test
+    fun `FFT plan exposes recovered inverse frame normalization and shift sequence`() {
+        val plan = S5SppFftPlanBuilder.build(8) { size, split, coefficients ->
+            split[0] = size / 4
+            split[1] = size / 4
+            true
+        }
+        val packed = FloatArray(8) { it.toFloat() }
+        val calls = mutableListOf<String>()
+        val output = plan.postProcessInverseFrame(
+            offset = 2,
+            packedSpectrum = packed,
+            inverseTransform = { size, direction, values ->
+                calls += "fft:$size:$direction"
+                FloatArray(size) { (it + 1).toFloat() }
+            },
+            normalize = { values, scale ->
+                calls += "scale:$scale"
+                FloatArray(values.size) { values[it] * scale }
+            },
+            rotate = { values, shift ->
+                calls += "rotate:$shift"
+                values
+            }
+        )
+        assertEquals(listOf("fft:8:1", "scale:0.125", "rotate:-2"), calls)
+        assertEquals(8, output.size)
+    }
+    @Test
     fun `larger FFT plan refuses small leaf shortcut`() {
         val plan = S5SppFftPlanBuilder.build(16) { size, split, coefficients ->
             split[0] = size / 4
