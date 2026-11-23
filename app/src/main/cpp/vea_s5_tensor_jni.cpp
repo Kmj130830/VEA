@@ -1646,3 +1646,33 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeSppFftLargeRadixStage(
     }
 }
 
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeSppRealFft(
+    JNIEnv* env, jobject, jint fft_size, jint direction, jfloatArray frame_array) {
+    if (frame_array == nullptr || fft_size < 4 || fft_size > 65536 ||
+        (fft_size & (fft_size - 1)) != 0) return nullptr;
+    const jsize frame_length = env->GetArrayLength(frame_array);
+    if (env->ExceptionCheck() || frame_length != fft_size) return nullptr;
+
+    try {
+        std::vector<float> frame(static_cast<size_t>(frame_length));
+        env->GetFloatArrayRegion(frame_array, 0, frame_length, frame.data());
+        if (env->ExceptionCheck()) return nullptr;
+
+        const VeaS5TensorStatus status = vea_s5_spp_real_fft_f32(
+            static_cast<uint32_t>(fft_size), direction, frame.data(), frame.size());
+        if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+
+        jfloatArray result = env->NewFloatArray(frame_length);
+        if (result != nullptr) {
+            env->SetFloatArrayRegion(result, 0, frame_length, frame.data());
+        }
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
