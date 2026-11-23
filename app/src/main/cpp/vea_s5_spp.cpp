@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <limits>
 #include <new>
+#include <stdexcept>
 #include <vector>
 
 extern "C" VeaS5TensorStatus vea_s5_spp_rotate_circular_f32(
@@ -155,6 +156,8 @@ extern "C" VeaS5TensorStatus vea_s5_spp_generate_phase_noise_f32(
         local_output.resize(expected_float_count);
     } catch (const std::bad_alloc&) {
         return VEA_S5_TENSOR_STATUS_OUT_OF_MEMORY;
+    } catch (const std::length_error&) {
+        return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
     }
 
     const uint32_t first_word = vea_s5_spp_next_random_u32(local_state);
