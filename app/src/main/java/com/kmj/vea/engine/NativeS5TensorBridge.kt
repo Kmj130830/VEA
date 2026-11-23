@@ -426,6 +426,15 @@ object NativeS5TensorBridge {
             ?: throw IllegalArgumentException("SPP circular buffer rotation failed.")
     }
 
+    /** Returns the floor(log2(N)) plan-table index used by FUN_180040630. */
+    fun sppFftLog2PlanIndex(size: Int): Int {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(size >= 0)
+        val result = nativeSppFftLog2Floor(size)
+        check(result != Int.MIN_VALUE) { "S5 FFT size index calculation failed." }
+        return result
+    }
+
     /**
      * Looks up/interpolates the SPP window table as in FUN_180139870.
      * table contains segmentCount+1 double values; fallback is used outside.
@@ -603,6 +612,7 @@ object NativeS5TensorBridge {
     private external fun nativeRotateSppCircularBuffer(values: FloatArray, shift: Int): FloatArray?
     private external fun nativeScaleSppBuffer(values: FloatArray, scale: Float): FloatArray?
     private external fun nativeLookupSppWindowTable(table: DoubleArray, segmentCount: Int, scale: Double, fallbackValue: Double, x: Double): DoubleArray?
+    private external fun nativeSppFftLog2Floor(size: Int): Int
     private external fun nativeComputeMeanInvStd(sum: Float, sumSquares: Float, count: Int, epsilon: Float): FloatArray?
     private external fun nativeReduceSumAndSquares(values: FloatArray): FloatArray?
     private external fun nativeApplyGatedActivation(planes: FloatArray, count: Int, mode: Int): FloatArray?
