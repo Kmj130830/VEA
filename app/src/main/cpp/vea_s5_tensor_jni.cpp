@@ -1419,3 +1419,36 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeFindSppWeightedPeak(
     }
 }
 
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeInterpolateSppPeak(
+    JNIEnv* env, jobject, jfloatArray magnitude_phase_array, jint bin_count, jint peak_index) {
+    if (magnitude_phase_array == nullptr || bin_count <= 0 ||
+        peak_index < 0 || peak_index >= bin_count ||
+        bin_count > std::numeric_limits<jsize>::max() / 2) return nullptr;
+    const jsize input_length = env->GetArrayLength(magnitude_phase_array);
+    if (env->ExceptionCheck() || input_length != bin_count * 2) return nullptr;
+
+    try {
+        std::vector<float> input(static_cast<size_t>(input_length));
+        env->GetFloatArrayRegion(magnitude_phase_array, 0, input_length, input.data());
+        if (env->ExceptionCheck()) return nullptr;
+
+        float magnitude = 0.0f;
+        float phase = 0.0f;
+        const VeaS5TensorStatus status = vea_s5_spp_interpolate_peak_f32(
+            input.data(), static_cast<size_t>(bin_count),
+            static_cast<size_t>(peak_index), &magnitude, &phase);
+        if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+
+        const jfloat output[2] = {magnitude, phase};
+        jfloatArray result = env->NewFloatArray(2);
+        if (result != nullptr) env->SetFloatArrayRegion(result, 0, 2, output);
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
