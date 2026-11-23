@@ -195,3 +195,88 @@ extern "C" VeaS5TensorStatus vea_s5_spp_generate_phase_noise_f32(
     for (size_t index = 0; index < 4u; ++index) state[index] = local_state[index];
     return VEA_S5_TENSOR_STATUS_OK;
 }
+extern "C" VeaS5TensorStatus vea_s5_spp_peak_weight_f32(
+    const float config[5], float coordinate, float* out_weight) {
+    if (config == nullptr || out_weight == nullptr || !std::isfinite(coordinate)) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    for (size_t index = 0; index < 5u; ++index) {
+        if (!std::isfinite(config[index])) return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    const float period = config[0];
+    const float low_edge = config[1];
+    const float center = config[2];
+    const float high_edge = config[3];
+    const float amplitude = config[4];
+    if (period <= 0.0f || low_edge <= 0.0f || center < low_edge || high_edge < center) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+
+    const float quotient = coordinate / period;
+    if (!std::isfinite(quotient)) return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    float wrapped = coordinate - std::floor(quotient) * period;
+    if (!std::isfinite(wrapped)) return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    // Keep round-off at the periodic boundary inside the canonical interval.
+    if (wrapped < 0.0f) wrapped += period;
+    if (wrapped >= period) wrapped -= period;
+
+    float weight = 0.0f;
+    if (low_edge <= wrapped) {
+        if (wrapped < center) {
+            weight = ((wrapped - low_edge) * -amplitude) / low_edge;
+        } else if (wrapped < high_edge) {
+            weight = ((1.0f - (wrapped - center)) * -amplitude) / low_edge - amplitude;
+        }
+    }
+    if (!std::isfinite(weight)) return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    *out_weight = weight;
+    return VEA_S5_TENSOR_STATUS_OK;
+}
+
+extern "C" VeaS5TensorStatus vea_s5_spp_find_weighted_peak_f32(
+    const float* values, size_t value_count, size_t value_stride,
+    size_t start_index, size_t end_index, float bin_spacing, float denominator,
+    const float weight_config[5], size_t* out_peak_index, float* out_peak_score) {
+    if (values == nullptr || weight_config == nullptr || out_peak_index == nullptr ||
+        out_peak_score == nullptr || value_count == 0u ||
+        (value_stride != 1u && value_stride != 2u) ||
+        start_index > end_index || end_index >= value_count ||
+        !std::isfinite(bin_spacing) || bin_spacing < 0.0f ||
+        !std::isfinite(denominator) || denominator <= 0.0f) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    size_t last_offset = 0u;
+    if (MulOverflow(end_index, value_stride, &last_offset)) {
+        return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
+    }
+
+    size_t best_index = start_index;
+    float best_score = 0.0f;
+    bool have_best = false;
+    for (size_t index = start_index; index <= end_index; ++index) {
+        size_t value_offset = 0u;
+        if (MulOverflow(index, value_stride, &value_offset)) {
+            return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
+        }
+        const float magnitude = values[value_offset];
+        if (!std::isfinite(magnitude)) return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+        const float coordinate = (static_cast<float>(index) * bin_spacing) / denominator;
+        if (!std::isfinite(coordinate)) return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+        float weight = 0.0f;
+        const VeaS5TensorStatus weight_status = vea_s5_spp_peak_weight_f32(
+            weight_config, coordinate, &weight);
+        if (weight_status != VEA_S5_TENSOR_STATUS_OK) return weight_status;
+        const float score = magnitude + weight;
+        if (!std::isfinite(score)) return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+        if (!have_best || score > best_score) {
+            best_index = index;
+            best_score = score;
+            have_best = true;
+        }
+        if (index == end_index) break; // Avoid size_t wrap at SIZE_MAX.
+    }
+    if (!have_best) return VEA_S5_TENSOR_STATUS_MALFORMED_DATA;
+    *out_peak_index = best_index;
+    *out_peak_score = best_score;
+    return VEA_S5_TENSOR_STATUS_OK;
+}
