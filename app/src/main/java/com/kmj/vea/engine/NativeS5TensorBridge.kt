@@ -475,6 +475,47 @@ object NativeS5TensorBridge {
         check(result.size == 1)
         return result[0]
     }
+    /** Ports FUN_180136150's periodic frequency-dependent peak penalty. */
+    fun sppPeakWeight(config: FloatArray, coordinate: Float): Float {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(config.size == 5)
+        require(config.all { it.isFinite() } && coordinate.isFinite())
+        val result = nativeSppPeakWeight(config, coordinate)
+        require(result.isFinite()) { "SPP peak-weight evaluation failed." }
+        return result
+    }
+
+    /**
+     * Finds the first maximum of magnitude + SPP frequency penalty.
+     * valueStride=1 matches FUN_180135b90; valueStride=2 matches
+     * FUN_180135670 where magnitude is stored in each pair's first lane.
+     */
+    fun findSppWeightedPeak(
+        values: FloatArray,
+        valueStride: Int,
+        startIndex: Int,
+        endIndex: Int,
+        binSpacing: Float,
+        denominator: Float,
+        weightConfig: FloatArray
+    ): Int {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(valueStride == 1 || valueStride == 2)
+        require(values.isNotEmpty() && values.size % valueStride == 0)
+        val valueCount = values.size / valueStride
+        require(startIndex >= 0 && startIndex <= endIndex && endIndex < valueCount)
+        require(binSpacing.isFinite() && binSpacing >= 0.0f)
+        require(denominator.isFinite() && denominator > 0.0f)
+        require(weightConfig.size == 5 && weightConfig.all { it.isFinite() })
+        require(values.all { it.isFinite() })
+        val result = nativeFindSppWeightedPeak(
+            values, valueStride, startIndex, endIndex,
+            binSpacing, denominator, weightConfig
+        )
+        check(result != Int.MIN_VALUE) { "S5 weighted spectral peak search failed." }
+        return result
+    }
+
     /** Applies the frame-wide scalar normalization in FUN_1801397d0. */
     fun scaleSppBuffer(values: FloatArray, scale: Float): FloatArray {
         check(loaded) { "Native S5 tensor library is not loaded." }
@@ -632,6 +673,8 @@ object NativeS5TensorBridge {
     private external fun nativeLookupSppWindowTable(table: DoubleArray, segmentCount: Int, scale: Double, fallbackValue: Double, x: Double): DoubleArray?
     private external fun nativeSppFftLog2Floor(size: Int): Int
     private external fun nativeGenerateSppPhaseNoise(magnitudes: FloatArray, state: IntArray, edgeMode: Int): FloatArray?
+    private external fun nativeSppPeakWeight(config: FloatArray, coordinate: Float): Float
+    private external fun nativeFindSppWeightedPeak(values: FloatArray, valueStride: Int, startIndex: Int, endIndex: Int, binSpacing: Float, denominator: Float, weightConfig: FloatArray): Int
     private external fun nativeComputeMeanInvStd(sum: Float, sumSquares: Float, count: Int, epsilon: Float): FloatArray?
     private external fun nativeReduceSumAndSquares(values: FloatArray): FloatArray?
     private external fun nativeApplyGatedActivation(planes: FloatArray, count: Int, mode: Int): FloatArray?
