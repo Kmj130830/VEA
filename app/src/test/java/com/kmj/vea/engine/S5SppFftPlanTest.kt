@@ -106,6 +106,29 @@ class S5SppFftPlanTest {
         }
     }
     @Test
+    fun `64 and 128 point plans dispatch the mixed radix stage`() {
+        for (size in listOf(64, 128)) {
+            val plan = S5SppFftPlanBuilder.build(size) { requested, split, coefficients ->
+                assertEquals(size, requested)
+                split[0] = size / 4
+                split[1] = size / 4
+                for (index in coefficients.indices) coefficients[index] = index * 0.001f
+                true
+            }
+            val input = FloatArray(size) { index -> (index % 13 - 6) * 0.125f }
+            var called = false
+            val result = plan.transformRadixStage(input) { stageSize, values, coefficients ->
+                called = true
+                assertEquals(size, stageSize)
+                assertArrayEquals(input, values, 0f)
+                assertArrayEquals(plan.coefficients, coefficients, 0f)
+                FloatArray(size) { it * 0.25f }
+            }
+            assertEquals(true, called)
+            assertArrayEquals(FloatArray(size) { it * 0.25f }, result, 0f)
+        }
+    }
+    @Test
     fun `larger FFT plan refuses small leaf shortcut`() {
         val plan = S5SppFftPlanBuilder.build(16) { size, split, coefficients ->
             split[0] = size / 4
