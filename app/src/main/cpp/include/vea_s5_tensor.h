@@ -398,6 +398,18 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_fft_small_leaf_f32(
     uint32_t fft_size, int32_t direction, float* interleaved, size_t value_count);
 
 /**
+ * Executes one recovered S5 complex FFT leaf for real FFT sizes 4, 8, 16 or 32.
+ * The input buffer contains fft_size floats, i.e. fft_size/2 interleaved
+ * complex samples. Sizes 16 and 32 consume the corresponding generated plan
+ * coefficients beginning at coefficient[1]. Direction < 0 selects the
+ * FUN_18007d700 output order; non-negative selects FUN_18007fca0.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_fft_leaf_f32(
+    uint32_t fft_size, int32_t direction,
+    float* interleaved, size_t value_count,
+    const float* coefficients, size_t coefficient_count);
+
+/**
  * Builds one 0x18-byte S5 real-FFT plan record's two backing arrays.
  * fft_size must be a power of two >= 4. split_table stores the compact
  * stage/decomposition schedule; coefficients stores the recovered float
