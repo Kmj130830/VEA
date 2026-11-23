@@ -517,3 +517,74 @@ extern "C" VeaS5TensorStatus vea_s5_spp_find_weighted_peak_f32(
     *out_peak_score = best_score;
     return VEA_S5_TENSOR_STATUS_OK;
 }
+
+extern "C" VeaS5TensorStatus vea_s5_spp_fft_small_leaf_f32(
+    uint32_t fft_size, int32_t direction, float* interleaved, size_t value_count) {
+    if ((fft_size != 4u && fft_size != 8u) ||
+        interleaved == nullptr || value_count != static_cast<size_t>(fft_size)) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    float values[8] = {};
+    for (size_t index = 0; index < value_count; ++index) {
+        if (!std::isfinite(interleaved[index])) {
+            return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+        }
+        values[index] = interleaved[index];
+    }
+
+    if (fft_size == 4u) {
+        const float real0 = values[0];
+        const float imag0 = values[1];
+        values[0] = values[2] + real0;
+        values[1] = values[3] + imag0;
+        values[2] = real0 - values[2];
+        values[3] = imag0 - values[3];
+    } else if (direction < 0) {
+        const float pair_26_real = values[2] + values[6];
+        const float pair_26_imag = values[3] + values[7];
+        const float pair_15_real = values[1] + values[5];
+        const float diff_15_real = values[1] - values[5];
+        const float diff_37_imag = values[3] - values[7];
+        const float diff_26_real = values[2] - values[6];
+        const float pair_04_real = values[0] + values[4];
+        const float diff_04_real = values[0] - values[4];
+
+        values[1] = pair_26_imag + pair_15_real;
+        values[5] = pair_15_real - pair_26_imag;
+        values[0] = pair_26_real + pair_04_real;
+        values[4] = pair_04_real - pair_26_real;
+        values[3] = diff_15_real - diff_26_real;
+        values[7] = diff_26_real + diff_15_real;
+        values[2] = diff_37_imag + diff_04_real;
+        values[6] = diff_04_real - diff_37_imag;
+    } else {
+        const float pair_26_real = values[2] + values[6];
+        const float pair_37_imag = values[3] + values[7];
+        const float pair_04_real = values[0] + values[4];
+        const float diff_04_real = values[0] - values[4];
+        const float diff_26_real = values[2] - values[6];
+        const float diff_37_imag = values[3] - values[7];
+        const float pair_15_imag = values[1] + values[5];
+        const float diff_15_imag = values[1] - values[5];
+
+        values[0] = pair_26_real + pair_04_real;
+        values[4] = pair_04_real - pair_26_real;
+        values[1] = pair_37_imag + pair_15_imag;
+        values[5] = pair_15_imag - pair_37_imag;
+        values[2] = diff_04_real - diff_37_imag;
+        values[6] = diff_37_imag + diff_04_real;
+        values[3] = diff_26_real + diff_15_imag;
+        values[7] = diff_15_imag - diff_26_real;
+    }
+
+    for (size_t index = 0; index < value_count; ++index) {
+        if (!std::isfinite(values[index])) {
+            return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+        }
+    }
+    for (size_t index = 0; index < value_count; ++index) {
+        interleaved[index] = values[index];
+    }
+    return VEA_S5_TENSOR_STATUS_OK;
+}
+
