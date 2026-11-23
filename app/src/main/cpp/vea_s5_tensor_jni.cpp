@@ -1277,3 +1277,16 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeLookupSppWindowTable(
     }
 }
 
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeSppFftLog2Floor(
+    JNIEnv*, jobject, jint value) {
+    if (value < 0) return std::numeric_limits<jint>::min();
+    int32_t index = -1;
+    const VeaS5TensorStatus status = vea_s5_spp_fft_log2_floor_u32(
+        static_cast<uint32_t>(value), &index);
+    return status == VEA_S5_TENSOR_STATUS_OK
+        ? static_cast<jint>(index)
+        : std::numeric_limits<jint>::min();
+}
+
