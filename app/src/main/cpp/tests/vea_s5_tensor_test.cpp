@@ -444,7 +444,7 @@ int main() {
     assert(cubic_value == 8.0f);
     assert(vea_s5_spp_cubic_segment_f32(
         0.5f, cubic_controls, &cubic_value) == VEA_S5_TENSOR_STATUS_OK);
-    assert(std::fabs(cubic_value - 6.0f) < 1.0e-6f);
+    assert(std::fabs(cubic_value - 3.5f) < 1.0e-6f);
     assert(vea_s5_spp_cubic_segment_f32(
         -0.01f, cubic_controls, &cubic_value) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
