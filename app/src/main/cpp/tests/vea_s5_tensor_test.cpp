@@ -227,7 +227,7 @@ int main() {
         VEA_S5_TENSOR_STATUS_BUFFER_TOO_SMALL);
     assert(std::memcmp(fft16_unchanged, fft16_input, sizeof(fft16_input)) == 0);
     assert(vea_s5_spp_fft_leaf_f32(
-        32u, -1, fft32_unchanged, 31u, fft32_coefficients, 16u) ==
+        32u, -1, fft32_input, 31u, fft32_coefficients, 16u) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
     // FUN_18007a000: FFT plan index is floor(log2(N)); zero maps to -1.
