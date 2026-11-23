@@ -15,6 +15,44 @@ bool IsAligned(const void* pointer, uintptr_t alignment) {
         (reinterpret_cast<uintptr_t>(pointer) & (alignment - 1u)) == 0;
 }
 
+void AssertSppFftLeafMatchesDirectDft(
+    uint32_t fft_size, int32_t direction,
+    const float* input, const float* coefficients) {
+    assert(fft_size == 16u || fft_size == 32u);
+    const size_t complex_count = fft_size / 2u;
+    float actual[32] = {};
+    for (size_t index = 0; index < fft_size; ++index) {
+        actual[index] = input[index];
+    }
+    assert(vea_s5_spp_fft_leaf_f32(
+        fft_size, direction, actual, fft_size,
+        coefficients, complex_count) == VEA_S5_TENSOR_STATUS_OK);
+
+    constexpr double kTwoPi = 6.283185307179586476925286766559;
+    const double sign = direction < 0 ? -1.0 : 1.0;
+    for (size_t frequency = 0; frequency < complex_count; ++frequency) {
+        double expected_real = 0.0;
+        double expected_imag = 0.0;
+        for (size_t sample = 0; sample < complex_count; ++sample) {
+            const double angle = sign * kTwoPi *
+                static_cast<double>(frequency * sample) /
+                static_cast<double>(complex_count);
+            const double cosine = std::cos(angle);
+            const double sine = std::sin(angle);
+            const double real = input[sample * 2u];
+            const double imag = input[sample * 2u + 1u];
+            expected_real += real * cosine - imag * sine;
+            expected_imag += real * sine + imag * cosine;
+        }
+        const double real_error = std::fabs(
+            static_cast<double>(actual[frequency * 2u]) - expected_real);
+        const double imag_error = std::fabs(
+            static_cast<double>(actual[frequency * 2u + 1u]) - expected_imag);
+        assert(real_error < 2.0e-4 * (1.0 + std::fabs(expected_real)));
+        assert(imag_error < 2.0e-4 * (1.0 + std::fabs(expected_imag)));
+    }
+}
+
 }  // namespace
 
 int main() {
@@ -150,6 +188,47 @@ int main() {
     assert(invalid_fft8[0] == 1.0f && invalid_fft8[6] == 7.0f);
     assert(vea_s5_spp_fft_small_leaf_f32(
         16u, -1, fft8_negative, 8) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
+    // FUN_18007db00 / FUN_18007e140: plan-backed 16/32 real-FFT complex leaves.
+    uint32_t fft16_split[4] = {};
+    float fft16_coefficients[8] = {};
+    assert(vea_s5_spp_fft_build_plan_f32(
+        16u, fft16_split, 4u, fft16_coefficients, 8u) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    float fft16_input[16] = {};
+    for (size_t index = 0; index < 16u; ++index) {
+        const int value = static_cast<int>((index * 7u + 3u) % 19u) - 9;
+        fft16_input[index] = static_cast<float>(value) * 0.125f;
+    }
+    AssertSppFftLeafMatchesDirectDft(
+        16u, -1, fft16_input, fft16_coefficients);
+    AssertSppFftLeafMatchesDirectDft(
+        16u, 1, fft16_input, fft16_coefficients);
+
+    uint32_t fft32_split[6] = {};
+    float fft32_coefficients[16] = {};
+    assert(vea_s5_spp_fft_build_plan_f32(
+        32u, fft32_split, 6u, fft32_coefficients, 16u) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    float fft32_input[32] = {};
+    for (size_t index = 0; index < 32u; ++index) {
+        const int value = static_cast<int>((index * 11u + 5u) % 23u) - 11;
+        fft32_input[index] = static_cast<float>(value) * 0.0625f;
+    }
+    AssertSppFftLeafMatchesDirectDft(
+        32u, -1, fft32_input, fft32_coefficients);
+    AssertSppFftLeafMatchesDirectDft(
+        32u, 1, fft32_input, fft32_coefficients);
+
+    float fft16_unchanged[16] = {};
+    std::memcpy(fft16_unchanged, fft16_input, sizeof(fft16_input));
+    assert(vea_s5_spp_fft_leaf_f32(
+        16u, -1, fft16_unchanged, 16u, fft16_coefficients, 1u) ==
+        VEA_S5_TENSOR_STATUS_BUFFER_TOO_SMALL);
+    assert(std::memcmp(fft16_unchanged, fft16_input, sizeof(fft16_input)) == 0);
+    assert(vea_s5_spp_fft_leaf_f32(
+        32u, -1, fft32_unchanged, 31u, fft32_coefficients, 16u) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
     // FUN_18007a000: FFT plan index is floor(log2(N)); zero maps to -1.
     int32_t fft_plan_index = 123;
