@@ -101,6 +101,44 @@ Native tests cover both rotation directions, wraparound shifts, zero-length
 buffers, invalid pointers, scale factors, NaN input and failure atomicity.
 These are isolated DSP primitives, not the complete SPP pipeline.
 
+## Frequency-weighted peak candidate selection
+
+`FUN_180136150` computes the periodic frequency penalty consumed by the two
+SPP peak candidate scanners. Its five-float configuration is:
+
+| Index | Meaning |
+|---:|---|
+| `0` | coordinate period |
+| `1` | low-edge threshold and first ramp denominator |
+| `2` | center of the penalty region |
+| `3` | high-edge cutoff |
+| `4` | penalty amplitude |
+
+The coordinate is wrapped into the period interval. Outside
+`[lowEdge, highEdge)` the penalty is zero. From lowEdge to center the
+function ramps down linearly; from center to highEdge it follows the
+second affine segment recovered in the original function. The peak scanners
+add this penalty to the candidate magnitude before comparing candidates.
+
+`FUN_180135b90` scans a contiguous magnitude array (`valueStride=1`).
+`FUN_180135670` scans interleaved `[magnitude, phase]` records and compares
+only each record's first lane (`valueStride=2`). Both initialize at the
+start index, advance forward, and replace the current winner only on a
+strictly greater score, so the first index wins ties.
+
+VEA implements `vea_s5_spp_peak_weight_f32` and the shared
+`vea_s5_spp_find_weighted_peak_f32` native primitive, exposed through
+`NativeS5TensorBridge.sppPeakWeight()` and
+`NativeS5TensorBridge.findSppWeightedPeak()`. Tests cover periodic wrap,
+both sides of the weighting region, stride-1/stride-2 scans, changed peak
+ranking, first-wins tie behavior, and invalid input preservation.
+
+This recovers candidate-index selection only. `FUN_1801343c0` additionally
+interpolates the local maximum and phase between neighboring bins, while
+`FUN_180133ba0` uses the original complex spectrum for its lazy-phase
+variant. Those refinement/output steps are not yet implemented as a complete
+peak extractor.
+
 ## Deterministic spectral phase-noise generation
 
 `FUN_180135490` advances a four-word xorshift state and converts magnitude
