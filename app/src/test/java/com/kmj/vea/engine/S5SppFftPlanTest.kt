@@ -76,6 +76,36 @@ class S5SppFftPlanTest {
     }
 
     @Test
+    fun `16 and 32 point plans dispatch their own twiddle tables`() {
+        for (size in listOf(16, 32)) {
+            val plan = S5SppFftPlanBuilder.build(size) { requested, split, coefficients ->
+                assertEquals(size, requested)
+                split[0] = size / 4
+                split[1] = size / 4
+                coefficients[0] = 1.0f
+                coefficients[1] = 0.70710678f
+                if (size == 32) {
+                    coefficients[2] = 0.9238795f
+                    coefficients[3] = 0.38268343f
+                }
+                true
+            }
+            val input = FloatArray(size) { (it - size / 2) * 0.125f }
+            var called = false
+            val result = plan.transformLeaf(-1, input) { receivedSize, direction, values, coefficients ->
+                called = true
+                assertEquals(size, receivedSize)
+                assertEquals(-1, direction)
+                assertArrayEquals(input, values, 0f)
+                assertArrayEquals(plan.coefficients, coefficients, 0f)
+                assertEquals(if (size == 16) 8 else 16, coefficients.size)
+                FloatArray(size) { it.toFloat() }
+            }
+            assertEquals(true, called)
+            assertArrayEquals(FloatArray(size) { it.toFloat() }, result, 0f)
+        }
+    }
+    @Test
     fun `larger FFT plan refuses small leaf shortcut`() {
         val plan = S5SppFftPlanBuilder.build(16) { size, split, coefficients ->
             split[0] = size / 4
