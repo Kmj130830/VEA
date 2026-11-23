@@ -689,7 +689,7 @@ class S5VtmgBaseGraphTest {
         }
         assertThrows(IllegalArgumentException::class.java) {
             S5VtmgMegpoidGraphPlanBuilder.build(
-                S5VtmgPackedBaseGraphWeights(valid.dropLast(1) + valid.first()),
+                S5VtmgPackedBaseGraphWeights(valid + valid.first()),
                 converter
             )
         }
