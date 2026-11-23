@@ -127,9 +127,13 @@ VEA now implements `vea_s5_spp_generate_phase_noise_f32` in native C++,
 exposes it through `nativeGenerateSppPhaseNoise`, and provides
 `NativeS5TensorBridge.generateSppPhaseNoise(magnitudes, state, edgeMode)`.
 The mutable four-word `IntArray` carries the updated PRNG state between
-frames. Tests cover deterministic output/state advancement, magnitude
-preservation, both terminal-bin modes and failure atomicity for invalid
-magnitude inputs.
+frames. `S5SppPhaseNoiseState` wraps that state as a synchronized frame
+stream and exposes snapshot/restore operations; the seed is supplied by the
+renderer/model state rather than hard-coded. Native tests cover deterministic
+output/state advancement, exact xorshift state progression, magnitude
+preservation, both terminal-bin modes, the one-bin boundary, and failure
+atomicity for invalid magnitude inputs. Kotlin tests cover persistent state,
+checkpoint restore and input validation.
 
 ## Window-table coefficient lookup
 
