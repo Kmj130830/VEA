@@ -353,7 +353,7 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_rotate_circular_f32(
 
 /**
  * Table lookup/interpolation used by FUN_180139870.
- * scaled = abs(x) * scale; index = nearest_integer(scaled), with ties down.
+ * scaled = abs(x) * scale; index = floor(scaled) for non-negative inputs.
  * If index < segment_count, interpolate table[index]..table[index+1].
  * Otherwise return fallback_value. table_count must cover segment_count+1.
  */
