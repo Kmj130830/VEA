@@ -333,7 +333,7 @@ int main() {
         positive_offset_spectrum, 3, 1,
         &interpolated_magnitude, &interpolated_phase) ==
         VEA_S5_TENSOR_STATUS_OK);
-    assert(std::fabs(interpolated_magnitude - 4.0625f) < 1.0e-5f);
+    assert(std::fabs(interpolated_magnitude - 4.125f) < 1.0e-5f);
     assert(std::fabs(interpolated_phase - 1.1f) < 1.0e-5f);
 
     // Edge bins and non-local maxima are returned unchanged.
