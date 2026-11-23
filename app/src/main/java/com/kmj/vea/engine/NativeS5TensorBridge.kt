@@ -578,6 +578,20 @@ object NativeS5TensorBridge {
             ?: throw IllegalArgumentException("SPP real FFT execution failed.")
     }
 
+    /**
+     * Interpolates one SPP pitch/phase curve segment using FUN_1801360c0.
+     * controls are the four neighboring values [p0,p1,p2,p3].
+     */
+    fun interpolateSppCubicSegment(position: Float, controls: FloatArray): Float {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(position.isFinite() && position in 0.0f..1.0f)
+        require(controls.size == 4 && controls.all { it.isFinite() })
+        val result = nativeSppCubicSegment(position, controls)
+            ?: throw IllegalArgumentException("SPP cubic curve interpolation failed.")
+        check(result.size == 1)
+        return result[0]
+    }
+
     /** Returns the floor(log2(N)) plan-table index used by FUN_180040630. */
     fun sppFftLog2PlanIndex(size: Int): Int {
         check(loaded) { "Native S5 tensor library is not loaded." }
@@ -811,6 +825,7 @@ object NativeS5TensorBridge {
     private external fun nativeSppFftRadixStage(fftSize: Int, values: FloatArray, coefficients: FloatArray): FloatArray?
     private external fun nativeSppFftLargeRadixStage(fftSize: Int, mode: Int, values: FloatArray, coefficients: FloatArray): FloatArray?
     private external fun nativeSppRealFft(fftSize: Int, direction: Int, frame: FloatArray): FloatArray?
+    private external fun nativeSppCubicSegment(position: Float, controls: FloatArray): FloatArray?
     private external fun nativeBuildSppFftPlan(fftSize: Int, splitTable: IntArray, coefficients: FloatArray): Boolean
     private external fun nativeGenerateSppPhaseNoise(magnitudes: FloatArray, state: IntArray, edgeMode: Int): FloatArray?
     private external fun nativeInterpolateSppPeak(magnitudePhase: FloatArray, binCount: Int, peakIndex: Int): FloatArray?
