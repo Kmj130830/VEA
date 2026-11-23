@@ -103,6 +103,24 @@ contains 27,779 float values.
   form to the render-preparation path.
 - Unit tests check all dimensions, bank interleave, packed counts and padding.
 
+## Explicit projection-operator handoff
+
+`S5VtmgRendererProjectionPlan.projectWithOperator()` exposes the three
+recovered operators without guessing the caller's stage binding:
+
+- `STRIDE2_CONV1D_C5440` uses the temporal `[output][input][tap]` weights
+  and the native stride-2 projection bridge;
+- `BANKED_LINEAR_C6390` uses `[bank][output][input]` weights and the
+  bank-major native projection bridge;
+- `UPSAMPLE_2X_C72D0` uses the temporal `[output][input][tap]` weights
+  and the native 2x upsample/three-tap projection bridge.
+
+The raw `0x59` renderer flag still selects only the reverse-stage operator
+between c6390 and c72d0. The forward c5440 loop is a separate call path and
+uses `projectWithOperator(STRIDE2_CONV1D_C5440, ...)` explicitly. The
+`convN` layer can be prepared for all three operators; this does not imply
+that the same conv tensor is passed to every descriptor in a real render.
+
 ## Named Megpoid graph-plan preparation
 
 `S5VtmgMegpoidGraphPlanBuilder` converts the nine packed layers into one
