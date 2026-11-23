@@ -579,6 +579,36 @@ object NativeS5TensorBridge {
     }
 
     /**
+     * Runs the final sample accumulation loop from FUN_1801334b0 in one
+     * native call. The partial/window buffer is supplied by its upstream
+     * FUN_1801347a0 preparation step.
+     */
+    fun accumulateSppFrameSamples(
+        sourceFrame: FloatArray,
+        partialWindowBuffer: FloatArray,
+        baseIndex: Int,
+        offset: Int,
+        windowSpan: Int,
+        windowTable: DoubleArray,
+        segmentCount: Int,
+        windowScale: Double,
+        windowFallback: Double
+    ): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(sourceFrame.isNotEmpty())
+        require(partialWindowBuffer.isNotEmpty())
+        require(windowSpan > 0 && segmentCount in 0 until Int.MAX_VALUE)
+        require(windowTable.size.toLong() >= segmentCount.toLong() + if (segmentCount > 0) 1L else 0L)
+        require(sourceFrame.all { it.isFinite() } && partialWindowBuffer.all { it.isFinite() })
+        require(windowTable.all { it.isFinite() })
+        require(windowScale.isFinite() && windowScale >= 0.0 && windowFallback.isFinite())
+        return nativeAccumulateSppFrameSamples(
+            sourceFrame, partialWindowBuffer, baseIndex, offset, windowSpan,
+            windowTable, segmentCount, windowScale, windowFallback
+        ) ?: throw IllegalArgumentException("SPP frame sample accumulation failed.")
+    }
+
+    /**
      * Interpolates one SPP pitch/phase curve segment using FUN_1801360c0.
      * controls are the four neighboring values [p0,p1,p2,p3].
      */
@@ -826,6 +856,7 @@ object NativeS5TensorBridge {
     private external fun nativeSppFftLargeRadixStage(fftSize: Int, mode: Int, values: FloatArray, coefficients: FloatArray): FloatArray?
     private external fun nativeSppRealFft(fftSize: Int, direction: Int, frame: FloatArray): FloatArray?
     private external fun nativeSppCubicSegment(position: Float, controls: FloatArray): FloatArray?
+    private external fun nativeAccumulateSppFrameSamples(source: FloatArray, partial: FloatArray, baseIndex: Int, offset: Int, windowSpan: Int, table: DoubleArray, segmentCount: Int, windowScale: Double, windowFallback: Double): FloatArray?
     private external fun nativeBuildSppFftPlan(fftSize: Int, splitTable: IntArray, coefficients: FloatArray): Boolean
     private external fun nativeGenerateSppPhaseNoise(magnitudes: FloatArray, state: IntArray, edgeMode: Int): FloatArray?
     private external fun nativeInterpolateSppPeak(magnitudePhase: FloatArray, binCount: Int, peakIndex: Int): FloatArray?
