@@ -125,6 +125,66 @@ static uint32_t vea_s5_spp_next_random_u32(uint32_t state[4]) {
     return next;
 }
 
+extern "C" VeaS5TensorStatus vea_s5_spp_interpolate_peak_f32(
+    const float* magnitude_phase, size_t bin_count, size_t peak_index,
+    float* out_magnitude, float* out_phase) {
+    if (magnitude_phase == nullptr || out_magnitude == nullptr || out_phase == nullptr ||
+        bin_count == 0u || peak_index >= bin_count ||
+        bin_count > std::numeric_limits<size_t>::max() / 2u) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    const size_t sample_count = bin_count * 2u;
+    for (size_t index = 0; index < sample_count; ++index) {
+        if (!std::isfinite(magnitude_phase[index])) {
+            return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+        }
+    }
+
+    const float center_magnitude = magnitude_phase[peak_index * 2u];
+    const float center_phase = magnitude_phase[peak_index * 2u + 1u];
+    float interpolated_magnitude = center_magnitude;
+    float interpolated_phase = center_phase;
+
+    if (peak_index > 0u && peak_index + 1u < bin_count) {
+        const float left_magnitude = magnitude_phase[(peak_index - 1u) * 2u];
+        const float right_magnitude = magnitude_phase[(peak_index + 1u) * 2u];
+        if (center_magnitude > left_magnitude && center_magnitude > right_magnitude) {
+            const float half_difference = (right_magnitude - left_magnitude) * 0.5f;
+            const float curvature =
+                (left_magnitude + right_magnitude) * 0.5f - center_magnitude;
+            const float denominator = curvature + curvature;
+            if (denominator != 0.0f && std::isfinite(denominator)) {
+                const float offset = -half_difference / denominator;
+                const float refined_magnitude = center_magnitude -
+                    (half_difference * half_difference) / (curvature * 4.0f);
+                if (!std::isfinite(offset) || !std::isfinite(refined_magnitude)) {
+                    return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+                }
+                if (offset >= 0.0f) {
+                    const float right_phase = magnitude_phase[(peak_index + 1u) * 2u + 1u];
+                    const float phase_delta = right_phase - center_phase;
+                    const float wrapped_delta = phase_delta -
+                        std::nearbyint(phase_delta * 0.15915494f) * 6.2831855f;
+                    interpolated_phase = center_phase + wrapped_delta * offset;
+                } else {
+                    const float left_phase = magnitude_phase[(peak_index - 1u) * 2u + 1u];
+                    const float phase_delta = center_phase - left_phase;
+                    const float wrapped_delta = phase_delta -
+                        std::nearbyint(phase_delta * 0.15915494f) * 6.2831855f;
+                    interpolated_phase = left_phase + wrapped_delta * (offset + 1.0f);
+                }
+                interpolated_magnitude = refined_magnitude;
+            }
+        }
+    }
+
+    if (!std::isfinite(interpolated_magnitude) || !std::isfinite(interpolated_phase)) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    *out_magnitude = interpolated_magnitude;
+    *out_phase = interpolated_phase;
+    return VEA_S5_TENSOR_STATUS_OK;
+}
 extern "C" VeaS5TensorStatus vea_s5_spp_generate_phase_noise_f32(
     const float* magnitudes, size_t count, uint8_t edge_mode,
     uint32_t state[4], float* output_complex, size_t output_float_count) {
