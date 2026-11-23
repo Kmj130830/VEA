@@ -136,7 +136,7 @@ extern "C" VeaS5TensorStatus vea_s5_spp_fft_build_plan_f32(
     float stage_angle = 0.0f;
     float stage_cos_quarter = 0.0f;
 
-    if (half_quarter >= 3u) {
+    if (quarter_size >= 3u) {
         stage_angle = std::atan(1.0f) / static_cast<float>(half_quarter);
         stage_cos_quarter =
             std::cos(static_cast<float>(half_quarter) * stage_angle);
@@ -195,6 +195,7 @@ extern "C" VeaS5TensorStatus vea_s5_spp_fft_build_plan_f32(
             }
         }
 
+        if (half_quarter >= 3u) {
         // FUN_180082220's recursive radix-stage table construction.
         for (;;) {
             const size_t next_stage = stage_base + half_quarter;
@@ -249,6 +250,8 @@ extern "C" VeaS5TensorStatus vea_s5_spp_fft_build_plan_f32(
             }
             break;
         }
+        }
+
     }
 
     // FUN_18004ec80's second half fills the terminal cosine/sine table.
