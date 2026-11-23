@@ -1661,3 +1661,180 @@ extern "C" VeaS5TensorStatus vea_s5_spp_fft_large_radix_stage_f32(
     return VEA_S5_TENSOR_STATUS_OK;
 }
 
+
+namespace {
+
+struct VeaS5SppComplex {
+    float real;
+    float imag;
+};
+
+VeaS5TensorStatus vea_s5_spp_complex_fft_inplace(
+    std::vector<VeaS5SppComplex>& values, int32_t direction) {
+    const size_t count = values.size();
+    if (count < 2u || (count & (count - 1u)) != 0u ||
+        (direction != -1 && direction != 1)) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+
+    size_t reversed = 0u;
+    for (size_t index = 1u; index < count; ++index) {
+        size_t bit = count >> 1u;
+        while ((reversed & bit) != 0u) {
+            reversed ^= bit;
+            bit >>= 1u;
+        }
+        reversed ^= bit;
+        if (index < reversed) {
+            std::swap(values[index], values[reversed]);
+        }
+    }
+
+    constexpr double kTwoPi = 6.283185307179586476925286766559;
+    for (size_t length = 2u; length <= count; length <<= 1u) {
+        const double angle = static_cast<double>(direction) *
+            kTwoPi / static_cast<double>(length);
+        const float root_real = static_cast<float>(std::cos(angle));
+        const float root_imag = static_cast<float>(std::sin(angle));
+        const size_t half = length >> 1u;
+        for (size_t block = 0u; block < count; block += length) {
+            float twiddle_real = 1.0f;
+            float twiddle_imag = 0.0f;
+            for (size_t offset = 0u; offset < half; ++offset) {
+                const VeaS5SppComplex even = values[block + offset];
+                const VeaS5SppComplex source_odd = values[block + offset + half];
+                const VeaS5SppComplex odd {
+                    source_odd.real * twiddle_real - source_odd.imag * twiddle_imag,
+                    source_odd.real * twiddle_imag + source_odd.imag * twiddle_real
+                };
+                values[block + offset] = {
+                    even.real + odd.real,
+                    even.imag + odd.imag
+                };
+                values[block + offset + half] = {
+                    even.real - odd.real,
+                    even.imag - odd.imag
+                };
+
+                const float next_real =
+                    twiddle_real * root_real - twiddle_imag * root_imag;
+                twiddle_imag =
+                    twiddle_real * root_imag + twiddle_imag * root_real;
+                twiddle_real = next_real;
+            }
+        }
+    }
+
+    for (const VeaS5SppComplex& value : values) {
+        if (!std::isfinite(value.real) || !std::isfinite(value.imag)) {
+            return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+        }
+    }
+    return VEA_S5_TENSOR_STATUS_OK;
+}
+
+}  // namespace
+
+extern "C" VeaS5TensorStatus vea_s5_spp_real_fft_f32(
+    uint32_t fft_size, int32_t direction, float* frame, size_t frame_count) {
+    if (frame == nullptr || frame_count != static_cast<size_t>(fft_size) ||
+        fft_size < 4u || fft_size > 65536u ||
+        (fft_size & (fft_size - 1u)) != 0u) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    for (size_t index = 0; index < frame_count; ++index) {
+        if (!std::isfinite(frame[index])) {
+            return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+        }
+    }
+
+    const size_t complex_count = static_cast<size_t>(fft_size / 2u);
+    try {
+        std::vector<VeaS5SppComplex> spectrum(complex_count);
+        std::vector<float> output(frame_count, 0.0f);
+        constexpr double kTwoPi = 6.283185307179586476925286766559;
+
+        if (direction < 0) {
+            // Pack adjacent real samples as z[n] = x[2n] + i*x[2n+1].
+            for (size_t index = 0; index < complex_count; ++index) {
+                spectrum[index] = {frame[index * 2u], frame[index * 2u + 1u]};
+            }
+            const VeaS5TensorStatus fft_status =
+                vea_s5_spp_complex_fft_inplace(spectrum, -1);
+            if (fft_status != VEA_S5_TENSOR_STATUS_OK) return fft_status;
+
+            // The DC and Nyquist bins share the zero-frequency complex pair.
+            output[0] = spectrum[0].real + spectrum[0].imag;
+            output[1] = spectrum[0].real - spectrum[0].imag;
+
+            for (size_t bin = 1u; bin < complex_count; ++bin) {
+                const VeaS5SppComplex current = spectrum[bin];
+                const VeaS5SppComplex mirrored = spectrum[complex_count - bin];
+                const float average_real = (current.real + mirrored.real) * 0.5f;
+                const float average_imag = (current.imag - mirrored.imag) * 0.5f;
+                const float difference_real = (current.real - mirrored.real) * 0.5f;
+                const float difference_imag = (current.imag + mirrored.imag) * 0.5f;
+                const double angle = kTwoPi * static_cast<double>(bin) /
+                    static_cast<double>(fft_size);
+                const float sine = static_cast<float>(std::sin(angle));
+                const float cosine = static_cast<float>(std::cos(angle));
+
+                // X[k] = A - i*exp(-i*angle)*B.
+                const float product_real =
+                    sine * difference_real - cosine * difference_imag;
+                const float product_imag =
+                    sine * difference_imag + cosine * difference_real;
+                output[bin * 2u] = average_real - product_real;
+                output[bin * 2u + 1u] = average_imag - product_imag;
+            }
+        } else {
+            // Unpack the real spectrum into the N/2 complex spectrum.
+            spectrum[0] = {
+                (frame[0] + frame[1]) * 0.5f,
+                (frame[0] - frame[1]) * 0.5f
+            };
+            for (size_t bin = 1u; bin < complex_count; ++bin) {
+                const float current_real = frame[bin * 2u];
+                const float current_imag = frame[bin * 2u + 1u];
+                const float mirrored_real = frame[(complex_count - bin) * 2u];
+                const float mirrored_imag = frame[(complex_count - bin) * 2u + 1u];
+                const float average_real = (current_real + mirrored_real) * 0.5f;
+                const float average_imag = (current_imag - mirrored_imag) * 0.5f;
+                const float difference_real = (current_real - mirrored_real) * 0.5f;
+                const float difference_imag = (current_imag + mirrored_imag) * 0.5f;
+                const double angle = kTwoPi * static_cast<double>(bin) /
+                    static_cast<double>(fft_size);
+                const float sine = static_cast<float>(std::sin(angle));
+                const float cosine = static_cast<float>(std::cos(angle));
+
+                // Z[k] = A + i*exp(-i*angle)*B.
+                const float product_real =
+                    sine * difference_real - cosine * difference_imag;
+                const float product_imag =
+                    sine * difference_imag + cosine * difference_real;
+                spectrum[bin] = {
+                    average_real + product_real,
+                    average_imag + product_imag
+                };
+            }
+
+            // The source inverse path is unnormalized: IFFT(M) returns M*x.
+            const VeaS5TensorStatus fft_status =
+                vea_s5_spp_complex_fft_inplace(spectrum, 1);
+            if (fft_status != VEA_S5_TENSOR_STATUS_OK) return fft_status;
+            for (size_t index = 0; index < complex_count; ++index) {
+                output[index * 2u] = spectrum[index].real;
+                output[index * 2u + 1u] = spectrum[index].imag;
+            }
+        }
+
+        for (float value : output) {
+            if (!std::isfinite(value)) return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+        }
+        std::copy(output.begin(), output.end(), frame);
+        return VEA_S5_TENSOR_STATUS_OK;
+    } catch (const std::bad_alloc&) {
+        return VEA_S5_TENSOR_STATUS_OUT_OF_MEMORY;
+    }
+}
+
