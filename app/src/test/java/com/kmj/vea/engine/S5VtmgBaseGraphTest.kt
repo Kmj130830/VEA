@@ -463,6 +463,50 @@ class S5VtmgBaseGraphTest {
         }
     }
     @Test
+    fun rendererProjectionPlanCanExplicitlyInvokeC5440Stride2() {
+        val layer = S5VtmgPackedGraphLayerWeights(
+            layerName = "conv-stride-probe",
+            matrices = FloatArray(3 * 2 * 8) { index ->
+                val tap = index / 16
+                val within = index % 16
+                val inputIndex = within / 8
+                val outputIndex = within % 8
+                if (outputIndex < 2) tap * 100f + inputIndex * 10f + outputIndex else 0f
+            },
+            bias = floatArrayOf(0.25f, -0.5f),
+            axis0Count = 2, axis1Count = 2, matrixCount = 3, paddedAxis0Count = 8
+        )
+        val plan = layer.toRendererProjectionPlan { source, out, input, padded, banks ->
+            FloatArray(out * input * banks) { index ->
+                val bank = index / (out * input)
+                val within = index % (out * input)
+                val outputIndex = within / input
+                val inputIndex = within % input
+                source[(bank * input + inputIndex) * padded + outputIndex]
+            }
+        }
+        val input = floatArrayOf(1f, 2f, 3f, 4f)
+        var called = false
+        val output = plan.projectWithOperator(
+            operator = S5RendererProjectionOperator.STRIDE2_CONV1D_C5440,
+            input = input,
+            positions = 2,
+            executeStride2 = { x, weights, bias, inCount, outCount, frames, taps ->
+                called = true
+                assertEquals(input.toList(), x.toList())
+                assertEquals(plan.temporal.weights.toList(), weights.toList())
+                assertEquals(plan.temporal.bias.toList(), bias?.toList())
+                assertEquals(2, inCount)
+                assertEquals(2, outCount)
+                assertEquals(2, frames)
+                assertEquals(3, taps)
+                floatArrayOf(3f, 4f)
+            }
+        )
+        assertEquals(true, called)
+        assertEquals(listOf(3f, 4f), output.toList())
+    }
+    @Test
     fun temporalProjectionPlanCallsTheExplicitStrideAndUpsampleOperators() {
         val layer = S5VtmgPackedGraphLayerWeights(
             layerName = "conv-probe",
