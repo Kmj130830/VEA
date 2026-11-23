@@ -1,5 +1,6 @@
 #include "vea_s5_tensor.h"
 
+#include <algorithm>
 #include <cmath>
 #include <bit>
 #include <cstddef>
