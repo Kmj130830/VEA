@@ -389,6 +389,16 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_generate_phase_noise_f32(
     uint32_t state[4], float* output_complex, size_t output_float_count);
 
 /**
+ * Builds one 0x18-byte S5 real-FFT plan record's two backing arrays.
+ * fft_size must be a power of two >= 4. split_table stores the compact
+ * stage/decomposition schedule; coefficients stores the recovered float
+ * recurrence and terminal twiddle factors. Capacities are measured in items.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_fft_build_plan_f32(
+    uint32_t fft_size, uint32_t* split_table, size_t split_table_count,
+    float* coefficients, size_t coefficient_count);
+
+/**
  * Returns floor(log2(value)) for non-zero uint32 values, and -1 for zero.
  * This is the size-index helper FUN_18007a000 used by the real FFT wrapper.
  */
