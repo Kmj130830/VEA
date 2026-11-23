@@ -97,6 +97,21 @@ class S5SppFftPlan internal constructor(
         require(interleavedValues.all { it.isFinite() })
         return execute(fftSize, mode, interleavedValues, coefficientData.copyOf())
     }
+    /**
+     * Runs the complete portable real-FFT boundary for this plan size.
+     * Negative direction returns packed real-spectrum bins; non-negative
+     * direction reconstructs the real frame with the unnormalized N/2 scale.
+     */
+    fun transformReal(
+        direction: Int,
+        frame: FloatArray,
+        execute: (Int, Int, FloatArray) -> FloatArray =
+            NativeS5TensorBridge::applySppRealFft
+    ): FloatArray {
+        require(frame.size == fftSize)
+        require(frame.all { it.isFinite() })
+        return execute(fftSize, direction, frame)
+    }
     init {
         require(fftSize >= 4 && (fftSize and (fftSize - 1)) == 0)
         val expectedSplitCount = kotlin.math.sqrt(fftSize / 2.0).toInt() + 2
