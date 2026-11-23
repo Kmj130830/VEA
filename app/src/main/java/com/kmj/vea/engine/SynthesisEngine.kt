@@ -204,6 +204,16 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
     ): Map<String, S5VtmgBankedProjectionPlan> =
         prepareSharedVtmgBaseGraph(voicebank).toBankedProjectionPlans()
 
+    /**
+     * Loads Megpoid's nine shared VTMG layers and prepares the complete named
+     * pre1/pre2, conv/cond and linear operator parameter bundle. This does not
+     * assign the bundles to renderer descriptor indices or execute the graph.
+     */
+    fun prepareMegpoidVtmgGraphPlan(
+        voicebank: VoicebankDescriptor
+    ): S5VtmgMegpoidGraphPlan =
+        S5VtmgMegpoidGraphPlanBuilder.build(prepareSharedVtmgBaseGraph(voicebank))
+
     override suspend fun render(
         project: VeaProject,
         voicebank: VoicebankDescriptor,
@@ -237,9 +247,12 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
 
         // VTMG supplies the shared S5 base graph. It is independent of the
         // optional RNN feature branch stored in the bank's VTB2 object.
-        val projectionPlans = prepareSharedVtmgProjectionPlans(voicebank)
-        require(projectionPlans.keys == S5VtmgGraphTensorCatalog.layers.map { it.layerName }.toSet()) {
-            "The shared VTMG projection-plan set is incomplete."
+        val vtmgGraphPlan = prepareMegpoidVtmgGraphPlan(voicebank)
+        require(vtmgGraphPlan.layerNames == S5VtmgGraphTensorCatalog.layers.map { it.layerName }.toSet()) {
+            "The Megpoid VTMG graph-plan layer set is incomplete."
+        }
+        require(vtmgGraphPlan.convolutionPairs.size == 3) {
+            "The Megpoid VTMG conv/cond pair set is incomplete."
         }
 
         val recurrentStatus = if (modelFeatures.recurrentBranch) {
@@ -254,16 +267,15 @@ class VocaloidAiEngineAdapter : SynthesisEngine {
         }
 
         throw UnsupportedOperationException(
-            "Loaded the shared VOCALOID7.vtmg base graph and converted its " +
-                "${projectionPlans.size} named layers to c6390-compatible banked projection plans " +
-                "and ${repeatedParameters.records.size} separate VTB2 tensor records plus " +
+            "Loaded the shared VOCALOID7.vtmg base graph and prepared all " +
+                "${vtmgGraphPlan.layerNames.size} named layer plans: pre1/pre2, " +
+                "${vtmgGraphPlan.convolutionPairs.size} conv/cond pairs and linear. " +
+                "Validated ${repeatedParameters.records.size} separate VTB2 tensor records plus " +
                 "${c5d50Parameters.blocks.size} mapped c5d50 stage/block parameter sets. " +
-                "(tensor-path/shape validation only; no complete neural forward graph yet). " +
-                "(pre1/pre2, conv1/cond1, conv2/cond2, conv3/cond3, linear). " +
-                "These plans are not yet assigned to renderer stages. " +
-                "$recurrentStatus $pairedStatus The remaining stage binding, base-graph forward operators, " +
-                "voicebank-specific VTB2 conditioning, Yamaha G2P, and acoustic waveform decoder are not " +
-                "complete; no WAV was generated."
+                "(model tensor layout and operator-plan preparation only; no complete forward graph yet). " +
+                "The VTMG bundles are not yet assigned to renderer descriptor indices. " +
+                "$recurrentStatus $pairedStatus The remaining model-to-renderer binding, activation/conditioning " +
+                "schedule, spectral decoder and PCM output are not complete; no WAV was generated."
         )
     }
 }
