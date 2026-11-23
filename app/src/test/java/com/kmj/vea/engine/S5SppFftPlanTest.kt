@@ -54,6 +54,40 @@ class S5SppFftPlanTest {
     }
 
     @Test
+    fun `small FFT plan dispatches its own direction and interleaved data`() {
+        val plan = S5SppFftPlanBuilder.build(8) { size, split, coefficients ->
+            split[0] = size / 4
+            split[1] = size / 4
+            true
+        }
+        val input = floatArrayOf(1f, 10f, 2f, 20f, 3f, 30f, 4f, 40f)
+        var receivedDirection = 0
+        val output = plan.transformSmallLeaf(-1, input) { size, direction, values ->
+            assertEquals(8, size)
+            receivedDirection = direction
+            assertArrayEquals(input, values, 0f)
+            floatArrayOf(10f, 100f, -22f, -18f, -2f, -20f, 18f, -22f)
+        }
+        assertEquals(-1, receivedDirection)
+        assertArrayEquals(
+            floatArrayOf(10f, 100f, -22f, -18f, -2f, -20f, 18f, -22f),
+            output, 0f
+        )
+    }
+
+    @Test
+    fun `larger FFT plan refuses small leaf shortcut`() {
+        val plan = S5SppFftPlanBuilder.build(16) { size, split, coefficients ->
+            split[0] = size / 4
+            split[1] = size / 4
+            true
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            plan.transformSmallLeaf(1, FloatArray(16)) { _, _, _ -> FloatArray(16) }
+        }
+    }
+
+    @Test
     fun `builder rejects invalid fft sizes and a failed native backend`() {
         assertThrows(IllegalArgumentException::class.java) {
             S5SppFftPlanBuilder.build(12) { _, _, _ -> true }
