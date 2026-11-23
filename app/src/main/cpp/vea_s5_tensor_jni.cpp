@@ -1676,3 +1676,23 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeSppRealFft(
     }
 }
 
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeSppCubicSegment(
+    JNIEnv* env, jobject, jfloat position, jfloatArray controls_array) {
+    if (controls_array == nullptr) return nullptr;
+    const jsize length = env->GetArrayLength(controls_array);
+    if (env->ExceptionCheck() || length != 4) return nullptr;
+    jfloat controls[4] = {};
+    env->GetFloatArrayRegion(controls_array, 0, 4, controls);
+    if (env->ExceptionCheck()) return nullptr;
+
+    float output = 0.0f;
+    const VeaS5TensorStatus status =
+        vea_s5_spp_cubic_segment_f32(position, controls, &output);
+    if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+    jfloatArray result = env->NewFloatArray(1);
+    if (result != nullptr) env->SetFloatArrayRegion(result, 0, 1, &output);
+    return env->ExceptionCheck() ? nullptr : result;
+}
+
