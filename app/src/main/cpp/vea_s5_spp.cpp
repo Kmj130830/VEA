@@ -245,8 +245,7 @@ extern "C" VeaS5TensorStatus vea_s5_spp_find_weighted_peak_f32(
         !std::isfinite(denominator) || denominator <= 0.0f) {
         return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
     }
-    size_t last_offset = 0u;
-    if (MulOverflow(end_index, value_stride, &last_offset)) {
+    if (end_index > std::numeric_limits<size_t>::max() / value_stride) {
         return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
     }
 
@@ -254,10 +253,7 @@ extern "C" VeaS5TensorStatus vea_s5_spp_find_weighted_peak_f32(
     float best_score = 0.0f;
     bool have_best = false;
     for (size_t index = start_index; index <= end_index; ++index) {
-        size_t value_offset = 0u;
-        if (MulOverflow(index, value_stride, &value_offset)) {
-            return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
-        }
+        const size_t value_offset = index * value_stride;
         const float magnitude = values[value_offset];
         if (!std::isfinite(magnitude)) return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
         const float coordinate = (static_cast<float>(index) * bin_spacing) / denominator;
