@@ -438,8 +438,8 @@ object NativeS5TensorBridge {
         x: Double
     ): Double {
         check(loaded) { "Native S5 tensor library is not loaded." }
-        require(segmentCount >= 0)
-        require(table.size >= segmentCount + if (segmentCount > 0) 1 else 0)
+        require(segmentCount in 0 until Int.MAX_VALUE)
+        require(table.size.toLong() >= segmentCount.toLong() + if (segmentCount > 0) 1L else 0L)
         require(scale.isFinite() && scale >= 0.0)
         require(fallbackValue.isFinite() && x.isFinite())
         val result = nativeLookupSppWindowTable(
