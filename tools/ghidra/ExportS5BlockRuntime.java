@@ -72,6 +72,10 @@ public class ExportS5BlockRuntime extends GhidraScript {
         "1800b8f60", "1800dc4b0", "1800d5a00",
     };
 
+    private static final String[] FORCE_FUNCTION_TARGETS = {
+        // Direct callees observed inside FUN_180082a30.
+        "18007d700", "18007fca0"
+    };
     private static final String[] CONTEXT_CALL_SITES = {
         // Caller of the SPP phase/vocoder sample processor.
         "180096051",
@@ -119,6 +123,17 @@ public class ExportS5BlockRuntime extends GhidraScript {
                 Address address = toAddr(hex);
                 Function f = currentProgram.getFunctionManager().getFunctionAt(address);
                 if (f == null) f = currentProgram.getFunctionManager().getFunctionContaining(address);
+                if (f == null) {
+                    for (String forceHex : FORCE_FUNCTION_TARGETS) {
+                        if (!forceHex.equalsIgnoreCase(hex)) continue;
+                        disassemble(address);
+                        f = currentProgram.getFunctionManager().getFunctionAt(address);
+                        if (f == null) {
+                            f = createFunction(address, null);
+                        }
+                        break;
+                    }
+                }
                 out.println("### 0x" + hex + (f == null ? " (not recovered)" : " " + f.getName()));
                 if (f == null) { out.println(); continue; }
                 selected.put(f.getEntryPoint(), f);
