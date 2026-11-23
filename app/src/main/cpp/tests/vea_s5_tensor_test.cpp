@@ -348,6 +348,12 @@ int main() {
             mode_zero_a.size() * sizeof(float)) != 0);
         for (float value : mode_zero_a) assert(std::isfinite(value));
         for (float value : mode_one) assert(std::isfinite(value));
+        const double input_energy = SumSquares(input.data(), input.size());
+        const double mode_zero_energy = SumSquares(mode_zero_a.data(), mode_zero_a.size());
+        const double mode_one_energy = SumSquares(mode_one.data(), mode_one.size());
+        const double expected_energy_ratio = static_cast<double>(fft_size) / 8.0;
+        assert(std::fabs(mode_zero_energy / input_energy - expected_energy_ratio) < 2.0e-2);
+        assert(std::fabs(mode_one_energy / input_energy - expected_energy_ratio) < 2.0e-2);
 
         std::vector<float> unchanged = input;
         assert(vea_s5_spp_fft_large_radix_stage_f32(
