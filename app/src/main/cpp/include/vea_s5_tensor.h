@@ -430,6 +430,18 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_fft_large_radix_stage_f32(
     const float* coefficients, size_t coefficient_count);
 
 /**
+ * Portable real-FFT wrapper for SPP frame buffers.
+ * direction < 0: real samples -> packed [DC, Nyquist, Re1, Im1, ...]
+ * direction >= 0: packed spectrum -> N real samples, scaled by N/2.
+ * Uses a radix-2 complex transform internally and preserves the source
+ * wrapper's unnormalized inverse convention. This is mathematically
+ * equivalent at the real-spectrum boundary, not a bit-exact port of the
+ * vendor's specialized butterfly schedule.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_real_fft_f32(
+    uint32_t fft_size, int32_t direction, float* frame, size_t frame_count);
+
+/**
  * Builds one 0x18-byte S5 real-FFT plan record's two backing arrays.
  * fft_size must be a power of two >= 4. split_table stores the compact
  * stage/decomposition schedule; coefficients stores the recovered float
