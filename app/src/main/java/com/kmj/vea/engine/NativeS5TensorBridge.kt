@@ -496,6 +496,29 @@ object NativeS5TensorBridge {
             ?: throw IllegalArgumentException("S5 small FFT butterfly failed.")
     }
 
+    /**
+     * Executes the recovered 4-, 8-, 16- or 32-point complex FFT leaf.
+     * For sizes 16/32, coefficients are the plan's generated table and
+     * provide the exact twiddles consumed by FUN_18007db00/FUN_18007e140.
+     */
+    fun applySppFftLeaf(
+        fftSize: Int,
+        direction: Int,
+        interleavedValues: FloatArray,
+        coefficients: FloatArray
+    ): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(fftSize == 4 || fftSize == 8 || fftSize == 16 || fftSize == 32)
+        require(interleavedValues.size == fftSize)
+        require(interleavedValues.all { it.isFinite() })
+        if (fftSize >= 16) {
+            require(coefficients.size >= if (fftSize == 16) 2 else 4)
+            require(coefficients.all { it.isFinite() })
+        }
+        return nativeSppFftLeaf(fftSize, direction, interleavedValues, coefficients)
+            ?: throw IllegalArgumentException("S5 FFT leaf execution failed.")
+    }
+
     /** Returns the floor(log2(N)) plan-table index used by FUN_180040630. */
     fun sppFftLog2PlanIndex(size: Int): Int {
         check(loaded) { "Native S5 tensor library is not loaded." }
@@ -725,6 +748,7 @@ object NativeS5TensorBridge {
     private external fun nativeLookupSppWindowTable(table: DoubleArray, segmentCount: Int, scale: Double, fallbackValue: Double, x: Double): DoubleArray?
     private external fun nativeSppFftLog2Floor(size: Int): Int
     private external fun nativeSppFftSmallLeaf(fftSize: Int, direction: Int, values: FloatArray): FloatArray?
+    private external fun nativeSppFftLeaf(fftSize: Int, direction: Int, values: FloatArray, coefficients: FloatArray): FloatArray?
     private external fun nativeBuildSppFftPlan(fftSize: Int, splitTable: IntArray, coefficients: FloatArray): Boolean
     private external fun nativeGenerateSppPhaseNoise(magnitudes: FloatArray, state: IntArray, edgeMode: Int): FloatArray?
     private external fun nativeInterpolateSppPeak(magnitudePhase: FloatArray, binCount: Int, peakIndex: Int): FloatArray?
