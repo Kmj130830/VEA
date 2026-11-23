@@ -594,4 +594,105 @@ class S5VtmgBaseGraphTest {
     }
 
 
+
+    @Test
+    fun megpoidGraphPlanPreparesAllNineNamedLayersAndThreeConvConditionPairs() {
+        val packedLayers = S5VtmgGraphTensorCatalog.layers.map { spec ->
+            val matrices = FloatArray(spec.packedWeightElementCount) { index ->
+                val rowWidth = spec.paddedAxis0Count
+                val bankStride = spec.axis1Count * rowWidth
+                val bank = index / bankStride
+                val withinBank = index % bankStride
+                val input = withinBank / rowWidth
+                val output = withinBank % rowWidth
+                if (output < spec.axis0Count) {
+                    1.0f + bank * 100.0f + input * 10.0f + output
+                } else {
+                    0.0f
+                }
+            }
+            S5VtmgPackedGraphLayerWeights(
+                layerName = spec.layerName,
+                matrices = matrices,
+                bias = FloatArray(spec.biasElementCount) { it * 0.01f },
+                axis0Count = spec.axis0Count,
+                axis1Count = spec.axis1Count,
+                matrixCount = spec.matrixCount,
+                paddedAxis0Count = spec.paddedAxis0Count
+            )
+        }
+        val packedGraph = S5VtmgPackedBaseGraphWeights(packedLayers)
+
+        val plan = S5VtmgMegpoidGraphPlanBuilder.build(packedGraph) {
+                source, outputCount, inputCount, paddedOutputCount, bankCount ->
+            FloatArray(outputCount * inputCount * bankCount) { index ->
+                val bankStride = outputCount * inputCount
+                val bank = index / bankStride
+                val withinBank = index % bankStride
+                val output = withinBank / inputCount
+                val input = withinBank % inputCount
+                source[(bank * inputCount + input) * paddedOutputCount + output]
+            }
+        }
+
+        assertEquals(
+            setOf("pre1", "pre2", "conv1", "cond1", "conv2", "cond2", "conv3", "cond3", "linear"),
+            plan.layerNames
+        )
+        assertEquals(82, plan.pre1.inputFeatures)
+        assertEquals(32, plan.pre1.outputFeatures)
+        assertEquals(32, plan.pre2.inputFeatures)
+        assertEquals(32, plan.pre2.outputFeatures)
+        assertEquals(3, plan.convolutionPairs.size)
+        assertEquals(3, plan.linear.outputFeatures)
+
+        plan.convolutionPairs.forEachIndexed { index, pair ->
+            assertEquals(index + 1, pair.ordinal)
+            assertEquals("conv" + (index + 1), pair.convolution.layerName)
+            assertEquals(32, pair.convolution.banked.inputFeatures)
+            assertEquals(64, pair.convolution.banked.outputFeatures)
+            assertEquals(3, pair.convolution.banked.banks)
+            assertEquals(3, pair.convolution.temporal.kernelWidth)
+            assertEquals(26, pair.conditioning.inputFeatures)
+            assertEquals(64, pair.conditioning.outputFeatures)
+            assertEquals(1, pair.conditioning.banks)
+            assertEquals(64, pair.convolutionTemporal.outputChannels)
+        }
+
+        assertEquals("conv2", plan.requireConvolutionPair(2).convolution.layerName)
+        assertThrows(IllegalArgumentException::class.java) {
+            plan.requireConvolutionPair(4)
+        }
+    }
+
+    @Test
+    fun megpoidGraphPlanRejectsMissingOrDuplicateLayerNames() {
+        val valid = S5VtmgGraphTensorCatalog.layers.map { spec ->
+            S5VtmgPackedGraphLayerWeights(
+                layerName = spec.layerName,
+                matrices = FloatArray(spec.packedWeightElementCount),
+                bias = FloatArray(spec.biasElementCount),
+                axis0Count = spec.axis0Count,
+                axis1Count = spec.axis1Count,
+                matrixCount = spec.matrixCount,
+                paddedAxis0Count = spec.paddedAxis0Count
+            )
+        }
+        val converter: (FloatArray, Int, Int, Int, Int) -> FloatArray =
+            { _, output, input, _, banks -> FloatArray(output * input * banks) }
+
+        assertThrows(IllegalArgumentException::class.java) {
+            S5VtmgMegpoidGraphPlanBuilder.build(
+                S5VtmgPackedBaseGraphWeights(valid.dropLast(1)),
+                converter
+            )
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            S5VtmgMegpoidGraphPlanBuilder.build(
+                S5VtmgPackedBaseGraphWeights(valid.dropLast(1) + valid.first()),
+                converter
+            )
+        }
+    }
+
 }
