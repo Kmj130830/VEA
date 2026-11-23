@@ -1568,3 +1568,41 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeSppFftLeaf(
     }
 }
 
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeSppFftRadixStage(
+    JNIEnv* env, jobject, jint fft_size,
+    jfloatArray values_array, jfloatArray coefficients_array) {
+    if (values_array == nullptr || coefficients_array == nullptr ||
+        (fft_size != 64 && fft_size != 128)) return nullptr;
+    const jsize value_length = env->GetArrayLength(values_array);
+    const jsize coefficient_length = env->GetArrayLength(coefficients_array);
+    if (env->ExceptionCheck() || value_length != fft_size ||
+        coefficient_length < fft_size / 2) return nullptr;
+
+    try {
+        std::vector<float> values(static_cast<size_t>(value_length));
+        std::vector<float> coefficients(static_cast<size_t>(coefficient_length));
+        env->GetFloatArrayRegion(values_array, 0, value_length, values.data());
+        if (env->ExceptionCheck()) return nullptr;
+        env->GetFloatArrayRegion(
+            coefficients_array, 0, coefficient_length, coefficients.data());
+        if (env->ExceptionCheck()) return nullptr;
+
+        const VeaS5TensorStatus status = vea_s5_spp_fft_radix_stage_f32(
+            static_cast<uint32_t>(fft_size), values.data(), values.size(),
+            coefficients.data(), coefficients.size());
+        if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+
+        jfloatArray result = env->NewFloatArray(value_length);
+        if (result != nullptr) {
+            env->SetFloatArrayRegion(result, 0, value_length, values.data());
+        }
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
