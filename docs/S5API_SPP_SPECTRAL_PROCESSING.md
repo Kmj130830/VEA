@@ -344,11 +344,21 @@ the length/finite-value contract at every boundary. JVM tests verify the
 exact call order and parameters: `direction=1`, `scale=1/frameSize`,
 `shift=-offset`.
 
-The later sample accumulation (step 5) is deliberately outside the plan.
-The decompilation reads a separate partial/window buffer, a double-table
-window coefficient configuration, and a per-sample amplitude stream; these
-must be bound from the model/render state before the complete function is
-considered ported.
+Step 5 is now represented by
+`S5SppFrameSampleAccumulatorPlan`. It receives the caller's source-frame
+view, the partial/window buffer prepared by `FUN_1801347a0`, the recovered
+base index/offset/window span, and the `S5SppWindowLookupPlan`. For each
+output sample it evaluates the exact index and coordinate expressions from
+the decompilation, then applies
+`(sourceFrame[sample] / coefficient) * partialWindowBuffer[frameIndex]`.
+The typed plan validates source and destination spans, finite values,
+non-zero coefficients and integer overflow.
+
+This closes the post-inverse frame accumulation operator boundary, but it
+does not yet load the partial/window descriptor arrays or the source-frame
+pointer from the renderer state. `FUN_1801347a0` must still generate the
+partial/window buffer and the SPP caller must provide the correct source view
+before `FUN_1801334b0` can be considered fully ported.
 
 ## Window-table coefficient lookup
 
