@@ -1839,3 +1839,31 @@ extern "C" VeaS5TensorStatus vea_s5_spp_real_fft_f32(
     }
 }
 
+
+extern "C" VeaS5TensorStatus vea_s5_spp_cubic_segment_f32(
+    float position, const float controls[4], float* out_value) {
+    if (controls == nullptr || out_value == nullptr ||
+        !std::isfinite(position) || position < 0.0f || position > 1.0f) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    for (size_t index = 0; index < 4u; ++index) {
+        if (!std::isfinite(controls[index])) {
+            return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+        }
+    }
+
+    const float squared = position * position;
+    const float basis0 = ((position + position) - 3.0f) * squared + 1.0f;
+    const float basis1 = (position - 2.0f) * squared + position;
+    const float result =
+        basis1 * controls[1] +
+        basis0 * controls[0] +
+        (1.0f - basis0) * controls[2] +
+        (position - 1.0f) * squared * controls[3];
+    if (!std::isfinite(result)) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    *out_value = result;
+    return VEA_S5_TENSOR_STATUS_OK;
+}
+
