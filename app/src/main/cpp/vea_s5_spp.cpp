@@ -708,8 +708,8 @@ static void vea_s5_spp_fft32_butterfly(
     f24 = f24 - f10;
     float f35 = f13 + f22;
     f22 = f22 - f13;
-    float f14 = p[14] + p[30];
-    float f20 = p[14] - p[30];
+    f14 = p[14] + p[30];
+    f20 = p[14] - p[30];
     f13 = f7 + f26;
     f26 = f26 - f7;
     f7 = f17 - f12;
