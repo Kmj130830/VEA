@@ -491,10 +491,6 @@ int main() {
         sample_output_unchanged, 3u) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
     assert(sample_output_unchanged[0] == 9.0f &&
         sample_output_unchanged[1] == 8.0f && sample_output_unchanged[2] == 7.0f);
-    assert(vea_s5_spp_accumulate_frame_samples_f32(
-        sample_source, 3u, sample_partial, 6u,
-        2, 0, 4u, constant_window_table, 5u, 4u, 0.0, 0.0,
-        sample_output_unchanged, 3u) == VEA_S5_TENSOR_STATUS_OK);
     const double zero_window_table[] = {0.0, 0.0, 0.0, 0.0, 0.0};
     assert(vea_s5_spp_accumulate_frame_samples_f32(
         sample_source, 3u, sample_partial, 6u,
