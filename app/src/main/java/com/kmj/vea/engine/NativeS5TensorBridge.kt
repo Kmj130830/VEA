@@ -426,6 +426,24 @@ object NativeS5TensorBridge {
             ?: throw IllegalArgumentException("SPP circular buffer rotation failed.")
     }
 
+    /**
+     * Generates deterministic SPP spectral phase values from magnitudes.
+     * state is a mutable four-word xorshift state and is updated in place.
+     * Output is interleaved [real,imag]; edgeMode bit 0 controls the final
+     * real-only boundary bin.
+     */
+    fun generateSppPhaseNoise(
+        magnitudes: FloatArray,
+        state: IntArray,
+        edgeMode: Int
+    ): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(state.size == 4)
+        require(edgeMode in 0..255)
+        require(magnitudes.all { it.isFinite() })
+        return nativeGenerateSppPhaseNoise(magnitudes, state, edgeMode)
+            ?: throw IllegalArgumentException("SPP phase-noise generation failed.")
+    }
     /** Returns the floor(log2(N)) plan-table index used by FUN_180040630. */
     fun sppFftLog2PlanIndex(size: Int): Int {
         check(loaded) { "Native S5 tensor library is not loaded." }
@@ -613,6 +631,7 @@ object NativeS5TensorBridge {
     private external fun nativeScaleSppBuffer(values: FloatArray, scale: Float): FloatArray?
     private external fun nativeLookupSppWindowTable(table: DoubleArray, segmentCount: Int, scale: Double, fallbackValue: Double, x: Double): DoubleArray?
     private external fun nativeSppFftLog2Floor(size: Int): Int
+    private external fun nativeGenerateSppPhaseNoise(magnitudes: FloatArray, state: IntArray, edgeMode: Int): FloatArray?
     private external fun nativeComputeMeanInvStd(sum: Float, sumSquares: Float, count: Int, epsilon: Float): FloatArray?
     private external fun nativeReduceSumAndSquares(values: FloatArray): FloatArray?
     private external fun nativeApplyGatedActivation(planes: FloatArray, count: Int, mode: Int): FloatArray?
