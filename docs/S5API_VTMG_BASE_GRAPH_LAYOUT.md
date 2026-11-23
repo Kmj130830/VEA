@@ -103,6 +103,24 @@ contains 27,779 float values.
   form to the render-preparation path.
 - Unit tests check all dimensions, bank interleave, packed counts and padding.
 
+## Independent named-node execution API
+
+`S5VtmgMegpoidGraphPlan` is now paired with
+`S5VtmgGraphOperatorExecutor`. The plan exposes independent calls for
+`pre1`, `pre2`, each `condN`, each `convN`, and `linear`:
+
+- `projectPre1()` and `projectPre2()` dispatch their single-bank plans;
+- `projectConditioning(N)` dispatches the selected `condN` plan;
+- `projectConvolution(N, operator)` explicitly selects c5440, c6390 or c72d0;
+- `projectLinear()` dispatches the final 32-to-3 plan.
+
+The default `NativeS5VtmgGraphOperatorExecutor` invokes the existing JNI
+bridges. JVM tests inject a recording executor and validate the selected
+node, tensor widths, bank counts, operator identity and output lengths.
+This allows each recovered node to be tested without inventing an order
+between nodes. The actual forward activation/conditioning schedule is still
+not asserted by this API.
+
 ## Explicit projection-operator handoff
 
 `S5VtmgRendererProjectionPlan.projectWithOperator()` exposes the three
