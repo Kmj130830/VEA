@@ -452,6 +452,13 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_fft_build_plan_f32(
     float* coefficients, size_t coefficient_count);
 
 /**
+ * Cubic segment interpolation used by the SPP pitch/phase curve sampler
+ * FUN_1801314f0 through FUN_1801360c0. controls are [p0,p1,p2,p3].
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_cubic_segment_f32(
+    float position, const float controls[4], float* out_value);
+
+/**
  * Returns floor(log2(value)) for non-zero uint32 values, and -1 for zero.
  * This is the size-index helper FUN_18007a000 used by the real FFT wrapper.
  */
