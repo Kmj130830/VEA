@@ -85,9 +85,12 @@ to match the original helper's double table and interpolation arithmetic.
 
 VEA now exposes `vea_s5_spp_lookup_table_f64` in C++,
 `nativeLookupSppWindowTable` through JNI, and
-`NativeS5TensorBridge.lookupSppWindowTable()` in Kotlin. Tests cover
-interpolation, negative coordinate symmetry, exact upper boundary, fallback,
-empty table, short table and invalid scale/pointer inputs.
+`NativeS5TensorBridge.lookupSppWindowTable()` in Kotlin.
+`S5SppWindowLookupPlan` packages the double table, segment count, scale and
+fallback value in the recovered config-field shape, and provides a validated
+per-coordinate lookup entry point. Native and JVM tests cover interpolation,
+negative coordinate symmetry, exact upper boundary, fallback, empty table,
+short table, non-finite values and invalid scale/pointer inputs.
 
 ## Real FFT wrapper and core
 
