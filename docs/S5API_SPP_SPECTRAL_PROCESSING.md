@@ -48,6 +48,39 @@ The above operation order is based on decompiled call sites and data flow;
 exact FFT scaling, window coefficients, peak interpolation, and all state
 field meanings still require dedicated helper decompilation and tests.
 
+## Implemented SPP buffer primitives
+
+Two buffer-level operations in the recovered SPP path are now ported to the
+portable S5 tensor library:
+
+- `FUN_180133fd0`: circularly rotates a real-valued frame buffer. Positive
+  shifts rotate left; negative shifts rotate right. The VEA adapter
+  `vea_s5_spp_rotate_circular_f32` normalizes any signed shift modulo the
+  buffer length and performs the operation in-place after validating the
+  input. Kotlin exposes `NativeS5TensorBridge.rotateSppCircularBuffer()`.
+- `FUN_1801397d0`: multiplies every element in a frame buffer by one scalar.
+  The VEA adapter `vea_s5_spp_scale_buffer_f32` validates the entire
+  multiplication before mutating the buffer. Kotlin exposes
+  `NativeS5TensorBridge.scaleSppBuffer()`.
+
+Native tests cover both rotation directions, wraparound shifts, zero-length
+buffers, invalid pointers, scale factors, NaN input and failure atomicity.
+These are isolated DSP primitives, not the complete SPP pipeline.
+
+## Real FFT wrapper and core
+
+`FUN_180040630` is a real-FFT wrapper, not the butterfly implementation.
+It selects a size-indexed plan using `FUN_18007a000`, packs/unpacks the real
+Nyquist/DC layout, applies the forward/inverse sign and amplitude handling,
+and calls `FUN_180082a30` with the plan's twiddle/scratch pointers. The
+latter dispatches to `FUN_18007d700` for the negative-direction branch and
+`FUN_18007fca0` for the positive-direction branch.
+
+Those two internal kernels have now been added as explicit Ghidra targets.
+Do not substitute an arbitrary FFT implementation until their array layouts,
+twiddle table construction, scaling and ordering have been recovered and
+tested against the wrapper's observable output.
+
 ## Helper functions requiring exact ports
 
 | Function | Current evidence | Still required |
