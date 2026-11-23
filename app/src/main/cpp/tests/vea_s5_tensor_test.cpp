@@ -255,6 +255,60 @@ int main() {
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
 
+    // FUN_1801343c0: parabolic interpolation of a [magnitude,phase] spectral peak.
+    const float interpolation_spectrum[] = {
+        0.5f, 0.0f,
+        2.0f, 3.1f,
+        4.0f, -3.0f,
+        1.0f, -2.9f
+    };
+    float interpolated_magnitude = 0.0f;
+    float interpolated_phase = 0.0f;
+    assert(vea_s5_spp_interpolate_peak_f32(
+        interpolation_spectrum, 4, 2,
+        &interpolated_magnitude, &interpolated_phase) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(std::fabs(interpolated_magnitude - 4.025f) < 1.0e-5f);
+    assert(std::fabs(interpolated_phase - 3.26486f) < 2.0e-4f);
+
+    // Positive sub-bin offsets interpolate from the center phase toward the right bin.
+    const float positive_offset_spectrum[] = {
+        1.0f, 0.5f,
+        4.0f, 1.0f,
+        3.0f, 1.4f
+    };
+    assert(vea_s5_spp_interpolate_peak_f32(
+        positive_offset_spectrum, 3, 1,
+        &interpolated_magnitude, &interpolated_phase) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(std::fabs(interpolated_magnitude - 4.0625f) < 1.0e-5f);
+    assert(std::fabs(interpolated_phase - 1.1f) < 1.0e-5f);
+
+    // Edge bins and non-local maxima are returned unchanged.
+    assert(vea_s5_spp_interpolate_peak_f32(
+        interpolation_spectrum, 4, 0,
+        &interpolated_magnitude, &interpolated_phase) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(interpolated_magnitude == 0.5f && interpolated_phase == 0.0f);
+    const float non_peak_spectrum[] = {1.0f, 0.1f, 1.0f, 0.2f, 2.0f, 0.3f};
+    assert(vea_s5_spp_interpolate_peak_f32(
+        non_peak_spectrum, 3, 1,
+        &interpolated_magnitude, &interpolated_phase) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(interpolated_magnitude == 1.0f && interpolated_phase == 0.2f);
+
+    const float invalid_interpolation_spectrum[] = {
+        1.0f, 0.0f, 2.0f, std::numeric_limits<float>::quiet_NaN(), 1.0f, 0.0f
+    };
+    assert(vea_s5_spp_interpolate_peak_f32(
+        invalid_interpolation_spectrum, 3, 1,
+        &interpolated_magnitude, &interpolated_phase) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_spp_interpolate_peak_f32(
+        interpolation_spectrum, 4, 4,
+        &interpolated_magnitude, &interpolated_phase) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
     VeaS5Arena* arena = nullptr;
     assert(vea_s5_arena_create(8192, &arena) == VEA_S5_TENSOR_STATUS_OK);
     assert(arena != nullptr);
