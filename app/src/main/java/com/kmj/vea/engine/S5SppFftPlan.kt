@@ -7,9 +7,11 @@ package com.kmj.vea.engine
  * separately 32-byte-aligned buffers. This class stores only their logical
  * contents; it is not itself a native record and does not expose raw pointers.
  *
- * Execution support is currently ported through the 512-lane inner radix
- * stage. This does not mean the complete real-FFT wrapper or final renderer
- * spectral pipeline is available.
+ * The portable real-FFT boundary is available for power-of-two frame
+ * sizes through 65536. Recovered S5-specific inner radix stages are exposed
+ * separately through 512 float lanes; this portable real transform is
+ * mathematically equivalent at its packed-spectrum boundary, not bit-exact
+ * with every vendor butterfly implementation.
  */
 class S5SppFftPlan internal constructor(
     val fftSize: Int,
