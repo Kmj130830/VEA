@@ -343,6 +343,18 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_run_vtb2_c5d50_block_f32(
     float* output, size_t channels, size_t positions,
     size_t expanded_features, float epsilon);
 
+/**
+ * Ports the in-place circular buffer rotation used by FUN_180133fd0.
+ * Positive shifts rotate left; negative shifts rotate right. Shifts are
+ * normalized modulo count by this portable adapter.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_rotate_circular_f32(
+    float* values, size_t count, int32_t shift);
+
+/** Ports the frame-wide scalar normalization in FUN_1801397d0. */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_scale_buffer_f32(
+    float* values, size_t count, float scale);
+
 /* Ports the MRW_LNSTATS reduction output: sum(input) and sum(input * input). */
 VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_reduce_sum_sumsq_f32(
     const float* input, size_t count, float* out_sum, float* out_sum_squares);
