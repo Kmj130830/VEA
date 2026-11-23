@@ -109,6 +109,12 @@ int main() {
         VEA_S5_TENSOR_STATUS_OK);
     assert(std::memcmp(phase_output_a, phase_output_b, sizeof(phase_output_a)) == 0);
     assert(std::memcmp(phase_state_a, phase_state_b, sizeof(phase_state_a)) == 0);
+    const uint32_t expected_phase_state_after_four_steps[] = {
+        0x972f3d15u, 0xeb183a5eu, 0xd0abc672u, 0x36156c97u
+    };
+    assert(std::memcmp(
+        phase_state_a, expected_phase_state_after_four_steps,
+        sizeof(expected_phase_state_after_four_steps)) == 0);
     assert(std::memcmp(phase_state_a, initial_phase_state, sizeof(phase_state_a)) != 0);
     assert(phase_output_a[1] == 0.0f);
     assert(phase_output_a[7] == 0.0f);
@@ -130,6 +136,20 @@ int main() {
     assert(std::fabs(std::hypot(phase_output_edge[6], phase_output_edge[7]) -
         spp_magnitudes[3]) < 1.0e-5f);
 
+    // The one-bin even mode follows the original DC then terminal-bin update path.
+    const float single_magnitude[] = {2.0f};
+    uint32_t single_state[4] = {
+        initial_phase_state[0], initial_phase_state[1],
+        initial_phase_state[2], initial_phase_state[3]
+    };
+    float single_output[2] = {};
+    assert(vea_s5_spp_generate_phase_noise_f32(
+        single_magnitude, 1, 0u, single_state, single_output, 2) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(single_output[1] == 0.0f);
+    assert(std::fabs(std::fabs(single_output[0]) - 2.0f) < 1.0e-6f);
+    assert(single_state[0] == 0x9abcdef0u && single_state[1] == 0x31415926u &&
+        single_state[2] == 0x27182818u && single_state[3] == 0xeb183a5eu);
     // Invalid requests do not mutate the caller RNG state or output buffer.
     uint32_t invalid_phase_state[4] = {
         initial_phase_state[0], initial_phase_state[1],
