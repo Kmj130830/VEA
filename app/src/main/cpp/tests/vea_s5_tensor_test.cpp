@@ -230,6 +230,66 @@ int main() {
         32u, -1, fft32_input, 31u, fft32_coefficients, 16u) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
 
+    // FUN_18007fff0: mixed 64/128-float radix stages with direction-independent leaves.
+    uint32_t fft64_split[7] = {};
+    float fft64_coefficients[32] = {};
+    assert(vea_s5_spp_fft_build_plan_f32(
+        64u, fft64_split, 7u, fft64_coefficients, 32u) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    float fft64_stage_input[64] = {};
+    for (size_t index = 0; index < 64u; ++index) {
+        fft64_stage_input[index] = static_cast<float>(
+            static_cast<int>((index * 5u + 2u) % 17u) - 8) * 0.125f;
+    }
+    float fft64_stage_a[64] = {};
+    float fft64_stage_b[64] = {};
+    std::memcpy(fft64_stage_a, fft64_stage_input, sizeof(fft64_stage_input));
+    std::memcpy(fft64_stage_b, fft64_stage_input, sizeof(fft64_stage_input));
+    assert(vea_s5_spp_fft_radix_stage_f32(
+        64u, fft64_stage_a, 64u, fft64_coefficients, 32u) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(vea_s5_spp_fft_radix_stage_f32(
+        64u, fft64_stage_b, 64u, fft64_coefficients, 32u) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(std::memcmp(fft64_stage_a, fft64_stage_b, sizeof(fft64_stage_a)) == 0);
+    assert(std::memcmp(fft64_stage_a, fft64_stage_input, sizeof(fft64_stage_a)) != 0);
+    for (float value : fft64_stage_a) assert(std::isfinite(value));
+
+    uint32_t fft128_split[10] = {};
+    float fft128_coefficients[64] = {};
+    assert(vea_s5_spp_fft_build_plan_f32(
+        128u, fft128_split, 10u, fft128_coefficients, 64u) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    float fft128_stage_input[128] = {};
+    for (size_t index = 0; index < 128u; ++index) {
+        fft128_stage_input[index] = static_cast<float>(
+            static_cast<int>((index * 7u + 3u) % 23u) - 11) * 0.0625f;
+    }
+    float fft128_stage_a[128] = {};
+    float fft128_stage_b[128] = {};
+    std::memcpy(fft128_stage_a, fft128_stage_input, sizeof(fft128_stage_input));
+    std::memcpy(fft128_stage_b, fft128_stage_input, sizeof(fft128_stage_input));
+    assert(vea_s5_spp_fft_radix_stage_f32(
+        128u, fft128_stage_a, 128u, fft128_coefficients, 64u) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(vea_s5_spp_fft_radix_stage_f32(
+        128u, fft128_stage_b, 128u, fft128_coefficients, 64u) ==
+        VEA_S5_TENSOR_STATUS_OK);
+    assert(std::memcmp(fft128_stage_a, fft128_stage_b, sizeof(fft128_stage_a)) == 0);
+    assert(std::memcmp(fft128_stage_a, fft128_stage_input, sizeof(fft128_stage_a)) != 0);
+    for (float value : fft128_stage_a) assert(std::isfinite(value));
+
+    float fft64_stage_unchanged[64] = {};
+    std::memcpy(fft64_stage_unchanged, fft64_stage_input, sizeof(fft64_stage_input));
+    assert(vea_s5_spp_fft_radix_stage_f32(
+        64u, fft64_stage_unchanged, 64u, fft64_coefficients, 31u) ==
+        VEA_S5_TENSOR_STATUS_BUFFER_TOO_SMALL);
+    assert(std::memcmp(fft64_stage_unchanged, fft64_stage_input,
+        sizeof(fft64_stage_input)) == 0);
+    assert(vea_s5_spp_fft_radix_stage_f32(
+        32u, fft64_stage_unchanged, 64u, fft64_coefficients, 32u) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
     // FUN_18007a000: FFT plan index is floor(log2(N)); zero maps to -1.
     int32_t fft_plan_index = 123;
     assert(vea_s5_spp_fft_log2_floor_u32(0u, &fft_plan_index) ==
