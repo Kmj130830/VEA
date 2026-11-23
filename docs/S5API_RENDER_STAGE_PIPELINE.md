@@ -114,11 +114,9 @@ For each key pair above, the VTB2 child object selected by the first key
 contains a dimension vector `[64,32,1,1]` and one F32 tensor of 2,048
 values (64 × 32). The child object selected by the second key contains a
 dimension vector `[32,1,7,7]` and one F32 tensor of 1,568 values
-(32 × 7 × 7). These are the confirmed per-stage/per-block tensor shapes for
-those two fields. Other c5d50 fields (projection return matrix, biases,
-affine vectors and state inputs) still require their own helper-key and
-descriptor-field mapping; this section does not claim the complete block
-is bound.
+(32 × 7 × 7). These two fields are part of the complete eight-tensor c5d50
+descriptor mapping documented in `S5API_C5D50_STAGE_BLOCK_PARAMETERS.md`;
+the other six fields are not inferred from these two shape matches.
 
 ## Descriptor arrays observed at the call sites
 
@@ -177,19 +175,25 @@ for assigning VTMG layer names to c5440 or c6390 stages.
 
 ## What is still unresolved
 
-The constructor that populates the descriptor arrays above has not yet been
-fully traced. The current static evidence does not establish:
+The c5d50 descriptor constructor and its VTB2 source are now
+recovered: `FUN_1800ced10` builds eight stage/block records and appends them
+to the configuration vector consumed by `FUN_1800c7ad0`. The remaining
+unresolved descriptor construction is specifically the three projection
+families:
 
-- which VTMG layer tensor is assigned to each `FUN_1800c5440` stage;
-- whether `FUN_1800c6390` descriptors point at VTMG weights, VTB2-conditioned
-  matrices, or a mixture, for a specific Megpoid configuration;
-- how the `0x28` descriptors consumed by `FUN_1800c72d0` are populated;
-- the conditioning tensors, parameter normalization values, and block
-  instance counts for the installed Megpoid package.
+- which VTMG tensors populate each `FUN_1800c5440` descriptor at slot `+0x94`;
+- which model parameters populate `FUN_1800c6390` descriptors at slot `+0xa0`;
+- how `FUN_1800c72d0` descriptors at slot `+0xac` receive their weights,
+  biases and mode-dependent scratch parameters;
+- how the VTMG `convN` and `condN` bundles are assigned to those descriptor
+  arrays, including the activation/gating operation between layers.
 
-These mappings must come from the render-state factory and its model-binding
-callers. VEA must not bind the nine VTMG tensor pairs by layer name or matching
-dimensions alone.
+VEA now builds a named VTMG graph plan containing `pre1`, `pre2`, three
+`convN/condN` pairs and `linear`. Each `convN` has both banked and temporal
+weight layouts available; each `condN` has its banked layout available. This
+is parameter preparation only. It deliberately does not equate a layer suffix
+with a renderer stage index until the factory's actual write/registration path
+is confirmed.
 
 ## VEA implementation boundary
 
@@ -311,6 +315,25 @@ zero, and c72d0 when it is nonzero. The plan also validates tensor dimensions
 and output lengths. This closes the decoded-tensor-to-operator call boundary
 for either projection mode, but it intentionally does not choose which of
 `conv1`, `conv2`, or `conv3` belongs to a specific descriptor index.
+
+## VTMG named graph-plan boundary
+
+`S5VtmgMegpoidGraphPlanBuilder` now converts all nine packed VTMG layers into
+one validated object containing `pre1`, `pre2`, three name-matched
+`convN/condN` parameter pairs, and `linear`. The three `convN` layers retain
+both the three-bank `[bank][output][input]` matrix layout and the
+`[output][input][tap]` temporal-kernel layout. Each `condN` is prepared as
+a one-bank 26-to-64 projection.
+
+The `convN/condN` pairing reflects the source model's paired names and
+matching 64-feature output widths. It is not yet a renderer descriptor
+mapping. The three pairs must not be automatically assigned to the
+three `c5440` or reverse projection descriptors from the names alone.
+
+`VocaloidAiEngineAdapter.prepareMegpoidVtmgGraphPlan()` loads the installed
+VOCALOID7.vtmg, packs the tensors, validates exact layer names and builds
+these operator plans. This is a complete named-parameter preparation
+boundary, not a complete graph evaluator or PCM generator.
 
 ## State-buffer sizing is separate from model-weight loading
 
