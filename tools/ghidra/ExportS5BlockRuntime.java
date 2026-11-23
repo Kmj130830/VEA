@@ -56,6 +56,8 @@ public class ExportS5BlockRuntime extends GhidraScript {
         // SPP FFT/IFFT, window, spectral-peak and interpolation helpers.
         "180040630", "180082a30", "18007a000",
         "18007d700", "18007fca0",
+        // FFT plan/table initialization that calls FUN_18007a000.
+        "180010110",
         // Leaf FFT permutations, radix stages, twiddle butterflies and packing.
         "18007e140", "18007db00", "18007cb90", "18007f170",
         "18007fff0", "1800800c0", "180081080", "18007c1c0", "18007b930",
