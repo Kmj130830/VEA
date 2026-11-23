@@ -63,7 +63,7 @@ public class ExportS5BlockRuntime extends GhidraScript {
         "18006d5d0", "180035b70", "180034cc0",
         "180030730", "1800356e0",
         "180135270", "1801347a0",
-        "1801360c0", "180135670", "180135b90",
+        "1801360c0", "180136150", "180135670", "180135b90",
         "18013a850", "1800789b0", "1800780b0",
 
         // Public model/resource initialization and render entry wrappers.
