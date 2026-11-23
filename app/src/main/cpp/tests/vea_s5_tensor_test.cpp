@@ -15,6 +15,14 @@ bool IsAligned(const void* pointer, uintptr_t alignment) {
         (reinterpret_cast<uintptr_t>(pointer) & (alignment - 1u)) == 0;
 }
 
+double SumSquares(const float* values, size_t count) {
+    double sum = 0.0;
+    for (size_t index = 0; index < count; ++index) {
+        sum += static_cast<double>(values[index]) * values[index];
+    }
+    return sum;
+}
+
 void AssertSppFftLeafMatchesDirectDft(
     uint32_t fft_size, int32_t direction,
     const float* input, const float* coefficients) {
@@ -254,6 +262,10 @@ int main() {
     assert(std::memcmp(fft64_stage_a, fft64_stage_b, sizeof(fft64_stage_a)) == 0);
     assert(std::memcmp(fft64_stage_a, fft64_stage_input, sizeof(fft64_stage_a)) != 0);
     for (float value : fft64_stage_a) assert(std::isfinite(value));
+    const double fft64_energy_in = SumSquares(fft64_stage_input, 64u);
+    const double fft64_energy_out = SumSquares(fft64_stage_a, 64u);
+    assert(std::fabs(fft64_energy_out / fft64_energy_in - 8.0) < 2.0e-3);
+
 
     uint32_t fft128_split[10] = {};
     float fft128_coefficients[64] = {};
@@ -278,6 +290,10 @@ int main() {
     assert(std::memcmp(fft128_stage_a, fft128_stage_b, sizeof(fft128_stage_a)) == 0);
     assert(std::memcmp(fft128_stage_a, fft128_stage_input, sizeof(fft128_stage_a)) != 0);
     for (float value : fft128_stage_a) assert(std::isfinite(value));
+    const double fft128_energy_in = SumSquares(fft128_stage_input, 128u);
+    const double fft128_energy_out = SumSquares(fft128_stage_a, 128u);
+    assert(std::fabs(fft128_energy_out / fft128_energy_in - 16.0) < 4.0e-3);
+
 
     float fft64_stage_unchanged[64] = {};
     std::memcpy(fft64_stage_unchanged, fft64_stage_input, sizeof(fft64_stage_input));
