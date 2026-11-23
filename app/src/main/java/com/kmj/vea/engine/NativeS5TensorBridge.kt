@@ -427,6 +427,22 @@ object NativeS5TensorBridge {
     }
 
     /**
+     * Interpolates a selected [magnitude,phase] peak from an SPP complex spectrum.
+     * Returns [refinedMagnitude, refinedPhase] using the recovered three-bin parabola.
+     */
+    fun interpolateSppPeak(magnitudePhase: FloatArray, peakIndex: Int): Pair<Float, Float> {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(magnitudePhase.isNotEmpty() && magnitudePhase.size % 2 == 0)
+        require(magnitudePhase.all { it.isFinite() })
+        val binCount = magnitudePhase.size / 2
+        require(peakIndex in 0 until binCount)
+        val result = nativeInterpolateSppPeak(magnitudePhase, binCount, peakIndex)
+            ?: throw IllegalArgumentException("SPP peak interpolation failed.")
+        check(result.size == 2)
+        return result[0] to result[1]
+    }
+
+    /**
      * Generates deterministic SPP spectral phase values from magnitudes.
      * state is a mutable four-word xorshift state and is updated in place.
      * Output is interleaved [real,imag]; edgeMode bit 0 controls the final
@@ -673,6 +689,7 @@ object NativeS5TensorBridge {
     private external fun nativeLookupSppWindowTable(table: DoubleArray, segmentCount: Int, scale: Double, fallbackValue: Double, x: Double): DoubleArray?
     private external fun nativeSppFftLog2Floor(size: Int): Int
     private external fun nativeGenerateSppPhaseNoise(magnitudes: FloatArray, state: IntArray, edgeMode: Int): FloatArray?
+    private external fun nativeInterpolateSppPeak(magnitudePhase: FloatArray, binCount: Int, peakIndex: Int): FloatArray?
     private external fun nativeSppPeakWeight(config: FloatArray, coordinate: Float): Float
     private external fun nativeFindSppWeightedPeak(values: FloatArray, valueStride: Int, startIndex: Int, endIndex: Int, binSpacing: Float, denominator: Float, weightConfig: FloatArray): Int
     private external fun nativeComputeMeanInvStd(sum: Float, sumSquares: Float, count: Int, epsilon: Float): FloatArray?
