@@ -104,6 +104,183 @@ extern "C" VeaS5TensorStatus vea_s5_spp_lookup_table_f64(
     *out_value = result;
     return VEA_S5_TENSOR_STATUS_OK;
 }
+extern "C" VeaS5TensorStatus vea_s5_spp_fft_build_plan_f32(
+    uint32_t fft_size, uint32_t* split_table, size_t split_table_count,
+    float* coefficients, size_t coefficient_count) {
+    if (fft_size < 4u || (fft_size & (fft_size - 1u)) != 0u ||
+        split_table == nullptr || coefficients == nullptr) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    // The original plan uses 32-bit sizes and allocates N/2 float coefficients.
+    if (fft_size > (1u << 24u)) return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
+
+    const size_t expected_coefficients = static_cast<size_t>(fft_size >> 1u);
+    const double split_extent =
+        std::sqrt(static_cast<double>(fft_size >> 1u)) + 2.0;
+    const size_t expected_split_count = static_cast<size_t>(split_extent);
+    if (split_table_count < expected_split_count ||
+        coefficient_count < expected_coefficients) {
+        return VEA_S5_TENSOR_STATUS_BUFFER_TOO_SMALL;
+    }
+
+    std::fill_n(split_table, split_table_count, 0u);
+    std::fill_n(coefficients, coefficient_count, 0.0f);
+
+    const uint32_t quarter_size = fft_size >> 2u;
+    split_table[0] = quarter_size;
+    split_table[1] = 1u;
+
+    uint32_t half_quarter = quarter_size >> 1u;
+    size_t stage_base = 0u;
+    float stage_angle = 0.0f;
+    float stage_cos_quarter = 0.0f;
+
+    if (half_quarter >= 3u) {
+        stage_angle = std::atan(1.0f) / static_cast<float>(half_quarter);
+        stage_cos_quarter =
+            std::cos(static_cast<float>(half_quarter) * stage_angle);
+        coefficients[0] = 1.0f;
+        coefficients[1] = stage_cos_quarter;
+
+        if (half_quarter == 4u) {
+            coefficients[2] = std::cos(stage_angle * 2.0f);
+            coefficients[3] = std::sin(stage_angle * 2.0f);
+        } else if (half_quarter > 4u) {
+            split_table[2] = 0u;
+            split_table[3] = 0x10u;
+
+            if (quarter_size > 0x20u) {
+                uint32_t remaining = quarter_size;
+                uint32_t radix = 2u;
+                while (remaining > 0x20u) {
+                    for (uint32_t index = radix; index < radix * 2u; ++index) {
+                        const uint32_t value = split_table[index];
+                        const size_t first_destination =
+                            static_cast<size_t>(radix) + index;
+                        const size_t second_destination =
+                            static_cast<size_t>(index) + radix * 2u;
+                        if (first_destination >= expected_split_count ||
+                            second_destination >= expected_split_count) {
+                            return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
+                        }
+                        split_table[first_destination] = value * 4u;
+                        split_table[second_destination] =
+                            value * 4u + radix * 0x10u;
+                    }
+                    remaining >>= 2u;
+                    radix <<= 1u;
+                }
+            }
+
+            const float cos_two = std::cos(stage_angle * 2.0f);
+            const float cos_six = std::cos(stage_angle * 6.0f);
+            if (cos_two == 0.0f || cos_six == 0.0f ||
+                !std::isfinite(cos_two) || !std::isfinite(cos_six)) {
+                return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+            }
+            coefficients[2] = 0.5f / cos_two;
+            coefficients[3] = 0.5f / cos_six;
+
+            for (uint32_t index = 4u; index < half_quarter; index += 4u) {
+                if (static_cast<size_t>(index) + 3u >= expected_coefficients) {
+                    return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
+                }
+                const float angle = static_cast<float>(index) * stage_angle;
+                const float triple_angle = angle * 3.0f;
+                coefficients[index] = std::cos(angle);
+                coefficients[index + 1u] = std::sin(angle);
+                coefficients[index + 2u] = std::cos(triple_angle);
+                coefficients[index + 3u] = -std::sin(triple_angle);
+            }
+        }
+
+        // FUN_180082220's recursive radix-stage table construction.
+        for (;;) {
+            const size_t next_stage = stage_base + half_quarter;
+            half_quarter >>= 1u;
+            if (next_stage + 1u >= expected_coefficients) {
+                return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
+            }
+            coefficients[next_stage] = 1.0f;
+            coefficients[next_stage + 1u] = stage_cos_quarter;
+
+            if (half_quarter == 4u) {
+                if (stage_base + 5u >= expected_coefficients ||
+                    next_stage + 3u >= expected_coefficients) {
+                    return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
+                }
+                coefficients[next_stage + 2u] = coefficients[stage_base + 4u];
+                coefficients[next_stage + 3u] = coefficients[stage_base + 5u];
+                stage_base = next_stage;
+                continue;
+            }
+
+            if (half_quarter > 4u) {
+                if (stage_base + 6u >= expected_coefficients ||
+                    next_stage + 3u >= expected_coefficients) {
+                    return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
+                }
+                const float cosine_two = coefficients[stage_base + 4u];
+                const float cosine_six = coefficients[stage_base + 6u];
+                if (cosine_two == 0.0f || cosine_six == 0.0f) {
+                    return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+                }
+                coefficients[next_stage + 2u] = 0.5f / cosine_two;
+                coefficients[next_stage + 3u] = 0.5f / cosine_six;
+
+                const uint32_t copy_groups = ((half_quarter - 5u) >> 2u) + 1u;
+                for (uint32_t group = 0u; group < copy_groups; ++group) {
+                    const size_t source = stage_base + 8u +
+                        static_cast<size_t>(group) * 8u;
+                    const size_t destination = next_stage + 4u +
+                        static_cast<size_t>(group) * 4u;
+                    if (source + 3u >= expected_coefficients ||
+                        destination + 3u >= expected_coefficients) {
+                        return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
+                    }
+                    coefficients[destination] = coefficients[source];
+                    coefficients[destination + 1u] = coefficients[source + 1u];
+                    coefficients[destination + 2u] = coefficients[source + 2u];
+                    coefficients[destination + 3u] = coefficients[source + 3u];
+                }
+                stage_base = next_stage;
+                continue;
+            }
+            break;
+        }
+    }
+
+    // FUN_18004ec80's second half fills the terminal cosine/sine table.
+    if (static_cast<uint64_t>(split_table[1]) * 4u < fft_size) {
+        split_table[1] = quarter_size;
+        if (quarter_size > 1u) {
+            const uint32_t eighth_size = fft_size >> 3u;
+            if (eighth_size == 0u ||
+                static_cast<size_t>(quarter_size) + eighth_size >= expected_coefficients) {
+                return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
+            }
+            const float angle_step =
+                std::atan(1.0f) / static_cast<float>(eighth_size);
+            const float quarter_cosine =
+                std::cos(static_cast<float>(eighth_size) * angle_step);
+            coefficients[quarter_size] = quarter_cosine;
+            coefficients[quarter_size + eighth_size] = quarter_cosine * 0.5f;
+            for (uint32_t index = 1u; index < eighth_size; ++index) {
+                const float angle = static_cast<float>(index) * angle_step;
+                coefficients[quarter_size + index] = std::cos(angle) * 0.5f;
+                coefficients[(quarter_size * 2u) - index] = std::sin(angle) * 0.5f;
+            }
+        }
+    }
+
+    for (size_t index = 0; index < expected_coefficients; ++index) {
+        if (!std::isfinite(coefficients[index])) {
+            return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+        }
+    }
+    return VEA_S5_TENSOR_STATUS_OK;
+}
+
 extern "C" VeaS5TensorStatus vea_s5_spp_fft_log2_floor_u32(
     uint32_t value, int32_t* out_index) {
     if (out_index == nullptr) return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
