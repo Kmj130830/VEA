@@ -739,4 +739,100 @@ class S5VtmgBaseGraphTest {
         }
     }
 
+    @Test
+    fun namedMegpoidGraphNodesDispatchToTheExplicitS5Operators() {
+        fun banked(input: Int, output: Int, banks: Int) = S5VtmgBankedProjectionPlan(
+            weights = FloatArray(input * output * banks),
+            bias = FloatArray(output),
+            inputFeatures = input,
+            outputFeatures = output,
+            banks = banks
+        )
+        fun convolution(ordinal: Int): S5VtmgConditionalConvolutionPairPlan {
+            val name = "conv" + ordinal
+            val bank = banked(32, 64, 3)
+            val temporal = S5VtmgTemporalProjectionPlan(
+                layerName = name,
+                weights = FloatArray(64 * 32 * 3),
+                bias = FloatArray(64),
+                inputChannels = 32,
+                outputChannels = 64,
+                kernelWidth = 3
+            )
+            return S5VtmgConditionalConvolutionPairPlan(
+                ordinal = ordinal,
+                convolution = S5VtmgRendererProjectionPlan(name, bank, temporal),
+                conditioning = banked(26, 64, 1)
+            )
+        }
+        val plan = S5VtmgMegpoidGraphPlan(
+            pre1 = banked(82, 32, 1),
+            pre2 = banked(32, 32, 1),
+            convolutionPairs = listOf(convolution(1), convolution(2), convolution(3)),
+            linear = banked(32, 3, 1)
+        )
+        val calls = mutableListOf<String>()
+        val executor = object : S5VtmgGraphOperatorExecutor {
+            override fun projectBanked(
+                plan: S5VtmgBankedProjectionPlan, input: FloatArray, positions: Int
+            ): FloatArray {
+                calls += "banked:${plan.inputFeatures}:${plan.outputFeatures}:${plan.banks}"
+                return FloatArray(plan.outputFeatures * positions * plan.banks)
+            }
+
+            override fun projectStride2(
+                plan: S5VtmgTemporalProjectionPlan, input: FloatArray, positions: Int
+            ): FloatArray {
+                calls += "stride2:${plan.inputChannels}:${plan.outputChannels}:${plan.kernelWidth}"
+                val outputPositions = (positions - (plan.kernelWidth % 2)) / 2 + 1
+                return FloatArray(plan.outputChannels * outputPositions)
+            }
+
+            override fun projectUpsample2(
+                plan: S5VtmgTemporalProjectionPlan, input: FloatArray, positions: Int
+            ): FloatArray {
+                calls += "upsample2:${plan.inputChannels}:${plan.outputChannels}:${plan.kernelWidth}"
+                return FloatArray(plan.outputChannels * positions * 2)
+            }
+        }
+
+        assertEquals(32 * 4, plan.projectPre1(FloatArray(82 * 4), 4, executor).size)
+        assertEquals(32 * 4, plan.projectPre2(FloatArray(32 * 4), 4, executor).size)
+        assertEquals(64 * 4, plan.projectConditioning(2, FloatArray(26 * 4), 4, executor).size)
+        assertEquals(
+            64 * 2,
+            plan.projectConvolution(
+                3, S5RendererProjectionOperator.STRIDE2_CONV1D_C5440,
+                FloatArray(32 * 4), 4, executor
+            ).size
+        )
+        assertEquals(
+            64 * 4 * 3,
+            plan.projectConvolution(
+                1, S5RendererProjectionOperator.BANKED_LINEAR_C6390,
+                FloatArray(32 * 4), 4, executor
+            ).size
+        )
+        assertEquals(
+            64 * 4 * 2,
+            plan.projectConvolution(
+                2, S5RendererProjectionOperator.UPSAMPLE_2X_C72D0,
+                FloatArray(32 * 4), 4, executor
+            ).size
+        )
+        assertEquals(3 * 4, plan.projectLinear(FloatArray(32 * 4), 4, executor).size)
+        assertEquals(
+            listOf(
+                "banked:82:32:1",
+                "banked:32:32:1",
+                "banked:26:64:1",
+                "stride2:32:64:3",
+                "banked:32:64:3",
+                "upsample2:32:64:3",
+                "banked:32:3:1"
+            ),
+            calls
+        )
+    }
+
 }
