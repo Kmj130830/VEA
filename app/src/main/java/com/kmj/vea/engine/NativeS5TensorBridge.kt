@@ -519,6 +519,26 @@ object NativeS5TensorBridge {
             ?: throw IllegalArgumentException("S5 FFT leaf execution failed.")
     }
 
+    /**
+     * Executes the recovered mixed-radix FFT stage for 64- or 128-float
+     * interleaved complex buffers. This is one inner stage, not a complete
+     * real-FFT transform or PCM rendering operation.
+     */
+    fun applySppFftRadixStage(
+        fftSize: Int,
+        interleavedValues: FloatArray,
+        coefficients: FloatArray
+    ): FloatArray {
+        check(loaded) { "Native S5 tensor library is not loaded." }
+        require(fftSize == 64 || fftSize == 128)
+        require(interleavedValues.size == fftSize)
+        require(coefficients.size >= fftSize / 2)
+        require(interleavedValues.all { it.isFinite() })
+        require(coefficients.all { it.isFinite() })
+        return nativeSppFftRadixStage(fftSize, interleavedValues, coefficients)
+            ?: throw IllegalArgumentException("S5 FFT radix stage execution failed.")
+    }
+
     /** Returns the floor(log2(N)) plan-table index used by FUN_180040630. */
     fun sppFftLog2PlanIndex(size: Int): Int {
         check(loaded) { "Native S5 tensor library is not loaded." }
@@ -749,6 +769,7 @@ object NativeS5TensorBridge {
     private external fun nativeSppFftLog2Floor(size: Int): Int
     private external fun nativeSppFftSmallLeaf(fftSize: Int, direction: Int, values: FloatArray): FloatArray?
     private external fun nativeSppFftLeaf(fftSize: Int, direction: Int, values: FloatArray, coefficients: FloatArray): FloatArray?
+    private external fun nativeSppFftRadixStage(fftSize: Int, values: FloatArray, coefficients: FloatArray): FloatArray?
     private external fun nativeBuildSppFftPlan(fftSize: Int, splitTable: IntArray, coefficients: FloatArray): Boolean
     private external fun nativeGenerateSppPhaseNoise(magnitudes: FloatArray, state: IntArray, edgeMode: Int): FloatArray?
     private external fun nativeInterpolateSppPeak(magnitudePhase: FloatArray, binCount: Int, peakIndex: Int): FloatArray?
