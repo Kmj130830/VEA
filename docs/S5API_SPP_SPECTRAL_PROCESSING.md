@@ -90,6 +90,32 @@ calling a generic complex FFT and only copying the result is not equivalent.
 The full real-FFT wrapper and the stage kernels for lengths above 32 remain
 unported.
 
+## Ported 64/128-lane mixed radix stages
+
+`FUN_18007fff0` is now represented by
+`vea_s5_spp_fft_radix_stage_f32()`. Its `fft_size` argument counts float
+lanes in the interleaved complex buffer, not complex samples:
+
+| Float lanes | Chunk layout | Per-chunk leaf calls |
+|---:|---|---|
+| 64 | 4 × 16 floats | `db00`, `ddc0`, `db00`, `db00` |
+| 128 | 4 × 32 floats | `e140`, `e820`, `e140`, `e140` |
+
+The `ddc0` and `e820` alternate sub-block butterflies are ported as
+private native kernels. The stage uses the exact plan-pointer offsets seen
+in the parent function: `N/2 - 8` for the `db00/e140` chunks and, for the
+128-lane alternate `e820` chunk, `N/2 - 32`. The caller's data is copied
+to bounded scratch storage before the sub-blocks are executed, so malformed
+parameters leave the original buffer unchanged.
+
+`NativeS5TensorBridge.applySppFftRadixStage()` and
+`S5SppFftPlan.transformRadixStage()` expose the operation. Native tests
+cover 64- and 128-lane plans, repeatability, finite outputs and short-plan
+rejection. This stage is only the inner `FUN_18007fff0` subroutine: the
+root's direction-specific input preparation (`cb90/f170`), recursive
+larger-stage dispatch (`0800c0/081080`), final reorder (`c1c0/b930`),
+and real-spectrum packing in `FUN_180082a30` are not yet joined.
+
 ## Generated FFT plan-record arrays
 
 `FUN_180010110` selects inclusive plan indices
