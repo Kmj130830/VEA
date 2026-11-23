@@ -129,9 +129,12 @@ strictly greater score, so the first index wins ties.
 VEA implements `vea_s5_spp_peak_weight_f32` and the shared
 `vea_s5_spp_find_weighted_peak_f32` native primitive, exposed through
 `NativeS5TensorBridge.sppPeakWeight()` and
-`NativeS5TensorBridge.findSppWeightedPeak()`. Tests cover periodic wrap,
-both sides of the weighting region, stride-1/stride-2 scans, changed peak
-ranking, first-wins tie behavior, and invalid input preservation.
+`NativeS5TensorBridge.findSppWeightedPeak()`. The
+`S5SppPeakSearchPlan` stores the five-float weighting config plus bin
+spacing/normalization and offers separate stride-1 magnitude and stride-2
+magnitude/phase entry points. Tests cover periodic wrap, both sides of the
+weighting region, both scan layouts, changed peak ranking, first-wins tie
+behavior, and invalid input preservation.
 
 This recovers candidate-index selection only. `FUN_1801343c0` additionally
 interpolates the local maximum and phase between neighboring bins, while
