@@ -410,6 +410,16 @@ VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_fft_leaf_f32(
     const float* coefficients, size_t coefficient_count);
 
 /**
+ * Executes the recovered mixed radix stage used by FUN_18007fff0.
+ * fft_size is the interleaved float-lane count: 64 or 128. The stage
+ * processes four contiguous 16- or 32-float subblocks, respectively.
+ * The coefficient buffer is the size-indexed S5 plan's N/2 float table.
+ */
+VEA_S5_TENSOR_API VeaS5TensorStatus vea_s5_spp_fft_radix_stage_f32(
+    uint32_t fft_size, float* interleaved, size_t value_count,
+    const float* coefficients, size_t coefficient_count);
+
+/**
  * Builds one 0x18-byte S5 real-FFT plan record's two backing arrays.
  * fft_size must be a power of two >= 4. split_table stores the compact
  * stage/decomposition schedule; coefficients stores the recovered float
