@@ -1225,8 +1225,11 @@ extern "C" VeaS5TensorStatus vea_s5_spp_fft_radix_stage_f32(
         output[index] = interleaved[index];
     }
 
+    // FUN_18007fff0 receives splitTable[0] (N/4) as param_3,
+    // so its pointer arithmetic is relative to quarter_size, not N/2.
+    const uint32_t quarter_size = fft_size / 4u;
     if (fft_size == 64u) {
-        const float* local_twiddle = coefficients + (fft_size / 2u - 8u);
+        const float* local_twiddle = coefficients + (quarter_size - 8u);
         for (size_t block = 0; block < 4u; ++block) {
             float* values = output + block * 16u;
             if (block == 1u) {
@@ -1236,8 +1239,8 @@ extern "C" VeaS5TensorStatus vea_s5_spp_fft_radix_stage_f32(
             }
         }
     } else {
-        const float* fft32_twiddle = coefficients + (fft_size / 2u - 8u);
-        const float* alternate_twiddle = coefficients + (fft_size / 2u - 32u);
+        const float* fft32_twiddle = coefficients + (quarter_size - 8u);
+        const float* alternate_twiddle = coefficients + (quarter_size - 32u);
         for (size_t block = 0; block < 4u; ++block) {
             float* values = output + block * 32u;
             if (block == 1u) {
