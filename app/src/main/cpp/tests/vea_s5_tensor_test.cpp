@@ -114,6 +114,43 @@ int main() {
         256u, fft_split_256, 12, fft_coefficients_256, 128) ==
         VEA_S5_TENSOR_STATUS_BUFFER_TOO_SMALL);
 
+    // FUN_18007d700 / FUN_18007fca0: exact small complex-leaf butterfly orders.
+    float fft4_negative[] = {1.0f, 2.0f, 3.0f, 4.0f};
+    assert(vea_s5_spp_fft_small_leaf_f32(
+        4u, -1, fft4_negative, 4) == VEA_S5_TENSOR_STATUS_OK);
+    const float expected_fft4[] = {4.0f, 6.0f, -2.0f, -2.0f};
+    assert(std::memcmp(fft4_negative, expected_fft4, sizeof(expected_fft4)) == 0);
+    float fft4_positive[] = {1.0f, 2.0f, 3.0f, 4.0f};
+    assert(vea_s5_spp_fft_small_leaf_f32(
+        4u, 1, fft4_positive, 4) == VEA_S5_TENSOR_STATUS_OK);
+    assert(std::memcmp(fft4_positive, expected_fft4, sizeof(expected_fft4)) == 0);
+
+    const float fft8_input[] = {1.0f, 10.0f, 2.0f, 20.0f, 3.0f, 30.0f, 4.0f, 40.0f};
+    float fft8_negative[8] = {};
+    std::memcpy(fft8_negative, fft8_input, sizeof(fft8_input));
+    assert(vea_s5_spp_fft_small_leaf_f32(
+        8u, -1, fft8_negative, 8) == VEA_S5_TENSOR_STATUS_OK);
+    const float expected_fft8_negative[] = {
+        10.0f, 100.0f, -22.0f, -18.0f, -2.0f, -20.0f, 18.0f, -22.0f
+    };
+    assert(std::memcmp(fft8_negative, expected_fft8_negative, sizeof(expected_fft8_negative)) == 0);
+
+    float fft8_positive[8] = {};
+    std::memcpy(fft8_positive, fft8_input, sizeof(fft8_input));
+    assert(vea_s5_spp_fft_small_leaf_f32(
+        8u, 1, fft8_positive, 8) == VEA_S5_TENSOR_STATUS_OK);
+    const float expected_fft8_positive[] = {
+        10.0f, 100.0f, 18.0f, -22.0f, -2.0f, -20.0f, -22.0f, -18.0f
+    };
+    assert(std::memcmp(fft8_positive, expected_fft8_positive, sizeof(expected_fft8_positive)) == 0);
+    float invalid_fft8[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f,
+        7.0f, std::numeric_limits<float>::quiet_NaN()};
+    assert(vea_s5_spp_fft_small_leaf_f32(
+        8u, -1, invalid_fft8, 8) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(invalid_fft8[0] == 1.0f && invalid_fft8[6] == 7.0f);
+    assert(vea_s5_spp_fft_small_leaf_f32(
+        16u, -1, fft8_negative, 8) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+
     // FUN_18007a000: FFT plan index is floor(log2(N)); zero maps to -1.
     int32_t fft_plan_index = 123;
     assert(vea_s5_spp_fft_log2_floor_u32(0u, &fft_plan_index) ==
