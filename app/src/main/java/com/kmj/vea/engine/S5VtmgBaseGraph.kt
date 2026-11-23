@@ -269,15 +269,6 @@ data class S5VtmgBankedProjectionPlan(
 }
 
 /**
- * Operator-ready temporal projection parameters for the recovered c5440 and
- * c72d0 primitives. The caller must select the operation explicitly:
- * - projectStride2() invokes FUN_1800c5440.
- * - projectUpsample2() invokes FUN_1800c72d0 and requires a three-tap kernel.
- *
- * The plan preserves the source layer name for diagnostics only. It does not
- * assign any VTMG layer to a renderer stage.
- */
-/**
  * Mode-selected projection using a VTMG layer's three matrix banks.
  *
  * rawModeFlag == 0: c6390 banked-linear projection.
@@ -350,6 +341,15 @@ data class S5VtmgRendererProjectionPlan(
         }
     }
 }
+/**
+ * Operator-ready temporal projection parameters for the recovered c5440 and
+ * c72d0 primitives. The caller must select the operation explicitly:
+ * - projectStride2() invokes FUN_1800c5440.
+ * - projectUpsample2() invokes FUN_1800c72d0 and requires a three-tap kernel.
+ *
+ * The plan preserves the source layer name for diagnostics only. It does not
+ * assign any VTMG layer to a renderer stage.
+ */
 data class S5VtmgTemporalProjectionPlan(
     val layerName: String,
     val weights: FloatArray,
