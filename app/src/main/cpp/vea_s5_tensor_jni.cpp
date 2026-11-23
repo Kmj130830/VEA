@@ -1696,3 +1696,61 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeSppCubicSegment(
     return env->ExceptionCheck() ? nullptr : result;
 }
 
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeAccumulateSppFrameSamples(
+    JNIEnv* env, jobject,
+    jfloatArray source_array, jfloatArray partial_array,
+    jint base_index, jint offset, jint window_span,
+    jdoubleArray table_array, jint segment_count,
+    jdouble window_scale, jdouble window_fallback) {
+    if (source_array == nullptr || partial_array == nullptr ||
+        table_array == nullptr || window_span <= 0 || segment_count < 0 ||
+        segment_count == std::numeric_limits<jint>::max()) return nullptr;
+
+    const jsize source_count = env->GetArrayLength(source_array);
+    const jsize partial_count = env->GetArrayLength(partial_array);
+    const jsize table_length = env->GetArrayLength(table_array);
+    if (env->ExceptionCheck() || source_count < 0 || partial_count < 0 ||
+        table_length < segment_count + (segment_count > 0 ? 1 : 0)) return nullptr;
+
+    try {
+        std::vector<float> source(static_cast<size_t>(source_count));
+        std::vector<float> partial(static_cast<size_t>(partial_count));
+        std::vector<double> table(static_cast<size_t>(table_length));
+        std::vector<float> output(static_cast<size_t>(source_count), 0.0f);
+        if (source_count > 0) {
+            env->GetFloatArrayRegion(source_array, 0, source_count, source.data());
+            if (env->ExceptionCheck()) return nullptr;
+        }
+        if (partial_count > 0) {
+            env->GetFloatArrayRegion(partial_array, 0, partial_count, partial.data());
+            if (env->ExceptionCheck()) return nullptr;
+        }
+        if (table_length > 0) {
+            env->GetDoubleArrayRegion(table_array, 0, table_length, table.data());
+            if (env->ExceptionCheck()) return nullptr;
+        }
+
+        const VeaS5TensorStatus status = vea_s5_spp_accumulate_frame_samples_f32(
+            source.empty() ? nullptr : source.data(), source.size(),
+            partial.empty() ? nullptr : partial.data(), partial.size(),
+            static_cast<int32_t>(base_index), static_cast<int32_t>(offset),
+            static_cast<uint32_t>(window_span),
+            table.empty() ? nullptr : table.data(), table.size(),
+            static_cast<size_t>(segment_count), window_scale, window_fallback,
+            output.empty() ? nullptr : output.data(), output.size());
+        if (status != VEA_S5_TENSOR_STATUS_OK) return nullptr;
+
+        jfloatArray result = env->NewFloatArray(source_count);
+        if (result != nullptr && source_count > 0) {
+            env->SetFloatArrayRegion(result, 0, source_count, output.data());
+        }
+        return env->ExceptionCheck() ? nullptr : result;
+    } catch (const std::bad_alloc&) {
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
