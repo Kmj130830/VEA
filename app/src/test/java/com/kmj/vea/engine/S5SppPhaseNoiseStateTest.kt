@@ -32,17 +32,20 @@ class S5SppPhaseNoiseStateTest {
     @Test
     fun `phase state restores a prior deterministic checkpoint`() {
         val stream = S5SppPhaseNoiseState(intArrayOf(10, 20, 30, 40)) { _, state, _ ->
+            state[0] += 1
             state[3] = state[0] xor state[1]
             FloatArray(0)
         }
 
         stream.generate(floatArrayOf(1f))
         val checkpoint = stream.snapshot()
+        assertArrayEquals(intArrayOf(11, 20, 30, 31), checkpoint)
         stream.generate(floatArrayOf(2f))
+        assertArrayEquals(intArrayOf(12, 20, 30, 24), stream.snapshot())
         stream.restore(checkpoint)
         assertArrayEquals(checkpoint, stream.snapshot())
         stream.generate(floatArrayOf(3f))
-        assertArrayEquals(checkpoint, stream.snapshot().also { it[3] = checkpoint[0] xor checkpoint[1] })
+        assertArrayEquals(intArrayOf(12, 20, 30, 24), stream.snapshot())
     }
 
     @Test
