@@ -36,6 +36,7 @@ add_library(veas5tensor SHARED
     vea_s5_upsample2_conv3.cpp
     vea_s5_block.cpp
     vea_s5_history_ring.cpp
+    vea_s5_spp.cpp
 )
 target_include_directories(veas5tensor PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_definitions(veas5tensor PRIVATE VEA_S5_TENSOR_BUILD)
