@@ -74,6 +74,25 @@ class S5SppFftPlan internal constructor(
         require(interleavedValues.all { it.isFinite() })
         return execute(fftSize, interleavedValues, coefficientData.copyOf())
     }
+    /**
+     * Runs the recovered 256/512-lane large radix stage. This is an inner
+     * stage of FUN_1800800c0; it does not perform the root reorder or real
+     * spectrum packing.
+     */
+    fun transformLargeRadixStage(
+        mode: Int,
+        interleavedValues: FloatArray,
+        execute: (Int, Int, FloatArray, FloatArray) -> FloatArray =
+            NativeS5TensorBridge::applySppFftLargeRadixStage
+    ): FloatArray {
+        require(fftSize == 256 || fftSize == 512) {
+            "Only 256- and 512-lane large radix stages are available."
+        }
+        require(mode == 0 || mode == 1)
+        require(interleavedValues.size == fftSize)
+        require(interleavedValues.all { it.isFinite() })
+        return execute(fftSize, mode, interleavedValues, coefficientData.copyOf())
+    }
     init {
         require(fftSize >= 4 && (fftSize and (fftSize - 1)) == 0)
         val expectedSplitCount = kotlin.math.sqrt(fftSize / 2.0).toInt() + 2
