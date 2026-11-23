@@ -1248,6 +1248,7 @@ Java_com_kmj_vea_engine_NativeS5TensorBridge_nativeLookupSppWindowTable(
     JNIEnv* env, jobject, jdoubleArray table_array, jint segment_count,
     jdouble scale, jdouble fallback_value, jdouble x) {
     if (table_array == nullptr || segment_count < 0 ||
+        segment_count == std::numeric_limits<jint>::max() ||
         !std::isfinite(scale) || scale < 0.0 ||
         !std::isfinite(fallback_value) || !std::isfinite(x)) return nullptr;
 
