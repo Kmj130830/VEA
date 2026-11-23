@@ -48,6 +48,40 @@ The above operation order is based on decompiled call sites and data flow;
 exact FFT scaling, window coefficients, peak interpolation, and all state
 field meanings still require dedicated helper decompilation and tests.
 
+## FFT size-plan index and branch dispatch
+
+`FUN_18007a000(uint32 n)` is now ported as
+`NativeS5TensorBridge.sppFftLog2PlanIndex(n)`. It returns `-1` for `n=0`
+and `floor(log2(n))` for positive 32-bit lengths. `FUN_180040630` uses this
+index to address a 0x18-byte plan record in the FFT context.
+
+`FUN_180040630` passes a signed direction to `FUN_180082a30`:
+
+| Wrapper direction flag | Signed direction | Core branch | Final helper |
+|---:|---:|---|---|
+| `0` | `+1` | `FUN_18007fca0` | `FUN_18007b930` |
+| non-zero | `-1` | `FUN_18007d700` | `FUN_18007c1c0` |
+
+This table records the actual call branches only. The semantic naming of
+positive/negative exponent as a user-facing forward/inverse convention is
+not inferred here.
+
+The two core branches have now been recovered as functions. Both contain
+dedicated kernels for lengths 4 and 8. Length 16 uses
+`FUN_18007db00`; length 32 uses `FUN_18007e140`. For lengths above 32:
+
+- the negative-direction path prepares data through `FUN_18007cb90`;
+- the positive-direction path prepares data through `FUN_18007f170`;
+- both dispatch to `FUN_18007fff0` below 128, `FUN_1800800c0` below 512,
+  and `FUN_180081080` from 512 upward;
+- the two directions then use their different final helper, `FUN_18007c1c0`
+  or `FUN_18007b930`.
+
+`FUN_180082a30` also performs real/complex edge-bin packing around those
+complex FFT kernels. The small-size butterflies, data preparation and
+direction-specific output stages are therefore part of the porting contract;
+calling a generic complex FFT and only copying the result is not equivalent.
+
 ## Implemented SPP buffer primitives
 
 Two buffer-level operations in the recovered SPP path are now ported to the
