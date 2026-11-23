@@ -44,9 +44,11 @@ frame-processing path, not an isolated sample utility.
 - The frame routine then invokes `FUN_1801334b0` on one or more spectral
   transfer buffers to apply additional frame-domain processing.
 
-The above operation order is based on decompiled call sites and data flow;
-exact FFT scaling, window coefficients, peak interpolation, and all state
-field meanings still require dedicated helper decompilation and tests.
+The above operation order is based on decompiled call sites and data flow.
+VEA now has a portable real-FFT boundary, native window-table lookup, peak
+selection/interpolation, phase-noise generation, frame rotation and scalar
+normalization. The exact Yamaha FFT butterfly schedule and the state/descriptor
+mapping for the complete SPP orchestrator remain separate integration work.
 
 ## FFT size-plan index and branch dispatch
 
@@ -84,11 +86,11 @@ For lengths above 32:
   or `FUN_18007b930`.
 
 `FUN_180082a30` also performs real/complex edge-bin packing around those
-complex FFT kernels. The 4/8/16/32 leaf butterflies, data preparation and
-direction-specific output stages are therefore part of the porting contract;
-calling a generic complex FFT and only copying the result is not equivalent.
-The full real-FFT wrapper and the stage kernels for lengths above 32 remain
-unported.
+complex FFT kernels. The 4/8/16/32 vendor leaf butterflies, data preparation
+and direction-specific output stages remain part of the bit-exact porting
+contract. Separately, VEA now supplies a portable mathematically equivalent
+real-FFT boundary for forward/inverse SPP frame processing. That portable
+wrapper is DFT/round-trip tested but is not bit-exact with the vendor schedule.
 
 ## Ported 64/128-lane mixed radix stages
 
@@ -295,6 +297,32 @@ preservation, both terminal-bin modes, the one-bin boundary, and failure
 atomicity for invalid magnitude inputs. Kotlin tests cover persistent state,
 checkpoint restore and input validation.
 
+## Inverse-frame post-processing plan
+
+`FUN_1801334b0` has the following confirmed operation sequence:
+
+1. Clear its frame auxiliary region and ask `FUN_1801347a0` to prepare the
+   partial/window contribution buffer.
+2. Run `FUN_180040630` with direction `1` to produce a real time-domain
+   frame in the internal work buffer.
+3. Run `FUN_1801397d0` over exactly `frameSize` floats with scale
+   `1.0 / frameSize`.
+4. Run `FUN_180133fd0` over the same frame buffer with shift `-offset`.
+5. Accumulate output samples from the shifted frame, the prepared partial/
+   window contribution, and a descriptor-provided amplitude stream.
+
+`S5SppInverseFramePlan` now implements steps 2–4 in that order. It validates
+the FFT size and offset, copies the packed spectrum before invoking the
+inverse transform, and checks the length/finite-value contract at every
+boundary. Its JVM test verifies the exact call order and parameters:
+`direction=1`, `scale=1/frameSize`, `shift=-offset`.
+
+The later sample accumulation (step 5) is deliberately outside the plan.
+The decompilation reads a separate partial/window buffer, a double-table
+window coefficient configuration, and a per-sample amplitude stream; these
+must be bound from the model/render state before the complete function is
+considered ported.
+
 ## Window-table coefficient lookup
 
 `FUN_180139870(double* config, double x)` is the SPP window-coefficient
@@ -334,29 +362,37 @@ Do not substitute an arbitrary FFT implementation until their array layouts,
 twiddle table construction, scaling and ordering have been recovered and
 tested against the wrapper's observable output.
 
-## Helper functions requiring exact ports
+## Remaining exact-port and SPP integration work
 
-| Function | Current evidence | Still required |
+| Function | Ported boundary | Still required |
 |---|---|---|
-| `FUN_180040630` | Called with direction 0 and 1 for forward/inverse transforms | FFT layout, scaling, normalization, supported sizes |
-| `FUN_180139870` | Supplies the analysis window coefficient | Window family, parameter mapping, edge behavior |
-| `FUN_1801397d0` | Applies scalar normalization to a frame buffer | Full vector/count semantics and exact scaling |
-| `FUN_1801343c0` | Selects/interpolates peaks from a magnitude/phase spectrum | Peak threshold, neighborhood and interpolation details |
-| `FUN_180133ba0` | Alternative peak selection used by lazy-phase mode | Exact branch equivalence and output contract |
-| `FUN_180135490` | Advances a four-word PRNG state and generates signed/complex spectral values | Seed initialization and complete output interpretation |
-| `FUN_180133fd0` | Circularly shifts a float buffer | Exact buffer ownership and aliasing contract |
-| `FUN_1801334b0` | Runs an inverse transform and writes frame-domain results | Input spectrum contract, windowing and overlap semantics |
+| `FUN_180040630` / `FUN_180082a30` | Portable real forward/inverse transform, packed DC/Nyquist bins and unnormalized inverse scale | Bit-exact vendor butterfly schedule, root permutations and stage-descriptor composition |
+| `FUN_180139870` | Double-precision table lookup and interpolation | Bind the actual window-table config to the renderer state |
+| `FUN_1801397d0` | Frame-wide scalar multiplication | Bind exact renderer buffer ownership |
+| `FUN_1801343c0` | Three-bin peak refinement and phase unwrap | Full peak-list loop and descriptor mapping |
+| `FUN_180133ba0` | Analysis target only | Lazy-phase output contract and implementation |
+| `FUN_180135490` | Four-word xorshift phase/noise generation | Seed/state source in the renderer object |
+| `FUN_180133fd0` | Circular buffer rotation | Bind source/destination buffers in the SPP state |
+| `FUN_1801334b0` | Typed post-inverse frame step: inverse FFT, `1/N` scale, `-offset` rotation | Exact windowed buffer/partial-amplitude inputs and final output accumulation |
+| `FUN_1801347a0` | Decompilation recovered | Bind/execute its partial-bin window synthesis descriptors |
+| `FUN_1801361f0` | Top-level SPP call sequence identified | Persistent ring-buffer state, VUV/pitch phase and lazy-phase orchestration |
 
-`FUN_180040630`, `FUN_1801347a0`, `FUN_180135270`, `FUN_1801360c0`,
-`FUN_180135670`, and `FUN_180135b90` have been added as explicit Ghidra
-analysis targets so their prototypes and implementations can be recovered
-rather than guessed from call sites.
+`S5SppInverseFramePlan` reproduces only the confirmed post-transform
+subsequence of `FUN_1801334b0`. The function's following sample loop combines
+that shifted frame with a separate partial/window buffer and amplitude
+stream; those descriptors are not fabricated by the typed plan.
 
 ## VEA boundary
 
-VEA does not yet execute this SPP path. The current implementation has
-validated c5d50 residual blocks and their per-block temporal state, but the
-complete VTMG stage binding, VTB2 conditioning graph, SPP operator chain,
-Yamaha G2P, and final PCM/WAV path are still incomplete. No generated vocal
-audio is claimed.
+VEA now has a portable real-FFT boundary and several individually tested SPP
+operators, plus a typed inverse-frame post-processing step matching the
+confirmed `FUN_1801334b0` operation order. It does not yet execute the complete
+`FUN_1801361f0` SPP state machine or connect its persistent pitch/phase/VUV
+buffers to the renderer.
+
+The complete VTMG stage binding, VTB2 conditioning/activation graph, remaining
+spectral synthesis operators, root-level vendor FFT permutations, waveform
+reconstruction and PCM/WAV output are still incomplete. Yamaha G2P remains
+deferred until the renderer is ready to use real rendering requests. No
+generated vocal audio is claimed.
 
