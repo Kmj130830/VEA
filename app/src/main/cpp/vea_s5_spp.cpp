@@ -1867,3 +1867,70 @@ extern "C" VeaS5TensorStatus vea_s5_spp_cubic_segment_f32(
     return VEA_S5_TENSOR_STATUS_OK;
 }
 
+
+extern "C" VeaS5TensorStatus vea_s5_spp_accumulate_frame_samples_f32(
+    const float* source_frame, size_t source_count,
+    const float* partial_window_buffer, size_t partial_count,
+    int32_t base_index, int32_t offset, uint32_t window_span,
+    const double* window_table, size_t table_count, size_t segment_count,
+    double window_scale, double window_fallback,
+    float* output, size_t output_count) {
+    if (source_count != output_count || window_span == 0u ||
+        !std::isfinite(window_scale) || window_scale < 0.0 ||
+        !std::isfinite(window_fallback)) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+    if (output_count == 0u) return VEA_S5_TENSOR_STATUS_OK;
+    if (source_frame == nullptr || partial_window_buffer == nullptr ||
+        output == nullptr || (segment_count > 0u && window_table == nullptr)) {
+        return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+    }
+
+    const int64_t frame_start =
+        static_cast<int64_t>(base_index) - static_cast<int64_t>(offset);
+    if (output_count > static_cast<size_t>(std::numeric_limits<int64_t>::max()) ||
+        output_count - 1u > static_cast<size_t>(
+            std::numeric_limits<int64_t>::max() - frame_start)) {
+        return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
+    }
+
+    for (size_t index = 0; index < source_count; ++index) {
+        if (!std::isfinite(source_frame[index])) {
+            return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+        }
+    }
+
+    try {
+        std::vector<float> scratch(output_count);
+        const int64_t window_center = static_cast<int64_t>(window_span >> 1u);
+        for (size_t sample = 0; sample < output_count; ++sample) {
+            const int64_t frame_index = frame_start + static_cast<int64_t>(sample);
+            if (frame_index < 0 ||
+                static_cast<uint64_t>(frame_index) >= static_cast<uint64_t>(partial_count)) {
+                return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+            }
+            const int64_t coordinate_numerator = frame_index - window_center;
+            const float coordinate = static_cast<float>(coordinate_numerator) /
+                static_cast<float>(window_span);
+            double coefficient = 0.0;
+            const VeaS5TensorStatus lookup_status = vea_s5_spp_lookup_table_f64(
+                window_table, table_count, segment_count, window_scale,
+                window_fallback, static_cast<double>(coordinate), &coefficient);
+            if (lookup_status != VEA_S5_TENSOR_STATUS_OK) return lookup_status;
+            if (!std::isfinite(coefficient) || coefficient == 0.0) {
+                return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+            }
+            const float partial = partial_window_buffer[static_cast<size_t>(frame_index)];
+            if (!std::isfinite(partial)) return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+            const float value =
+                (source_frame[sample] / static_cast<float>(coefficient)) * partial;
+            if (!std::isfinite(value)) return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
+            scratch[sample] = value;
+        }
+        std::copy(scratch.begin(), scratch.end(), output);
+        return VEA_S5_TENSOR_STATUS_OK;
+    } catch (const std::bad_alloc&) {
+        return VEA_S5_TENSOR_STATUS_OUT_OF_MEMORY;
+    }
+}
+
