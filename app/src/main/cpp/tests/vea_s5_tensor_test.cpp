@@ -62,6 +62,58 @@ int main() {
         VEA_S5_TENSOR_STATUS_OK);
 
 
+    // FUN_18004ec80 / FUN_180082220: size-dependent real-FFT plan records.
+    uint32_t fft_split_4[3] = {};
+    float fft_coefficients_4[2] = {};
+    assert(vea_s5_spp_fft_build_plan_f32(
+        4u, fft_split_4, 3, fft_coefficients_4, 2) == VEA_S5_TENSOR_STATUS_OK);
+    assert(fft_split_4[0] == 1u && fft_split_4[1] == 1u);
+    assert(fft_coefficients_4[0] == 0.0f && fft_coefficients_4[1] == 0.0f);
+
+    uint32_t fft_split_8[4] = {};
+    float fft_coefficients_8[4] = {};
+    assert(vea_s5_spp_fft_build_plan_f32(
+        8u, fft_split_8, 4, fft_coefficients_8, 4) == VEA_S5_TENSOR_STATUS_OK);
+    assert(fft_split_8[0] == 2u && fft_split_8[1] == 2u);
+    assert(std::fabs(fft_coefficients_8[2] - 0.70710678f) < 1.0e-6f);
+    assert(std::fabs(fft_coefficients_8[3] - 0.35355339f) < 1.0e-6f);
+
+    uint32_t fft_split_16[4] = {};
+    float fft_coefficients_16[8] = {};
+    assert(vea_s5_spp_fft_build_plan_f32(
+        16u, fft_split_16, 4, fft_coefficients_16, 8) == VEA_S5_TENSOR_STATUS_OK);
+    assert(fft_split_16[0] == 4u && fft_split_16[1] == 4u);
+    assert(fft_coefficients_16[0] == 1.0f);
+    assert(std::fabs(fft_coefficients_16[1] - 0.70710678f) < 1.0e-6f);
+    assert(std::fabs(fft_coefficients_16[5] - 0.46193975f) < 1.0e-6f);
+    assert(std::fabs(fft_coefficients_16[6] - 0.35355339f) < 1.0e-6f);
+    assert(std::fabs(fft_coefficients_16[7] - 0.19134171f) < 1.0e-6f);
+
+    uint32_t fft_split_32[6] = {};
+    float fft_coefficients_32[16] = {};
+    assert(vea_s5_spp_fft_build_plan_f32(
+        32u, fft_split_32, 6, fft_coefficients_32, 16) == VEA_S5_TENSOR_STATUS_OK);
+    assert(fft_split_32[0] == 8u && fft_split_32[1] == 8u);
+    assert(fft_coefficients_32[0] == 1.0f && fft_coefficients_32[4] == 1.0f);
+    assert(std::fabs(fft_coefficients_32[2] - 0.92387950f) < 1.0e-6f);
+    assert(std::fabs(fft_coefficients_32[3] - 0.38268343f) < 1.0e-6f);
+    assert(std::fabs(fft_coefficients_32[15] - 0.09754516f) < 1.0e-6f);
+
+    uint32_t fft_split_256[13] = {};
+    float fft_coefficients_256[128] = {};
+    assert(vea_s5_spp_fft_build_plan_f32(
+        256u, fft_split_256, 13, fft_coefficients_256, 128) == VEA_S5_TENSOR_STATUS_OK);
+    const uint32_t expected_fft_split_256[] = {64u, 64u, 0u, 16u, 0u, 64u, 32u, 96u};
+    for (size_t index = 0; index < 8; ++index) {
+        assert(fft_split_256[index] == expected_fft_split_256[index]);
+    }
+    assert(vea_s5_spp_fft_build_plan_f32(
+        12u, fft_split_256, 13, fft_coefficients_256, 128) ==
+        VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(vea_s5_spp_fft_build_plan_f32(
+        256u, fft_split_256, 12, fft_coefficients_256, 128) ==
+        VEA_S5_TENSOR_STATUS_BUFFER_TOO_SMALL);
+
     // FUN_18007a000: FFT plan index is floor(log2(N)); zero maps to -1.
     int32_t fft_plan_index = 123;
     assert(vea_s5_spp_fft_log2_floor_u32(0u, &fft_plan_index) ==
