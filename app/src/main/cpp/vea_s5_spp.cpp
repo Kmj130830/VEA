@@ -72,6 +72,9 @@ extern "C" VeaS5TensorStatus vea_s5_spp_lookup_table_f64(
         !std::isfinite(fallback_value) || !std::isfinite(x)) {
         return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
     }
+    if (segment_count == std::numeric_limits<size_t>::max()) {
+        return VEA_S5_TENSOR_STATUS_SIZE_OVERFLOW;
+    }
     if (segment_count > 0u && (table == nullptr || table_count < segment_count + 1u)) {
         return VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT;
     }
