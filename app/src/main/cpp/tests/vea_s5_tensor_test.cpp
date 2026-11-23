@@ -462,6 +462,46 @@ int main() {
     assert(vea_s5_spp_cubic_segment_f32(
         0.5f, bad_cubic_controls, &cubic_value) ==
         VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    // FUN_1801334b0: batched post-inverse frame sample accumulation.
+    const float sample_source[] = {10.0f, 20.0f, 30.0f};
+    const float sample_partial[] = {0.0f, 1.0f, 4.0f, 5.0f, 6.0f, 7.0f};
+    const double sample_window_table[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    float sample_output[3] = {};
+    assert(vea_s5_spp_accumulate_frame_samples_f32(
+        sample_source, 3u, sample_partial, 6u,
+        2, 0, 4u, sample_window_table, 5u, 4u, 1.0, -1.0,
+        sample_output, 3u) == VEA_S5_TENSOR_STATUS_OK);
+    assert(std::fabs(sample_output[0] - 40.0f) < 1.0e-6f);
+    assert(std::fabs(sample_output[1] - 80.0f) < 1.0e-6f);
+    assert(std::fabs(sample_output[2] - 120.0f) < 1.0e-6f);
+
+    const double constant_window_table[] = {1.0, 1.0, 1.0, 1.0, 1.0};
+    const float offset_partial[] = {0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+    float offset_output[2] = {};
+    assert(vea_s5_spp_accumulate_frame_samples_f32(
+        sample_source, 2u, offset_partial, 6u,
+        5, 2, 4u, constant_window_table, 5u, 4u, 1.0, 1.0,
+        offset_output, 2u) == VEA_S5_TENSOR_STATUS_OK);
+    assert(offset_output[0] == 6.0f && offset_output[1] == 12.0f);
+
+    float sample_output_unchanged[] = {9.0f, 8.0f, 7.0f};
+    assert(vea_s5_spp_accumulate_frame_samples_f32(
+        sample_source, 3u, sample_partial, 4u,
+        2, 0, 4u, sample_window_table, 5u, 4u, 1.0, -1.0,
+        sample_output_unchanged, 3u) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(sample_output_unchanged[0] == 9.0f &&
+        sample_output_unchanged[1] == 8.0f && sample_output_unchanged[2] == 7.0f);
+    assert(vea_s5_spp_accumulate_frame_samples_f32(
+        sample_source, 3u, sample_partial, 6u,
+        2, 0, 4u, constant_window_table, 5u, 4u, 0.0, 0.0,
+        sample_output_unchanged, 3u) == VEA_S5_TENSOR_STATUS_OK);
+    const double zero_window_table[] = {0.0, 0.0, 0.0, 0.0, 0.0};
+    assert(vea_s5_spp_accumulate_frame_samples_f32(
+        sample_source, 3u, sample_partial, 6u,
+        2, 0, 4u, zero_window_table, 5u, 4u, 1.0, 0.0,
+        sample_output_unchanged, 3u) == VEA_S5_TENSOR_STATUS_INVALID_ARGUMENT);
+    assert(sample_output_unchanged[0] == 9.0f &&
+        sample_output_unchanged[1] == 8.0f && sample_output_unchanged[2] == 7.0f);
     // FUN_18007a000: FFT plan index is floor(log2(N)); zero maps to -1.
     int32_t fft_plan_index = 123;
     assert(vea_s5_spp_fft_log2_floor_u32(0u, &fft_plan_index) ==
