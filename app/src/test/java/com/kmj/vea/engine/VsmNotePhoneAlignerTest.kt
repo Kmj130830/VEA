@@ -110,7 +110,7 @@ class VsmNotePhoneAlignerTest {
     fun rejectsNoteWithMorePhonesThanAvailableSamples() {
         assertThrows(IllegalArgumentException::class.java) {
             VsmNotePhoneAligner.alignExplicitPhonemes(
-                schedule(totalSamples = 2, note(0, 2, "k a i"))
+                schedule(2, note(0, 2, "k a i"))
             )
         }
     }
