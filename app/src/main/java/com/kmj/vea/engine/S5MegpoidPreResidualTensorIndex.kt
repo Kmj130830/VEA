@@ -71,6 +71,46 @@ class S5MegpoidPreResidualTensorIndex private constructor(
         return S5MegpoidDenseProjectionDimensions(inputFeatures, outputFeatures)
     }
 
+    /**
+     * Derives both Dense dimensions from the actual selected model tensors.
+     *
+     * The normalization vectors define the output-feature count. The Dense
+     * weight tensor is the row-major [outputFeature][inputFeature] matrix,
+     * so its element count must divide evenly by that output width.
+     */
+    fun resolveDenseProjectionDimensionsFromModel(): S5MegpoidDenseProjectionDimensions {
+        val outputFeatures = normalizationScale.elementCount
+        require(outputFeatures > 0) {
+            "Dense normalization scale is empty."
+        }
+        require(normalizationBias.elementCount == outputFeatures) {
+            "Dense normalization scale and bias have different feature counts."
+        }
+        require(denseProjectionWeights.elementCount % outputFeatures == 0) {
+            "Dense weight element count is not divisible by the model normalization width."
+        }
+        val inputFeatures = denseProjectionWeights.elementCount / outputFeatures
+        require(inputFeatures > 0) {
+            "Dense model weights resolve to an empty input-feature width."
+        }
+        return S5MegpoidDenseProjectionDimensions(
+            inputFeatures = inputFeatures,
+            outputFeatures = outputFeatures
+        )
+    }
+
+    /** Builds the first model-backed Dense + normalization stage without guessed dimensions. */
+    fun buildDenseNormalizationStageFromModel(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidDenseNormalizationStage {
+        val dimensions = resolveDenseProjectionDimensionsFromModel()
+        return buildDenseNormalizationStage(
+            inputFeatures = dimensions.inputFeatures,
+            outputFeatures = dimensions.outputFeatures,
+            tensorDecoder = tensorDecoder
+        )
+    }
+
     fun buildDenseNormalizationStageForInputFeatures(
         inputFeatures: Int,
         tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
