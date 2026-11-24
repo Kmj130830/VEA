@@ -106,6 +106,42 @@ class S5MegpoidPreResidualTensorIndexTest {
     }
 
     @Test
+    fun derivesBothDenseDimensionsFromTheModelWeightAndNormalizationCounts() {
+        val fixture = fixture(
+            dense = FloatArray(4 * 12),
+            scale = FloatArray(4),
+            bias = FloatArray(4)
+        )
+        val index = S5MegpoidPreResidualTensorIndex.build(fixture.tree)
+
+        val dimensions = index.resolveDenseProjectionDimensionsFromModel()
+        assertEquals(12, dimensions.inputFeatures)
+        assertEquals(4, dimensions.outputFeatures)
+
+        val stage = index.buildDenseNormalizationStageFromModel(fixture.decoder)
+        assertEquals(12, stage.projection.inputFeatures)
+        assertEquals(4, stage.projection.outputFeatures)
+        assertEquals(4, stage.normalization.features)
+    }
+
+    @Test
+    fun rejectsModelDenseWeightsThatCannotFormAnIntegralMatrix() {
+        val fixture = fixture(
+            dense = FloatArray(5),
+            scale = FloatArray(2),
+            bias = FloatArray(2)
+        )
+        val index = S5MegpoidPreResidualTensorIndex.build(fixture.tree)
+
+        assertThrows(IllegalArgumentException::class.java) {
+            index.resolveDenseProjectionDimensionsFromModel()
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            index.buildDenseNormalizationStageFromModel(fixture.decoder)
+        }
+    }
+
+    @Test
     fun rejectsDenseInputWidthThatDoesNotMatchTheModelWeightCount() {
         val fixture = fixture()
         val index = S5MegpoidPreResidualTensorIndex.build(fixture.tree)
