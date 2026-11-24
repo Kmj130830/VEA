@@ -15,6 +15,33 @@ This milestone connects model loading, note scheduling, and the recovered phone-
 
 The model-package registry is generic. AI Megpoid V7 is the first registered provider; additional voicebanks can add their own loader without changing the editor's generic synthesis interface.
 
+## Note-to-phone alignment added
+
+The Android path now has an explicit, deterministic adapter from each scheduled note's
+existing `phoneme` field to timed `VsmPhoneEvent` objects:
+
+- Whitespace separates phone labels. Standalone `.` and `|` tokens are treated as
+  syllable/word separators; composite labels such as `y|CH` remain intact.
+- Each note's sample duration is divided evenly across its explicit phone labels.
+  Remainder samples are assigned to the earliest labels, and each label receives at
+  least one sample.
+- Gaps before, between and after notes are represented as `sil` events.
+- Event boundaries are derived from integer sample positions and converted to seconds
+  only at the `VsmPhoneEvent` boundary.
+- The 14-category phone map is checked and unsupported labels routed to category 13
+  are reported in `fallbackPhoneLabels` for review.
+
+`PreparedMegpoidRuntime.prepareExplicitPhoneInputForDense()` now composes this alignment
+with the existing event preprocessor, mode-0 feature matrix builder, dimension checks
+and model-backed Dense/normalization stage.
+
+This is a temporary deterministic alignment policy for **already supplied phone
+labels**. It is not Yamaha G2P, does not infer pronunciation from lyrics, and does
+not reproduce measured per-phoneme durations. The caller must still supply the active
+phone-feature layout and minimum/maximum duration values from a verified render
+descriptor. A note with an empty phoneme field is rejected rather than silently
+inventing a pronunciation.
+
 ## Exact boundaries that remain
 
 - The app still does not derive timed per-phone events from VeaNote.phoneme. That field is editor display text, not already aligned phones.
