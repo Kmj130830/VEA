@@ -282,6 +282,12 @@ data class S5VoicebankModelPackage(
             tensorDecoder = tensorDecoder
         )
 
+    /** Builds Dense + normalization after deriving both dimensions from the selected model tensors. */
+    fun preparePreResidualDenseNormalizationStageFromModel(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidDenseNormalizationStage =
+        preResidualTensorIndex.buildDenseNormalizationStageFromModel(tensorDecoder)
+
     fun preparePreResidualDenseNormalizationStageForInputFeatures(
         inputFeatures: Int,
         tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
