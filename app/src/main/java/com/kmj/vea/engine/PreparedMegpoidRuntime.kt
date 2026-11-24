@@ -30,6 +30,16 @@ data class PreparedMegpoidPhoneInput(
     }
 }
 
+/**
+ * Timed note-to-phone alignment together with the ready-to-run pre-residual
+ * Dense input. Fallback labels remain visible so unsupported phone symbols
+ * can be corrected instead of silently accepted as valid model categories.
+ */
+data class PreparedMegpoidExplicitPhoneInput(
+    val alignment: VsmNotePhoneAlignmentResult,
+    val input: PreparedMegpoidPhoneInput
+)
+
 data class PreparedMegpoidRuntime(
     val modelPackage: S5VoicebankModelPackage,
     val namedLayerParameters: List<S5MegpoidPackedNamedLayer>,
@@ -138,6 +148,37 @@ data class PreparedMegpoidRuntime(
             inputFeatures = matrix.rowWidth
         )
         return PreparedMegpoidPhoneInput(matrix, dimensions, stage)
+    }
+
+    /**
+     * Aligns explicit note phoneme strings to the scheduled sample timeline,
+     * then builds the checked phone-feature matrix and model-backed Dense stage.
+     *
+     * This is deliberately not G2P: every note must already contain explicit
+     * phone labels. The active feature layout and duration limits are supplied
+     * by the caller because their native render-context descriptor fields are
+     * not yet fully populated by the Android port.
+     */
+    fun prepareExplicitPhoneInputForDense(
+        schedule: VsmRenderSchedule,
+        layout: S5ApiDefaultPhoneFeatureLayout,
+        minimumPhoneSeconds: Float,
+        maximumPhoneSeconds: Float
+    ): PreparedMegpoidExplicitPhoneInput {
+        val alignment = VsmNotePhoneAligner.alignExplicitPhonemes(schedule)
+        require(alignment.events.isNotEmpty()) {
+            "There are no timed phone events to feed into the Megpoid model."
+        }
+        val input = preparePhoneInputForDense(
+            phoneEvents = alignment.events,
+            layout = layout,
+            minimumPhoneSeconds = minimumPhoneSeconds,
+            maximumPhoneSeconds = maximumPhoneSeconds
+        )
+        return PreparedMegpoidExplicitPhoneInput(
+            alignment = alignment,
+            input = input
+        )
     }
 
     fun createResidualBlockExecutor(
