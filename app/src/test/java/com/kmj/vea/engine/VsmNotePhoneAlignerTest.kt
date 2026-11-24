@@ -64,6 +64,16 @@ class VsmNotePhoneAlignerTest {
     }
 
     @Test
+    fun keepsCompositePhoneLabelsContainingVerticalBarsIntact() {
+        val result = VsmNotePhoneAligner.alignExplicitPhonemes(
+            schedule(4, note(0, 4, "y|CH"))
+        )
+
+        assertEquals(listOf("y|CH"), result.events.map { it.phoneLabel })
+        assertTrue(result.fallbackPhoneLabels.isEmpty())
+    }
+
+    @Test
     fun reportsLabelsThatFallBackToTheRecoveredCategory() {
         val result = VsmNotePhoneAligner.alignExplicitPhonemes(
             schedule(2, note(0, 2, "S a"))
