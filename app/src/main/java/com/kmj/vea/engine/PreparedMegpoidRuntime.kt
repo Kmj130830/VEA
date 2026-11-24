@@ -94,6 +94,14 @@ data class PreparedMegpoidRuntime(
     val scheduledNoteCount: Int
         get() = scheduledNotes.size
 
+    /** Exact Dense input/output widths derived from the loaded Megpoid model tensors. */
+    val denseProjectionDimensionsFromModel: S5MegpoidDenseProjectionDimensions
+        get() = modelPackage.preResidualTensorIndex.resolveDenseProjectionDimensionsFromModel()
+
+    /** Phone-feature row width required by this model's first Dense operator. */
+    val requiredPhoneFeatureWidth: Int
+        get() = denseProjectionDimensionsFromModel.inputFeatures
+
     fun prepareAlignedPhoneFeatures(
         phoneEvents: List<VsmPhoneEvent>,
         minimumPhoneSeconds: Float,
@@ -141,12 +149,13 @@ data class PreparedMegpoidRuntime(
             maximumPhoneSeconds = maximumPhoneSeconds
         )
         require(matrix.rowCount > 0) { "There are no aligned phone events to prepare." }
-        val dimensions = modelPackage.preResidualTensorIndex.resolveDenseProjectionDimensions(
-            inputFeatures = matrix.rowWidth
-        )
-        val stage = modelPackage.preparePreResidualDenseNormalizationStageForInputFeatures(
-            inputFeatures = matrix.rowWidth
-        )
+        val dimensions = denseProjectionDimensionsFromModel
+        require(matrix.rowWidth == dimensions.inputFeatures) {
+            "The active phone-feature layout produces ${matrix.rowWidth} values per phone, " +
+                "but the loaded Megpoid Dense tensor requires ${dimensions.inputFeatures}. " +
+                "Recover the active S5API phone-layout descriptor before inference."
+        }
+        val stage = modelPackage.preparePreResidualDenseNormalizationStageFromModel()
         return PreparedMegpoidPhoneInput(matrix, dimensions, stage)
     }
 
