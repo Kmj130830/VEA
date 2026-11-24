@@ -42,6 +42,30 @@ phone-feature layout and minimum/maximum duration values from a verified render
 descriptor. A note with an empty phoneme field is rejected rather than silently
 inventing a pronunciation.
 
+## Dense input dimensions derived from the model
+
+The Dense input width no longer needs to be supplied as an assumed value.
+The selected VTB2 Dense tensor is consumed as a row-major
+`[outputFeature][inputFeature]` matrix, while the normalization scale and
+bias vectors establish the exact output-feature count. Android now derives:
+
+`outputFeatures = normalizationScale.elementCount`
+
+`inputFeatures = denseWeight.elementCount / outputFeatures`
+
+The derivation rejects empty dimensions, scale/bias width disagreement, and
+a weight count that is not an exact multiple of the normalization width.
+`PreparedMegpoidRuntime.requiredPhoneFeatureWidth` exposes the resulting
+model-required input width. Before Dense inference, the generated phone
+matrix must match it exactly; the model-backed Dense/normalization stage is
+then built from those same model-derived dimensions.
+
+This proves the Dense tensor's matrix dimensions from its payload count and
+the normalization vectors. It does **not** recover the missing phone-layout
+descriptor values: category stride, preceding/following context counts,
+leading-flag mode, and duration limits still require the active render-context
+data. A mismatch is rejected instead of selecting a plausible layout by guess.
+
 ## Exact boundaries that remain
 
 - The app still does not derive timed per-phone events from VeaNote.phoneme. That field is editor display text, not already aligned phones.
