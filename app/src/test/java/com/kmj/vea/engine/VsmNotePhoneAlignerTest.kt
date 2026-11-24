@@ -11,7 +11,7 @@ class VsmNotePhoneAlignerTest {
     fun dividesNoteSamplesExactlyAndAssignsRemainderToEarlierPhones() {
         val result = VsmNotePhoneAligner.alignExplicitPhonemes(
             schedule(
-                totalSamples = 20,
+                20,
                 note(10, 10, "k a i")
             )
         )
@@ -30,7 +30,7 @@ class VsmNotePhoneAlignerTest {
     fun preservesLeadingInternalAndTrailingSilenceGaps() {
         val result = VsmNotePhoneAligner.alignExplicitPhonemes(
             schedule(
-                totalSamples = 400,
+                400,
                 note(100, 100, "a"),
                 note(300, 50, "i")
             )
@@ -56,7 +56,7 @@ class VsmNotePhoneAlignerTest {
     @Test
     fun ignoresOnlyStandaloneSyllableAndWordSeparators() {
         val result = VsmNotePhoneAligner.alignExplicitPhonemes(
-            schedule(totalSamples = 12, note(0, 12, "k a . i | o"))
+            schedule(12, note(0, 12, "k a . i | o"))
         )
 
         assertEquals(listOf("k", "a", "i", "o"), result.events.map { it.phoneLabel })
@@ -66,7 +66,7 @@ class VsmNotePhoneAlignerTest {
     @Test
     fun reportsLabelsThatFallBackToTheRecoveredCategory() {
         val result = VsmNotePhoneAligner.alignExplicitPhonemes(
-            schedule(totalSamples = 2, note(0, 2, "S a"))
+            schedule(2, note(0, 2, "S a"))
         )
 
         assertTrue(result.fallbackPhoneLabels.contains("S"))
@@ -77,7 +77,7 @@ class VsmNotePhoneAlignerTest {
     fun rejectsNotesWithoutExplicitPhonemesInsteadOfGuessingG2p() {
         val error = assertThrows(IllegalArgumentException::class.java) {
             VsmNotePhoneAligner.alignExplicitPhonemes(
-                schedule(totalSamples = 10, note(0, 10, ""))
+                schedule(10, note(0, 10, ""))
             )
         }
         assertTrue(error.message!!.contains("Automatic G2P is not connected"))
@@ -88,7 +88,7 @@ class VsmNotePhoneAlignerTest {
         assertThrows(IllegalArgumentException::class.java) {
             VsmNotePhoneAligner.alignExplicitPhonemes(
                 schedule(
-                    totalSamples = 30,
+                    30,
                     note(0, 20, "a"),
                     note(10, 20, "i")
                 )
