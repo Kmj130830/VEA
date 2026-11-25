@@ -26,7 +26,12 @@ class S5MegpoidSequenceOperatorTensorIndexTest {
             raw[0] = (entry.key.second + 1).toByte()
             val encoded = "*F32" + Base64.getEncoder().encodeToString(raw)
             decoded[encoded] = entry.value
-            "\"" + key + "\":\"" + encoded + "\""
+            val dimensions = metadata[entry.key] ?: listOf(entry.value.size)
+            "\\\"" + key + "\\":{" +
+                "\\\"" + S5MegpoidCarrierFusionModelPath.SHAPE_METADATA_KEY + "\\":[" +
+                dimensions.joinToString(",") + "]," +
+                "\\\"" + S5MegpoidCarrierFusionModelPath.TYPED_PAYLOAD_KEY + "\\":\\\"" +
+                encoded + "\\\"}"
         }
         return Fixture(S5ModelObjectTree.parseUtf8("{\"selected\":{" + fields.joinToString(",") + "}}"), FakeDecoder(decoded))
     }
