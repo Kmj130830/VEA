@@ -285,6 +285,15 @@ class S5MegpoidMultipartOutputModulationTest {
             )
         }
         assertEquals(List(6) { 7f }, output.toList())
+
+        assertThrows(IllegalArgumentException::class.java) {
+            table.accumulateAllPartsInto(
+                outputInterleaved = output,
+                firstFeaturePlaneByPart = List(3) { FloatArray(3) } + listOf(floatArrayOf(1f)),
+                secondFeaturePlaneByPart = List(4) { FloatArray(3) }
+            )
+        }
+        assertEquals(List(6) { 7f }, output.toList())
     }
 
     @Test
