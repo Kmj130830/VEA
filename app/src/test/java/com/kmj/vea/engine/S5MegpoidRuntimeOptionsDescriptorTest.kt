@@ -10,7 +10,9 @@ class S5MegpoidRuntimeOptionsDescriptorTest {
     private fun tree(
         overrides: Map<String, S5ModelValue> = emptyMap(),
         includeAlternateSelector: Boolean = true,
-        includeMultipartThresholdSelector: Boolean = true
+        includeMultipartThresholdSelector: Boolean = true,
+        includeNearestPartMaskSelector: Boolean = true,
+        includePartModulationIdentifier: Boolean = true
     ): S5ModelObjectTree {
         val defaults = linkedMapOf<String, S5ModelValue>(
             S5MegpoidRuntimeOptionKeys.PARAM_0 to S5ModelValue.NumberValue(217.0),
@@ -33,7 +35,10 @@ class S5MegpoidRuntimeOptionsDescriptorTest {
                 S5ModelValue.BooleanValue(true),
             S5MegpoidRuntimeOptionKeys.CARRIER_FUSION_ENABLED to S5ModelValue.BooleanValue(true),
             S5MegpoidRuntimeOptionKeys.ALTERNATE_TRANSITION_ENABLED to S5ModelValue.BooleanValue(true),
-            S5MegpoidRuntimeOptionKeys.MULTIPART_THRESHOLD_MODE_ENABLED to S5ModelValue.BooleanValue(true)
+            S5MegpoidRuntimeOptionKeys.MULTIPART_THRESHOLD_MODE_ENABLED to S5ModelValue.BooleanValue(true),
+            S5MegpoidRuntimeOptionKeys.NEAREST_PART_MASK_ENABLED to S5ModelValue.BooleanValue(true),
+            S5MegpoidRuntimeOptionKeys.PART_MODULATION_IDENTIFIER to
+                S5ModelValue.StringValue(S5MegpoidRuntimeOptionKeys.EXPECTED_PART_MODULATION_IDENTIFIER)
         )
         if (!includeAlternateSelector) {
             defaults.remove(S5MegpoidRuntimeOptionKeys.ALTERNATE_TRANSITION_ENABLED)
@@ -41,11 +46,18 @@ class S5MegpoidRuntimeOptionsDescriptorTest {
         if (!includeMultipartThresholdSelector) {
             defaults.remove(S5MegpoidRuntimeOptionKeys.MULTIPART_THRESHOLD_MODE_ENABLED)
         }
+        if (!includeNearestPartMaskSelector) {
+            defaults.remove(S5MegpoidRuntimeOptionKeys.NEAREST_PART_MASK_ENABLED)
+        }
+        if (!includePartModulationIdentifier) {
+            defaults.remove(S5MegpoidRuntimeOptionKeys.PART_MODULATION_IDENTIFIER)
+        }
         defaults.putAll(overrides)
         val entries = defaults.entries.joinToString(",") { (key, value) ->
             val encoded = when (value) {
                 is S5ModelValue.NumberValue -> value.value.toString()
                 is S5ModelValue.BooleanValue -> value.value.toString()
+                is S5ModelValue.StringValue -> "\"" + value.value + "\""
                 else -> error("Unsupported test value.")
             }
             "\"" + key + "\":" + encoded
@@ -79,6 +91,11 @@ class S5MegpoidRuntimeOptionsDescriptorTest {
         assertTrue(options.alternateTransitionEnabled)
         assertEquals(S5MegpoidReverseTransitionMode.ALTERNATE, options.reverseTransitionMode)
         assertTrue(options.multipartThresholdModeEnabled)
+        assertTrue(options.nearestPartMaskEnabled)
+        assertEquals(
+            S5MegpoidRuntimeOptionKeys.EXPECTED_PART_MODULATION_IDENTIFIER,
+            options.partModulationIdentifier
+        )
         options.requireMegpoidV7BlockGrid()
     }
 
@@ -119,6 +136,47 @@ class S5MegpoidRuntimeOptionsDescriptorTest {
     }
 
     @Test
+    fun readsTheNearestPartMaskFlagAndDefaultsToFalseWhenAbsent() {
+        val enabled = S5MegpoidRuntimeOptionsDescriptor.from(tree())
+        assertTrue(enabled.nearestPartMaskEnabled)
+        assertEquals(
+            S5MegpoidRuntimeOptionKeys.EXPECTED_PART_MODULATION_IDENTIFIER,
+            enabled.partModulationIdentifier
+        )
+
+        val absent = S5MegpoidRuntimeOptionsDescriptor.from(
+            tree(includeNearestPartMaskSelector = false)
+        )
+        assertFalse(absent.nearestPartMaskEnabled)
+        assertEquals(null, absent.partModulationIdentifier)
+    }
+
+    @Test
+    fun requiresTheNativePartModulationIdentifierOnlyWhenTheMaskFlagIsEnabled() {
+        assertThrows(IllegalArgumentException::class.java) {
+            S5MegpoidRuntimeOptionsDescriptor.from(
+                tree(includePartModulationIdentifier = false)
+            )
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            S5MegpoidRuntimeOptionsDescriptor.from(tree(mapOf(
+                S5MegpoidRuntimeOptionKeys.PART_MODULATION_IDENTIFIER to
+                    S5ModelValue.StringValue("wrong-modulation-id")
+            )))
+        }
+
+        // A disabled mask branch does not read/validate the optional identifier.
+        val disabled = S5MegpoidRuntimeOptionsDescriptor.from(tree(mapOf(
+            S5MegpoidRuntimeOptionKeys.NEAREST_PART_MASK_ENABLED to
+                S5ModelValue.BooleanValue(false),
+            S5MegpoidRuntimeOptionKeys.PART_MODULATION_IDENTIFIER to
+                S5ModelValue.StringValue("unused")
+        )))
+        assertFalse(disabled.nearestPartMaskEnabled)
+        assertEquals(null, disabled.partModulationIdentifier)
+    }
+
+    @Test
     fun derivesTheActiveFourPartOutputHeadWidthFromMegpoidOptions() {
         val options = S5MegpoidRuntimeOptionsDescriptor.from(tree())
 
@@ -132,8 +190,7 @@ class S5MegpoidRuntimeOptionsDescriptorTest {
         val table = options.buildMultipartOutputModulation(
             positionCount = 3,
             fundamentalFrequencyHz = 100f,
-            thetaCenterRadians = 0.5f,
-            nearestPartMaskEnabledAtRoot3405 = true
+            thetaCenterRadians = 0.5f
         )
 
         assertEquals(4, table.partCount)
