@@ -194,6 +194,33 @@ class S5MegpoidCarrierFusionWorkspace(
     }
 
     /**
+     * Model-backed active route. The source matrix and control vectors are
+     * compiled from the exact VTB2 carrier Dense and normalization tensors.
+     */
+    @Synchronized
+    fun projectCarrierConditionedFeatures(
+        inputFeatureMajor: FloatArray,
+        activeParameters: S5MegpoidCarrierFusionActiveParameters,
+        scale: Float,
+        amplitude: Float,
+        gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel
+    ): FloatArray {
+        require(activeParameters.inputFeatures == geometry.inputFeatures) {
+            "Carrier active parameters require ${activeParameters.inputFeatures} input features, " +
+                "but this workspace was created for ${geometry.inputFeatures}."
+        }
+        return projectCarrierConditionedFeatures(
+            inputFeatureMajor = inputFeatureMajor,
+            sourceMatrixTwoByInput = activeParameters.copySourceMatrixTwoByInput(),
+            scale = scale,
+            amplitude = amplitude,
+            control162 = activeParameters.copyControl162(),
+            control166 = activeParameters.copyControl166(),
+            gemm = gemm
+        )
+    }
+
+    /**
      * Fallback-only route: apply the optional VTB2 +0xD60 32-to-2 Dense
      * descriptor to the selected fallback input. The native forward path
      * uses this when MRW_CARRIER_FUSE is disabled, root +0x16C is false, or
