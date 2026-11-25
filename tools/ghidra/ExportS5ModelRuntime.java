@@ -36,6 +36,8 @@ public class ExportS5ModelRuntime extends GhidraScript {
             "180068190", "180020190", "1800214c0", "18005ebe0",
             "18005fd62874", "18006fdb0", "180024a90", "180064670",
             "180047900", "1800c7ad0", "1800c1a30", "1800ccdb0",
+            // Both reverse-transition operators selected by render-state +0x59.
+            "1800c6390", "1800c72d0",
             "1800c5260", "1800c3740", "1800c1060", "1800c1210",
             "1800df720", "1800c0ee0", "18012d350", "18012e0d0",
             "180130b70", "18012d460", "18012f280", "180130ce0",
