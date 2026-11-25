@@ -181,6 +181,7 @@ object S5MegpoidMultipartOutputModulationBuilder {
             val frequencyCoordinate =
                 (position.toFloat() * frequencyStep) / frequency
 
+            // Native first pass: fill every part's location and distance arrays.
             for (part in 0 until partCount) {
                 val baseLocation = (part + 1).toFloat()
                 val cycleCount = roundHalfAwayFromZero(
@@ -188,16 +189,20 @@ object S5MegpoidMultipartOutputModulationBuilder {
                 )
                 val candidateLocation =
                     cycleCount * partCount.toFloat() + baseLocation
-                val phaseLocation = if (baseLocation <= candidateLocation) {
-                    candidateLocation
-                } else {
-                    baseLocation
-                }
-                val distance = abs(frequencyCoordinate - phaseLocation) * frequency
-
+                val phaseLocation = maxOf(baseLocation, candidateLocation)
                 val index = position * partCount + part
+
                 locations[index] = phaseLocation
-                distances[index] = distance
+                distances[index] =
+                    abs(frequencyCoordinate - phaseLocation) * frequency
+            }
+
+            // Native second pass: compare the completed distance row, then
+            // prepare the complex rotation used by the accumulator.
+            for (part in 0 until partCount) {
+                val index = position * partCount + part
+                val phaseLocation = locations[index]
+                val distance = distances[index]
 
                 if (nearestPartMaskEnabledAtRoot3405 && voiced) {
                     var nearestOtherDistance = Float.POSITIVE_INFINITY
@@ -205,14 +210,10 @@ object S5MegpoidMultipartOutputModulationBuilder {
                         if (otherPart == part) continue
                         nearestOtherDistance = minOf(
                             nearestOtherDistance,
-                            distancesForPart(
-                                frequencyCoordinate = frequencyCoordinate,
-                                frequency = frequency,
-                                partCount = partCount,
-                                partIndex = otherPart
-                            )
+                            distances[position * partCount + otherPart]
                         )
                     }
+
                     // Native branch: under the threshold every part remains
                     // active; outside it, only a nearest part remains active.
                     // Ties are retained because the native comparison is strict.
@@ -242,25 +243,6 @@ object S5MegpoidMultipartOutputModulationBuilder {
             rotationReal = rotationReal,
             nativeRotationSine = rotationSine
         )
-    }
-
-    private fun distancesForPart(
-        frequencyCoordinate: Float,
-        frequency: Float,
-        partCount: Int,
-        partIndex: Int
-    ): Float {
-        val baseLocation = (partIndex + 1).toFloat()
-        val cycleCount = roundHalfAwayFromZero(
-            (frequencyCoordinate - baseLocation) / partCount.toFloat()
-        )
-        val candidateLocation = cycleCount * partCount.toFloat() + baseLocation
-        val phaseLocation = if (baseLocation <= candidateLocation) {
-            candidateLocation
-        } else {
-            baseLocation
-        }
-        return abs(frequencyCoordinate - phaseLocation) * frequency
     }
 
     /** C/C++ roundf semantics: nearest integer, half values away from zero. */
