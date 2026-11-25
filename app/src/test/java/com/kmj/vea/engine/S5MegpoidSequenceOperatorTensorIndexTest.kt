@@ -138,6 +138,34 @@ class S5MegpoidSequenceOperatorTensorIndexTest {
     }
 
     @Test
+    fun decodesAllThreeAlternateTransitionsWithoutReinterpretingTheirAxes() {
+        val tensors = linkedMapOf<Pair<S5MegpoidSequenceOperatorFactory, Int>, FloatArray>()
+        val metadata = linkedMapOf<Pair<S5MegpoidSequenceOperatorFactory, Int>, List<Int>>()
+        for (index in 0..2) {
+            val weightsKey = S5MegpoidSequenceOperatorFactory.ALTERNATE_WEIGHTS to index
+            val biasKey = S5MegpoidSequenceOperatorFactory.ALTERNATE_BIAS to index
+            tensors[weightsKey] = FloatArray(32 * 32 * 3) { index + it / 1000f }
+            tensors[biasKey] = FloatArray(32) { -index - it / 10f }
+            metadata[weightsKey] = listOf(32, 32, 3, 1)
+            metadata[biasKey] = listOf(32)
+        }
+        val fixture = fixture(tensors, metadata)
+        val prepared = S5MegpoidSequenceOperatorTensorIndex.build(fixture.tree)
+            .decodeMegpoidV7AlternateTransitionSet(fixture.decoder)
+
+        assertEquals(3, prepared.size)
+        prepared.forEachIndexed { index, transition ->
+            assertEquals(index, transition.sequenceIndex)
+            assertEquals(listOf(32, 32, 3, 1), transition.weightMetadata)
+            assertEquals(listOf(32), transition.biasMetadata)
+            assertEquals(32 * 32 * 3, transition.copyWeights().size)
+            assertEquals(32, transition.copyBias().size)
+            assertEquals(index.toFloat(), transition.copyWeights()[0], 0f)
+            assertEquals(-index.toFloat(), transition.copyBias()[0], 0f)
+        }
+    }
+
+    @Test
     fun rejectsAnIncompleteMegpoidAlternateTransitionSet() {
         val tensors = mapOf(
             (S5MegpoidSequenceOperatorFactory.ALTERNATE_WEIGHTS to 0) to FloatArray(32 * 32 * 3),
