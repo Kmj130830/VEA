@@ -76,6 +76,23 @@ data class S5MegpoidRuntimeOptionsDescriptor(
             fftSize = param1,
             complexBinCount = param2
         )
+    /**
+     * The native post-residual head uses D00 * 2 features when D01 is enabled
+     * and D00 is at least two; otherwise it falls back to two terminal planes.
+     * FUN_1800ced10 stores this derived width in root word +0xD07.
+     */
+    val usesMultiPartOutputHead: Boolean
+        get() = paramD01 && paramD00 >= 2
+
+    val postResidualHeadFeatureWidth: Int
+        get() {
+            val width = if (usesMultiPartOutputHead) paramD00.toLong() * 2L else 2L
+            require(width in 2L..Int.MAX_VALUE.toLong()) {
+                "Post-residual output-head width is outside the supported integer range."
+            }
+            return width.toInt()
+        }
+
     /** Number of feature buffers owned by the native render context. */
     val sequenceSlotCount: Int get() = param5
 
