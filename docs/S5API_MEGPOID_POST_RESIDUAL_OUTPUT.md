@@ -318,3 +318,55 @@ complex mode remains available for other banks/configurations.
 
 Until these are resolved and tested on Android ARM64, `SynthesisEngine.render()`
 must remain unavailable and must not emit placeholder audio.
+
+
+
+## 7. Per-part rotation and gain tables — 2026-11-25
+
+The scalar multi-part modulation path has now been recovered and ported.
+It computes the four part locations/distances from the output position, the
+FFT/output geometry ratio, F0 and `theta_ctr`; creates the cosine/sine
+rotation coefficients; and applies the native nearest-part/threshold gain
+rule before complex accumulation.
+
+The two option getters are:
+- `FUN_1800e3030` -> key
+  `7a5a0ba0ba2f00ab8a0a0d538add0e6d` -> root `+0x3405`.
+- `FUN_1800e2770` -> key
+  `ef12c1f702abd89b2e1f07a126cc5411` -> root `+0x3411`.
+
+Both are present as Boolean `true` in the selected AI Megpoid runtime
+options object. When +0x3405 is true, native also requires the string value
+at key `184ef4ded83d0b35e1f07a126cc5411`? No: the verified key is
+`184ef4ded83d0b35d809a7f1b09b1066`, with value
+`117fd5ea7e76f7852c197a284c4dd3bc`. The Android loader validates this
+exact identifier and refuses to prepare the mask mode when it is absent
+or differs.
+
+The native threshold for AI Megpoid is D02 + D03 = 133 + 25 = 158
+(D02 narrows to an int-backed word before use), because D04 and +0x3411
+are both true. For a voiced frame with nearest-part masking enabled,
+the native rule is `distance <= threshold OR isNearestPart`, with ties
+retained and the threshold comparison inclusive. This corrects the earlier
+rough interpretation of the mask as a nearest-part AND threshold rule.
+
+Android now provides:
+- `S5MegpoidMultipartOutputModulationBuilder` for position-major
+  four-part location, distance, gain and rotation arrays.
+- `S5MegpoidMultipartOutputModulation.accumulatePartInto()` for the
+  native scalar complex-accumulation signs/order.
+- `S5MegpoidRuntimeOptionsDescriptor.buildMultipartOutputModulation()`
+  and `PreparedMegpoidRuntime.prepareMultipartOutputModulation()`, which
+  obtain both selectors and D-values from the selected VTB2 options.
+
+See `S5API_MULTIPART_OUTPUT_MODULATION.md` for the recovered formula and
+test matrix.
+
+This does not yet complete the eight-channel output head. The four
+per-part x/y feature planes are not yet extracted from the post-residual
+VTMG graph, and the independent interpolation helpers
+`FUN_1800c4080` / `FUN_1800c39f0`, carrier-conditioned feature input,
+carrier scheduler and final reduction to two spectrum planes remain
+unported. The scalar modulation table is one connected part of the output
+path, not a complete vocal renderer.
+
