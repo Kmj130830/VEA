@@ -149,7 +149,7 @@ The optional carrier path now has a dedicated Android workspace. Its native
 buffer dimensions are read from active render context values:
 
 - `D6C = inputFeatures × carrierPositions` (Dense input)
-- `D74 = 2 × carrierPositions` (two-row carrier Dense output)
+- `D74 = 2 × carrierPositions` (two-row carrier-conditioned projection output)
 - `D80 = historySlots × 2 × spectrumBins` (carrier frame ring)
 - `D86 = 2 × spectrumBins` (current carrier frame)
 - `historySlots = root[0x181] + root[0x182] + 1`
@@ -161,11 +161,19 @@ that layout and the native write cursor. The new
 `accumulateDelayedCarrierFrameInto()` also ports the final carrier-history
 complex multiply using the oldest slot selected by the native lag formula.
 
-The workspace is created from the model-backed 32→2 carrier Dense layer,
-but caller-supplied geometry is still required for carrier positions and the
-two history counts. The 32-wide carrier feature input, its normalization
-parameters and the optional interpolation/control path are not yet built.
-The full model output therefore remains unavailable.
+The active workspace is created from render geometry and the model-derived
+input width, not from the fallback Dense weights. Its
+`projectCarrierConditionedFeatures()` takes the runtime `[2][32]` source
+matrix from root `+0x15E`, the current `[32][positions]` feature tensor,
+and the two-value control vectors at `+0x162/+0x166`. It performs the
+native 2×32 GEMM and per-row affine correction using the `+0x16A/+0x16B`
+scalars. The optional VTB2 `+0xD60` 32→2 Dense layer remains separate and
+is exposed only for the native fallback sub-branch.
+
+The source matrix and control vectors are still supplied by the missing
+upstream render-context/conditioning preparation path. The workspace now
+implements the math once those exact buffers are available, but it does not
+invent their values or claim the carrier branch is end-to-end connected.
 
 ## Non-multi-part fallback output head
 
@@ -191,6 +199,6 @@ package but is not used for that configuration.
 - The mode-0 feature builder needs the active render descriptor fields. Category width must be at least 14, but actual width and context counts are runtime data and are not hard-coded.
 - Alternate phone-feature layout mode +0x25 != 0 is not implemented.
 - The complete root render-state descriptor, runtime-derived tensor dimensions, and active workspace bindings are not yet populated.
-- The second post-residual Dense/global-normalization head and full multi-part/carrier processing remain unresolved. The active spectrum-encoding and carrier-fusion options are now read from VTB2, and the carrier weight/bias tensor objects are indexed, but the carrier descriptor axis/stride mapping and verified PCM/WAV contract remain incomplete.
+- The second post-residual Dense/global-normalization head and full multi-part/carrier processing remain unresolved. The active spectrum-encoding and carrier-fusion options are read from VTB2. The optional fallback carrier Dense tensor objects and their 2×32 descriptor are indexed separately from the active runtime-generated source matrix. Carrier source/control preparation, four-part interpolation scheduling and the verified PCM/WAV contract remain incomplete.
 
 Consequently, SynthesisEngine.render() does not emit placeholder WAV data and EngineStatus remains unavailable until the full path has been implemented and verified on Android ARM64.
