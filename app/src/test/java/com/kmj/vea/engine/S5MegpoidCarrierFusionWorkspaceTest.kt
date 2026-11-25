@@ -48,20 +48,31 @@ class S5MegpoidCarrierFusionWorkspaceTest {
             historySlotsFromRoot181 = 1,
             historySlotsFromRoot182 = 1
         )
-        val workspace = S5MegpoidCarrierFusionWorkspace(geometry, projection())
+        val workspace = S5MegpoidCarrierFusionWorkspace(geometry)
         val input = FloatArray(32 * 2)
         input[0] = 1f
         input[1] = 2f
         input[2] = 3f
         input[3] = 4f
+        val sourceMatrix = FloatArray(2 * 32)
+        sourceMatrix[0] = 1f
+        sourceMatrix[32 + 1] = 1f
 
-        val output = workspace.projectPreparedCarrierFeatures(
+        val output = workspace.projectCarrierConditionedFeatures(
             inputFeatureMajor = input,
+            sourceMatrixTwoByInput = sourceMatrix,
+            scale = 2f,
+            amplitude = 0.5f,
+            control162 = floatArrayOf(10f, 20f),
+            control166 = floatArrayOf(1f, 2f),
             gemm = ReferenceS5MegpoidGemmKernel
         )
 
-        assertArrayEquals(floatArrayOf(1.5f, 2.5f, 2.5f, 3.5f), output, 0.00001f)
+        assertArrayEquals(floatArrayOf(11f, 13f, 24f, 26f), output, 0.00001f)
         assertArrayEquals(input, workspace.denseInputFeatureMajor, 0f)
+        assertArrayEquals(sourceMatrix, workspace.carrierSourceVector, 0f)
+        assertArrayEquals(floatArrayOf(10f, 20f), workspace.carrierAccumulationVectorA, 0f)
+        assertArrayEquals(floatArrayOf(1f, 2f), workspace.carrierAccumulationVectorB, 0f)
         assertArrayEquals(output, workspace.denseOutputFeatureMajor, 0f)
     }
 
@@ -74,7 +85,7 @@ class S5MegpoidCarrierFusionWorkspaceTest {
             historySlotsFromRoot181 = 1,
             historySlotsFromRoot182 = 1
         )
-        val workspace = S5MegpoidCarrierFusionWorkspace(geometry, projection())
+        val workspace = S5MegpoidCarrierFusionWorkspace(geometry)
 
         assertEquals(0, workspace.appendCarrierFramePlanes(floatArrayOf(1f, 2f), floatArrayOf(3f, 4f)))
         assertEquals(1, workspace.appendCarrierFramePlanes(floatArrayOf(5f, 6f), floatArrayOf(7f, 8f)))
@@ -108,7 +119,7 @@ class S5MegpoidCarrierFusionWorkspaceTest {
             historySlotsFromRoot181 = 0,
             historySlotsFromRoot182 = 0
         )
-        val workspace = S5MegpoidCarrierFusionWorkspace(geometry, projection())
+        val workspace = S5MegpoidCarrierFusionWorkspace(geometry)
 
         workspace.appendCarrierFramePlanes(
             firstPlane = floatArrayOf(10f, 20f),
@@ -138,7 +149,7 @@ class S5MegpoidCarrierFusionWorkspaceTest {
             historySlotsFromRoot181 = 0,
             historySlotsFromRoot182 = 0
         )
-        val workspace = S5MegpoidCarrierFusionWorkspace(geometry, projection())
+        val workspace = S5MegpoidCarrierFusionWorkspace(geometry)
         workspace.denseOutputFeatureMajor[0] = 11f
         workspace.denseOutputFeatureMajor[1] = 13f
         workspace.denseOutputFeatureMajor[2] = 17f
@@ -164,7 +175,7 @@ class S5MegpoidCarrierFusionWorkspaceTest {
             historySlotsFromRoot181 = 1,
             historySlotsFromRoot182 = 1
         )
-        val workspace = S5MegpoidCarrierFusionWorkspace(geometry, projection())
+        val workspace = S5MegpoidCarrierFusionWorkspace(geometry)
         workspace.denseOutputFeatureMajor[0] = 1f
         workspace.denseOutputFeatureMajor[1] = 0f
 
@@ -189,7 +200,7 @@ class S5MegpoidCarrierFusionWorkspaceTest {
             historySlotsFromRoot181 = 1,
             historySlotsFromRoot182 = 1
         )
-        val workspace = S5MegpoidCarrierFusionWorkspace(geometry, projection())
+        val workspace = S5MegpoidCarrierFusionWorkspace(geometry)
 
         workspace.appendCarrierFramePlanes(floatArrayOf(1f, 2f), floatArrayOf(3f, 4f))
         assertArrayEquals(
@@ -210,6 +221,30 @@ class S5MegpoidCarrierFusionWorkspaceTest {
     }
 
     @Test
+    fun runsTheOptionalFallbackDenseProjectionSeparatelyFromTheActiveCarrierPath() {
+        val geometry = S5MegpoidCarrierFusionBufferGeometry(
+            inputFeatures = 32,
+            carrierPositions = 2,
+            spectrumBins = 2,
+            historySlotsFromRoot181 = 0,
+            historySlotsFromRoot182 = 0
+        )
+        val workspace = S5MegpoidCarrierFusionWorkspace(geometry)
+        val input = FloatArray(32 * 2)
+        input[0] = 1f
+        input[1] = 2f
+        input[2] = 3f
+        input[3] = 4f
+
+        val output = workspace.projectFallbackCarrierFeatures(
+            inputFeatureMajor = input,
+            fallbackProjection = projection(),
+            gemm = ReferenceS5MegpoidGemmKernel
+        )
+        assertArrayEquals(floatArrayOf(1.5f, 2.5f, 2.5f, 3.5f), output, 0.00001f)
+    }
+
+    @Test
     fun rejectsWrongDenseAndSpectrumShapes() {
         val geometry = S5MegpoidCarrierFusionBufferGeometry(
             inputFeatures = 32,
@@ -218,10 +253,17 @@ class S5MegpoidCarrierFusionWorkspaceTest {
             historySlotsFromRoot181 = 1,
             historySlotsFromRoot182 = 0
         )
-        val workspace = S5MegpoidCarrierFusionWorkspace(geometry, projection())
+        val workspace = S5MegpoidCarrierFusionWorkspace(geometry)
 
         assertThrows(IllegalArgumentException::class.java) {
-            workspace.projectPreparedCarrierFeatures(FloatArray(31 * 2))
+            workspace.projectCarrierConditionedFeatures(
+                inputFeatureMajor = FloatArray(31 * 2),
+                sourceMatrixTwoByInput = FloatArray(64),
+                scale = 1f,
+                amplitude = 0f,
+                control162 = FloatArray(2),
+                control166 = FloatArray(2)
+            )
         }
         assertThrows(IllegalArgumentException::class.java) {
             workspace.appendCarrierFramePlanes(FloatArray(1), FloatArray(2))
@@ -253,8 +295,10 @@ class S5MegpoidCarrierFusionWorkspaceTest {
         }
         assertThrows(IllegalArgumentException::class.java) {
             S5MegpoidCarrierFusionWorkspace(
-                geometry = S5MegpoidCarrierFusionBufferGeometry(32, 1, 1, 0, 0),
-                carrierDenseProjection = S5MegpoidDenseProjection(
+                geometry = S5MegpoidCarrierFusionBufferGeometry(32, 1, 1, 0, 0)
+            ).projectFallbackCarrierFeatures(
+                inputFeatureMajor = FloatArray(32),
+                fallbackProjection = S5MegpoidDenseProjection(
                     inputFeatures = 16,
                     outputFeatures = 2,
                     weights = FloatArray(32),
