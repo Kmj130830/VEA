@@ -67,19 +67,28 @@ distance(k) = abs(u - location(k)) * f0
 
 For the inline scalar path, replace `trunc` with `roundf`.
 The four locations and distances are materialized for all parts before the
-mask pass. For a voiced frame, the rotation coefficients are:
+mask pass. The table helper reduces its phase in turns using
+`theta_ctr * 0.15915494 * location(k)` and evaluates the following
+quarter-wave polynomial:
 
 ```text
-phase(k) = fmodf(theta_ctr * location(k), 2*pi)
-D46(k) = cosf(phase(k) - pi/2)
-D4C(k) = sinf(phase(k) - pi/2)
+P(z) = ((((0.00016044118*z - 0.004681754)*z + 0.079692625)
+          *z - 0.6459641)*z + 1.5707964)
+
+turn = theta_ctr * 0.15915494 * location(k)
+D46  = signed(P(x_sin*x_sin) * x_sin)
+D4C  = -signed(P(x_cos*x_cos) * x_cos)
 ```
 
-The table helpers use a polynomial approximation for the trig values;
-Android currently uses platform `sin/cos` over the identical phase and
-writes the same position-major buffer contract. This is numerically
-equivalent at the mathematical level, but bit-exact SIMD parity remains
-unverified. For unvoiced frames, rotation is identity: D46=1 and D4C=0.
+Here `x_sin` and `x_cos` are produced by the native two-stage
+fractional-turn/quadrant reduction in `FUN_1800c4080`; the sign toggles
+when the reduced quadrant integer is odd. Android now ports this same
+polynomial and reduction order in the default
+`SIMD_TABLE_TRUNCATION` mode. The scalar fallback
+`INLINE_SCALAR_ROUNDF` uses native `roundf` for locations and platform
+`cos/sin`, matching the inline scalar branch.
+
+For unvoiced frames, rotation is identity: D46=1 and D4C=0.
 
 ## Native gain/mask rule
 
@@ -129,9 +138,10 @@ the frame-specific position count, F0 and `theta_ctr`.
 
 Tests cover the four part locations/distances, both native coordinate
 rounding routes (SIMD-table truncation and inline-scalar `roundf`), the
-nearest/threshold OR rule, strict nearest-distance tie behavior, inclusive
-threshold equality, both threshold-selector modes, unvoiced identity
-rotation, and the complex accumulation sign/order.
+native SIMD quarter-wave polynomial, the nearest/threshold OR rule,
+strict nearest-distance tie behavior, inclusive threshold equality, both
+threshold-selector modes, unvoiced identity rotation, and the complex
+accumulation sign/order.
 
 ## Boundary: this is not the complete output head
 
