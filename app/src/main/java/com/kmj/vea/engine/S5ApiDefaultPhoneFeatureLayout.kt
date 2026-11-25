@@ -53,3 +53,58 @@ data class S5ApiDefaultPhoneFeatureLayout(
         return value.toInt()
     }
 }
+
+/**
+ * Complete mode-0 phone-feature descriptor fields consumed by FUN_18003ab70
+ * and forwarded to FUN_18006c720.
+ *
+ * This is a value object for the active render-context descriptor. It does
+ * not supply defaults for fields that have not yet been recovered from the
+ * live S5API context.
+ */
+data class S5ApiDefaultPhoneFeatureDescriptor(
+    val categoryWidthAt10: Int,
+    val minimumPhoneSecondsAt14: Float,
+    val maximumPhoneSecondsAt18: Float,
+    val followingContextCountAt1C: Int,
+    val precedingContextCountAt20: Int,
+    val includeLeadingFlagPairAt24: Boolean,
+    val layoutModeAt25: Int,
+    /** Preserved from +0x26; the recovered mode-0 branch does not consume it. */
+    val auxiliaryByteAt26: Int = 0
+) {
+    init {
+        require(categoryWidthAt10 >= S5ApiPhoneCategoryMap.CATEGORY_COUNT) {
+            "Phone category width must fit all recovered category slots."
+        }
+        require(minimumPhoneSecondsAt14.isFinite() && minimumPhoneSecondsAt14 > 0f) {
+            "Phone minimum duration must be a finite positive float."
+        }
+        require(maximumPhoneSecondsAt18.isFinite() &&
+            maximumPhoneSecondsAt18 > minimumPhoneSecondsAt14) {
+            "Phone maximum duration must exceed the positive minimum duration."
+        }
+        require(followingContextCountAt1C >= 0 && precedingContextCountAt20 >= 0) {
+            "Phone context counts cannot be negative."
+        }
+        require(layoutModeAt25 in 0..255) {
+            "Phone layout mode must fit in one byte."
+        }
+        require(auxiliaryByteAt26 in 0..255) {
+            "Phone auxiliary byte must fit in one byte."
+        }
+    }
+
+    fun requireDefaultMode0(): S5ApiDefaultPhoneFeatureLayout {
+        require(layoutModeAt25 == 0) {
+            "Only S5API phone-feature layout mode 0 is implemented."
+        }
+        return S5ApiDefaultPhoneFeatureLayout(
+            categoryWidth = categoryWidthAt10,
+            contextCountAt1C = followingContextCountAt1C,
+            contextCountAt20 = precedingContextCountAt20,
+            includeFlagPair = includeLeadingFlagPairAt24,
+            layoutMode = layoutModeAt25
+        )
+    }
+}
