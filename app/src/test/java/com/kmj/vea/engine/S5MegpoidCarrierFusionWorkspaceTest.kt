@@ -3,6 +3,7 @@ package com.kmj.vea.engine
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 class S5MegpoidCarrierFusionWorkspaceTest {
@@ -75,10 +76,10 @@ class S5MegpoidCarrierFusionWorkspaceTest {
         )
         val workspace = S5MegpoidCarrierFusionWorkspace(geometry, projection())
 
-        assertEquals(0, workspace.appendCarrierFramePairs(floatArrayOf(1f, 2f, 3f, 4f)))
-        assertEquals(1, workspace.appendCarrierFramePairs(floatArrayOf(5f, 6f, 7f, 8f)))
-        assertEquals(2, workspace.appendCarrierFramePairs(floatArrayOf(9f, 10f, 11f, 12f)))
-        assertEquals(0, workspace.appendCarrierFramePairs(floatArrayOf(13f, 14f, 15f, 16f)))
+        assertEquals(0, workspace.appendCarrierFramePlanes(floatArrayOf(1f, 2f), floatArrayOf(3f, 4f)))
+        assertEquals(1, workspace.appendCarrierFramePlanes(floatArrayOf(5f, 6f), floatArrayOf(7f, 8f)))
+        assertEquals(2, workspace.appendCarrierFramePlanes(floatArrayOf(9f, 10f), floatArrayOf(11f, 12f)))
+        assertEquals(0, workspace.appendCarrierFramePlanes(floatArrayOf(13f, 14f), floatArrayOf(15f, 16f)))
 
         assertEquals(1, workspace.nextHistoryWriteIndex)
         assertEquals(3L, workspace.historyFramesWritten)
@@ -99,6 +100,87 @@ class S5MegpoidCarrierFusionWorkspaceTest {
     }
 
     @Test
+    fun writesAndReadsCarrierFramesAsTwoPlanarArraysNotInterleavedPairs() {
+        val geometry = S5MegpoidCarrierFusionBufferGeometry(
+            inputFeatures = 32,
+            carrierPositions = 2,
+            spectrumBins = 2,
+            historySlotsFromRoot181 = 0,
+            historySlotsFromRoot182 = 0
+        )
+        val workspace = S5MegpoidCarrierFusionWorkspace(geometry, projection())
+
+        workspace.appendCarrierFramePlanes(
+            firstPlane = floatArrayOf(10f, 20f),
+            secondPlane = floatArrayOf(30f, 40f)
+        )
+
+        // H=1 means the write cursor wraps to the same/oldest ring slot.
+        assertEquals(0, workspace.nextHistoryWriteIndex)
+        assertArrayEquals(
+            floatArrayOf(10f, 20f, 30f, 40f),
+            workspace.copyMostRecentCarrierFrame(),
+            0f
+        )
+        assertArrayEquals(
+            floatArrayOf(10f, 20f, 30f, 40f),
+            workspace.copyHistoryOldestToNewest(),
+            0f
+        )
+    }
+
+    @Test
+    fun mixesDenseTwoPlaneOutputWithTheDelayedCarrierSlotLikeNativeForwardPath() {
+        val geometry = S5MegpoidCarrierFusionBufferGeometry(
+            inputFeatures = 32,
+            carrierPositions = 2,
+            spectrumBins = 2,
+            historySlotsFromRoot181 = 0,
+            historySlotsFromRoot182 = 0
+        )
+        val workspace = S5MegpoidCarrierFusionWorkspace(geometry, projection())
+        workspace.denseOutputFeatureMajor[0] = 11f
+        workspace.denseOutputFeatureMajor[1] = 13f
+        workspace.denseOutputFeatureMajor[2] = 17f
+        workspace.denseOutputFeatureMajor[3] = 19f
+        workspace.appendCarrierFramePlanes(
+            firstPlane = floatArrayOf(2f, 3f),
+            secondPlane = floatArrayOf(5f, 7f)
+        )
+
+        val output = FloatArray(4)
+        val returned = workspace.accumulateDelayedCarrierFrameInto(output)
+
+        assertSame(output, returned)
+        assertArrayEquals(floatArrayOf(-21f, 107f, -34f, 172f), output, 0.00001f)
+    }
+
+    @Test
+    fun nativeDelayedSlotSelectsTheOldestHistoryEntryAtTheWriteCursor() {
+        val geometry = S5MegpoidCarrierFusionBufferGeometry(
+            inputFeatures = 32,
+            carrierPositions = 1,
+            spectrumBins = 1,
+            historySlotsFromRoot181 = 1,
+            historySlotsFromRoot182 = 1
+        )
+        val workspace = S5MegpoidCarrierFusionWorkspace(geometry, projection())
+        workspace.denseOutputFeatureMajor[0] = 1f
+        workspace.denseOutputFeatureMajor[1] = 0f
+
+        workspace.appendCarrierFramePlanes(floatArrayOf(1f), floatArrayOf(10f))
+        workspace.appendCarrierFramePlanes(floatArrayOf(2f), floatArrayOf(20f))
+        workspace.appendCarrierFramePlanes(floatArrayOf(3f), floatArrayOf(30f))
+
+        // After three writes H=3 and cursor wraps to slot zero. Native
+        // index (cursor - lag182 - lag181 - 1) modulo H is also slot zero.
+        assertEquals(0, workspace.nextHistoryWriteIndex)
+        val output = FloatArray(2)
+        workspace.accumulateDelayedCarrierFrameInto(output)
+        assertArrayEquals(floatArrayOf(-10f, 1f), output, 0.00001f)
+    }
+
+    @Test
     fun unwrittenHistorySlotsRemainZeroAndResetClearsTheRing() {
         val geometry = S5MegpoidCarrierFusionBufferGeometry(
             inputFeatures = 32,
@@ -109,7 +191,7 @@ class S5MegpoidCarrierFusionWorkspaceTest {
         )
         val workspace = S5MegpoidCarrierFusionWorkspace(geometry, projection())
 
-        workspace.appendCarrierFramePairs(floatArrayOf(1f, 2f, 3f, 4f))
+        workspace.appendCarrierFramePlanes(floatArrayOf(1f, 2f), floatArrayOf(3f, 4f))
         assertArrayEquals(
             floatArrayOf(
                 0f, 0f, 0f, 0f,
@@ -142,10 +224,10 @@ class S5MegpoidCarrierFusionWorkspaceTest {
             workspace.projectNormalizedCarrierFeatures(FloatArray(31 * 2))
         }
         assertThrows(IllegalArgumentException::class.java) {
-            workspace.appendCarrierFramePairs(FloatArray(3))
+            workspace.appendCarrierFramePlanes(FloatArray(1), FloatArray(2))
         }
         assertThrows(IllegalArgumentException::class.java) {
-            workspace.appendCarrierFramePairs(floatArrayOf(0f, 0f, Float.NaN, 0f))
+            workspace.appendCarrierFramePlanes(floatArrayOf(0f, Float.NaN), floatArrayOf(0f, 0f))
         }
     }
 
