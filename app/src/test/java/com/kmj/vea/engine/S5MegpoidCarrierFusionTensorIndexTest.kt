@@ -87,7 +87,7 @@ class S5MegpoidCarrierFusionTensorIndexTest {
         val dimensions = index.resolveDenseDimensions()
         assertEquals(32, dimensions.inputFeatures)
         assertEquals(2, dimensions.outputFeatures)
-        val dense = index.buildDenseProjection(fixture.decoder)
+        val dense = index.buildFallbackDenseProjection(fixture.decoder)
         assertEquals(32, dense.inputFeatures)
         assertEquals(2, dense.outputFeatures)
     }
@@ -116,7 +116,7 @@ class S5MegpoidCarrierFusionTensorIndexTest {
             index.resolveDenseDimensions()
         }
         assertThrows(IllegalArgumentException::class.java) {
-            index.buildDenseProjection(fixture.decoder)
+            index.buildFallbackDenseProjection(fixture.decoder)
         }
     }
 
