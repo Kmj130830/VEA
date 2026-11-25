@@ -4,10 +4,17 @@
 
 Static analysis of the supplied S5API.dll identifies the following path:
 
-- FUN_180003a90 initializes the ordered phone-label groups.
-- FUN_18006c520 builds the label-to-index lookup map.
-- FUN_180021c50 checks categories 0 through 12 and returns 13 on no match.
-- FUN_180074a50 performs alias handling, fallback-string filtering, and four explicit overrides.
+- FUN_180003a90 initializes a 14-entry ordered phone-label-group vector.
+- FUN_1800111c0 copies those 14 groups to the global vector at DAT_1801c4160.
+- FUN_18006c520 iterates the outer group index from 0 upward and stores that
+  exact index in each inserted label-tree node at node offset +0x40.
+- FUN_180021c50 checks the category map and returns 13 on no match.
+- FUN_180074a50 performs alias handling, fallback-string filtering, reads
+  the stored context-map uint32 index, and applies four explicit overrides.
+
+This establishes the numeric IDs directly from the native construction and
+lookup path. The category vector's outer index is the returned native ID;
+it is not inferred from read-only string order.
 
 This documents the Windows PE's statically recovered behavior. It is not a runtime trace and does not establish that every language package uses an identical active mapping.
 
@@ -59,3 +66,42 @@ VsmAlignedPhoneFeaturePreparer now returns a concrete categoryIndex in the range
 This index does not by itself complete the acoustic feature row. The category vector width, context-window counts, optional feature flags, and their active render-state descriptor values still have to be read from the actual model/render context. The number of categories must not be mistaken for the category vector width.
 
 G2P and per-phone alignment remain separate. The editor's note-level phoneme display string is not split into fabricated phone intervals.
+
+## Numeric category ID proof — 2026-11-25
+
+The ordered group vector is created by FUN_180003a90 with 14 adjacent
+0x18-byte group records. The first two groups are the three silence
+labels and three break labels. The remaining twelve groups are the phone
+arrays and smaller literal sets initialized immediately afterward. At the
+end of the constructor, FUN_1800111c0 copies exactly 14 group records into
+DAT_1801c4160.
+
+FUN_18006c520 traverses those groups in ascending order. For each label it
+inserts a node into the lookup tree and writes the current outer-loop
+counter to the node's +0x40 uint32 field. FUN_180074a50 later reads that
+field and returns it as the phone category index. Consequently, the native
+group ordinals map directly to IDs 0 through 13.
+
+The exact group sizes reconstructed from the constructor are:
+
+| Native ID | Label count | Group |
+|---:|---:|---|
+| 0 | 3 | sil / Sil / SIL |
+| 1 | 3 | br / Br / BR |
+| 2 | 76 | vowels, diphthongs, contextual spellings and +1 forms |
+| 3 | 6 | n / N / m / ny / my / ng |
+| 4 | 7 | g / d / b / gy / dy / by / dh |
+| 5 | 4 | z / zh / v / z` |
+| 6 | 2 | j / jh |
+| 7 | 19 | y / w and +0 glide-vowel aliases |
+| 8 | 4 | r / ry / l / 4 |
+| 9 | 8 | k / t / p and palatal/aspirated forms |
+| 10 | 9 | s / sh / h / C / f and related fricatives |
+| 11 | 8 | ch / ts and related affricates |
+| 12 | 1 | cl |
+| 13 | 1 | junk |
+
+The Android category-map test now checks all 14 native group sizes and
+resolves every member against its native group ordinal. It accounts for the
+four explicit FUN_180074a50 overrides, where `Sil` and `SIL` are stored in
+group 0 but return category ID 1.
