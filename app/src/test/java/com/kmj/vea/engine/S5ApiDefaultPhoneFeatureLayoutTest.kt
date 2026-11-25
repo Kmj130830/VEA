@@ -95,6 +95,51 @@ class S5ApiDefaultPhoneFeatureLayoutTest {
     }
 
     @Test
+    fun decodesVerifiedNativeDescriptorOffsetsFromLittleEndianBytes() {
+        val base = 5
+        val bytes = ByteArray(base + S5ApiDefaultPhoneFeatureDescriptor.NATIVE_MINIMUM_SIZE + 3)
+        val buffer = java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        buffer.putInt(base + 0x10, 24)
+        buffer.putFloat(base + 0x14, 0.004f)
+        buffer.putFloat(base + 0x18, 2.75f)
+        buffer.putInt(base + 0x1c, 3)
+        buffer.putInt(base + 0x20, 2)
+        buffer.put(base + 0x24, 0x7f.toByte())
+        buffer.put(base + 0x25, 0)
+        buffer.put(base + 0x26, 0xa5.toByte())
+
+        val descriptor = S5ApiDefaultPhoneFeatureDescriptor.fromNativeBytes(bytes, base)
+        assertEquals(24, descriptor.categoryWidthAt10)
+        assertEquals(0.004f, descriptor.minimumPhoneSecondsAt14, 0f)
+        assertEquals(2.75f, descriptor.maximumPhoneSecondsAt18, 0f)
+        assertEquals(3, descriptor.followingContextCountAt1C)
+        assertEquals(2, descriptor.precedingContextCountAt20)
+        assertEquals(true, descriptor.includeLeadingFlagPairAt24)
+        assertEquals(0, descriptor.layoutModeAt25)
+        assertEquals(0xa5, descriptor.auxiliaryByteAt26)
+        assertEquals(24, descriptor.requireDefaultMode0().categoryWidth)
+    }
+
+    @Test
+    fun rejectsTruncatedOrInvalidNativeDescriptorBytes() {
+        assertThrows(IllegalArgumentException::class.java) {
+            S5ApiDefaultPhoneFeatureDescriptor.fromNativeBytes(ByteArray(0x26))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            S5ApiDefaultPhoneFeatureDescriptor.fromNativeBytes(ByteArray(64), -1)
+        }
+
+        val invalid = ByteArray(S5ApiDefaultPhoneFeatureDescriptor.NATIVE_MINIMUM_SIZE)
+        val buffer = java.nio.ByteBuffer.wrap(invalid).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        buffer.putInt(0x10, 14)
+        buffer.putFloat(0x14, 0.01f)
+        buffer.putFloat(0x18, Float.NaN)
+        assertThrows(IllegalArgumentException::class.java) {
+            S5ApiDefaultPhoneFeatureDescriptor.fromNativeBytes(invalid)
+        }
+    }
+
+    @Test
     fun rejectsMode1RatherThanTreatingItAsMode0() {
         val descriptor = S5ApiDefaultPhoneFeatureDescriptor(
             categoryWidthAt10 = 14,
