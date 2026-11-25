@@ -121,14 +121,12 @@ class S5MegpoidPostResidualFallbackTensorIndexTest {
     }
 
     @Test
-    fun rejectsAWeightCountThatDoesNotMatchNativeEightByThirtyTwoAxes() {
+    fun rejectsAWeightPayloadCountThatDisagreesWithItsMetadata() {
         val fixture = fixture(denseWeights = FloatArray(255))
-        val index = S5MegpoidPostResidualFallbackTensorIndex.build(fixture.tree)
+        // The nested VTB2 parser checks metadata product against payload
+        // length before the feature-specific [8,32,1,1] contract is resolved.
         assertThrows(IllegalArgumentException::class.java) {
-            index.resolveDimensions()
-        }
-        assertThrows(IllegalArgumentException::class.java) {
-            index.buildStage(fixture.decoder)
+            S5MegpoidPostResidualFallbackTensorIndex.build(fixture.tree)
         }
     }
 
