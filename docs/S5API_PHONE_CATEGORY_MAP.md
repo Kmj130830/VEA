@@ -38,6 +38,20 @@ FUN_180074a50 returns category 1 directly for exact normalized spellings SIL, Si
 
 For non-alias labels, the native fallback path retains only ASCII A-Z, a-z, and the character 4 before performing the category lookup. The Android port applies the recovered alias map first, preserves exact punctuation-bearing labels present in the static groups, then applies this filtering and the four overrides.
 
+## Numeric category indices: constructor order is confirmed
+
+The numeric indices are not inferred from the read-only string order.
+`FUN_180003a90` constructs the ordered vector of 14 phone groups and
+publishes it through `FUN_1800111c0`. `FUN_18006c520` traverses that vector
+from its first group to its last, maintains a group counter starting at zero,
+and writes that counter into each inserted phone-map node at offset
+`+0x40`. Therefore the runtime lookup IDs are exactly the group ordinals
+0 through 13, matching the Android table and its tests.
+
+The feature descriptor's category stride at `+0x10` is a separate value:
+the category map proves that at least 14 slots are required, but the stride
+must not be assumed to equal 14 without reading the active descriptor.
+
 ## Integration boundary
 
 VsmAlignedPhoneFeaturePreparer now returns a concrete categoryIndex in the range 0..13 for each already aligned VsmPhoneEvent. Unknown labels receive the native fallback category 13.
