@@ -57,12 +57,23 @@ S5API has three coordinate implementations:
   half values away from zero.
 
 The Windows caller has an `MRW_MODROT_SIMD=0` override to force the inline
-scalar path and also has a CPU-dispatch condition. AI Megpoid has four
-parts, within both table helpers' supported ranges. Android exposes all
-three modes explicitly; its default is the four-lane SSE/NEON-compatible
-`SIMD_SSE_TABLE_TRUNCATION` mode. Callers that need the AVX helper's
-nearest-even result can select `SIMD_AVX_TABLE_NEAREST_EVEN`, and the
-inline fallback remains available as `INLINE_SCALAR_ROUNDF`.
+scalar path. Otherwise, the callsite first evaluates `FUN_1800dc2e0`:
+
+- `FUN_1800dc2e0` checks CPUID leaf 1 for OSXSAVE, AVX and FMA, verifies
+  that XCR0 has the XMM/YMM state enabled, then checks CPUID leaf 7 EBX
+  bit 5 (AVX2). It returns nonzero only for the AVX2-capable route.
+- When that check succeeds, `FUN_1800c3930` dispatches to the 8-lane
+  AVX helper `FUN_1800c39f0`.
+- When AVX2 is unavailable, the caller checks the processor feature level
+  returned by `FUN_18003cbe0`. Feature level 3 selects the inline scalar
+  fallback; other levels use `FUN_1800c3930`, which dispatches to the
+  4-lane SSE helper `FUN_1800c4080`.
+
+AI Megpoid has four parts, within both table helpers' supported ranges.
+Android does not execute x86 SSE/AVX instructions: its default Kotlin path
+reproduces the 4-lane SSE helper's truncation and polynomial semantics as
+the portable baseline. Callers can select the AVX helper's nearest-even
+rounding mode for comparison, or the inline scalar `roundf` mode.
 
 For the SSE table path:
 
