@@ -137,9 +137,20 @@ establish the full user-facing meaning of each scalar control.
 
 The complex modulation accumulator has a common scalar equation now ported
 as `S5MegpoidOutputHeadKernels.accumulateComplexModulatedOutput`; the
-CPU-dispatched native AVX2 and general paths implement the same equation.
+CPU-dispatched native AVX2 and general paths implement the same equation:
+
+```text
+x = gain * feature0
+y = gain * feature1
+out.real += modulationReal * x - modulationImag * y
+out.imag += modulationImag * x + modulationReal * y
+```
+
 The affine vector operation used by the carrier path is also ported as
-`applyAffineInPlace`. The remaining work is the per-part interpolation,
+`applyAffineInPlace`, matching `value = value * scale + bias` from
+`FUN_1800cea30` / `FUN_1800ceba0`. These are portable scalar reference
+kernels, not the complete SIMD dispatch or per-part scheduler. The remaining
+work is the interpolation in `FUN_1800c4080` / `FUN_1800c39f0`,
 carrier-conditioned input construction, ring-buffer traversal and final
 fusion scheduling. The supplied AI Megpoid model has carrier fusion enabled.
 
