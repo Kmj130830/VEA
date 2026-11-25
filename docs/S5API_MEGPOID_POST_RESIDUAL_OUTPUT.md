@@ -12,9 +12,10 @@ object.
 
 The trace begins after the 4x2 residual-block feedback loop and continues
 through the call to `FUN_18012c740`. It identifies the terminal feature-pair
-conversion and output-transform call. It does not yet recover every
-intermediate modulation/carrier parameter or the active value of the
-terminal representation flag.
+conversion and output-transform call. The supplied AI Megpoid option values
+also establish that its multi-part output-head condition is enabled. The
+remaining unknowns are the detailed per-part interpolation/carrier parameters
+and the model tensors feeding the second output head.
 
 ## 1. Post-residual projection and normalization branches
 
@@ -37,6 +38,33 @@ have not yet been mapped. The debug-dump branch for render modes 10 and 11
 calls the same operators directly while writing intermediate buffers to
 the optional trace file; those debug modes must not be mistaken for separate
 model architecture.
+
+### AI Megpoid branch selection from the installed VTB2 options
+
+The native model-population routine `FUN_1800ced10` copies the option
+`D00` to render-root word `+0xD00` and option `D01` to byte
+`+0xD01`. It derives root word `+0xD07` as:
+
+```text
+if (D01 && D00 >= 2):
+    root[0xD07] = D00 * 2
+else:
+    root[0xD07] = 2
+```
+
+The supplied AI Megpoid V7 runtime-options object contains `D00 = 4`
+and `D01 = true`. Thus its traced render path enters the multi-part
+branch and the derived post-residual head feature width at root word
+`+0xD07` is 8. This width is distinct from the final two feature planes
+converted to 513 complex spectral bins; it describes the preceding
+multi-part output-head representation.
+
+Android now exposes `usesMultiPartOutputHead` and
+`postResidualHeadFeatureWidth` on `S5MegpoidRuntimeOptionsDescriptor`.
+Tests cover the actual 4-part/8-feature case, disabled mode, one-part
+fallback and integer overflow rejection. The per-part projection,
+interpolation, carrier-history and final reduction kernels are still not
+wired to VTB2 tensors.
 
 ## 2. Multi-part feature/modulation branch
 
@@ -91,9 +119,14 @@ The native branch uses float32 `expf`, `cosf`, `sinf`, and an upper
 magnitude limit of 100. No lower clamp is visible in this terminal loop;
 underflow to zero is therefore preserved.
 
-This establishes two possible two-plane representations. It does not yet
-establish which value of the root `+0x48` selector is used by the supplied
-AI Megpoid package at runtime.
+This establishes two possible two-plane representations. In the traced
+new-root initialization path, `FUN_1800bca40` zeroes the selector byte at
+root `+0x48`, and `FUN_1800ced10` does not overwrite it. The supplied AI
+Megpoid render-state creation path uses that fresh root, so direct-complex
+is the selected default for this path. Android's
+`processMegpoidDefaultOutputPlanes()` now uses `DIRECT_COMPLEX`; the explicit
+log-magnitude/phase mode remains available for other render-state paths that
+may set the selector differently.
 
 ## 4. Inverse transform and output block
 
@@ -123,10 +156,10 @@ not a claim that the full neural graph has generated those feature planes.
 
 ## 5. Remaining output-head work
 
-1. Recover the exact active root `+0x48` representation flag and its model/configuration source.
-2. Trace `FUN_1800c3930`, `FUN_1800d52b0` and `FUN_1800d5610` for the multi-part and carrier-mix branches.
-3. Map the second global-normalization and dense descriptors at root `+0x310` and `+0x338` to VTB2 keys and active dimensions.
-4. Connect the completed upstream sequence pipeline to the second head and the correct modulation/carrier branch.
+1. Map the second global-normalization and dense descriptors at root `+0x310` and `+0x338` to VTB2 keys and active dimensions.
+2. Trace `FUN_1800c3930`, `FUN_1800d52b0` and `FUN_1800d5610` for the per-part interpolation and carrier-mix branches.
+3. Implement the model-backed 8-feature output head, its per-part modulation and final reduction to the two terminal feature planes.
+4. Connect the completed upstream sequence pipeline to the second head and the carrier-history branch.
 5. Compare complex spectra and overlap-add output against authorized native reference frames before enabling WAV rendering.
 
 Until these are resolved and tested on Android ARM64, `SynthesisEngine.render()`
