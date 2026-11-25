@@ -133,8 +133,7 @@ class S5MegpoidRuntimeOptionsDescriptorTest {
             positionCount = 3,
             fundamentalFrequencyHz = 100f,
             thetaCenterRadians = 0.5f,
-            nearestPartMaskEnabledAtRoot3405 = true,
-            thresholdModeEnabledAtRoot3411 = true
+            nearestPartMaskEnabledAtRoot3405 = true
         )
 
         assertEquals(4, table.partCount)
