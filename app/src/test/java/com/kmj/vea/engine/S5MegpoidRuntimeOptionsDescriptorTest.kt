@@ -26,7 +26,10 @@ class S5MegpoidRuntimeOptionsDescriptorTest {
             S5MegpoidRuntimeOptionKeys.PARAM_D02 to S5ModelValue.NumberValue(133.34),
             S5MegpoidRuntimeOptionKeys.PARAM_D03 to S5ModelValue.NumberValue(25.0),
             S5MegpoidRuntimeOptionKeys.PARAM_D04 to S5ModelValue.BooleanValue(true),
-            S5MegpoidRuntimeOptionKeys.PARAM_D05 to S5ModelValue.NumberValue(0.01)
+            S5MegpoidRuntimeOptionKeys.PARAM_D05 to S5ModelValue.NumberValue(0.01),
+            S5MegpoidRuntimeOptionKeys.TERMINAL_SPECTRUM_LOG_MAGNITUDE_PHASE to
+                S5ModelValue.BooleanValue(true),
+            S5MegpoidRuntimeOptionKeys.CARRIER_FUSION_ENABLED to S5ModelValue.BooleanValue(true)
         )
         defaults.putAll(overrides)
         val entries = defaults.entries.joinToString(",") { (key, value) ->
@@ -59,6 +62,10 @@ class S5MegpoidRuntimeOptionsDescriptorTest {
         assertEquals(25.0, options.paramD03, 0.000001)
         assertTrue(options.paramD04)
         assertEquals(0.01, options.paramD05, 0.000001)
+        assertTrue(options.terminalSpectrumLogMagnitudePhase)
+        assertEquals(S5MegpoidSpectrumFrameEncoding.LOG_MAGNITUDE_PHASE,
+            options.terminalSpectrumEncoding)
+        assertTrue(options.carrierFusionEnabled)
         options.requireMegpoidV7BlockGrid()
     }
 
@@ -143,6 +150,38 @@ class S5MegpoidRuntimeOptionsDescriptorTest {
         }
     }
     @Test
+    fun mapsSpectrumRepresentationFlagToExactOutputEncoding() {
+        val logPolar = S5MegpoidRuntimeOptionsDescriptor.from(tree())
+        assertEquals(
+            S5MegpoidSpectrumFrameEncoding.LOG_MAGNITUDE_PHASE,
+            logPolar.terminalSpectrumEncoding
+        )
+
+        val direct = S5MegpoidRuntimeOptionsDescriptor.from(tree(mapOf(
+            S5MegpoidRuntimeOptionKeys.TERMINAL_SPECTRUM_LOG_MAGNITUDE_PHASE to
+                S5ModelValue.BooleanValue(false)
+        )))
+        assertEquals(
+            S5MegpoidSpectrumFrameEncoding.DIRECT_COMPLEX,
+            direct.terminalSpectrumEncoding
+        )
+    }
+
+    @Test
+    fun readsCarrierFusionFlagIndependentlyOfTheMultipartHeadFlag() {
+        val enabled = S5MegpoidRuntimeOptionsDescriptor.from(tree())
+        assertTrue(enabled.usesMultiPartOutputHead)
+        assertTrue(enabled.carrierFusionEnabled)
+
+        val disabled = S5MegpoidRuntimeOptionsDescriptor.from(tree(mapOf(
+            S5MegpoidRuntimeOptionKeys.CARRIER_FUSION_ENABLED to
+                S5ModelValue.BooleanValue(false)
+        )))
+        assertTrue(disabled.usesMultiPartOutputHead)
+        assertFalse(disabled.carrierFusionEnabled)
+    }
+
+    @Test
     fun rejectsMissingFieldsAndWrongJsonValueTypes() {
         val missing = S5ModelObjectTree.parseUtf8("{}")
         assertThrows(IllegalArgumentException::class.java) {
@@ -156,6 +195,12 @@ class S5MegpoidRuntimeOptionsDescriptorTest {
         assertThrows(IllegalArgumentException::class.java) {
             S5MegpoidRuntimeOptionsDescriptor.from(tree(mapOf(
                 S5MegpoidRuntimeOptionKeys.PARAM_D01 to S5ModelValue.NumberValue(1.0)
+            )))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            S5MegpoidRuntimeOptionsDescriptor.from(tree(mapOf(
+                S5MegpoidRuntimeOptionKeys.TERMINAL_SPECTRUM_LOG_MAGNITUDE_PHASE to
+                    S5ModelValue.NumberValue(1.0)
             )))
         }
     }
