@@ -108,6 +108,36 @@ class PreparedMegpoidSpectralOutputSessionTest {
     }
 
     @Test
+    fun consumesTwoModelOutputFeaturePlanesThroughTheExplicitDirectComplexMode() {
+        val session = createSession()
+        val real = floatArrayOf(16f, 0f, 0f, 0f, 0f)
+        val imaginary = FloatArray(5)
+
+        val output = session.processModelOutputPlanes(
+            firstFeaturePlane = real,
+            secondFeaturePlane = imaginary,
+            encoding = S5MegpoidSpectrumFrameEncoding.DIRECT_COMPLEX
+        )
+
+        assertEquals(4, output.size)
+        assertEquals(1L, session.processedFrameCount)
+        assertTrue(output.all { it.isFinite() })
+    }
+
+    @Test
+    fun invalidModelOutputPlanesDoNotAdvanceTheSession() {
+        val session = createSession()
+        assertThrows(IllegalArgumentException::class.java) {
+            session.processModelOutputPlanes(
+                firstFeaturePlane = FloatArray(4),
+                secondFeaturePlane = FloatArray(5),
+                encoding = S5MegpoidSpectrumFrameEncoding.LOG_MAGNITUDE_PHASE
+            )
+        }
+        assertEquals(0L, session.processedFrameCount)
+    }
+
+    @Test
     fun resetClearsOverlapHistoryAndFrameCounter() {
         val session = createSession()
         val spectrum = FloatArray(10).also { it[0] = 16f }
