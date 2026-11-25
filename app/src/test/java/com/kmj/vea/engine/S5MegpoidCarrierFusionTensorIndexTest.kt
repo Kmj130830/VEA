@@ -22,10 +22,10 @@ class S5MegpoidCarrierFusionTensorIndexTest {
     )
 
     private fun fixture(
-        weightShape: List<Int> = listOf(2),
-        weightValues: FloatArray = floatArrayOf(0.25f, -0.5f),
-        biasShape: List<Int> = listOf(2, 32, 1, 1),
-        biasValues: FloatArray = FloatArray(64) { it / 64f }
+        weightShape: List<Int> = listOf(2, 32, 1, 1),
+        weightValues: FloatArray = FloatArray(64) { it / 64f },
+        biasShape: List<Int> = listOf(2),
+        biasValues: FloatArray = floatArrayOf(0.25f, -0.5f)
     ): Fixture {
         fun encode(shape: List<Int>, values: FloatArray, marker: String): String {
             val bytes = when (marker) {
@@ -71,25 +71,32 @@ class S5MegpoidCarrierFusionTensorIndexTest {
         val fixture = fixture()
         val index = S5MegpoidCarrierFusionTensorIndex.build(fixture.tree)
 
-        assertEquals(listOf(2), index.weights.descriptorMetadata)
-        assertEquals(2, index.weights.elementCount)
+        assertEquals(listOf(2, 32, 1, 1), index.weights.descriptorMetadata)
+        assertEquals(64, index.weights.elementCount)
         assertEquals("*F32", index.weights.marker)
-        assertEquals(listOf(2, 32, 1, 1), index.bias.descriptorMetadata)
-        assertEquals(64, index.bias.elementCount)
+        assertEquals(listOf(2), index.bias.descriptorMetadata)
+        assertEquals(2, index.bias.elementCount)
         assertEquals("*F32", index.bias.marker)
 
+        assertEquals(64, index.weights.decodeFloatArray(fixture.decoder).size)
         assertEquals(
             listOf(0.25f, -0.5f),
-            index.weights.decodeFloatArray(fixture.decoder).toList()
+            index.bias.decodeFloatArray(fixture.decoder).toList()
         )
-        assertEquals(64, index.bias.decodeFloatArray(fixture.decoder).size)
+
+        val dimensions = index.resolveDenseDimensions()
+        assertEquals(32, dimensions.inputFeatures)
+        assertEquals(2, dimensions.outputFeatures)
+        val dense = index.buildDenseProjection(fixture.decoder)
+        assertEquals(32, dense.inputFeatures)
+        assertEquals(2, dense.outputFeatures)
     }
 
     @Test
     fun rejectsTensorMetadataThatDoesNotMatchTheEncodedPayloadCount() {
         val fixture = fixture(
-            weightShape = listOf(3),
-            weightValues = floatArrayOf(1f, 2f)
+            weightShape = listOf(2, 32, 1, 1),
+            weightValues = FloatArray(63) { it.toFloat() }
         )
         assertThrows(IllegalArgumentException::class.java) {
             S5MegpoidCarrierFusionTensorIndex.build(fixture.tree)
@@ -120,6 +127,6 @@ class S5MegpoidCarrierFusionTensorIndexTest {
             S5MegpoidCarrierFusionTensorIndex.build(duplicate)
         }
         // The ordinary exact fixture remains independently readable.
-        assertEquals(2, S5MegpoidCarrierFusionTensorIndex.build(fixture.tree).weights.elementCount)
+        assertEquals(64, S5MegpoidCarrierFusionTensorIndex.build(fixture.tree).weights.elementCount)
     }
 }
