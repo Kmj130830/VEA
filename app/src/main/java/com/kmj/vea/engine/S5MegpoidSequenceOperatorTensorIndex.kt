@@ -183,6 +183,46 @@ class S5MegpoidSequenceOperatorTensorIndex private constructor(
         return S5MegpoidAlternateTransitionTensorPair(weights, bias)
     }
 
+    /** Available Alternate transition slots backed by both weights and bias tensors. */
+    fun availableAlternateTransitionIndices(): Set<Int> {
+        val weightIndices = availableIndices(S5MegpoidSequenceOperatorFactory.ALTERNATE_WEIGHTS)
+        val biasIndices = availableIndices(S5MegpoidSequenceOperatorFactory.ALTERNATE_BIAS)
+        return weightIndices.intersect(biasIndices)
+    }
+
+    /**
+     * Requires the supplied AI Megpoid V7 Alternate tensor shape without
+     * assigning an unverified arithmetic interpretation to its axes.
+     */
+    fun requireMegpoidV7AlternateTransitionPair(
+        index: Int
+    ): S5MegpoidAlternateTransitionTensorPair {
+        val pair = alternateTransitionPairOrNull(index)
+            ?: throw IllegalArgumentException(
+                "AI Megpoid V7 has no complete Alternate transition pair at index $index."
+            )
+        require(pair.weights.descriptorMetadata == listOf(32, 32, 3, 1)) {
+            "AI Megpoid V7 Alternate weights must retain native metadata [32,32,3,1]."
+        }
+        require(pair.bias.descriptorMetadata == listOf(32)) {
+            "AI Megpoid V7 Alternate bias must retain native metadata [32]."
+        }
+        require(pair.weights.elementCount == 32 * 32 * 3 && pair.bias.elementCount == 32) {
+            "AI Megpoid V7 Alternate transition payload count does not match its native metadata."
+        }
+        return pair
+    }
+
+    /** Requires the three populated transition pairs used by the four-slot Megpoid V7 graph. */
+    fun requireMegpoidV7AlternateTransitionSet(): List<S5MegpoidAlternateTransitionTensorPair> {
+        val expectedIndices = setOf(0, 1, 2)
+        val actualIndices = availableAlternateTransitionIndices()
+        require(actualIndices == expectedIndices) {
+            "AI Megpoid V7 Alternate transition indices must be $expectedIndices, but were $actualIndices."
+        }
+        return expectedIndices.sorted().map(::requireMegpoidV7AlternateTransitionPair)
+    }
+
     companion object {
         fun build(tree: S5ModelObjectTree): S5MegpoidSequenceOperatorTensorIndex {
             val entriesByKey = S5MegpoidSequenceOperatorFactoryKeys.all().groupBy { it.lookupKey }
