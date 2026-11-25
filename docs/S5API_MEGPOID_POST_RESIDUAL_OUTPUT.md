@@ -111,7 +111,9 @@ establish the full user-facing meaning of each scalar control.
 
 The exact interpolation rule, carrier-history ownership and model property
 sources are reserved for a focused trace of `FUN_1800c3930`,
-`FUN_1800d52b0` and `FUN_1800d5610`. VEA's current Android pipeline does
+`FUN_1800d52b0` and `FUN_1800d5610`. The native branch conditions and
+workspace offsets are confirmed; the AI Megpoid carrier-fusion option value
+is not yet established. VEA's current Android pipeline does
 not implement this multi-part or carrier-mix branch.
 
 ## 4. Terminal two-plane to complex-spectrum conversion
@@ -146,14 +148,13 @@ The native branch uses float32 `expf`, `cosf`, `sinf`, and an upper
 magnitude limit of 100. No lower clamp is visible in this terminal loop;
 underflow to zero is therefore preserved.
 
-This establishes two possible two-plane representations. In the traced
-new-root initialization path, `FUN_1800bca40` zeroes the selector byte at
-root `+0x48`, and `FUN_1800ced10` does not overwrite it. The supplied AI
-Megpoid render-state creation path uses that fresh root, so direct-complex
-is the selected default for this path. Android's
-`processMegpoidDefaultOutputPlanes()` now uses `DIRECT_COMPLEX`; the explicit
-log-magnitude/phase mode remains available for other render-state paths that
-may set the selector differently.
+This establishes two possible two-plane representations. Although
+`FUN_1800bca40` initializes root byte `+0x48` to zero, the subsequent
+`FUN_1800ced10` model-option loader overwrites that byte using a boolean
+property obtained from `FUN_1800e6c20()`. The constructor default therefore
+does not establish the active encoding. Android keeps the choice explicit
+until that getter's hash key and the corresponding AI Megpoid VTB2 value
+have been recovered.
 
 ## 5. Inverse transform and output block
 
