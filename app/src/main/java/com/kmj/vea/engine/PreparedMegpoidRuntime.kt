@@ -138,12 +138,15 @@ data class PreparedMegpoidRuntime(
     fun prepareMultipartOutputModulation(
         positionCount: Int,
         fundamentalFrequencyHz: Float,
-        thetaCenterRadians: Float
+        thetaCenterRadians: Float,
+        coordinateKernel: S5MegpoidMultipartCoordinateKernel =
+            S5MegpoidMultipartCoordinateKernel.SIMD_SSE_TABLE_TRUNCATION
     ): S5MegpoidMultipartOutputModulation =
         runtimeOptions.buildMultipartOutputModulation(
             positionCount = positionCount,
             fundamentalFrequencyHz = fundamentalFrequencyHz,
-            thetaCenterRadians = thetaCenterRadians
+            thetaCenterRadians = thetaCenterRadians,
+            coordinateKernel = coordinateKernel
         )
 
     /** Actual terminal spectrum representation read from this singer's VTB2 options. */
