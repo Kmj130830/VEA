@@ -93,6 +93,8 @@ public class ExportS5RendererPath extends GhidraScript {
                 // Force its initializer and adjacent subobject constructors
                 // into the report instead of relying on the bounded closure.
                 "180050aa0", "180013410", "180012030", "180011be0",
+                // Phone descriptor and feature-context constructor helpers.
+                "180011680", "180011e80", "18005a980", "180032750",
                 // The phone-label -> category-index map builder walks the
                 // global grouped phone inventory at DAT_1801c4160/4168.
                 "18006c520", "1800103e0", "180197460",
@@ -196,6 +198,64 @@ public class ExportS5RendererPath extends GhidraScript {
             if (spectralReferenceCount == 0) {
                 out.println("| - | - | no direct callers recovered | - |");
             }
+            out.println();
+
+            out.println("## Phone-feature descriptor and category-context cross-references");
+            out.println();
+            out.println("| Target address | Recovered target | Direct caller | Call site |");
+            out.println("|---:|---|---|---:|");
+            String[][] phoneTargets = {
+                {"180011680", "phone context subobject initializer A"},
+                {"180011e80", "phone context subobject initializer B"},
+                {"180013410", "phone feature context constructor"},
+                {"180012030", "alternate feature context constructor"},
+                {"1800591d0", "render phone/feature configuration loader"},
+                {"180050aa0", "render-context scalar and feature configuration copier"},
+                {"18005a980", "render-context configuration caller"},
+                {"180032750", "phone-category context map initializer"},
+                {"18006c520", "phone-category label-to-index builder"},
+                {"18003ab70", "timed-phone event feature-row builder"},
+                {"18006c720", "phone feature matrix core"}
+            };
+            int phoneReferenceCount = 0;
+            for (String[] target : phoneTargets) {
+                Address targetAddress = toAddr(target[0]);
+                Function targetFunction =
+                    currentProgram.getFunctionManager().getFunctionAt(targetAddress);
+                if (targetFunction == null) {
+                    targetFunction = currentProgram.getFunctionManager()
+                        .getFunctionContaining(targetAddress);
+                }
+                ReferenceIterator refs =
+                    currentProgram.getReferenceManager().getReferencesTo(targetAddress);
+                while (refs.hasNext()) {
+                    Reference ref = refs.next();
+                    if (!ref.getReferenceType().isCall()) continue;
+                    Function caller = currentProgram.getFunctionManager()
+                        .getFunctionContaining(ref.getFromAddress());
+                    if (caller == null) continue;
+                    phoneReferenceCount++;
+                    out.printf("| %s (%s) | %s | %s at %s | %s |%n",
+                        targetAddress,
+                        targetFunction == null ? "not recovered" : targetFunction.getName(),
+                        target[1], caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+                }
+            }
+            if (phoneReferenceCount == 0) {
+                out.println("| - | - | no direct callers recovered | - |");
+            }
+            out.println();
+
+            out.println("## Phone descriptor constructor decompilation targets");
+            out.println();
+            out.println("The following constructors are explicitly retained in the function closure above,");
+            out.println("even when their callers are outside the generic bounded call-graph expansion:");
+            out.println();
+            out.println("- FUN_180011680: phone feature context subobject initializer");
+            out.println("- FUN_180011e80: alternate feature context subobject initializer");
+            out.println("- FUN_180013410 / FUN_180012030: owning context constructors");
+            out.println("- FUN_1800591d0 / FUN_180050aa0: caller-side descriptor configuration");
+            out.println("- FUN_18005a980 / FUN_180032750: upstream config and category-map callers");
             out.println();
 
             out.println("## Frame-window generator callers");
