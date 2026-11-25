@@ -170,10 +170,30 @@ native 2×32 GEMM and per-row affine correction using the `+0x16A/+0x16B`
 scalars. The optional VTB2 `+0xD60` 32→2 Dense layer remains separate and
 is exposed only for the native fallback sub-branch.
 
-The source matrix and control vectors are still supplied by the missing
-upstream render-context/conditioning preparation path. The workspace now
-implements the math once those exact buffers are available, but it does not
-invent their values or claim the carrier branch is end-to-end connected.
+The source matrix and control vectors are now compiled directly from the
+selected VTB2 model data. The `FUN_1800ced10` builder reads the same
+`[2,32,1,1]` carrier Dense weights and `[2]` bias that populate
+the optional `+0xD60` fallback descriptor, plus the 32-value
+normalization scale and bias from the post-residual fallback normalizer.
+The recovered fold is:
+
+```text
+sourceMatrix[r,k] = carrierWeight[r,k] * normalizationScale[k]
+control162[r] = carrierBias[r] + sum_k(carrierWeight[r,k] * normalizationBias[k])
+control166[r] = sum_k(sourceMatrix[r,k])
+```
+
+`S5MegpoidCarrierFusionActiveParameters` validates all four model vectors,
+builds the [2][32] source matrix and both two-value controls, and exposes
+copy-isolated arrays. `S5VoicebankModelPackage.prepareCarrierFusionActiveParameters()`
+and `PreparedMegpoidRuntime.prepareCarrierFusionActiveParameters()` connect
+that compiler to the installed voicebank. The workspace now has a model-backed
+overload so callers no longer need to inject guessed source/control arrays.
+
+This advances the parameter-construction boundary only. Runtime values at
+root +0x16A/+0x16B, carrier positions and history lag counts still come from
+the active render context; the PCM/audio callback and final render session
+remain unconnected.
 
 ## Non-multi-part fallback output head
 
