@@ -144,6 +144,38 @@ class S5MegpoidMultipartOutputModulationTest {
     }
 
     @Test
+    fun avxTablePathUsesMxcsrNearestEvenForCoordinatesAndQuadrantReduction() {
+        fun build(kernel: S5MegpoidMultipartCoordinateKernel) =
+            S5MegpoidMultipartOutputModulationBuilder.build(
+                partCount = 4,
+                positionCount = 2,
+                frequencyStep = 31.25f,
+                fundamentalFrequencyHz = 1f,
+                thetaCenterRadians = 0.5f,
+                maximumDistanceParameter = 133f,
+                distanceExtensionParameter = 25f,
+                extendedThresholdMode = true,
+                nearestPartMaskEnabledAtRoot3405 = false,
+                thresholdModeEnabledAtRoot3411 = true,
+                coordinateKernel = kernel
+            )
+
+        val avx = build(S5MegpoidMultipartCoordinateKernel.SIMD_AVX_TABLE_NEAREST_EVEN)
+        val sse = build(S5MegpoidMultipartCoordinateKernel.SIMD_SSE_TABLE_TRUNCATION)
+
+        // At the second output position, the first quotient is 7.5625,
+        // so both AVX nearest and SSE truncation produce a cycle of 8 vs 7.
+        assertEquals(
+            listOf(33f, 30f, 31f, 32f),
+            avx.copyPhaseLocations().copyOfRange(4, 8).toList()
+        )
+        assertEquals(
+            listOf(29f, 30f, 31f, 28f),
+            sse.copyPhaseLocations().copyOfRange(4, 8).toList()
+        )
+    }
+
+    @Test
     fun defaultSimdTableUsesTheRecoveredNativeQuarterWavePolynomial() {
         val theta = (2.0 * Math.PI * 0.24).toFloat()
         val table = S5MegpoidMultipartOutputModulationBuilder.build(
