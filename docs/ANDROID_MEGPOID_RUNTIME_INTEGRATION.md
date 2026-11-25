@@ -88,6 +88,29 @@ the matrix field layout itself; it is obtaining the **actual descriptor
 values** from the active voice/render context and proving them against a
 real reference render.
 
+## Terminal feature-pair to complex-spectrum conversion
+
+The trailing section of `FUN_1800c7ad0` now has a focused static trace.
+After the post-residual output head, S5API reads two contiguous float32
+feature planes, each with the one-sided bin count, and converts them into
+interleaved complex bins. Two encodings are present:
+
+- Direct complex: plane 0 → real, plane 1 → imaginary.
+- Log magnitude / phase: `magnitude = min(exp(plane0), 100)`,
+  `real = magnitude * cos(plane1)`, `imag = magnitude * sin(plane1)`.
+
+VEA adds `S5MegpoidSpectrumFrameEncoder` for both exact terminal transforms.
+`PreparedMegpoidSpectralOutputSession.processModelOutputPlanes()` then
+feeds the encoded complex frame into the already ported inverse-FFT and
+overlap-add stage. The two encodings are selectable explicitly; the active
+AI Megpoid value for the native root `+0x48` selector has not yet been
+proven, so no default mode is chosen.
+
+This is only the terminal representation conversion. The additional
+post-residual Dense/global-normalization head, the optional multi-part
+feature branch, carrier-mix history and their model descriptors remain
+unconnected. The full output graph is therefore still unavailable.
+
 ## Exact boundaries that remain
 
 - The app still does not derive timed per-phone events from VeaNote.phoneme. That field is editor display text, not already aligned phones.
@@ -95,6 +118,6 @@ real reference render.
 - The mode-0 feature builder needs the active render descriptor fields. Category width must be at least 14, but actual width and context counts are runtime data and are not hard-coded.
 - Alternate phone-feature layout mode +0x25 != 0 is not implemented.
 - The complete root render-state descriptor, runtime-derived tensor dimensions, and active workspace bindings are not yet populated.
-- Full neural output-domain execution, spectral-frame generation, overlap-add state, sample conversion, and the verified PCM/WAV contract remain incomplete.
+- The second post-residual Dense/global-normalization head, multi-part/carrier branch and active spectrum-encoding selector remain unresolved; terminal two-plane-to-complex conversion and spectral overlap-add are now separate tested components, but the verified PCM/WAV contract remains incomplete.
 
 Consequently, SynthesisEngine.render() does not emit placeholder WAV data and EngineStatus remains unavailable until the full path has been implemented and verified on Android ARM64.
