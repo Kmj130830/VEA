@@ -159,6 +159,18 @@ data class PreparedMegpoidRuntime(
         return PreparedMegpoidPhoneInput(matrix, dimensions, stage)
     }
 
+    /** Uses the exact mode-0 render-context descriptor as one validated value object. */
+    fun preparePhoneInputForDense(
+        phoneEvents: List<VsmPhoneEvent>,
+        descriptor: S5ApiDefaultPhoneFeatureDescriptor
+    ): PreparedMegpoidPhoneInput =
+        preparePhoneInputForDense(
+            phoneEvents = phoneEvents,
+            layout = descriptor.requireDefaultMode0(),
+            minimumPhoneSeconds = descriptor.minimumPhoneSecondsAt14,
+            maximumPhoneSeconds = descriptor.maximumPhoneSecondsAt18
+        )
+
     /**
      * Aligns explicit note phoneme strings to the scheduled sample timeline,
      * then builds the checked phone-feature matrix and model-backed Dense stage.
@@ -183,6 +195,25 @@ data class PreparedMegpoidRuntime(
             layout = layout,
             minimumPhoneSeconds = minimumPhoneSeconds,
             maximumPhoneSeconds = maximumPhoneSeconds
+        )
+        return PreparedMegpoidExplicitPhoneInput(
+            alignment = alignment,
+            input = input
+        )
+    }
+
+    /** Aligns explicit note phones and prepares features from a validated mode-0 descriptor. */
+    fun prepareExplicitPhoneInputForDense(
+        schedule: VsmRenderSchedule,
+        descriptor: S5ApiDefaultPhoneFeatureDescriptor
+    ): PreparedMegpoidExplicitPhoneInput {
+        val alignment = VsmNotePhoneAligner.alignExplicitPhonemes(schedule)
+        require(alignment.events.isNotEmpty()) {
+            "There are no timed phone events to feed into the Megpoid model."
+        }
+        val input = preparePhoneInputForDense(
+            phoneEvents = alignment.events,
+            descriptor = descriptor
         )
         return PreparedMegpoidExplicitPhoneInput(
             alignment = alignment,
