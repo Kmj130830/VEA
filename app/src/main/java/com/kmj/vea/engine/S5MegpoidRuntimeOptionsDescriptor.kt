@@ -30,13 +30,26 @@ data class S5MegpoidRuntimeOptionsDescriptor(
     /** Native render-root byte +0x59: true selects FUN_1800c72d0 Alternate. */
     val alternateTransitionEnabled: Boolean,
     /** Native render-root byte +0x3411, optional and false when absent. */
-    val multipartThresholdModeEnabled: Boolean
+    val multipartThresholdModeEnabled: Boolean,
+    /** Native render-root byte +0x3405, optional and false when absent. */
+    val nearestPartMaskEnabled: Boolean,
+    /** Required native modulation identifier when +0x3405 is enabled. */
+    val partModulationIdentifier: String?
 ) {
     init {
         require(param5 > 0) { "Native param[5] sequence-slot count must be positive." }
         require(param6 > 0) { "Native param[6] residual-column count must be positive." }
         require(paramD02.isFinite() && paramD03.isFinite() && paramD05.isFinite()) {
             "Runtime option floating-point fields must be finite."
+        }
+        if (nearestPartMaskEnabled) {
+            require(partModulationIdentifier == S5MegpoidRuntimeOptionKeys.EXPECTED_PART_MODULATION_IDENTIFIER) {
+                "The selected nearest-part mask mode requires the native AI Megpoid modulation identifier."
+            }
+        } else {
+            require(partModulationIdentifier == null) {
+                "A modulation identifier must not be loaded when nearest-part masking is disabled."
+            }
         }
     }
 
@@ -101,16 +114,13 @@ data class S5MegpoidRuntimeOptionsDescriptor(
 
     /**
      * Builds the recovered scalar part-rotation table for one output frame.
-     * Root flags +0x3405 and +0x3411 are intentionally explicit inputs:
-     * they are independent optional properties and are not folded into
-     * D00..D05.
+     * The two independent mask/threshold flags are loaded and validated from
+     * the same selected runtime-options object as D00..D05.
      */
     fun buildMultipartOutputModulation(
         positionCount: Int,
         fundamentalFrequencyHz: Float,
-        thetaCenterRadians: Float,
-        nearestPartMaskEnabledAtRoot3405: Boolean,
-        thresholdModeEnabledAtRoot3411: Boolean = multipartThresholdModeEnabled
+        thetaCenterRadians: Float
     ): S5MegpoidMultipartOutputModulation {
         require(usesMultiPartOutputHead) {
             "The active model options do not select the multipart output head."
@@ -129,8 +139,8 @@ data class S5MegpoidRuntimeOptionsDescriptor(
             maximumDistanceParameter = paramD02.toFloat(),
             distanceExtensionParameter = paramD03.toFloat(),
             extendedThresholdMode = paramD04,
-            nearestPartMaskEnabledAtRoot3405 = nearestPartMaskEnabledAtRoot3405,
-            thresholdModeEnabledAtRoot3411 = thresholdModeEnabledAtRoot3411
+            nearestPartMaskEnabledAtRoot3405 = nearestPartMaskEnabled,
+            thresholdModeEnabledAtRoot3411 = multipartThresholdModeEnabled
         )
     }
 
@@ -228,6 +238,24 @@ data class S5MegpoidRuntimeOptionsDescriptor(
                     ?: throw IllegalArgumentException("S5API runtime option " + key + " must be boolean.")
             }
 
+            val nearestPartMaskEnabled =
+                optionalBoolean(S5MegpoidRuntimeOptionKeys.NEAREST_PART_MASK_ENABLED)
+            val partModulationIdentifier = if (nearestPartMaskEnabled) {
+                val candidate = optionsTree.findByLookupKey(
+                    S5MegpoidRuntimeOptionKeys.PART_MODULATION_IDENTIFIER
+                ) ?: throw IllegalArgumentException(
+                    "S5API runtime option " +
+                        S5MegpoidRuntimeOptionKeys.PART_MODULATION_IDENTIFIER +
+                        " is required when nearest-part masking is enabled."
+                )
+                (candidate as? S5ModelValue.StringValue)?.value
+                    ?: throw IllegalArgumentException(
+                        "S5API runtime option " +
+                            S5MegpoidRuntimeOptionKeys.PART_MODULATION_IDENTIFIER +
+                            " must be a string."
+                    )
+            } else null
+
             return S5MegpoidRuntimeOptionsDescriptor(
                 param0 = int(S5MegpoidRuntimeOptionKeys.PARAM_0),
                 param1 = int(S5MegpoidRuntimeOptionKeys.PARAM_1),
@@ -252,7 +280,9 @@ data class S5MegpoidRuntimeOptionsDescriptor(
                 alternateTransitionEnabled =
                     optionalBoolean(S5MegpoidRuntimeOptionKeys.ALTERNATE_TRANSITION_ENABLED),
                 multipartThresholdModeEnabled =
-                    optionalBoolean(S5MegpoidRuntimeOptionKeys.MULTIPART_THRESHOLD_MODE_ENABLED)
+                    optionalBoolean(S5MegpoidRuntimeOptionKeys.MULTIPART_THRESHOLD_MODE_ENABLED),
+                nearestPartMaskEnabled = nearestPartMaskEnabled,
+                partModulationIdentifier = partModulationIdentifier
             )
         }
     }
@@ -290,6 +320,11 @@ object S5MegpoidRuntimeOptionKeys {
     const val ALTERNATE_TRANSITION_ENABLED = "119558af50f9c8919539abd8e064b287"
     /** FUN_1800e2770 -> render-root byte +0x3411: optional, absent=false. */
     const val MULTIPART_THRESHOLD_MODE_ENABLED = "ef12c1f702abd89b2e1f07a126cc5411"
+    /** FUN_1800e3030 -> render-root byte +0x3405: optional, absent=false. */
+    const val NEAREST_PART_MASK_ENABLED = "7a5a0ba0ba2f00ab8a0a0d538add0e6d"
+    /** FUN_1800e2e70 -> required string when +0x3405 is true. */
+    const val PART_MODULATION_IDENTIFIER = "184ef4ded83d0b35d809a7f1b09b1066"
+    const val EXPECTED_PART_MODULATION_IDENTIFIER = "117fd5ea7e76f7852c197a284c4dd3bc"
 }
 
 /**
