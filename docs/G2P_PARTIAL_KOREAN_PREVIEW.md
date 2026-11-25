@@ -40,8 +40,12 @@ manager.
 The successful static report shows that `FUN_180007390` is not a simple
 normalizer:
 
-- It allocates a mutable UTF-16 working string and two byte arrays with
-  capacity tied to the source UTF-16 length.
+- It allocates a mutable UTF-16 working string at state offset
+  `+0x08`, plus two byte arrays at `+0x18` and `+0x20`, each indexed by
+  the transformed UTF-16 code-unit position.
+- The `+0x18` byte array is read by `FUN_180007f80` for special-hyphen
+  and syllable handling. The separate `+0x20` array is read by
+  `FUN_180008730` to gate adjacent-syllable rewrite rules.
 - Its first scan treats hyphen and slash as control characters. It can
   replace source characters with Hangul filler `아` and writes flag values
   including 1 and 2 into the parallel arrays.
