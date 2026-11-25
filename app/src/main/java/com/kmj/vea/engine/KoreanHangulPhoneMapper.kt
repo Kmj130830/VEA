@@ -61,6 +61,52 @@ object KoreanHangulPhoneMapper {
         val final = finalId[offset % 28]
         return 0x8000 or (initial shl 10) or (vowel shl 5) or final
     }
+
+    private val initialOffsetById = IntArray(32) { -1 }.also { inverse ->
+        initialId.forEachIndexed { offset, id -> inverse[id] = offset }
+    }
+    private val vowelOffsetById = IntArray(32) { -1 }.also { inverse ->
+        vowelId.forEachIndexed { offset, id -> inverse[id] = offset }
+    }
+    private val finalOffsetById = IntArray(32) { -1 }.also { inverse ->
+        finalId.forEachIndexed { offset, id -> inverse[id] = offset }
+    }
+
+    /**
+     * Reverse of the vendor's FUN_180008660 code-to-Hangul lookup when the
+     * lookup key is nonzero. Invalid/reserved feature IDs return null.
+     *
+     * The native table stores the key as 0x8000 | (initial << 10) |
+     * (medial << 5) | final. The three axes use sparse vendor IDs, not the
+     * raw Unicode decomposition indices.
+     */
+    fun syllableFromInternalCode(code: Int): Char? {
+        if (code !in 0..0xffff || (code and 0x8000) == 0) return null
+
+        val initialIdValue = (code ushr 10) and 0x1f
+        val vowelIdValue = (code ushr 5) and 0x1f
+        val finalIdValue = code and 0x1f
+        val initialOffset = initialOffsetById[initialIdValue]
+        val vowelOffset = vowelOffsetById[vowelIdValue]
+        val finalOffset = finalOffsetById[finalIdValue]
+        if (initialOffset < 0 || vowelOffset < 0 || finalOffset < 0) return null
+
+        val codePoint = HANGUL_BASE + initialOffset * 588 +
+            vowelOffset * 28 + finalOffset
+        if (codePoint !in HANGUL_BASE..HANGUL_LAST) return null
+        return codePoint.toChar()
+    }
+
+    /**
+     * Implements the two directions of FUN_180008660 used by the Korean
+     * manager: a zero key encodes a Hangul character; a nonzero key decodes
+     * an internal syllable code. This helper has no side effects.
+     */
+    fun lookupInternalSyllable(character: Char): Int =
+        internalSyllableCode(character) ?: 0
+
+    fun lookupHangulSyllable(code: Int): Char =
+        syllableFromInternalCode(code) ?: '\u0000'
     /**
      * Converts each supported precomposed Hangul syllable into one vendor
      * phone string. ASCII spaces are skipped. A hyphen is emitted only when
