@@ -259,3 +259,46 @@ Banked/Residual pairs. A Banked output is stored as
 
 The pipeline starts at an already prepared feature tensor. Note/phoneme
 feature generation and final post-residual decoding remain outside this code.
+
+
+## Active carrier source-matrix population
+
+The carrier setup branch in `FUN_1800ced10` is gated by the model-context
+flag at `+0x3559`. It prepares both the optional fallback Dense descriptor
+at `+0xD60` and the runtime-generated active carrier buffers:
+
+- `+0x15E`: two rows of `K` float values, shape `[2][K]`
+- `+0x162`: two affine offsets, shape `[2]`
+- `+0x166`: two row-sum controls, shape `[2]`
+
+For AI Megpoid, `K=32`. The matrix and controls are built from the four
+selected VTB2 tensor records:
+
+| Property factory | Key | Metadata | Builder role |
+|---|---|---|---|
+| `FUN_1800e9740` | `61ef9b49f8fe353fe0d586220366ce92` | `[2,32,1,1]` | carrier weights `W[r,k]` |
+| `FUN_1800e9580` | `0128c19d610695f96c546cb8e04839fd` | `[2]` | carrier bias `b[r]` |
+| `FUN_1800e9ac0` | `d55956a69b51b6f6dd43bd0cc2467bcf` | `[32]` | per-input normalization scale `A[k]` |
+| `FUN_1800e9900` | `bf96a6e83ab8bb7d33509f2d3a1a348f` | `[32]` | per-input normalization offset `B[k]` |
+
+The loop in `FUN_1800ced10` folds these tensors into the active buffers:
+
+```text
+M[r,k] = W[r,k] * A[k]
+control162[r] = b[r] + sum_k(W[r,k] * B[k])
+control166[r] = sum_k(M[r,k])
+```
+
+The two scale/bias vectors are also indexed as the 32-element
+post-residual fallback normalizer. Their use in carrier preparation is
+independent of whether the non-multi-part output head is selected: the
+carrier setup consumes them while the active main output configuration can
+still use the four-part head.
+
+Android now reproduces this parameter-folding step in
+`S5MegpoidCarrierFusionActiveParameters`, validating exact tensor lengths,
+finite values and [2][K] row order. The workspace consumes that model-backed
+object and keeps the separate `+0xD60` fallback Dense projection distinct.
+This does not supply the live scalar controls at `+0x16A/+0x16B`, the
+carrier history lag values at `+0x181/+0x182`, or the missing spectrum/audio
+callback.
