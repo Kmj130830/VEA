@@ -41,35 +41,43 @@ u    = p * step / f0
 base(k) = k + 1                    where k = 0..3
 ```
 
-S5API has two coordinate implementations:
+S5API has three coordinate implementations:
 
-- The default modulation-table route calls `FUN_1800c3930`, which dispatches
-  to `FUN_1800c4080` or `FUN_1800c39f0`. These helpers materialize all
-  part locations/distances before the mask pass and convert the cycle
-  quotient to a native int32, i.e. truncate toward zero:
+- `FUN_1800c3930` dispatches to `FUN_1800c4080` when
+  `FUN_1800dc2e0()` returns zero, and to `FUN_1800c39f0` otherwise.
+  Both helpers materialize every part's locations/distances before the
+  mask pass.
+- The SSE-style `FUN_1800c4080` converts the cycle quotient to int32,
+  truncating toward zero:
   `cycle = trunc((u - base(k)) / 4)`.
+- The AVX-style `FUN_1800c39f0` uses `vroundps(..., 8)`; with the
+  ordinary MXCSR nearest-even mode this is:
+  `cycle = roundToNearestEven((u - base(k)) / 4)`.
 - The inline scalar fallback uses `roundf((u - base(k)) / 4)`, with
   half values away from zero.
 
-The Windows caller enables the table route by default unless
-`MRW_MODROT_SIMD=0`, subject to its CPU-dispatch condition. AI Megpoid has
-four parts, so it is within the table helper's supported part-count range.
-Android's default builder mirrors the table helper's truncation mode; the
-`INLINE_SCALAR_ROUNDF` variant remains available as a reference for the
-native fallback path.
+The Windows caller has an `MRW_MODROT_SIMD=0` override to force the inline
+scalar path and also has a CPU-dispatch condition. AI Megpoid has four
+parts, within both table helpers' supported ranges. Android exposes all
+three modes explicitly; its default is the four-lane SSE/NEON-compatible
+`SIMD_SSE_TABLE_TRUNCATION` mode. Callers that need the AVX helper's
+nearest-even result can select `SIMD_AVX_TABLE_NEAREST_EVEN`, and the
+inline fallback remains available as `INLINE_SCALAR_ROUNDF`.
 
-For the default table path:
+For the SSE table path:
 
 ```text
 location(k) = max(base(k), trunc((u - base(k)) / 4) * 4 + base(k))
 distance(k) = abs(u - location(k)) * f0
 ```
 
-For the inline scalar path, replace `trunc` with `roundf`.
+For the AVX table path, replace `trunc` with MXCSR nearest-even rounding.
+For the inline scalar path, replace it with `roundf`.
 The four locations and distances are materialized for all parts before the
-mask pass. The table helper reduces its phase in turns using
-`theta_ctr * 0.15915494 * location(k)` and evaluates the following
-quarter-wave polynomial:
+mask pass. The SSE and AVX table helpers reduce their phase in turns using
+`theta_ctr * 0.15915494 * location(k)` and evaluate the following
+quarter-wave polynomial. SSE uses truncation for quadrant reduction; AVX
+uses MXCSR nearest-even rounding:
 
 ```text
 P(z) = ((((0.00016044118*z - 0.004681754)*z + 0.079692625)
