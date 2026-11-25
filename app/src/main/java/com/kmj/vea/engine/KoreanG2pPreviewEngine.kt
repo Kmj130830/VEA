@@ -123,6 +123,7 @@ object KoreanG2pPreviewEngine {
                 .filterNot { character ->
                     character.code in HANGUL_FIRST..HANGUL_LAST || character == '-'
                 }
+                .toList()
                 .distinct()
             KoreanG2pPreviewToken(
                 originalToken = token,
