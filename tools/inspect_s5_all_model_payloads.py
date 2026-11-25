@@ -42,6 +42,9 @@ CONFIG_KEYS = {
 # The hash formatter writes each uint32 as eight lowercase hex digits.
 RENDER_OPTION_KEYS = {
     "terminal_spectrum_log_magnitude_phase": "d22b2750ccebc1459f7a9d9ea7186bbf",
+    # FUN_1800e6de0 -> render-root byte +0x59: zero selects standard
+    # Banked; nonzero selects the Alternate 2x temporal-expansion operator.
+    "alternate_transition_enabled": "119558af50f9c8919539abd8e064b287",
     "carrier_fusion_enabled": "66bfcc4a31ba796aca88c5eae36870fc",
     "carrier_dense_weights": "61ef9b49f8fe353fe0d586220366ce92",
     "carrier_dense_bias": "0128c19d610695f96c546cb8e04839fd",
