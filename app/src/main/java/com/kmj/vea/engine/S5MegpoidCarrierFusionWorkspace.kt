@@ -96,9 +96,10 @@ data class S5MegpoidCarrierFusionBufferGeometry(
  * State for the carrier branch's separate Dense input/output buffers and
  * two-plane carrier-frame history ring.
  *
- * The Dense input is expected to have already passed the native global
- * normalization at root +0xC4. This class does not substitute a guessed
- * normalizer or synthesize the carrier-conditioned input itself.
+ * This workspace accepts a fully prepared feature-major carrier input. The
+ * fallback branch may reach it after root +0xC4 normalization; the active
+ * carrier branch builds a conditioned feature tensor from the source/control
+ * vectors before Dense. That conditioning step is not synthesized here.
  */
 class S5MegpoidCarrierFusionWorkspace(
     val geometry: S5MegpoidCarrierFusionBufferGeometry,
@@ -137,7 +138,7 @@ class S5MegpoidCarrierFusionWorkspace(
      * Returns a defensive copy of the [2][position] result.
      */
     @Synchronized
-    fun projectNormalizedCarrierFeatures(
+    fun projectPreparedCarrierFeatures(
         inputFeatureMajor: FloatArray,
         gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel
     ): FloatArray {
