@@ -100,6 +100,17 @@ data class S5VoicebankModelPackage(
             "Carrier fusion is disabled in the selected AI Megpoid runtime options."
         )
 
+    /**
+     * Native-decoded active carrier parameters are shared across render chunks.
+     * The source matrix and control vectors are model constants, not per-frame
+     * values; cache them after the first validated decode.
+     */
+    val activeCarrierFusionParameters: S5MegpoidCarrierFusionActiveParameters by lazy(
+        LazyThreadSafetyMode.PUBLICATION
+    ) {
+        buildCarrierFusionActiveParameters(NativeS5TypedTensorDecoder)
+    }
+
     /** Builds the optional carrier Dense layer using the recovered 2-output matrix contract. */
     fun prepareCarrierFusionFallbackDenseProjection(
         tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
@@ -113,6 +124,15 @@ data class S5VoicebankModelPackage(
      */
     fun prepareCarrierFusionActiveParameters(
         tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidCarrierFusionActiveParameters =
+        if (tensorDecoder === NativeS5TypedTensorDecoder) {
+            activeCarrierFusionParameters
+        } else {
+            buildCarrierFusionActiveParameters(tensorDecoder)
+        }
+
+    private fun buildCarrierFusionActiveParameters(
+        tensorDecoder: S5TypedTensorDecoder
     ): S5MegpoidCarrierFusionActiveParameters {
         val carrierTensors = requireCarrierFusionTensorIndex()
         val outputHeadTensors = postResidualFallbackTensorIndex
