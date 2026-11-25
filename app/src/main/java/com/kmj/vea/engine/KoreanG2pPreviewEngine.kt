@@ -30,9 +30,11 @@ data class KoreanG2pPreviewToken(
 data class KoreanG2pPreviewResult(
     val sourceText: String,
     val normalizedText: String,
-    val tokens: List<KoreanG2pPreviewToken>,
-    val isComplete: Boolean = false
+    val tokens: List<KoreanG2pPreviewToken>
 ) {
+    /** The currently implemented subset is intentionally never marked complete. */
+    val isComplete: Boolean get() = false
+
     val phoneLabels: List<String>
         get() = tokens.flatMap { it.phoneLabels }
 
@@ -140,7 +142,6 @@ object KoreanG2pPreviewEngine {
             sourceText = lyric,
             normalizedText = normalized,
             tokens = previewTokens,
-            isComplete = false
         )
     }
 
