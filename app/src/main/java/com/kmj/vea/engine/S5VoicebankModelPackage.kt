@@ -100,6 +100,12 @@ data class S5VoicebankModelPackage(
             "Carrier fusion is disabled in the selected AI Megpoid runtime options."
         )
 
+    /** Builds the optional carrier Dense layer using the recovered 2-output matrix contract. */
+    fun prepareCarrierFusionDenseProjection(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidDenseProjection =
+        requireCarrierFusionTensorIndex().buildDenseProjection(tensorDecoder)
+
     /** Exact sequence-indexed Temporal/Banked factory tables populated by FUN_1800ced10. */
     val sequenceOperatorTensorIndex: S5MegpoidSequenceOperatorTensorIndex by lazy(
         LazyThreadSafetyMode.PUBLICATION
