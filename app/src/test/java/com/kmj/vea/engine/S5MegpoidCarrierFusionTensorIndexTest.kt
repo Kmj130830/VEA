@@ -136,6 +136,48 @@ class S5MegpoidCarrierFusionTensorIndexTest {
     }
 
     @Test
+    fun activeModelParametersDriveTheCarrierWorkspaceWithoutRawBufferInjection() {
+        val weights = FloatArray(64)
+        weights[0] = 1f
+        weights[32 + 1] = 1f
+        val fixture = fixture(
+            weightValues = weights,
+            biasValues = floatArrayOf(0f, 0f)
+        )
+        val index = S5MegpoidCarrierFusionTensorIndex.build(fixture.tree)
+        val active = S5MegpoidCarrierFusionActiveParameters.build(
+            carrierTensors = index,
+            normalizationScale = FloatArray(32) { 1f },
+            normalizationBias = FloatArray(32),
+            tensorDecoder = fixture.decoder
+        )
+        val workspace = S5MegpoidCarrierFusionWorkspace(
+            S5MegpoidCarrierFusionBufferGeometry(
+                inputFeatures = 32,
+                carrierPositions = 2,
+                spectrumBins = 2,
+                historySlotsFromRoot181 = 0,
+                historySlotsFromRoot182 = 0
+            )
+        )
+        val featureMajor = FloatArray(32 * 2)
+        featureMajor[0] = 1f
+        featureMajor[1] = 2f
+        featureMajor[2] = 3f
+        featureMajor[3] = 4f
+
+        val output = workspace.projectCarrierConditionedFeatures(
+            inputFeatureMajor = featureMajor,
+            activeParameters = active,
+            scale = 2f,
+            amplitude = 0.5f,
+            gemm = ReferenceS5MegpoidGemmKernel
+        )
+
+        assertArrayEquals(floatArrayOf(1f, 3f, 5f, 7f), output, 0f)
+    }
+
+    @Test
     fun rejectsActiveCarrierNormalizationVectorsWithTheWrongWidthOrNonFiniteValues() {
         val fixture = fixture()
         val index = S5MegpoidCarrierFusionTensorIndex.build(fixture.tree)
