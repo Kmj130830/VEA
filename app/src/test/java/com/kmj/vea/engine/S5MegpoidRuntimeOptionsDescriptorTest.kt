@@ -104,6 +104,28 @@ class S5MegpoidRuntimeOptionsDescriptorTest {
     }
 
     @Test
+    fun buildsFourPartModulationFromTheActualMegpoidOutputGeometryAndDValues() {
+        val options = S5MegpoidRuntimeOptionsDescriptor.from(tree())
+        val table = options.buildMultipartOutputModulation(
+            positionCount = 3,
+            fundamentalFrequencyHz = 100f,
+            thetaCenterRadians = 0.5f,
+            nearestPartMaskEnabledAtRoot3405 = true,
+            thresholdModeEnabledAtRoot3411 = true
+        )
+
+        assertEquals(4, table.partCount)
+        assertEquals(3, table.positionCount)
+        // Native ratio is root +0x10 / root +0x04 = 32000 / 1024 = 31.25.
+        assertEquals(
+            listOf(100f, 200f, 300f, 400f),
+            table.copyDistances().copyOfRange(0, 4).toList()
+        )
+        // Native stores D02 in an int-backed word, so 133.34 is narrowed to 133.
+        assertEquals(listOf(1f, 0f, 0f, 0f), table.copyGains().copyOfRange(0, 4).toList())
+    }
+
+    @Test
     fun fallsBackToTwoOutputPlanesWhenTheMultiPartBranchIsDisabled() {
         val disabled = S5MegpoidRuntimeOptionsDescriptor.from(tree(mapOf(
             S5MegpoidRuntimeOptionKeys.PARAM_D01 to S5ModelValue.BooleanValue(false)
