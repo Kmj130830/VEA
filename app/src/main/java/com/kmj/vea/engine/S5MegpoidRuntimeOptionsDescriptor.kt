@@ -120,7 +120,9 @@ data class S5MegpoidRuntimeOptionsDescriptor(
     fun buildMultipartOutputModulation(
         positionCount: Int,
         fundamentalFrequencyHz: Float,
-        thetaCenterRadians: Float
+        thetaCenterRadians: Float,
+        coordinateKernel: S5MegpoidMultipartCoordinateKernel =
+            S5MegpoidMultipartCoordinateKernel.SIMD_SSE_TABLE_TRUNCATION
     ): S5MegpoidMultipartOutputModulation {
         require(usesMultiPartOutputHead) {
             "The active model options do not select the multipart output head."
@@ -140,7 +142,8 @@ data class S5MegpoidRuntimeOptionsDescriptor(
             distanceExtensionParameter = paramD03.toFloat(),
             extendedThresholdMode = paramD04,
             nearestPartMaskEnabledAtRoot3405 = nearestPartMaskEnabled,
-            thresholdModeEnabledAtRoot3411 = multipartThresholdModeEnabled
+            thresholdModeEnabledAtRoot3411 = multipartThresholdModeEnabled,
+            coordinateKernel = coordinateKernel
         )
     }
 
