@@ -48,6 +48,8 @@ public class ExportS5ModelRuntime extends GhidraScript {
             "1800c3740", "18012c740",
             // Model-option key getters for output representation and carrier-fuse selectors.
             "1800e6c20", "1800dfb50",
+            // Optional carrier-fusion Dense weight and bias key getters.
+            "1800e9580", "1800e9740",
             // Related keys guarding multi-part model interpolation data.
             "1800e0250", "1800e2cb0", "1800e2930", "1800e2af0",
             "1800e2770", "1800dfed0"
