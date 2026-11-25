@@ -58,13 +58,11 @@ class S5MegpoidCarrierFusionTensorIndex private constructor(
             "Carrier Dense weights must retain the native four-axis descriptor."
         }
         val metadata = weights.descriptorMetadata
+        require(metadata[2] == 1 && metadata[3] == 1) {
+            "Carrier Dense weights must use the native [output][input][1][1] tensor layout."
+        }
         val outputFeatures = metadata[0]
-        val inputFeatures = metadata.drop(1).fold(1L) { product, dimension ->
-            require(product <= Int.MAX_VALUE.toLong() / dimension.toLong()) {
-                "Carrier Dense input width exceeds the supported integer range."
-            }
-            product * dimension.toLong()
-        }.toInt()
+        val inputFeatures = metadata[1]
         require(outputFeatures == 2) {
             "The recovered carrier Dense descriptor requires two output features."
         }
