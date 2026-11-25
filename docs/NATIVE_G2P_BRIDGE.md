@@ -81,6 +81,63 @@ phonemes, syllable boundaries, phone durations or model category IDs. The
 vendor's subsequent token-to-internal-module conversion and note-container
 update path remain to be ported and differentially tested.
 
+## Newly recovered Korean phoneme pipeline call order
+
+A focused Ghidra report now includes the internal Korean parser entry points
+and their direct callers. The recovered sequence inside
+`G2PAManager_KOR.dll` is:
+
+`FUN_180007210` → `FUN_180007390` → `FUN_180008730` →
+`FUN_180007f80`
+
+`FUN_180007210` first copies the UTF-16 lyric, applies the 32 literal
+rewrite pairs through its fixed lookup tables, then calls those three
+functions in that order. A nonzero return from any stage is raised through
+the manager's error path. This establishes that the previously ported
+lexical normalizer and syllable mapper are separated by two substantial
+preprocessing/conversion stages; calling the syllable mapper directly on
+the original input is not equivalent to the manager pipeline.
+
+The newly inspected stages have these confirmed boundaries:
+
+- `FUN_180007390` clones the normalized working string and creates two
+  byte-per-UTF-16-code-unit side arrays. It rewrites special separators,
+  marks synthetic/inserted positions and adjusts both arrays whenever the
+  working string is compacted or expanded. The outputs are consumed by the
+  later converter and syllable-to-phone stage.
+- `FUN_180008730` makes a second working-string copy and performs
+  context-dependent Hangul syllable transformations. Its rules inspect
+  neighboring syllable fields (onset, vowel and coda), rewrite syllable
+  keys through the vendor lookup helper, and apply multiple ordered
+  assimilation tables.
+- `FUN_180007f80` consumes the transformed string plus the two aligned
+  per-code-unit flag arrays and converts each syllable to the vendor phone
+  strings. It also applies its own cross-syllable rules and the null-onset/
+  hyphen flag behavior.
+
+`FUN_180008660` is the shared Hangul lookup primitive used by both
+preprocessing stages. With a zero key it finds a character's 16-bit vendor
+syllable code; with a nonzero key it resolves the code back to the character.
+The Android mapper now implements both directions from the recovered
+19×21×28 Unicode decomposition and the vendor's sparse onset/medial/coda
+IDs. A full 11,172-syllable round-trip test is included. This reproduces
+the code/character lookup only; it does not claim that the two preceding
+phonological passes are ported.
+
+The note-update caller is also clearer: `FUN_1800063c0` constructs the
+per-note working representation and invokes `FUN_180007210`. The
+manager-facing `FUN_180001350` tokenizes the incoming UTF-16 lyric through
+`FUN_180003310`, creates the two-field token record with
+`FUN_1800034e0`, invokes a language-manager virtual method for each
+record, and then copies returned syllable/phoneme strings into its owned
+result list. The exact host note-interface ownership and update semantics
+still need a separate ABI port.
+
+The third-pass report is static Ghidra evidence only. No Windows DLL was
+executed. The Android language readiness mask therefore remains zero until
+both upstream transformations, manager-facing note updates and reference
+output comparisons are implemented.
+
 ## Table-driven Hangul syllable phone mapping
 
 Static analysis of G2PAManager_KOR.dll FUN_180007f80 and its read-only data
