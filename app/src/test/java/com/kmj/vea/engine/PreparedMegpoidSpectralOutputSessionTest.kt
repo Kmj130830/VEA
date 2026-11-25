@@ -1,6 +1,8 @@
 package com.kmj.vea.engine
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -135,6 +137,54 @@ class PreparedMegpoidSpectralOutputSessionTest {
             )
         }
         assertEquals(0L, session.processedFrameCount)
+    }
+
+    private fun runtimeOptions(
+        logMagnitudePhase: Boolean
+    ) = S5MegpoidRuntimeOptionsDescriptor(
+        param0 = 217,
+        param1 = 8,
+        param2 = 5,
+        param3 = 4,
+        param4 = 8,
+        param5 = 4,
+        param6 = 2,
+        param13 = false,
+        param14 = 0,
+        param15 = 1,
+        paramD00 = 4,
+        paramD01 = true,
+        paramD02 = 133.34,
+        paramD03 = 25.0,
+        paramD04 = true,
+        paramD05 = 0.01,
+        terminalSpectrumLogMagnitudePhase = logMagnitudePhase,
+        carrierFusionEnabled = true
+    )
+
+    @Test
+    fun readsTerminalRepresentationFromTheLoadedRuntimeOptions() {
+        val logPolarSession = createSession()
+        val first = floatArrayOf(kotlin.math.ln(2f), 0f, 0f, 0f, 0f)
+        val phase = FloatArray(5)
+
+        val logPolarOutput = logPolarSession.processModelOutputPlanes(
+            firstFeaturePlane = first,
+            secondFeaturePlane = phase,
+            runtimeOptions = runtimeOptions(logMagnitudePhase = true)
+        )
+        assertEquals(1L, logPolarSession.processedFrameCount)
+        assertTrue(logPolarOutput.all { it.isFinite() })
+
+        val directSession = createSession()
+        val directOutput = directSession.processModelOutputPlanes(
+            firstFeaturePlane = first,
+            secondFeaturePlane = phase,
+            runtimeOptions = runtimeOptions(logMagnitudePhase = false)
+        )
+        assertEquals(1L, directSession.processedFrameCount)
+        assertTrue(directOutput.all { it.isFinite() })
+        assertFalse(logPolarOutput.contentEquals(directOutput))
     }
 
     @Test
