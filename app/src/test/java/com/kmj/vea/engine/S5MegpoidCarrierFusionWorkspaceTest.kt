@@ -66,7 +66,7 @@ class S5MegpoidCarrierFusionWorkspaceTest {
     }
 
     @Test
-    fun storesCarrierSpectrumFramesInNativeCircularRingOrder() {
+    fun storesPlanarCarrierFramesInNativeCircularRingOrder() {
         val geometry = S5MegpoidCarrierFusionBufferGeometry(
             inputFeatures = 32,
             carrierPositions = 1,
