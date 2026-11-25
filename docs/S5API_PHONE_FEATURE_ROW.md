@@ -21,6 +21,35 @@ Each category segment has descriptor +0x10 floats. Its width must be at least 14
 
 Descriptor +0x25 selects the feature-layout branch. Only mode 0 is implemented. Other modes are rejected rather than silently treated as mode 0.
 
+## Active mode-0 descriptor offsets
+
+The render-context descriptor consumed by `FUN_18003ab70` is forwarded to
+`FUN_18006c720` with these exact fields:
+
+| Offset | Mode-0 role |
+|---:|---|
+| `+0x10` | Category-vector stride/width |
+| `+0x14` | Minimum phone duration in seconds (float32) |
+| `+0x18` | Maximum phone duration in seconds (float32) |
+| `+0x1C` | Following-context event count |
+| `+0x20` | Preceding-context event count |
+| `+0x24` | Enables the two-value leading-bang flag pair |
+| `+0x25` | Feature-layout mode; mode 0 is ported |
+| `+0x26` | Preserved auxiliary byte; not consumed by the recovered mode-0 branch |
+
+The mode-0 allocation formula is
+`1 + (flagPairEnabled ? 2 : 0) + categoryWidth * (preceding + 1 + following)`.
+When the flag pair is enabled, the centre one-hot category starts at offset
+3 rather than offset 1. The same +0x24 byte controls both allocation and
+that offset, so the Android `S5ApiDefaultPhoneFeatureLayout` mirrors it.
+
+The Android `S5ApiDefaultPhoneFeatureDescriptor` now keeps all of these
+fields together with the +0x14/+0x18 duration bounds. It validates the
+descriptor and only converts to the implemented mode-0 layout when
+`layoutModeAt25 == 0`. These are value-field offsets from the decompiled
+feature builder; their actual runtime values still need to be read from the
+active S5API render context.
+
 ## Memory orientation
 
 The native phone-feature routine writes row-major [position][feature] values. The Megpoid Dense operator consumes [feature][position]. S5ApiDefaultPhoneFeatureMatrix.toFeatureMajor() performs the transpose, and S5MegpoidSequenceTransitionPipeline.runPhoneFeatureMatrix() checks the Dense input width before invoking the existing sequence pipeline.
