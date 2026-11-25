@@ -45,6 +45,10 @@ RENDER_OPTION_KEYS = {
     "carrier_fusion_enabled": "66bfcc4a31ba796aca88c5eae36870fc",
     "carrier_dense_weights": "61ef9b49f8fe353fe0d586220366ce92",
     "carrier_dense_bias": "0128c19d610695f96c546cb8e04839fd",
+    "fallback_normalization_scale": "d55956a69b51b6f6dd43bd0cc2467bcf",
+    "fallback_normalization_bias": "bf96a6e83ab8bb7d33509f2d3a1a348f",
+    "fallback_dense_weights": "051fe4a0e8e7e92c3c8791bd28f24da8",
+    "fallback_dense_bias": "3a9561654ca2e128021a59d14813a88f",
 }
 
 
