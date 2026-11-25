@@ -122,24 +122,29 @@ data class S5MegpoidAlternateTransitionTensorPair(
     val bias: S5MegpoidSequenceOperatorTensorReference
 )
 
-data class S5MegpoidPreparedAlternateTransition(
+class S5MegpoidPreparedAlternateTransition internal constructor(
     val sequenceIndex: Int,
-    val weightMetadata: List<Int>,
-    val biasMetadata: List<Int>,
-    val weights: FloatArray,
-    val bias: FloatArray
+    weightMetadata: List<Int>,
+    biasMetadata: List<Int>,
+    weights: FloatArray,
+    bias: FloatArray
 ) {
+    val weightMetadata: List<Int> = weightMetadata.toList()
+    val biasMetadata: List<Int> = biasMetadata.toList()
+    private val weightValues = weights.copyOf()
+    private val biasValues = bias.copyOf()
+
     init {
         require(sequenceIndex in 0..2)
-        require(weightMetadata == listOf(32, 32, 3, 1))
-        require(biasMetadata == listOf(32))
-        require(weights.size == 32 * 32 * 3)
-        require(bias.size == 32)
-        require(weights.all { it.isFinite() } && bias.all { it.isFinite() })
+        require(this.weightMetadata == listOf(32, 32, 3, 1))
+        require(this.biasMetadata == listOf(32))
+        require(weightValues.size == 32 * 32 * 3)
+        require(biasValues.size == 32)
+        require(weightValues.all { it.isFinite() } && biasValues.all { it.isFinite() })
     }
 
-    fun copyWeights(): FloatArray = weights.copyOf()
-    fun copyBias(): FloatArray = bias.copyOf()
+    fun copyWeights(): FloatArray = weightValues.copyOf()
+    fun copyBias(): FloatArray = biasValues.copyOf()
 }
 
 /**
