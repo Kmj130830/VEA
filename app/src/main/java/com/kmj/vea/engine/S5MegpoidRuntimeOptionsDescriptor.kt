@@ -97,6 +97,41 @@ data class S5MegpoidRuntimeOptionsDescriptor(
             return width.toInt()
         }
 
+    /**
+     * Builds the recovered scalar part-rotation table for one output frame.
+     * Root flags +0x3405 and +0x3411 are intentionally explicit inputs:
+     * they are independent optional properties and are not folded into
+     * D00..D05.
+     */
+    fun buildMultipartOutputModulation(
+        positionCount: Int,
+        fundamentalFrequencyHz: Float,
+        thetaCenterRadians: Float,
+        nearestPartMaskEnabledAtRoot3405: Boolean,
+        thresholdModeEnabledAtRoot3411: Boolean
+    ): S5MegpoidMultipartOutputModulation {
+        require(usesMultiPartOutputHead) {
+            "The active model options do not select the multipart output head."
+        }
+        require(param1 > 0 && param4 > 0) {
+            "Multipart modulation requires positive native FFT and output geometry values."
+        }
+        val frequencyStep = param4.toFloat() / param1.toFloat()
+        require(frequencyStep.isFinite() && frequencyStep > 0f)
+        return S5MegpoidMultipartOutputModulationBuilder.build(
+            partCount = paramD00,
+            positionCount = positionCount,
+            frequencyStep = frequencyStep,
+            fundamentalFrequencyHz = fundamentalFrequencyHz,
+            thetaCenterRadians = thetaCenterRadians,
+            maximumDistanceParameter = paramD02.toFloat(),
+            distanceExtensionParameter = paramD03.toFloat(),
+            extendedThresholdMode = paramD04,
+            nearestPartMaskEnabledAtRoot3405 = nearestPartMaskEnabledAtRoot3405,
+            thresholdModeEnabledAtRoot3411 = thresholdModeEnabledAtRoot3411
+        )
+    }
+
     /** Native render-root +0x48: true selects log-magnitude/phase terminal planes. */
     val terminalSpectrumEncoding: S5MegpoidSpectrumFrameEncoding
         get() = if (terminalSpectrumLogMagnitudePhase) {
