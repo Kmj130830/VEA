@@ -268,7 +268,7 @@ class S5MegpoidMultipartOutputModulationTest {
         table.accumulateAllPartsInto(output, first, second)
 
         assertEquals(
-            listOf(1111f, 2222f, 3333f, -1111f, -2222f, -3333f),
+            listOf(1111f, -1111f, 2222f, -2222f, 3333f, -3333f),
             output.toList()
         )
     }
