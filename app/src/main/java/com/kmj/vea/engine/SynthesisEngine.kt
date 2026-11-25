@@ -87,8 +87,9 @@ class VocaloidAiEngineAdapter(
         }
 
         val bridgeMessage = if (NativeG2pBridge.isLoaded) {
-            "Android ARM64 JNI bridge loaded (ABI 0x%08X). Korean input canonicalization is available, " +
-                "but Yamaha G2PA phoneme conversion and the VOCALOID7 singing renderer are not ported yet."
+            "Android ARM64 JNI bridge loaded (ABI 0x%08X). Korean input canonicalization and a partial, " +
+                "preview-only Korean phone mapping are available. Full Yamaha G2PA conversion and the " +
+                "VOCALOID7 singing renderer are not implemented."
         } else {
             "Android ARM64 JNI bridge is not loaded. The G2P phoneme engine and VOCALOID7 singing renderer " +
                 "are not ported yet."
