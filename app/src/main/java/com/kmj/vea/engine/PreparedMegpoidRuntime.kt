@@ -134,6 +134,18 @@ data class PreparedMegpoidRuntime(
     val requiredPhoneFeatureWidth: Int
         get() = denseProjectionDimensionsFromModel.inputFeatures
 
+    /**
+     * Preview Korean lyric-to-phone mapping for this schedule.
+     *
+     * The returned labels are diagnostic only because the upstream Korean
+     * source-flag and intermediate-transformation stages remain unported.
+     */
+    fun previewKoreanG2p(
+        schedule: VsmRenderSchedule,
+        language: String
+    ): List<KoreanG2pScheduledNotePreview> =
+        KoreanG2pPreviewEngine.previewSchedule(schedule, language)
+
     /** Builds part modulation using the validated VTB2 mask and threshold flags. */
     fun prepareMultipartOutputModulation(
         positionCount: Int,
