@@ -322,6 +322,81 @@ data class S5VoicebankModelPackage(
      * Feature dimensions, kernel sizes, bank counts and bias flags come from
      * the active render descriptor.
      */
+    /**
+     * Builds the actual AI Megpoid V7 reverse branch selected by model flag +0x59.
+     *
+     * The supplied VTB2 stores three Temporal and three Alternate [32,32,3,1]
+     * matrices plus [32] biases. Dense dimensions are derived from the selected
+     * model tensors; no standard Banked tensors are assumed.
+     */
+    fun createMegpoidV7AlternateSequenceTransitionPipeline(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder,
+        firstInputWorkspace: S5MegpoidWorkspaceSlot = S5MegpoidWorkspaceSlot.FIRST
+    ): S5MegpoidAlternateSequenceTransitionPipeline {
+        runtimeOptionsDescriptor.requireMegpoidV7BlockGrid()
+        require(runtimeOptionsDescriptor.reverseTransitionMode ==
+            S5MegpoidReverseTransitionMode.ALTERNATE) {
+            "AI Megpoid V7 model options do not select the Alternate reverse-transition branch."
+        }
+
+        val denseDimensions = preResidualTensorIndex.resolveDenseProjectionDimensionsFromModel()
+        val dense = preparePreResidualDenseNormalizationStageFromModel(tensorDecoder)
+        val residualExecutor = createResidualBlockExecutor(tensorDecoder, firstInputWorkspace)
+        val channels = residualExecutor.channels
+        require(channels == 32) {
+            "AI Megpoid V7 residual channel width must be 32."
+        }
+        require(denseDimensions.outputFeatures == channels) {
+            "Dense output width ${denseDimensions.outputFeatures} does not match residual channels $channels."
+        }
+
+        val temporalStages = buildList {
+            for (index in 0 until runtimeOptionsDescriptor.temporalTransitionCount) {
+                val weights = sequenceOperatorTensorIndex.requireTensor(
+                    S5MegpoidSequenceOperatorFactory.TEMPORAL_WEIGHTS, index
+                )
+                val bias = sequenceOperatorTensorIndex.requireTensor(
+                    S5MegpoidSequenceOperatorFactory.TEMPORAL_BIAS, index
+                )
+                require(weights.descriptorMetadata == listOf(channels, channels, 3, 1)) {
+                    "Temporal[$index] metadata does not match [32,32,3,1]."
+                }
+                require(bias.descriptorMetadata == listOf(channels)) {
+                    "Temporal[$index] bias metadata does not match [32]."
+                }
+                add(
+                    prepareTemporalProjection(
+                        sequenceIndex = index,
+                        inputFeatures = channels,
+                        outputFeatures = channels,
+                        kernelSize = 3,
+                        biasEnabled = true,
+                        tensorDecoder = tensorDecoder
+                    )
+                )
+            }
+        }
+
+        val alternateStages = buildList {
+            for (index in 0 until runtimeOptionsDescriptor.temporalTransitionCount) {
+                add(
+                    prepareAlternateTemporalProjection(
+                        sequenceIndex = index,
+                        channels = channels,
+                        tensorDecoder = tensorDecoder
+                    )
+                )
+            }
+        }
+
+        return S5MegpoidAlternateSequenceTransitionPipeline.fromModelStages(
+            denseStage = dense,
+            temporalStages = temporalStages,
+            alternateStages = alternateStages,
+            residualExecutor = residualExecutor
+        )
+    }
+
     fun createSequenceTransitionPipeline(
         denseInputFeatures: Int,
         denseOutputFeatures: Int,
