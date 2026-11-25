@@ -56,6 +56,12 @@ data class PreparedMegpoidRuntime(
     val outputTransformInputs: S5MegpoidOutputTransformInputs
         get() = runtimeOptions.buildOutputTransformInputsFromNativeMegpoidDefaults()
 
+    /** Decoded Alternate tensor parameters available in AI Megpoid V7's selected VTB2 subtree. */
+    fun prepareAlternateTransitionParameters(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): List<S5MegpoidPreparedAlternateTransition> =
+        modelPackage.prepareAlternateTransitionParameters(tensorDecoder)
+
     /** Model-output spectrum dimensions recovered from root fields +0x04 and +0x08. */
     val spectrumOutputShape: S5MegpoidSpectrumOutputShape
         get() = runtimeOptions.buildSpectrumOutputShape()
