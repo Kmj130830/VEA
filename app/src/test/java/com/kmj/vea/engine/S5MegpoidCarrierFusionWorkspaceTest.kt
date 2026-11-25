@@ -40,7 +40,7 @@ class S5MegpoidCarrierFusionWorkspaceTest {
     }
 
     @Test
-    fun projectsNormalizedFeatureMajorCarrierInputToTwoRows() {
+    fun projectsPreparedFeatureMajorCarrierInputToTwoRows() {
         val geometry = S5MegpoidCarrierFusionBufferGeometry(
             inputFeatures = 32,
             carrierPositions = 2,
@@ -221,7 +221,7 @@ class S5MegpoidCarrierFusionWorkspaceTest {
         val workspace = S5MegpoidCarrierFusionWorkspace(geometry, projection())
 
         assertThrows(IllegalArgumentException::class.java) {
-            workspace.projectNormalizedCarrierFeatures(FloatArray(31 * 2))
+            workspace.projectPreparedCarrierFeatures(FloatArray(31 * 2))
         }
         assertThrows(IllegalArgumentException::class.java) {
             workspace.appendCarrierFramePlanes(FloatArray(1), FloatArray(2))
