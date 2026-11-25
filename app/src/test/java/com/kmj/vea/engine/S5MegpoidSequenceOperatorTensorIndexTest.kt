@@ -166,6 +166,51 @@ class S5MegpoidSequenceOperatorTensorIndexTest {
     }
 
     @Test
+    fun buildsTheAlternateTemporalProjectionFromTheNativeDescriptorShape() {
+        val weightKey = S5MegpoidSequenceOperatorFactory.ALTERNATE_WEIGHTS to 1
+        val biasKey = S5MegpoidSequenceOperatorFactory.ALTERNATE_BIAS to 1
+        val weights = FloatArray(32 * 32 * 3) { it / 1000f }
+        val bias = FloatArray(32) { it / 10f }
+        val f = fixture(
+            tensors = mapOf(weightKey to weights, biasKey to bias),
+            metadata = mapOf(
+                weightKey to listOf(32, 32, 3, 1),
+                biasKey to listOf(32)
+            )
+        )
+
+        val stage = S5MegpoidSequenceOperatorTensorIndex.build(f.tree)
+            .buildMegpoidV7AlternateTemporalProjection(1, tensorDecoder = f.decoder)
+
+        assertEquals(32, stage.inputFeatures)
+        assertEquals(32, stage.outputFeatures)
+        assertEquals(3, stage.kernelSize)
+        assertEquals(weights.toList(), stage.copyWeights().toList())
+        assertEquals(bias.toList(), stage.copyBias().toList())
+    }
+
+    @Test
+    fun rejectsAlternateTransitionPreparationWhenTheChannelDescriptorDiffers() {
+        val weightKey = S5MegpoidSequenceOperatorFactory.ALTERNATE_WEIGHTS to 0
+        val biasKey = S5MegpoidSequenceOperatorFactory.ALTERNATE_BIAS to 0
+        val f = fixture(
+            tensors = mapOf(
+                weightKey to FloatArray(32 * 32 * 3),
+                biasKey to FloatArray(32)
+            ),
+            metadata = mapOf(
+                weightKey to listOf(32, 32, 3, 1),
+                biasKey to listOf(32)
+            )
+        )
+        val index = S5MegpoidSequenceOperatorTensorIndex.build(f.tree)
+
+        assertThrows(IllegalArgumentException::class.java) {
+            index.buildMegpoidV7AlternateTemporalProjection(0, channels = 16, tensorDecoder = f.decoder)
+        }
+    }
+
+    @Test
     fun rejectsAnIncompleteMegpoidAlternateTransitionSet() {
         val tensors = mapOf(
             (S5MegpoidSequenceOperatorFactory.ALTERNATE_WEIGHTS to 0) to FloatArray(32 * 32 * 3),
