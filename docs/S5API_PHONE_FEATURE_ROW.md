@@ -106,31 +106,48 @@ window, rather than establishing the phone descriptor's +0x10..+0x26
 fields.
 
 Therefore `FUN_180013830` is **not** evidence for the phone descriptor's
-constructor. A separate, offset-consistent constructor path has now been
-recovered:
+constructor. A separate, offset-consistent render-context path has now been recovered:
 
 ```text
-FUN_1800591d0(renderContext, ...)
-  -> FUN_180050aa0(renderContext + 0x08, ...)
-       -> when its mode argument equals 2:
-            FUN_180059c90(renderContext + 0xD0, ...)
+Func_6b47c126
+  -> lVar7 = FUN_180012b40(...)
+       -> FUN_180013410(lVar7 + 0x18)
+            -> FUN_180011680(lVar7 + 0x20)
+
+Func_6b47c126
+  -> FUN_1800591d0(lVar7 + 0x18, ...)
+       -> FUN_180050aa0(lVar7 + 0x20, ...)
+            -> if param_7 == 2:
+                 FUN_180059c90(lVar7 + 0xE8, ...)
 ```
 
-The pointer arithmetic is exact: `FUN_1800591d0` passes an `int *`
-at `renderContext + 2` to `FUN_180050aa0`; that function passes
-`param_1 + 0x32` to `FUN_180059c90`. Since this is 32-bit pointer
-arithmetic, the latter address is `renderContext + 0x08 + 0x32 * 4 =
-renderContext + 0xD0`. The exported `Func_417eec3e` later passes its
-`param_1 + 0xD0` to `FUN_18003ab70`, which forwards the descriptor's
-fields to `FUN_18006c720`.
+The address arithmetic is confirmed by the recovered argument types:
+`FUN_180012b40` takes a `uint *`, so its `param_1 + 6` passed to
+`FUN_180013410` is +0x18 bytes. `FUN_180013410` takes a `longlong`,
+so its `param_1 + 8` passed to `FUN_180011680` is +8 bytes, giving
+`lVar7 + 0x20`. `FUN_1800591d0` takes an `int *` and passes
+`param_1 + 2` to `FUN_180050aa0`, also yielding `lVar7 + 0x20`.
+In the selected `param_7 == 2` branch, `FUN_180050aa0` passes
+`param_1 + 0x32` to `FUN_180059c90`, another +0xC8 bytes, placing
+that DSP/FFT subobject at `lVar7 + 0xE8`.
 
-This establishes the constructor entry point and the exact object address.
-It does **not yet** establish which arguments populate category width,
-duration limits, context counts and flags, or whether the mode-2 branch is
-the active branch for every voice/render configuration. A focused Ghidra
-export now includes `FUN_180059c90` and the callsite argument setup so
-those field assignments can be checked before any Android default is
-introduced.
+This is a strong candidate for the object whose subobject is later
+addressed by `Func_417eec3e` at `param_1 + 0xD0`: the two addresses
+coincide when the exported adapter receives `param_1 = lVar7 + 0x18`.
+However, the VSM-to-S5API callsite that proves this exact first-argument
+identity has not yet been recovered. The current evidence therefore proves
+the S5API-side object construction and address arithmetic, but not yet the
+cross-export object identity.
+
+The body of `FUN_180059c90` begins by calling `FUN_18004f2d0`, which
+selects CPU/SIMD function pointers from CPUID features. It then copies
+configuration records and builds FFT/history workspaces at higher offsets
+(starting around its own `+0x59C)); it does not directly assign the phone
+descriptor values at `+0x10..+0x26`. Consequently, the phone-feature
+descriptor's scalar source values are still unresolved. The next target is
+the lower-level object initialization performed through
+`FUN_180011680` and the exact VSM call that passes the context into
+`Func_417eec3e`.
 
 The Android byte decoder remains only a validated parser for an already
 captured descriptor; it does not itself read a live Windows context.
