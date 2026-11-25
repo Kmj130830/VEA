@@ -50,6 +50,31 @@ descriptor and only converts to the implemented mode-0 layout when
 feature builder; their actual runtime values still need to be read from the
 active S5API render context.
 
+## Separate configuration-object trace — 2026-11-25
+
+A focused Ghidra pass added the following configuration path:
+
+```text
+FUN_1800591d0
+  -> FUN_180050aa0
+       -> FUN_18005cba0(config, descriptorOutput, allocator)
+            -> FUN_18004d660(config)
+            -> FUN_180007210(languageContext, tokenCount)
+```
+
+Observed data flow in `FUN_18005cba0`:
+
+- Reads an integer count at `config + 0x04`.
+- `FUN_18004d660` sums that many signed 32-bit values from the array pointer at `config + 0x58`.
+- Stores the sum in output field `descriptorOutput[0]`.
+- Stores the sum rounded up to a multiple of eight in `descriptorOutput[1]`.
+- Derives additional power-of-two and storage fields from other values in the configuration object.
+- Calls the Korean/selected-language G2P entry `FUN_180007210` with the configured token count and builds additional per-token work descriptors.
+
+This establishes a real configuration-to-G2P-workspace path, but it does **not** yet prove that `descriptorOutput[0]` or the source integer array is the category-width field at `FUN_18006c720`'s `+0x10). The phone event builder is called with a different-looking context pointer (`Func_417eec3e` passes its own `param_1 + 0xD0` to `FUN_18003ab70`), and the ownership/transfer connecting these objects is not proven.
+
+Accordingly, Android does not use the summed value as a phone feature width, nor infer duration bounds, context counts, or flags from it. The recovered `S5ApiDefaultPhoneFeatureDescriptor` remains a validated byte-layout parser only; the active context values and their construction path still need to be recovered.
+
 ## Memory orientation
 
 The native phone-feature routine writes row-major [position][feature] values. The Megpoid Dense operator consumes [feature][position]. S5ApiDefaultPhoneFeatureMatrix.toFeatureMajor() performs the transpose, and S5MegpoidSequenceTransitionPipeline.runPhoneFeatureMatrix() checks the Dense input width before invoking the existing sequence pipeline.
