@@ -159,7 +159,8 @@ class PreparedMegpoidSpectralOutputSessionTest {
         paramD04 = true,
         paramD05 = 0.01,
         terminalSpectrumLogMagnitudePhase = logMagnitudePhase,
-        carrierFusionEnabled = true
+        carrierFusionEnabled = true,
+        alternateTransitionEnabled = false
     )
 
     @Test
