@@ -133,9 +133,9 @@ class S5MegpoidCarrierFusionWorkspace(
     }
 
     /**
-     * Runs the recovered 32-input/2-output Dense projection over an already
-     * normalized feature-major [inputFeature][position] carrier tensor.
-     * Returns a defensive copy of the [2][position] result.
+     * Runs the recovered 32-input/2-output Dense projection over a prepared
+     * feature-major [inputFeature][position] carrier tensor. Returns a
+     * defensive copy of the [2][position] result.
      */
     @Synchronized
     fun projectPreparedCarrierFeatures(
