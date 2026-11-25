@@ -39,12 +39,33 @@ step = param[4] / param[1] = 32000 / 1024 = 31.25
 f0   = max(F0, 1e-5)
 u    = p * step / f0
 base(k) = k + 1                    where k = 0..3
-cycle(k) = roundf((u - base(k)) / 4)
-location(k) = max(base(k), cycle(k) * 4 + base(k))
+```
+
+S5API has two coordinate implementations:
+
+- The default modulation-table route calls `FUN_1800c3930`, which dispatches
+  to `FUN_1800c4080` or `FUN_1800c39f0`. These helpers materialize all
+  part locations/distances before the mask pass and convert the cycle
+  quotient to a native int32, i.e. truncate toward zero:
+  `cycle = trunc((u - base(k)) / 4)`.
+- The inline scalar fallback uses `roundf((u - base(k)) / 4)`, with
+  half values away from zero.
+
+The Windows caller enables the table route by default unless
+`MRW_MODROT_SIMD=0`, subject to its CPU-dispatch condition. AI Megpoid has
+four parts, so it is within the table helper's supported part-count range.
+Android's default builder mirrors the table helper's truncation mode; the
+`INLINE_SCALAR_ROUNDF` variant remains available as a reference for the
+native fallback path.
+
+For the default table path:
+
+```text
+location(k) = max(base(k), trunc((u - base(k)) / 4) * 4 + base(k))
 distance(k) = abs(u - location(k)) * f0
 ```
 
-The native `roundf` behavior rounds half values away from zero.
+For the inline scalar path, replace `trunc` with `roundf`.
 The four locations and distances are materialized for all parts before the
 mask pass. For a voiced frame, the rotation coefficients are:
 
@@ -54,7 +75,11 @@ D46(k) = cosf(phase(k) - pi/2)
 D4C(k) = sinf(phase(k) - pi/2)
 ```
 
-For unvoiced frames, rotation is identity: D46=1 and D4C=0.
+The table helpers use a polynomial approximation for the trig values;
+Android currently uses platform `sin/cos` over the identical phase and
+writes the same position-major buffer contract. This is numerically
+equivalent at the mathematical level, but bit-exact SIMD parity remains
+unverified. For unvoiced frames, rotation is identity: D46=1 and D4C=0.
 
 ## Native gain/mask rule
 
@@ -102,10 +127,11 @@ is validated by the same descriptor before a table is created.
 `PreparedMegpoidRuntime.prepareMultipartOutputModulation()` accepts only
 the frame-specific position count, F0 and `theta_ctr`.
 
-Tests cover all four part locations/distances, the nearest/threshold OR
-rule, strict nearest-distance tie behavior, inclusive threshold equality,
-both threshold-selector modes, unvoiced identity rotation, and the
-complex accumulation sign/order.
+Tests cover the four part locations/distances, both native coordinate
+rounding routes (SIMD-table truncation and inline-scalar `roundf`), the
+nearest/threshold OR rule, strict nearest-distance tie behavior, inclusive
+threshold equality, both threshold-selector modes, unvoiced identity
+rotation, and the complex accumulation sign/order.
 
 ## Boundary: this is not the complete output head
 
