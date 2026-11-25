@@ -143,21 +143,20 @@ data class PreparedMegpoidRuntime(
         get() = modelPackage.carrierFusionTensorIndex
 
     /** Prepares the 32-input / 2-output carrier Dense layer when carrier fusion is enabled. */
-    fun prepareCarrierFusionDenseProjection(
+    fun prepareCarrierFusionFallbackDenseProjection(
         tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
     ): S5MegpoidDenseProjection {
         check(carrierFusionEnabled) {
             "Carrier fusion is disabled by the selected voicebank runtime options."
         }
-        return modelPackage.prepareCarrierFusionDenseProjection(tensorDecoder)
+        return modelPackage.prepareCarrierFusionFallbackDenseProjection(tensorDecoder)
     }
 
     /** Builds the carrier Dense workspace using active render-context geometry. */
     fun createCarrierFusionWorkspace(
         carrierPositions: Int,
         historySlotsFromRoot181: Int,
-        historySlotsFromRoot182: Int,
-        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+        historySlotsFromRoot182: Int
     ): S5MegpoidCarrierFusionWorkspace {
         check(carrierFusionEnabled) {
             "Carrier fusion is disabled by the selected voicebank runtime options."
@@ -165,8 +164,7 @@ data class PreparedMegpoidRuntime(
         return modelPackage.createCarrierFusionWorkspace(
             carrierPositions = carrierPositions,
             historySlotsFromRoot181 = historySlotsFromRoot181,
-            historySlotsFromRoot182 = historySlotsFromRoot182,
-            tensorDecoder = tensorDecoder
+            historySlotsFromRoot182 = historySlotsFromRoot182
         )
     }
 
