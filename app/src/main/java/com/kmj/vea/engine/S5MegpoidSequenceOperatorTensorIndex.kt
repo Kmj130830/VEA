@@ -103,6 +103,8 @@ class S5MegpoidSequenceOperatorTensorReference internal constructor(
     val factoryKey: S5MegpoidSequenceOperatorFactoryKey,
     val objectPath: String,
     val marker: String,
+    /** Exact model metadata dimensions; empty only for legacy unshaped fixtures. */
+    val descriptorMetadata: List<Int>,
     val elementCount: Int,
     private val encodedValue: S5ModelValue.StringValue
 ) {
@@ -184,18 +186,50 @@ class S5MegpoidSequenceOperatorTensorIndex private constructor(
     companion object {
         fun build(tree: S5ModelObjectTree): S5MegpoidSequenceOperatorTensorIndex {
             val entriesByKey = S5MegpoidSequenceOperatorFactoryKeys.all().groupBy { it.lookupKey }
-            val leavesByKey = mutableMapOf<String, MutableList<Pair<String, S5ModelValue.StringValue>>>()
+            data class TensorLeaf(
+                val path: String,
+                val value: S5ModelValue.StringValue,
+                val metadata: List<Int>
+            )
+            val leavesByKey = mutableMapOf<String, MutableList<TensorLeaf>>()
 
-            fun collectLeaves(value: S5ModelValue, path: String, output: MutableList<Pair<String, S5ModelValue.StringValue>>) {
-                when (value) {
-                    is S5ModelValue.StringValue -> if (value.value.startsWith("*F32") || value.value.startsWith("*F16")) {
-                        output += path to value
+            fun parseMetadata(value: S5ModelValue?): List<Int> {
+                val array = value as? S5ModelValue.ArrayValue ?: return emptyList()
+                return array.values.mapIndexed { index, item ->
+                    val number = (item as? S5ModelValue.NumberValue)?.value
+                        ?: throw IllegalArgumentException(
+                            "Sequence tensor metadata contains a non-numeric dimension at $index."
+                        )
+                    require(number.isFinite() && number % 1.0 == 0.0 &&
+                        number in 1.0..Int.MAX_VALUE.toDouble()) {
+                        "Sequence tensor metadata contains an invalid dimension at $index."
                     }
-                    is S5ModelValue.ObjectValue -> value.fields.forEach { (key, child) ->
-                        collectLeaves(child, path + "/" + key, output)
+                    number.toInt()
+                }
+            }
+
+            fun collectLeaves(
+                value: S5ModelValue,
+                path: String,
+                output: MutableList<TensorLeaf>,
+                inheritedMetadata: List<Int> = emptyList()
+            ) {
+                when (value) {
+                    is S5ModelValue.StringValue -> if (
+                        value.value.startsWith("*F32") || value.value.startsWith("*F16")
+                    ) {
+                        output += TensorLeaf(path, value, inheritedMetadata)
+                    }
+                    is S5ModelValue.ObjectValue -> {
+                        val localMetadata = parseMetadata(
+                            value.fields[S5MegpoidCarrierFusionModelPath.SHAPE_METADATA_KEY]
+                        ).ifEmpty { inheritedMetadata }
+                        value.fields.forEach { (key, child) ->
+                            collectLeaves(child, path + "/" + key, output, localMetadata)
+                        }
                     }
                     is S5ModelValue.ArrayValue -> value.values.forEachIndexed { i, child ->
-                        collectLeaves(child, path + "[" + i + "]", output)
+                        collectLeaves(child, path + "[" + i + "]", output, inheritedMetadata)
                     }
                     else -> Unit
                 }
@@ -225,17 +259,39 @@ class S5MegpoidSequenceOperatorTensorIndex private constructor(
                     "Duplicate tensor leaves for " + entry.factory.nativeFunction + "[" + entry.sequenceIndex + "]."
                 }
                 val leaf = leaves.single()
-                val encoded = leaf.second.value
+                val encoded = leaf.value.value
                 val marker = encoded.take(4)
                 val body = encoded.substring(4)
                 val bytes = try { Base64.getDecoder().decode(body).size }
                     catch (error: IllegalArgumentException) {
-                        throw IllegalArgumentException("Malformed sequence tensor at " + leaf.first, error)
+                        throw IllegalArgumentException("Malformed sequence tensor at " + leaf.path, error)
                     }
                 val scalarBytes = if (marker == "*F16") 2 else 4
-                require(bytes > 0 && bytes % scalarBytes == 0) { "Invalid tensor alignment at " + leaf.first }
+                require(bytes > 0 && bytes % scalarBytes == 0) {
+                    "Invalid tensor alignment at " + leaf.path
+                }
+                val elementCount = bytes / scalarBytes
+                if (leaf.metadata.isNotEmpty()) {
+                    val metadataCount = leaf.metadata.fold(1L) { product, dimension ->
+                        require(product <= Int.MAX_VALUE.toLong() / dimension.toLong()) {
+                            "Sequence tensor metadata exceeds the supported tensor size at " + leaf.path
+                        }
+                        product * dimension.toLong()
+                    }
+                    require(metadataCount == elementCount.toLong()) {
+                        "Sequence tensor metadata declares $metadataCount values but stores $elementCount at " +
+                            leaf.path + "."
+                    }
+                }
                 resolved.getValue(entry.factory)[entry.sequenceIndex] =
-                    S5MegpoidSequenceOperatorTensorReference(entry, leaf.first, marker, bytes / scalarBytes, leaf.second)
+                    S5MegpoidSequenceOperatorTensorReference(
+                        factoryKey = entry,
+                        objectPath = leaf.path,
+                        marker = marker,
+                        descriptorMetadata = leaf.metadata,
+                        elementCount = elementCount,
+                        encodedValue = leaf.value
+                    )
             }
             return S5MegpoidSequenceOperatorTensorIndex(resolved.mapValues { it.value.toMap() })
         }
