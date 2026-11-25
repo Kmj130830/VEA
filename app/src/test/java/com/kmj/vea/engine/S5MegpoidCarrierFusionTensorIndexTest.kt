@@ -104,6 +104,35 @@ class S5MegpoidCarrierFusionTensorIndexTest {
     }
 
     @Test
+    fun rejectsEqualElementCountWithTheWrongNativeMatrixAxes() {
+        val fixture = fixture(
+            weightShape = listOf(2, 16, 2, 1),
+            weightValues = FloatArray(64)
+        )
+        val index = S5MegpoidCarrierFusionTensorIndex.build(fixture.tree)
+
+        assertEquals(64, index.weights.elementCount)
+        assertThrows(IllegalArgumentException::class.java) {
+            index.resolveDenseDimensions()
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            index.buildDenseProjection(fixture.decoder)
+        }
+    }
+
+    @Test
+    fun rejectsBiasThatDoesNotMatchTheTwoOutputDenseDescriptor() {
+        val fixture = fixture(
+            biasShape = listOf(1, 2),
+            biasValues = floatArrayOf(0.25f, -0.5f)
+        )
+        val index = S5MegpoidCarrierFusionTensorIndex.build(fixture.tree)
+        assertThrows(IllegalArgumentException::class.java) {
+            index.resolveDenseDimensions()
+        }
+    }
+
+    @Test
     fun rejectsUnexpectedTensorObjectKeysAndMissingPayloads() {
         val missing = S5ModelObjectTree.parseUtf8(
             "{\"" + S5MegpoidCarrierFusionModelPath.CONFIG_KEY + "\":{" +
