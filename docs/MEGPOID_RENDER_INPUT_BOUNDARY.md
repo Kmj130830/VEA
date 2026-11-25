@@ -145,6 +145,37 @@ recover the meaning of the source uint32 and auxiliary 0x28-record fields.
 Until then, do not serialize a private 0x38/0x58 record or claim a
 model-ready phoneme index.
 
+
+## Phone-feature layout descriptor ownership trace — 2026-11-25
+
+The exported `Func_417eec3e` passes the address `context + 0xD0` as
+the first argument to `FUN_18003ab70`. The latter passes the following
+fields from that descriptor directly to `FUN_18006c720`:
+
+| Context offset | Phone-feature meaning established at the consumer |
+|---:|---|
+| `+0x10` | Category segment width |
+| `+0x14` | Rounded/padded category segment stride |
+| `+0x18` | Auxiliary output-width/count field; exact role still not named |
+| `+0x1C` | Following-phone context count |
+| `+0x20` | Preceding-phone context count |
+| `+0x24` | Include the two-value leading-marker flag pair |
+| `+0x25` | Phone-feature layout mode; mode 0 is the default matrix path |
+| `+0x26` | Additional layout selector passed through the builder |
+
+The event-preparation wrapper does not assign these fields locally; it
+consumes the already-populated context block. The Android
+`S5ApiDefaultPhoneFeatureLayout` currently represents the verified mode-0
+subset: category width, forward/backward context counts, leading-flag switch
+and layout mode. The stride and auxiliary selector are not exposed as
+caller-supplied values because their model/runtime role is not yet proven.
+
+This establishes the *consumer and owning context offset*, not the setter
+that writes the active values for AI Megpoid. The next static target is the
+render-context setup path that initializes/populates the block at
+`context + 0xD0`. Until that setter is traced, the Android port must not
+fill the layout fields with guessed constants.
+
 ## Android phone-event preprocessor
 
 VEA now has an owned data model `VsmPhoneEvent(startSeconds, endSeconds,
