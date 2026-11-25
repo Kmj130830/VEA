@@ -133,13 +133,15 @@ these optional carrier-Dense tensor records:
 
 | Role | Metadata | Typed payload count |
 |---|---|---:|
-| Weights | `[2]` | 2 × F32 |
-| Bias | `[2,32,1,1]` | 64 × F32 |
+| Weights | `[2,32,1,1]` | 64 × F32 |
+| Bias | `[2]` | 2 × F32 |
 
-Android now indexes and validates both nested metadata/payload objects.
-The index deliberately preserves their vendor metadata without guessing
-how `FUN_1800bbf10` / `FUN_1800d4610` use the unusual dimensions. The
-carrier descriptor and per-part output path remain under implementation.
+The native call order now establishes the roles: `FUN_1800bbf10`
+constructs an input-width-by-two-output Dense descriptor;
+`FUN_1800d4610` receives the 64-value `[2,32,1,1]` matrix first and the
+2-value bias second. The index validates this shape and builds the
+model-backed `2 × 32` Dense projection. Carrier-conditioned input creation,
+history scheduling and the per-part output mix remain under implementation.
 
 ## Exact boundaries that remain
 
