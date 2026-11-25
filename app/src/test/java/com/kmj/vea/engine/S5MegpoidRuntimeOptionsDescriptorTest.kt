@@ -9,7 +9,8 @@ import org.junit.Test
 class S5MegpoidRuntimeOptionsDescriptorTest {
     private fun tree(
         overrides: Map<String, S5ModelValue> = emptyMap(),
-        includeAlternateSelector: Boolean = true
+        includeAlternateSelector: Boolean = true,
+        includeMultipartThresholdSelector: Boolean = true
     ): S5ModelObjectTree {
         val defaults = linkedMapOf<String, S5ModelValue>(
             S5MegpoidRuntimeOptionKeys.PARAM_0 to S5ModelValue.NumberValue(217.0),
@@ -31,10 +32,14 @@ class S5MegpoidRuntimeOptionsDescriptorTest {
             S5MegpoidRuntimeOptionKeys.TERMINAL_SPECTRUM_LOG_MAGNITUDE_PHASE to
                 S5ModelValue.BooleanValue(true),
             S5MegpoidRuntimeOptionKeys.CARRIER_FUSION_ENABLED to S5ModelValue.BooleanValue(true),
-            S5MegpoidRuntimeOptionKeys.ALTERNATE_TRANSITION_ENABLED to S5ModelValue.BooleanValue(true)
+            S5MegpoidRuntimeOptionKeys.ALTERNATE_TRANSITION_ENABLED to S5ModelValue.BooleanValue(true),
+            S5MegpoidRuntimeOptionKeys.MULTIPART_THRESHOLD_MODE_ENABLED to S5ModelValue.BooleanValue(true)
         )
         if (!includeAlternateSelector) {
             defaults.remove(S5MegpoidRuntimeOptionKeys.ALTERNATE_TRANSITION_ENABLED)
+        }
+        if (!includeMultipartThresholdSelector) {
+            defaults.remove(S5MegpoidRuntimeOptionKeys.MULTIPART_THRESHOLD_MODE_ENABLED)
         }
         defaults.putAll(overrides)
         val entries = defaults.entries.joinToString(",") { (key, value) ->
@@ -73,6 +78,7 @@ class S5MegpoidRuntimeOptionsDescriptorTest {
         assertTrue(options.carrierFusionEnabled)
         assertTrue(options.alternateTransitionEnabled)
         assertEquals(S5MegpoidReverseTransitionMode.ALTERNATE, options.reverseTransitionMode)
+        assertTrue(options.multipartThresholdModeEnabled)
         options.requireMegpoidV7BlockGrid()
     }
 
@@ -93,6 +99,23 @@ class S5MegpoidRuntimeOptionsDescriptorTest {
                 S5ModelValue.BooleanValue(false)
         )))
         assertFalse(explicitlyStandard.alternateTransitionEnabled)
+    }
+
+    @Test
+    fun readsMultipartThresholdModeAndDefaultsToFalseWhenTheOptionIsAbsent() {
+        val enabled = S5MegpoidRuntimeOptionsDescriptor.from(tree())
+        assertTrue(enabled.multipartThresholdModeEnabled)
+
+        val absent = S5MegpoidRuntimeOptionsDescriptor.from(
+            tree(includeMultipartThresholdSelector = false)
+        )
+        assertFalse(absent.multipartThresholdModeEnabled)
+
+        val explicitlyDisabled = S5MegpoidRuntimeOptionsDescriptor.from(tree(mapOf(
+            S5MegpoidRuntimeOptionKeys.MULTIPART_THRESHOLD_MODE_ENABLED to
+                S5ModelValue.BooleanValue(false)
+        )))
+        assertFalse(explicitlyDisabled.multipartThresholdModeEnabled)
     }
 
     @Test
