@@ -65,21 +65,6 @@ class PreparedMegpoidSpectralOutputSession(
         return processSpectrumFrame(spectrum)
     }
 
-    /**
-     * Uses the direct-complex representation selected by the traced AI
-     * Megpoid new-root initialization path: FUN_1800bca40 zeroes root +0x48,
-     * and FUN_1800ced10 leaves that selector unchanged.
-     */
-    @Synchronized
-    fun processMegpoidDefaultOutputPlanes(
-        firstFeaturePlane: FloatArray,
-        secondFeaturePlane: FloatArray
-    ): FloatArray = processModelOutputPlanes(
-        firstFeaturePlane = firstFeaturePlane,
-        secondFeaturePlane = secondFeaturePlane,
-        encoding = S5MegpoidSpectrumFrameEncoding.DIRECT_COMPLEX
-    )
-
     /** Clears overlap history and starts a fresh utterance-local frame count. */
     @Synchronized
     fun reset() {
