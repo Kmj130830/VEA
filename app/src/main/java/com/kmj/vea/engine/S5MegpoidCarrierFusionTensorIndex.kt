@@ -189,3 +189,116 @@ class S5MegpoidCarrierFusionTensorIndex private constructor(
         }
     }
 }
+
+
+/**
+ * Runtime-generated carrier source matrix and its two affine-control vectors.
+ *
+ * FUN_1800ced10 folds the model Dense descriptor into these arrays before
+ * inference:
+ *   source[r,k] = weight[r,k] * normalizationScale[k]
+ *   control162[r] = bias[r] + sum_k(weight[r,k] * normalizationBias[k])
+ *   control166[r] = sum_k(source[r,k])
+ *
+ * The source matrix is [outputFeature=2][inputFeature=K]. The two control
+ * vectors each contain two values, in output-feature order.
+ */
+class S5MegpoidCarrierFusionActiveParameters private constructor(
+    val inputFeatures: Int,
+    private val sourceMatrix: FloatArray,
+    private val control162: FloatArray,
+    private val control166: FloatArray
+) {
+    init {
+        require(inputFeatures > 0)
+        require(sourceMatrix.size.toLong() == 2L * inputFeatures.toLong())
+        require(control162.size == 2 && control166.size == 2)
+        require(sourceMatrix.all { it.isFinite() } &&
+            control162.all { it.isFinite() } &&
+            control166.all { it.isFinite() }) {
+            "Carrier active parameters contain a non-finite value."
+        }
+    }
+
+    fun copySourceMatrixTwoByInput(): FloatArray = sourceMatrix.copyOf()
+    fun copyControl162(): FloatArray = control162.copyOf()
+    fun copyControl166(): FloatArray = control166.copyOf()
+
+    companion object {
+        fun build(
+            carrierTensors: S5MegpoidCarrierFusionTensorIndex,
+            normalizationScale: FloatArray,
+            normalizationBias: FloatArray,
+            tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+        ): S5MegpoidCarrierFusionActiveParameters {
+            val dimensions = carrierTensors.resolveDenseDimensions()
+            require(dimensions.outputFeatures == 2)
+            require(normalizationScale.size == dimensions.inputFeatures) {
+                "Carrier normalization scale must have one value per input feature."
+            }
+            require(normalizationBias.size == dimensions.inputFeatures) {
+                "Carrier normalization bias must have one value per input feature."
+            }
+            require(normalizationScale.all { it.isFinite() } &&
+                normalizationBias.all { it.isFinite() }) {
+                "Carrier normalization tensors contain a non-finite value."
+            }
+
+            val weights = carrierTensors.weights.decodeFloatArray(tensorDecoder)
+            val bias = carrierTensors.bias.decodeFloatArray(tensorDecoder)
+            val sourceMatrix = FloatArray(weights.size)
+            val control162 = FloatArray(2)
+            val control166 = FloatArray(2)
+
+            // FUN_1800ced10 processes both output rows independently and
+            // unrolls the inner K loop by four. Preserve that accumulation
+            // grouping, then process the remaining 0..3 values scalarly.
+            for (row in 0 until 2) {
+                val rowOffset = row * dimensions.inputFeatures
+                var offsetSum = 0.0f
+                var scaleSum = 0.0f
+                var feature = 0
+                while (feature + 4 <= dimensions.inputFeatures) {
+                    val w0 = weights[rowOffset + feature]
+                    val w1 = weights[rowOffset + feature + 1]
+                    val w2 = weights[rowOffset + feature + 2]
+                    val w3 = weights[rowOffset + feature + 3]
+
+                    val m0 = w0 * normalizationScale[feature]
+                    val m1 = w1 * normalizationScale[feature + 1]
+                    val m2 = w2 * normalizationScale[feature + 2]
+                    val m3 = w3 * normalizationScale[feature + 3]
+                    sourceMatrix[rowOffset + feature] = m0
+                    sourceMatrix[rowOffset + feature + 1] = m1
+                    sourceMatrix[rowOffset + feature + 2] = m2
+                    sourceMatrix[rowOffset + feature + 3] = m3
+
+                    offsetSum = offsetSum +
+                        w0 * normalizationBias[feature] +
+                        w1 * normalizationBias[feature + 1] +
+                        w2 * normalizationBias[feature + 2] +
+                        w3 * normalizationBias[feature + 3]
+                    scaleSum = scaleSum + m0 + m1 + m2 + m3
+                    feature += 4
+                }
+                while (feature < dimensions.inputFeatures) {
+                    val weight = weights[rowOffset + feature]
+                    val scaled = weight * normalizationScale[feature]
+                    sourceMatrix[rowOffset + feature] = scaled
+                    offsetSum += weight * normalizationBias[feature]
+                    scaleSum += scaled
+                    feature++
+                }
+                control162[row] = offsetSum + bias[row]
+                control166[row] = scaleSum
+            }
+
+            return S5MegpoidCarrierFusionActiveParameters(
+                inputFeatures = dimensions.inputFeatures,
+                sourceMatrix = sourceMatrix,
+                control162 = control162,
+                control166 = control166
+            )
+        }
+    }
+}
