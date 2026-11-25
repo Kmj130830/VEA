@@ -122,6 +122,26 @@ data class S5MegpoidAlternateTransitionTensorPair(
     val bias: S5MegpoidSequenceOperatorTensorReference
 )
 
+data class S5MegpoidPreparedAlternateTransition(
+    val sequenceIndex: Int,
+    val weightMetadata: List<Int>,
+    val biasMetadata: List<Int>,
+    val weights: FloatArray,
+    val bias: FloatArray
+) {
+    init {
+        require(sequenceIndex in 0..2)
+        require(weightMetadata == listOf(32, 32, 3, 1))
+        require(biasMetadata == listOf(32))
+        require(weights.size == 32 * 32 * 3)
+        require(bias.size == 32)
+        require(weights.all { it.isFinite() } && bias.all { it.isFinite() })
+    }
+
+    fun copyWeights(): FloatArray = weights.copyOf()
+    fun copyBias(): FloatArray = bias.copyOf()
+}
+
 /**
  * Recursive index for sequence-indexed S5API model properties.
  * The active sequence count and all operator dimensions remain render metadata.
@@ -222,6 +242,24 @@ class S5MegpoidSequenceOperatorTensorIndex private constructor(
         }
         return expectedIndices.sorted().map(::requireMegpoidV7AlternateTransitionPair)
     }
+
+    /**
+     * Decodes the exact three Megpoid Alternate tensor pairs while preserving
+     * their original metadata. No operator math or axis reinterpretation is
+     * performed here.
+     */
+    fun decodeMegpoidV7AlternateTransitionSet(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): List<S5MegpoidPreparedAlternateTransition> =
+        requireMegpoidV7AlternateTransitionSet().mapIndexed { index, pair ->
+            S5MegpoidPreparedAlternateTransition(
+                sequenceIndex = index,
+                weightMetadata = pair.weights.descriptorMetadata.toList(),
+                biasMetadata = pair.bias.descriptorMetadata.toList(),
+                weights = pair.weights.decodeFloatArray(tensorDecoder),
+                bias = pair.bias.decodeFloatArray(tensorDecoder)
+            )
+        }
 
     companion object {
         fun build(tree: S5ModelObjectTree): S5MegpoidSequenceOperatorTensorIndex {
