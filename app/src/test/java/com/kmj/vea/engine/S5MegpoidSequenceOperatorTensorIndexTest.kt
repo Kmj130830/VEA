@@ -113,6 +113,49 @@ class S5MegpoidSequenceOperatorTensorIndexTest {
     }
 
     @Test
+    fun requiresAllThreeMegpoidAlternateTransitionPairsWithExactNativeShape() {
+        val tensors = linkedMapOf<Pair<S5MegpoidSequenceOperatorFactory, Int>, FloatArray>()
+        val metadata = linkedMapOf<Pair<S5MegpoidSequenceOperatorFactory, Int>, List<Int>>()
+        for (index in 0..2) {
+            val weightKey = S5MegpoidSequenceOperatorFactory.ALTERNATE_WEIGHTS to index
+            val biasKey = S5MegpoidSequenceOperatorFactory.ALTERNATE_BIAS to index
+            tensors[weightKey] = FloatArray(32 * 32 * 3)
+            tensors[biasKey] = FloatArray(32)
+            metadata[weightKey] = listOf(32, 32, 3, 1)
+            metadata[biasKey] = listOf(32)
+        }
+        val index = S5MegpoidSequenceOperatorTensorIndex.build(
+            fixture(tensors, metadata).tree
+        )
+
+        assertEquals(setOf(0, 1, 2), index.availableAlternateTransitionIndices())
+        val pairs = index.requireMegpoidV7AlternateTransitionSet()
+        assertEquals(3, pairs.size)
+        pairs.forEach { pair ->
+            assertEquals(listOf(32, 32, 3, 1), pair.weights.descriptorMetadata)
+            assertEquals(listOf(32), pair.bias.descriptorMetadata)
+        }
+    }
+
+    @Test
+    fun rejectsAnIncompleteMegpoidAlternateTransitionSet() {
+        val tensors = mapOf(
+            (S5MegpoidSequenceOperatorFactory.ALTERNATE_WEIGHTS to 0) to FloatArray(32 * 32 * 3),
+            (S5MegpoidSequenceOperatorFactory.ALTERNATE_BIAS to 0) to FloatArray(32)
+        )
+        val metadata = mapOf(
+            (S5MegpoidSequenceOperatorFactory.ALTERNATE_WEIGHTS to 0) to listOf(32, 32, 3, 1),
+            (S5MegpoidSequenceOperatorFactory.ALTERNATE_BIAS to 0) to listOf(32)
+        )
+        val index = S5MegpoidSequenceOperatorTensorIndex.build(
+            fixture(tensors, metadata).tree
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            index.requireMegpoidV7AlternateTransitionSet()
+        }
+    }
+
+    @Test
     fun rejectsSequenceTensorMetadataThatDoesNotMatchItsPayload() {
         val weightKey = S5MegpoidSequenceOperatorFactory.ALTERNATE_WEIGHTS to 0
         val f = fixture(
