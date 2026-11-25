@@ -98,6 +98,36 @@ edge extension, tap-window layout, row-major GEMM and bias broadcast. Tests
 cover the 2x position expansion, left/centre/right windows, one-position
 boundary behavior and multi-channel tap flattening.
 
+## Tensor payload materialization boundary
+
+The render-path decompilation shows the Alternate properties flowing through:
+
+```text
+FUN_1801237e0 / FUN_180124740
+  -> FUN_1800d5970 (exact hashed property lookup)
+  -> FUN_1800adca0 (typed numeric payload conversion)
+  -> FUN_1800b8b20 (float-vector ownership wrapper)
+  -> FUN_1800c0320 (shared vector descriptor attach)
+  -> render descriptor +0x18 / +0x08
+  -> FUN_1800c72d0
+```
+
+The typed-value converter accepts the `*F32` and `*F16` markers.
+For `*F32`, it copies the float32 payload into the owning vector in source
+order. For `*F16`, it converts each half value to float32 in the same
+element order. The Alternate descriptor setup then attaches that vector;
+the inspected path contains no transpose or axis permutation before
+`FUN_1800c72d0` consumes it.
+
+This confirms that the Android model loader must preserve the raw decoded
+tensor order. It does **not**, by itself, assign semantic names to the four
+metadata axes `[32,32,3,1]`. The native GEMM treats the resulting vector as
+a contiguous `[outputFeature][inputFeature * kernelTap]` matrix. The
+correspondence between the VTB2 metadata's first two size-32 axes and the
+GEMM's output/input axes remains an interpretation that must be validated
+against a reference native render before claiming bit-exact parity. No
+transpose is inserted on the basis of a guessed framework convention.
+
 ## AI Megpoid model inventory
 
 The selected AI Megpoid VTB2 subtree contains Alternate weight/bias pairs
