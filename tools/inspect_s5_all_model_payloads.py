@@ -47,6 +47,8 @@ RENDER_OPTION_KEYS = {
     "alternate_transition_enabled": "119558af50f9c8919539abd8e064b287",
     # FUN_1800e3030 -> render-root byte +0x3405 (optional; default false).
     "nearest_part_mask_enabled": "7a5a0ba0ba2f00ab8a0a0d538add0e6d",
+    # FUN_1800e2e70 -> required identifier when nearest-part masking is enabled.
+    "part_modulation_identifier": "184ef4ded83d0b35d809a7f1b09b1066",
     # FUN_1800e2770 -> render-root byte +0x3411 (optional; default false).
     "multipart_threshold_mode": "ef12c1f702abd89b2e1f07a126cc5411",
     "carrier_fusion_enabled": "66bfcc4a31ba796aca88c5eae36870fc",
