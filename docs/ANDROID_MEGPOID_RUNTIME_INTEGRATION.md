@@ -66,6 +66,28 @@ descriptor values: category stride, preceding/following context counts,
 leading-flag mode, and duration limits still require the active render-context
 data. A mismatch is rejected instead of selecting a plausible layout by guess.
 
+## Mode-0 phone descriptor representation
+
+The native feature builder call chain now has a complete field-offset map.
+`FUN_18003ab70` forwards the active render-context descriptor fields at
+`+0x10`, `+0x14`, `+0x18`, `+0x1C`, `+0x20`, `+0x24`, `+0x25`
+and `+0x26` into `FUN_18006c720`. Android represents these as one
+`S5ApiDefaultPhoneFeatureDescriptor`, validates the category capacity,
+duration bounds and context counts, and converts it to the mode-0 matrix
+layout only when the mode byte is zero.
+
+The phone-category IDs are also now grounded in the constructor path:
+`FUN_180003a90` builds the 14 ordered groups and `FUN_18006c520` assigns
+each group's ordinal as its numeric phone-map index. This confirms IDs 0–13
+and still keeps the feature stride separate from the number of categories.
+
+The new descriptor overloads are wired into
+`PreparedMegpoidRuntime.preparePhoneInputForDense()` and
+`prepareExplicitPhoneInputForDense()`. The unresolved task is no longer
+the matrix field layout itself; it is obtaining the **actual descriptor
+values** from the active voice/render context and proving them against a
+real reference render.
+
 ## Exact boundaries that remain
 
 - The app still does not derive timed per-phone events from VeaNote.phoneme. That field is editor display text, not already aligned phones.
