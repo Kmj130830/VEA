@@ -106,15 +106,21 @@ allocates per-frame carrier history at root words `+0xD80` and a second
 feature buffer at root word `+0xD74`, with auxiliary dimensions/cursors at
 `+0xD7C` and `+0xD7E`.
 
-When the carrier-fusion path is enabled, the configuration loader constructs
-a separate Dense descriptor at root word `+0xD60` (byte offset `+0x3580`)
-using the shared VTB2 matrix descriptor factory. The forward path also
-contains a fallback sub-branch that copies the current feature tensor,
-applies the global normalizer at word `+0xC4`, and projects with that
-`+0xD60` Dense descriptor. In the active carrier-fusion sub-branch, the
-renderer instead builds a carrier-conditioned two-feature input, projects
-and combines the output over retained carrier frames, then mixes the result
-with the complex per-part output.
+When the carrier-fusion option is present, the configuration loader also
+constructs a fallback Dense descriptor at root word `+0xD60` (byte offset
+`+0x3580`) using the shared VTB2 matrix descriptor factory. This descriptor
+is used by the fallback sub-branch when the runtime `MRW_CARRIER_FUSE`
+switch is disabled, root `+0x16C` is false, or the dynamic source matrix at
+`+0x15E` is absent. That fallback copies the current feature tensor, applies
+the global normalizer at word `+0xC4`, and projects with `+0xD60`.
+
+The active carrier branch does **not** use the VTB2 `+0xD60` weights as its
+projection matrix. It uses a runtime-generated `[2][K]` source matrix at
+`+0x15E`, multiplies it by the current `[K][N]` feature tensor with
+`FUN_1800c3740(M=2,N,K)` to create D74, then applies per-row affine values
+derived from scalars at `+0x16A/+0x16B` and two-value vectors at
+`+0x162/+0x166`. It subsequently mixes the delayed planar carrier-history
+slot into the complex per-part output.
 
 The carrier selector is therefore not implied by D00/D01. The getter
 `FUN_1800dfb50()` resolves to key
@@ -142,15 +148,14 @@ typed payload at `0ed3f4c15ca6d021d59b2b1038226a7f`. Android's
 the encoded payload length and retains the native dimensions verbatim.
 
 The call sequence resolves the layout: `FUN_1800bbf10` constructs the
-carrier Dense descriptor with the shared input width and two output features,
-then `FUN_1800d4610` receives the 64-element tensor from
-`FUN_1800e9740()` as the matrix before the two-element tensor from
+optional fallback carrier Dense descriptor with the shared input width and
+two output features, then `FUN_1800d4610` receives the 64-element tensor
+from `FUN_1800e9740()` as the matrix before the two-element tensor from
 `FUN_1800e9580()` as the bias. The metadata `[2,32,1,1]` therefore gives
-a row-major `[output=2][input=32]` carrier weight matrix; `[2]` is the
-two-value output bias. Android now validates these roles and creates the
-corresponding `S5MegpoidDenseProjection(inputFeatures=32, outputFeatures=2)`
-through the model-package preparation API. The carrier-conditioned input
-construction and history/mix scheduling remain separate.
+a row-major `[output=2][input=32]` fallback matrix; `[2]` is its bias.
+Android validates these roles and exposes them through
+`prepareCarrierFusionFallbackDenseProjection()`. The active branch instead
+uses the dynamic source matrix at root `+0x15E` and the generic GEMM path.
 
 ## 3. Multi-part feature/modulation branch
 
