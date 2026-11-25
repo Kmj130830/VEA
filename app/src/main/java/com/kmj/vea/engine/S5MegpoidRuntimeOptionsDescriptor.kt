@@ -26,7 +26,9 @@ data class S5MegpoidRuntimeOptionsDescriptor(
     val paramD04: Boolean,
     val paramD05: Double,
     val terminalSpectrumLogMagnitudePhase: Boolean,
-    val carrierFusionEnabled: Boolean
+    val carrierFusionEnabled: Boolean,
+    /** Native render-root byte +0x59: true selects FUN_1800c72d0 Alternate. */
+    val alternateTransitionEnabled: Boolean
 ) {
     init {
         require(param5 > 0) { "Native param[5] sequence-slot count must be positive." }
@@ -103,6 +105,14 @@ data class S5MegpoidRuntimeOptionsDescriptor(
             S5MegpoidSpectrumFrameEncoding.DIRECT_COMPLEX
         }
 
+    /** Native +0x59 dispatch: false = standard Banked, true = Alternate. */
+    val reverseTransitionMode: S5MegpoidReverseTransitionMode
+        get() = if (alternateTransitionEnabled) {
+            S5MegpoidReverseTransitionMode.ALTERNATE
+        } else {
+            S5MegpoidReverseTransitionMode.STANDARD_BANKED
+        }
+
     /** Number of feature buffers owned by the native render context. */
     val sequenceSlotCount: Int get() = param5
 
@@ -175,6 +185,12 @@ data class S5MegpoidRuntimeOptionsDescriptor(
                 (value(key) as? S5ModelValue.BooleanValue)?.value
                     ?: throw IllegalArgumentException("S5API runtime option " + key + " must be boolean.")
 
+            fun optionalBoolean(key: String, defaultValue: Boolean = false): Boolean {
+                val candidate = optionsTree.findByLookupKey(key) ?: return defaultValue
+                return (candidate as? S5ModelValue.BooleanValue)?.value
+                    ?: throw IllegalArgumentException("S5API runtime option " + key + " must be boolean.")
+            }
+
             return S5MegpoidRuntimeOptionsDescriptor(
                 param0 = int(S5MegpoidRuntimeOptionKeys.PARAM_0),
                 param1 = int(S5MegpoidRuntimeOptionKeys.PARAM_1),
@@ -195,10 +211,18 @@ data class S5MegpoidRuntimeOptionsDescriptor(
                 terminalSpectrumLogMagnitudePhase =
                     boolean(S5MegpoidRuntimeOptionKeys.TERMINAL_SPECTRUM_LOG_MAGNITUDE_PHASE),
                 carrierFusionEnabled =
-                    boolean(S5MegpoidRuntimeOptionKeys.CARRIER_FUSION_ENABLED)
+                    boolean(S5MegpoidRuntimeOptionKeys.CARRIER_FUSION_ENABLED),
+                alternateTransitionEnabled =
+                    optionalBoolean(S5MegpoidRuntimeOptionKeys.ALTERNATE_TRANSITION_ENABLED)
             )
         }
     }
+}
+
+/** Native reverse-transition branch selected by render-root byte +0x59. */
+enum class S5MegpoidReverseTransitionMode {
+    STANDARD_BANKED,
+    ALTERNATE
 }
 
 /** Exact native static property keys used by the runtime-options constructor. */
@@ -223,6 +247,8 @@ object S5MegpoidRuntimeOptionKeys {
     const val TERMINAL_SPECTRUM_LOG_MAGNITUDE_PHASE = "d22b2750ccebc1459f7a9d9ea7186bbf"
     /** FUN_1800dfb50 -> render-root byte +0x3559. */
     const val CARRIER_FUSION_ENABLED = "66bfcc4a31ba796aca88c5eae36870fc"
+    /** FUN_1800e6de0 -> render-root byte +0x59: false=Banked, true=Alternate. */
+    const val ALTERNATE_TRANSITION_ENABLED = "119558af50f9c8919539abd8e064b287"
 }
 
 /**
