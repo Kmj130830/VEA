@@ -89,10 +89,10 @@ D4C  = -signed(P(x_cos*x_cos) * x_cos)
 ```
 
 Here `x_sin` and `x_cos` are produced by the native two-stage
-fractional-turn/quadrant reduction in `FUN_1800c4080`; the sign toggles
-when the reduced quadrant integer is odd. Android now ports this same
-polynomial and reduction order in the default
-`SIMD_TABLE_TRUNCATION` mode. The scalar fallback
+fractional-turn/quadrant reduction; the sign toggles when the reduced
+quadrant integer is odd. Android ports the same polynomial in both table
+modes, using truncation in `SIMD_SSE_TABLE_TRUNCATION` and nearest-even
+rounding in `SIMD_AVX_TABLE_NEAREST_EVEN`. The scalar fallback
 `INLINE_SCALAR_ROUNDF` uses native `roundf` for locations and platform
 `cos/sin`, matching the inline scalar branch.
 
