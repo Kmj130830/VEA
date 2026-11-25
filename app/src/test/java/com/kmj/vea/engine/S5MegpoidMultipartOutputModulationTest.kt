@@ -249,6 +249,45 @@ class S5MegpoidMultipartOutputModulationTest {
     }
 
     @Test
+    fun accumulatesAllFourPartPairsInNativePartOrder() {
+        val table = build(f0 = 0f, mask = true)
+        val first = listOf(
+            floatArrayOf(1f, 2f, 3f),
+            floatArrayOf(10f, 20f, 30f),
+            floatArrayOf(100f, 200f, 300f),
+            floatArrayOf(1000f, 2000f, 3000f)
+        )
+        val second = listOf(
+            floatArrayOf(-1f, -2f, -3f),
+            floatArrayOf(-10f, -20f, -30f),
+            floatArrayOf(-100f, -200f, -300f),
+            floatArrayOf(-1000f, -2000f, -3000f)
+        )
+        val output = FloatArray(6)
+
+        table.accumulateAllPartsInto(output, first, second)
+
+        assertEquals(
+            listOf(1111f, 2222f, 3333f, -1111f, -2222f, -3333f),
+            output.toList()
+        )
+    }
+
+    @Test
+    fun rejectsMissingPartPlanesBeforeMutatingTheOutput() {
+        val table = build(f0 = 0f)
+        val output = FloatArray(6) { 7f }
+        assertThrows(IllegalArgumentException::class.java) {
+            table.accumulateAllPartsInto(
+                outputInterleaved = output,
+                firstFeaturePlaneByPart = listOf(FloatArray(3)),
+                secondFeaturePlaneByPart = List(4) { FloatArray(3) }
+            )
+        }
+        assertEquals(List(6) { 7f }, output.toList())
+    }
+
+    @Test
     fun rejectsInvalidGeometryAndMismatchedFeaturePlaneLengths() {
         assertThrows(IllegalArgumentException::class.java) {
             S5MegpoidMultipartOutputModulationBuilder.build(
