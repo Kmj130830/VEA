@@ -159,6 +159,51 @@ work is the interpolation in `FUN_1800c4080` / `FUN_1800c39f0`,
 carrier-conditioned input construction, ring-buffer traversal and final
 fusion scheduling. The supplied AI Megpoid model has carrier fusion enabled.
 
+## Carrier workspace and native history mixing layout
+
+The carrier-history buffer is not stored as bin-interleaved `[real,imag]`
+pairs. The native capture loop in `FUN_1800c7ad0` copies two source values
+per bin into separate halves of `D86`, then copies the entire flat buffer
+into `D80`. The confirmed per-slot layout is therefore:
+
+```text
+D80 slot = [firstPlane[0..bins), secondPlane[0..bins)]
+slotStride = 2 * bins
+historySlots = root[0x181] + root[0x182] + 1
+```
+
+The write cursor is `root[0xD7E]`; after each frame, native increments it
+and wraps at `root[0xD7C]`. When reading the carrier frame for fusion, native
+uses:
+
+```text
+selectedSlot = (writeCursor - root[0x182] - root[0x181] - 1) mod historySlots
+```
+
+Because `historySlots = root[0x181] + root[0x182] + 1`, this selects the
+oldest ring slot at the current write cursor. Android's
+`S5MegpoidCarrierFusionWorkspace` mirrors the two-plane storage, write
+cursor, oldest-slot order and reset behavior.
+
+### Final carrier-history accumulation
+
+For each spectrum bin, native reads carrier history as
+`carrierFirst = slot[bin]` and `carrierSecond = slot[bins + bin]`, and the
+carrier Dense output as two rows `denseFirst` and `denseSecond`. It
+accumulates the complex product into the terminal interleaved output:
+
+```text
+out.real += denseSecond * carrierFirst - denseFirst * carrierSecond
+out.imag += denseFirst * carrierFirst + denseSecond * carrierSecond
+```
+
+Android implements this in
+`S5MegpoidCarrierFusionWorkspace.accumulateDelayedCarrierFrameInto()`.
+Tests cover the planar ring layout, wraparound, delayed-slot selection,
+complex multiplication, zero-initialized slots and reset. This does not yet
+create the carrier-conditioned 32-feature Dense input or recover the
+normalization vectors feeding the `+0xC4` descriptor.
+
 ## 4. Terminal two-plane to complex-spectrum conversion
 
 Immediately before the inverse-FFT/output-transform call, the function reads
