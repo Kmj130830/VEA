@@ -352,3 +352,34 @@ operator adapter without coercing them into the standard banked format.
 bias handling must be recovered before implementing an Alternate CPU/JNI
 kernel. Until then, the exact metadata is indexed but no unverified
 operator calculation is performed.
+
+
+## Corrected active reverse-transition selector — 2026-11-25
+
+The optional model flag is now resolved. `FUN_1800e6de0` constructs hash
+key `119558af50f9c8919539abd8e064b287`; the root-options initializer checks
+for it and writes false when absent, otherwise requires a Boolean and copies
+it to root `+0x59`.
+
+The offline scan in
+[workflow run 45590025813](https://github.com/Kmj130830/VEA/actions/runs/45590025813)
+found the key at:
+
+`$.5be3f5d6495f68286523e230e2d0d9a4.154c806ba4d274fad9c7484acdc1779e.a4ba655a061e6151f80574e6088492a0.119558af50f9c8919539abd8e064b287`
+
+with Boolean value `true`. This is the same selected option object as the
+terminal-spectrum and carrier-fusion flags. For the supplied AI Megpoid V7
+model, the active render-root byte is therefore `+0x59 = 1` and the native
+dispatcher selects Alternate `FUN_1800c72d0`.
+
+Android reads this exact option through
+`S5MegpoidRuntimeOptionsDescriptor.alternateTransitionEnabled`. The
+dedicated Alternate sequence pipeline now mirrors the native order:
+Temporal[0..2], Residual row 3, then three Alternate/Residual pairs for
+rows 2, 1 and 0. The earlier statements above that the active selector
+was unresolved are superseded by this section.
+
+The raw VTB2 tensor-axis mapping to the native row-major `[M][3*C]`
+weight pointer remains the outstanding model-weight parity check; a
+matching element count alone does not prove that axis mapping.
+
