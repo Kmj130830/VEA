@@ -139,9 +139,12 @@ The analyzed S5API `.rdata` contains label strings such as `sil`, `br`,
 `n`, `N`, `m`, `ng`, `g`, `d`, `z`, `zh`, `v`, `r`, `l`, `k`, `t`, `p`,
 `s`, `sh`, `h`, `f`, `ch`, `ts`, `cl`, and `junk`, plus variants.
 
-The string inventory is confirmed, but the complete runtime tree initializer
-and its exact string-to-integer assignments are not yet recovered. Do not
-treat the read-only string order as the numeric category-ID order.
+The numeric map construction is now confirmed: FUN_180003a90 builds
+14 ordered groups, FUN_1800111c0 copies them to DAT_1801c4160, and
+FUN_18006c520 stores the outer group ordinal in each label-tree node at
++0x40. FUN_180074a50 reads and returns that stored uint32. These numeric
+IDs are therefore distinct from the separate alias-to-canonical string
+table.
 
 This supersedes the earlier seven-double/five-key interpretation. Android
 must represent the upstream event as an interval plus an owned phone-label
