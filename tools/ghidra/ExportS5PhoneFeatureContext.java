@@ -24,7 +24,7 @@ public class ExportS5PhoneFeatureContext extends GhidraScript {
         "18006c520", "180003a90", "180021c50",
         "18005b9a0", "18005c890", "18005cba0", "18004f2d0",
         "180012b40", "180013410", "180011680", "180013830",
-        "180091610", "180097ff0", "180085d10",
+        "180091610", "180097ff0", "180085d10", "180084040", "180084040",
         "18004be40", "18004cb90", "18004d660"
     };
     private static final String[] TARGETS = {
@@ -104,6 +104,52 @@ public class ExportS5PhoneFeatureContext extends GhidraScript {
                     out.println();
                 }
             }
+
+            out.println("## Descriptor-field reference scan");
+            out.println();
+            out.println("Operand-0 references to the phone descriptor fields are listed below. " +
+                "Both the Func_417eec3e context (+0xD0) and the Func_133d38ab context (+0x288) are scanned.");
+            out.println();
+            out.println("| Field offset | Function | Instruction address | Operand 0 / instruction |");
+            out.println("|---:|---|---:|---|");
+            String[] descriptorFieldOffsets = {
+                "0xe0", "0xe4", "0xe8", "0xec", "0xf0", "0xf4", "0xf5", "0xf6",
+                "0x298", "0x29c", "0x2a0", "0x2a4", "0x2a8", "0x2ac", "0x2ad", "0x2ae"
+            };
+            LinkedHashMap<Address, Function> fieldReferenceFunctions = new LinkedHashMap<>();
+            int fieldReferenceCount = 0;
+            InstructionIterator allInstructions = currentProgram.getListing().getInstructions(true);
+            while (allInstructions.hasNext()) {
+                monitor.checkCancelled();
+                Instruction instruction = allInstructions.next();
+                if (instruction.getNumOperands() < 1) continue;
+                String operand0 = instruction.getDefaultOperandRepresentation(0);
+                String lower = operand0.toLowerCase();
+                if (!lower.contains("[")) continue;
+                for (String offset : descriptorFieldOffsets) {
+                    if (lower.contains("+ " + offset + "]") ||
+                        lower.contains("+ " + offset + " ") ||
+                        lower.endsWith("+ " + offset)) {
+                        Function owner = currentProgram.getFunctionManager()
+                            .getFunctionContaining(instruction.getAddress());
+                        String ownerName = owner == null ? "data/non-function" :
+                            owner.getName() + " at " + owner.getEntryPoint();
+                        out.printf("| %s | %s | %s | %s |%n",
+                            offset, ownerName, instruction.getAddress(), instruction.toString());
+                        fieldReferenceCount++;
+                        if (owner != null && fieldReferenceFunctions.size() < 120) {
+                            fieldReferenceFunctions.put(owner.getEntryPoint(), owner);
+                        }
+                    }
+                }
+            }
+            if (fieldReferenceCount == 0) {
+                out.println("| - | no direct operand-0 field references recovered | - |");
+            }
+            out.println();
+            out.println("Functions with descriptor-offset references: " +
+                fieldReferenceFunctions.size() + ".");
+            out.println();
 
             out.println("## Decompilation");
             out.println();
