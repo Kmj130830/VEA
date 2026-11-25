@@ -136,6 +136,8 @@ public class ExportS5RendererPath extends GhidraScript {
                 "1800b8b20", "1800c0320", "1800b0590",
                 "1800d44b0", "1800d47c0", "1800c72d0", "1800c6390",
                 "1800e6de0", "1800dc260", "1800b6d40",
+                // Multi-part modulation CPU dispatch and ISA capability helpers.
+                "1800dc2e0", "18003cbe0",
                 // Optional per-part output-head mask controls stored at
                 // render-root +0x3405 and +0x3411.
                 "1800e3030", "1800e2770",
@@ -285,6 +287,80 @@ public class ExportS5RendererPath extends GhidraScript {
             out.println("- FUN_1800591d0 / FUN_180050aa0: caller-side descriptor configuration");
             out.println("- FUN_18005a980 / FUN_180032750: upstream config and category-map callers");
             out.println();
+
+            out.println("## Multi-part modulation dispatcher callsites");
+            out.println();
+            out.println("| Target | Caller | Call site |");
+            out.println("|---:|---|---:|");
+            String[] modulationTargets = {"1800c3930", "1800c4080", "1800c39f0"};
+            for (String targetHex : modulationTargets) {
+                Address targetAddress = toAddr(targetHex);
+                Function targetFunction =
+                    currentProgram.getFunctionManager().getFunctionAt(targetAddress);
+                if (targetFunction == null) {
+                    targetFunction = currentProgram.getFunctionManager()
+                        .getFunctionContaining(targetAddress);
+                }
+                ReferenceIterator refs =
+                    currentProgram.getReferenceManager().getReferencesTo(targetAddress);
+                int count = 0;
+                while (refs.hasNext()) {
+                    Reference ref = refs.next();
+                    if (!ref.getReferenceType().isCall()) continue;
+                    Function caller = currentProgram.getFunctionManager()
+                        .getFunctionContaining(ref.getFromAddress());
+                    if (caller == null) continue;
+                    count++;
+                    out.printf("| %s (%s) | %s at %s | %s |%n",
+                        targetAddress,
+                        targetFunction == null ? "not recovered" : targetFunction.getName(),
+                        caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+                }
+                if (count == 0) out.printf("| %s | no direct caller recovered | - |%n", targetAddress);
+            }
+            out.println();
+
+            Function modulationCaller =
+                currentProgram.getFunctionManager().getFunctionAt(toAddr("1800c7ad0"));
+            if (modulationCaller != null) {
+                String[] modulationCallTargets = {"1800c3930", "1800c39f0", "1800c4080"};
+                for (String targetHex : modulationCallTargets) {
+                    Address targetAddress = toAddr(targetHex);
+                    out.println("### FUN_1800c7ad0 call instruction to " + targetAddress);
+                    out.println();
+                    InstructionIterator instructions =
+                        currentProgram.getListing().getInstructions(modulationCaller.getBody(), true);
+                    ArrayDeque<Instruction> preceding = new ArrayDeque<>();
+                    int count = 0;
+                    while (instructions.hasNext()) {
+                        monitor.checkCancelled();
+                        Instruction ins = instructions.next();
+                        boolean match = false;
+                        for (Reference ref : ins.getReferencesFrom()) {
+                            if (ref.getReferenceType().isCall() &&
+                                ref.getToAddress().equals(targetAddress)) {
+                                match = true;
+                                break;
+                            }
+                        }
+                        if (match) {
+                            count++;
+                            out.println("Callsite: " + ins.getAddress());
+                            out.println("~~~asm");
+                            for (Instruction prior : preceding) {
+                                out.println(prior.getAddress() + "  " + prior.toString());
+                            }
+                            out.println(ins.getAddress() + "  " + ins.toString());
+                            out.println("~~~");
+                            out.println();
+                        }
+                        preceding.addLast(ins);
+                        while (preceding.size() > 64) preceding.removeFirst();
+                    }
+                    if (count == 0) out.println("- No direct call instruction recovered in FUN_1800c7ad0.");
+                    out.println();
+                }
+            }
 
             out.println("## Frame-window generator callers");
             out.println();
