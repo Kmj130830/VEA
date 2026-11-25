@@ -212,6 +212,39 @@ installed AI Megpoid V7 has `D00=4`, `D01=true`, so its main output path
 remains the multi-part head; this fallback stage is present in the model
 package but is not used for that configuration.
 
+## Confirmed Alternate branch and sequence integration — 2026-11-25
+
+The S5API initializer reads optional VTB2 key
+`119558af50f9c8919539abd8e064b287` and writes its Boolean value to render
+root `+0x59`. An offline scan of the exact AI Megpoid VTB2 selected options
+object found this value to be `true`; absence defaults to false, matching
+the native initializer. AI Megpoid therefore selects Alternate
+`FUN_1800c72d0`, not standard Banked `FUN_1800c6390`.
+
+Android now reads that value as
+`S5MegpoidRuntimeOptionsDescriptor.alternateTransitionEnabled` and exposes
+the corresponding `reverseTransitionMode`. The Alternate operator
+`S5MegpoidAlternateTemporalProjection` implements 2x linear interpolation,
+zero-padded left/centre/right context windows, row-major GEMM and bias
+broadcast. The dedicated
+`S5MegpoidAlternateSequenceTransitionPipeline` executes Temporal[0..2],
+Residual row 3, then Alternate[0]/Residual row 2,
+Alternate[1]/Residual row 1, and Alternate[2]/Residual row 0. Each
+Alternate transition doubles its sequence positions.
+
+`S5VoicebankModelPackage.createMegpoidV7AlternateSequenceTransitionPipeline()`
+assembles the checked Dense/normalization stage, three model-backed Temporal
+stages, three model-backed Alternate stages and the eight residual blocks.
+The sequence test checks the minimum 49 phone-position input, residual row
+order, and 56 output positions after three 2x transitions.
+
+The remaining neural-operator check is the raw VTB2 Alternate weight-axis
+mapping against the native `[M][3*C]` GEMM row order. The phone-event
+upstream still lacks G2P, real per-phone timing, and the actual phone feature
+descriptor values. The post-residual multi-part output and final spectrum to
+PCM/audio callback are also incomplete. No successful vocal render or WAV
+output is claimed.
+
 ## Exact boundaries that remain
 
 - The app still does not derive timed per-phone events from VeaNote.phoneme. That field is editor display text, not already aligned phones.
