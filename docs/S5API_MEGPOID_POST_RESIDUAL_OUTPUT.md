@@ -17,6 +17,34 @@ also establish that its multi-part output-head condition is enabled. The
 remaining unknowns are the detailed per-part interpolation/carrier parameters
 and the model tensors feeding the second output head.
 
+### Model tensors for the non-multi-part fallback head
+
+The render-state population path constructs the fallback descriptors
+unconditionally, even though the forward dispatcher selects them only when
+`D01 == false` or `D00 < 2`. Their four VTB2 getter keys and exact
+metadata are now recovered:
+
+| Descriptor role | Getter | Lookup key | Metadata / payload |
+|---|---|---|---|
+| +0xC4 normalization scale | `FUN_1800e9ac0` | `d55956a69b51b6f6dd43bd0cc2467bcf` | `[32]` / 32 F32 |
+| +0xC4 normalization bias | `FUN_1800e9900` | `bf96a6e83ab8bb7d33509f2d3a1a348f` | `[32]` / 32 F32 |
+| +0xCE Dense weights | `FUN_1800e9e40` | `051fe4a0e8e7e92c3c8791bd28f24da8` | `[8,32,1,1]` / 256 F32 |
+| +0xCE Dense bias | `FUN_1800e9c80` | `3a9561654ca2e128021a59d14813a88f` | `[8]` / 8 F32 |
+
+The setter order at `FUN_1800ced10` confirms scale before bias for
+`FUN_1800d4a90`, then Dense matrix before Dense bias for
+`FUN_1800d4610`. The Dense constructor is called with 32 input features,
+8 output features and bias enabled. The normalizer epsilon comes from
+float32 bit pattern `0x358637bd` (1.0e-6), and the forward order is global
+normalization followed by Dense projection.
+
+Android now indexes and validates these four nested metadata/payload
+objects in `S5MegpoidPostResidualFallbackTensorIndex`, and builds a
+32→8 stage in the exact native operator order. This is not the active
+AI Megpoid head: its VTB2 options set `D00=4` and `D01=true`, selecting
+the four-part/8-feature path. The fallback builder refuses to run when
+that multi-part branch is selected.
+
 ## 1. Post-residual projection and normalization branches
 
 After the temporal/reverse-residual work, the function selects an output-head
