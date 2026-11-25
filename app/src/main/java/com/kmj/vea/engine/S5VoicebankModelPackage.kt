@@ -202,6 +202,25 @@ data class S5VoicebankModelPackage(
     }
 
     /**
+     * Decoded AI Megpoid V7 Alternate transition tensor parameters. This is
+     * parameter preparation only; FUN_1800c72d0 has not yet been ported.
+     */
+    val preparedAlternateTransitionParameters: List<S5MegpoidPreparedAlternateTransition> by lazy(
+        LazyThreadSafetyMode.PUBLICATION
+    ) {
+        sequenceOperatorTensorIndex.decodeMegpoidV7AlternateTransitionSet()
+    }
+
+    fun prepareAlternateTransitionParameters(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): List<S5MegpoidPreparedAlternateTransition> =
+        if (tensorDecoder === NativeS5TypedTensorDecoder) {
+            preparedAlternateTransitionParameters
+        } else {
+            sequenceOperatorTensorIndex.decodeMegpoidV7AlternateTransitionSet(tensorDecoder)
+        }
+
+    /**
      * Lazily indexes the eight FUN_1800ced10 model-property families for
      * the four-by-two block grid, scoped to the exact subtree selected by
      * the high-level native initializer.
