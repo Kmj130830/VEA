@@ -20,16 +20,26 @@ class S5MegpoidSequenceOperatorTensorIndexTest {
         metadata: Map<Pair<S5MegpoidSequenceOperatorFactory, Int>, List<Int>> = emptyMap()
     ): Fixture {
         val decoded = mutableMapOf<String, FloatArray>()
+
+        fun objectJson(shape: List<Int>, encoded: String): String =
+            "{\"" + S5MegpoidCarrierFusionModelPath.SHAPE_METADATA_KEY + "\":[" +
+                shape.joinToString(",") + "],\"" +
+                S5MegpoidCarrierFusionModelPath.TYPED_PAYLOAD_KEY + "\":\"" +
+                encoded + "\"}"
+
         val fields = tensors.entries.map { entry ->
-            val key = S5MegpoidSequenceOperatorFactoryKeys.lookupKey(entry.key.first, entry.key.second)
-            val raw = ByteArray(entry.value.size * 4)
-            raw[0] = (entry.key.second + 1).toByte()
-            val encoded = "*F32" + Base64.getEncoder().encodeToString(raw)
+            val key = S5MegpoidSequenceOperatorFactoryKeys.lookupKey(
+                entry.key.first, entry.key.second
+            )
+            val encodedBytes = ByteArray(entry.value.size * 4)
+            encodedBytes[0] = (entry.key.second + 1).toByte()
+            val encoded = "*F32" + Base64.getEncoder().encodeToString(encodedBytes)
             decoded[encoded] = entry.value
             val dimensions = metadata[entry.key] ?: listOf(entry.value.size)
-            """{"$key":{"${S5MegpoidCarrierFusionModelPath.SHAPE_METADATA_KEY}":[${dimensions.joinToString(",")}],"${S5MegpoidCarrierFusionModelPath.TYPED_PAYLOAD_KEY}":"$encoded"}}"""
+            "\"" + key + "\":" + objectJson(dimensions, encoded)
         }
-        return Fixture(S5ModelObjectTree.parseUtf8("{\"selected\":{" + fields.joinToString(",") + "}}"), FakeDecoder(decoded))
+        val json = "{\"selected\":{" + fields.joinToString(",") + "}}"
+        return Fixture(S5ModelObjectTree.parseUtf8(json), FakeDecoder(decoded))
     }
 
     @Test fun exposesAllSixSixteenEntryFactoryTables() {
