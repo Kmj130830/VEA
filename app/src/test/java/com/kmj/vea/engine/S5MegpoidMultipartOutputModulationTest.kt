@@ -97,6 +97,53 @@ class S5MegpoidMultipartOutputModulationTest {
     }
 
     @Test
+    fun defaultNativeTablePathUsesTruncationAndScalarFallbackUsesRoundf() {
+        fun build(kernel: S5MegpoidMultipartCoordinateKernel) =
+            S5MegpoidMultipartOutputModulationBuilder.build(
+                partCount = 4,
+                positionCount = 2,
+                frequencyStep = 31.25f,
+                fundamentalFrequencyHz = 1f,
+                thetaCenterRadians = 0.5f,
+                maximumDistanceParameter = 133f,
+                distanceExtensionParameter = 25f,
+                extendedThresholdMode = true,
+                nearestPartMaskEnabledAtRoot3405 = false,
+                thresholdModeEnabledAtRoot3411 = true,
+                coordinateKernel = kernel
+            )
+
+        val nativeDefault = S5MegpoidMultipartOutputModulationBuilder.build(
+            partCount = 4,
+            positionCount = 2,
+            frequencyStep = 31.25f,
+            fundamentalFrequencyHz = 1f,
+            thetaCenterRadians = 0.5f,
+            maximumDistanceParameter = 133f,
+            distanceExtensionParameter = 25f,
+            extendedThresholdMode = true,
+            nearestPartMaskEnabledAtRoot3405 = false,
+            thresholdModeEnabledAtRoot3411 = true
+        )
+        val scalarFallback = build(
+            S5MegpoidMultipartCoordinateKernel.INLINE_SCALAR_ROUNDF
+        )
+
+        assertEquals(
+            listOf(29f, 30f, 31f, 28f),
+            nativeDefault.copyPhaseLocations().copyOfRange(4, 8).toList()
+        )
+        assertEquals(
+            listOf(33f, 30f, 31f, 32f),
+            scalarFallback.copyPhaseLocations().copyOfRange(4, 8).toList()
+        )
+        assertEquals(
+            listOf(2.25f, 1.25f, 0.25f, 3.25f),
+            nativeDefault.copyDistances().copyOfRange(4, 8).toList()
+        )
+    }
+
+    @Test
     fun disablingNearestPartMaskLeavesAllPartsActiveButKeepsTheirRotations() {
         val masked = build(mask = true)
         val unmasked = build(mask = false)
