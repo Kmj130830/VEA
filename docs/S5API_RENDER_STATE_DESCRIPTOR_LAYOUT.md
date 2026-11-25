@@ -231,9 +231,9 @@ descriptor metadata and are not guessed by this index.
 
 The supplied AI Megpoid V7 `VTB2` runtime-options tree yields
 `param[5] = 4` sequence-feature slots and `param[6] = 2` residual columns.
-The initializer allocates `param[5]` feature slots, runs the Temporal and
-Banked descriptor loops `param[5] - 1` times, and populates the residual
-factory grid `param[5] * param[6]` (4 rows × 2 columns).
+The initializer allocates four feature slots and builds three forward
+Temporal descriptors plus three reverse-transition descriptors. The
+residual factory grid contains `param[5] * param[6]` (4 rows × 2 columns).
 
 The verified call order in `FUN_1800c7ad0` is:
 
@@ -242,20 +242,29 @@ The verified call order in `FUN_1800c7ad0` is:
 | 1 | Temporal[0] | slot 0 → slot 1 |
 | 2 | Temporal[1] | slot 1 → slot 2 |
 | 3 | Temporal[2] | slot 2 → slot 3 |
-| 4 | Residual row 3 | initial highest slot, before the reverse Banked sweep |
-| 5 | Banked[0] → Residual row 2 | slot 3 → slot 2 |
-| 6 | Banked[1] → Residual row 1 | slot 2 → slot 1 |
-| 7 | Banked[2] → Residual row 0 | slot 1 → slot 0 |
+| 4 | Residual row 3 | initial highest slot, before the reverse-transition sweep |
+| 5 | Reverse transition[0] → Residual row 2 | slot 3 → slot 2 |
+| 6 | Reverse transition[1] → Residual row 1 | slot 2 → slot 1 |
+| 7 | Reverse transition[2] → Residual row 0 | slot 1 → slot 0 |
 
-Thus there are four sequence slots, three Temporal transitions, three
-Banked transitions, and eight residual blocks. The initial Residual row 3
-does not have a preceding Banked operation.
+There are four feature slots, three Temporal transitions, three
+reverse-transition stages and eight residual blocks. The initial Residual
+row 3 does not have a preceding reverse-transition operator.
 
-Android's `S5MegpoidSequenceTransitionPipeline` mirrors this order:
-Dense + Global Normalization, Temporal[0..2], Residual row 3, then three
-Banked/Residual pairs. A Banked output is stored as
-`[feature][position][bank]`; the innermost bank axis is flattened into
-`position * bankCount` for the following residual row.
+The reverse-transition implementation is selected by render-context byte
+`+0x59`. Value zero calls standard Banked `FUN_1800c6390` through the
+descriptor/workspace arrays at root `+0xA0/+0xA6`. Nonzero calls Alternate
+`FUN_1800c72d0) through the separate descriptor/workspace arrays at root
+`+0xAC/+0xB2`. These are distinct operator contracts; Alternate must not
+be fed into the standard Banked adapter.
+
+The Android `S5MegpoidSequenceTransitionPipeline` currently mirrors the
+standard Banked branch only: Dense + Global Normalization, Temporal[0..2],
+Residual row 3, then three Banked/Residual pairs. It is not yet a complete
+AI Megpoid forward graph. The actual AI Megpoid V7 selected VTB2 subtree
+contains three Alternate weight/bias pairs and no standard Banked pairs;
+the active `+0x59` Boolean property is being recovered before choosing
+and implementing the corresponding Android route.
 
 The pipeline starts at an already prepared feature tensor. Note/phoneme
 feature generation and final post-residual decoding remain outside this code.
