@@ -236,12 +236,12 @@ class S5MegpoidMultipartOutputModulationTest {
         val nativeSin = table.copyNativeRotationSine().filterIndexed { i, _ -> i % 4 == 0 }
         for (position in 0 until 3) {
             assertEquals(
-                real[position] * nativeCos[position] + imaginary[position] * nativeSin[position],
+                real[position] * nativeCos[position] - imaginary[position] * nativeSin[position],
                 output[position * 2],
                 0.00001f
             )
             assertEquals(
-                imaginary[position] * nativeCos[position] - real[position] * nativeSin[position],
+                imaginary[position] * nativeCos[position] + real[position] * nativeSin[position],
                 output[position * 2 + 1],
                 0.00001f
             )
