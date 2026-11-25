@@ -88,11 +88,37 @@ renderer instead builds a carrier-conditioned two-feature input, projects
 and combines the output over retained carrier frames, then mixes the result
 with the complex per-part output.
 
-The carrier selector is therefore not implied by D00/D01. VEA must resolve
-the `FUN_1800dfb50()` property key separately and check whether it exists in
-the selected AI Megpoid VTB2 tree before choosing whether to build the
-carrier Dense descriptor or allocate carrier-history workspaces. This also
-decides whether the optional `+0xD60` Dense branch is active.
+The carrier selector is therefore not implied by D00/D01. The getter
+`FUN_1800dfb50()` resolves to key
+`66bfcc4a31ba796aca88c5eae36870fc`; the selected AI Megpoid runtime-options
+object contains this key with boolean value `true`. Therefore the supplied
+bank enables the independent carrier-fusion flag at root `+0x3559`, and the
+native setup enters the branch that constructs the optional `+0xD60` Dense
+descriptor and carrier-history workspaces. Android now loads this flag from
+the selected VTB2 options tree.
+### Actual AI Megpoid carrier tensors
+
+The two carrier Dense properties use the exact keys returned by
+`FUN_1800e9580()` and `FUN_1800e9740()`:
+
+| Role | Lookup key | VTB2 metadata | Payload |
+|---|---|---|---:|
+| Carrier weights | `0128c19d610695f96c546cb8e04839fd` | `[2]` | 2 × F32 |
+| Carrier bias | `61ef9b49f8fe353fe0d586220366ce92` | `[2,32,1,1]` | 64 × F32 |
+
+Both objects are under the selected residual configuration subtree at
+`43726e4ce752ea6cc300dc2fca3e8372`. Each property is an object containing
+one integer metadata array at `4ba18a32e4fa1a2f3b293713692a3a2e` and one
+typed payload at `0ed3f4c15ca6d021d59b2b1038226a7f`. Android's
+`S5MegpoidCarrierFusionTensorIndex` validates the metadata product against
+the encoded payload length and retains the native dimensions verbatim.
+
+This does not yet establish how `FUN_1800bbf10` and `FUN_1800d4610`
+interpret the two-element weight vector together with the 64-element
+bias tensor. The descriptor construction and exact axis/stride contract
+must be recovered before these values are passed to the carrier Dense
+operator; Android does not reinterpret them as a conventional matrix yet.
+
 ## 3. Multi-part feature/modulation branch
 
 When root `+0x3404` is enabled and the count at root `+0x3400` is at least
@@ -109,12 +135,13 @@ diagnostic labels include `Xcarrier_real`, `Xcarrier_imag`,
 buffer roles as carrier and per-part complex feature streams, but do not
 establish the full user-facing meaning of each scalar control.
 
-The exact interpolation rule, carrier-history ownership and model property
-sources are reserved for a focused trace of `FUN_1800c3930`,
-`FUN_1800d52b0` and `FUN_1800d5610`. The native branch conditions and
-workspace offsets are confirmed; the AI Megpoid carrier-fusion option value
-is not yet established. VEA's current Android pipeline does
-not implement this multi-part or carrier-mix branch.
+The complex modulation accumulator has a common scalar equation now ported
+as `S5MegpoidOutputHeadKernels.accumulateComplexModulatedOutput`; the
+CPU-dispatched native AVX2 and general paths implement the same equation.
+The affine vector operation used by the carrier path is also ported as
+`applyAffineInPlace`. The remaining work is the per-part interpolation,
+carrier-conditioned input construction, ring-buffer traversal and final
+fusion scheduling. The supplied AI Megpoid model has carrier fusion enabled.
 
 ## 4. Terminal two-plane to complex-spectrum conversion
 
@@ -150,11 +177,13 @@ underflow to zero is therefore preserved.
 
 This establishes two possible two-plane representations. Although
 `FUN_1800bca40` initializes root byte `+0x48` to zero, the subsequent
-`FUN_1800ced10` model-option loader overwrites that byte using a boolean
-property obtained from `FUN_1800e6c20()`. The constructor default therefore
-does not establish the active encoding. Android keeps the choice explicit
-until that getter's hash key and the corresponding AI Megpoid VTB2 value
-have been recovered.
+`FUN_1800ced10` model-option loader overwrites it using the boolean property
+returned by `FUN_1800e6c20()`. That getter resolves to key
+`d22b2750ccebc1459f7a9d9ea7186bbf`, which is present with value `true` in
+the selected AI Megpoid runtime-options object. The supplied bank therefore
+uses log-magnitude/phase encoding. `S5MegpoidRuntimeOptionsDescriptor`
+loads this key and `PreparedMegpoidRuntime` passes the selected encoding to
+the spectral output session.
 
 ## 5. Inverse transform and output block
 
@@ -177,13 +206,12 @@ representations, and `PreparedMegpoidSpectralOutputSession` can now accept
 the two model output planes and pass their encoded complex spectrum into the
 existing overlap-add processor.
 
-The active value of root `+0x48` is loaded by `FUN_1800ced10` from a
-separate boolean option key returned by `FUN_1800e6c20()`. The root
-constructor's zero initialization is therefore not the final configured
-value. VEA keeps the encoding explicit until that hashed key is recovered
-from the helper and matched to the installed AI Megpoid VTB2 tree. The two
-modes are operator implementations, not a claim that the full neural graph
-has generated those feature planes.
+The active value of root `+0x48` is loaded by `FUN_1800ced10` from the
+boolean key returned by `FUN_1800e6c20()`. The installed AI Megpoid VTB2
+contains that key with value `true`, so its selected mode is
+`LOG_MAGNITUDE_PHASE`. Android reads this setting from the same runtime
+options object and passes it to `processModelOutputPlanes()`. The direct
+complex mode remains available for other banks/configurations.
 
 ## 6. Remaining output-head work
 
