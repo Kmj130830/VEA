@@ -5,8 +5,10 @@ import java.util.Base64
 /** Exact selected VTB2 subtree used by the carrier-fusion Dense descriptor. */
 object S5MegpoidCarrierFusionModelPath {
     const val CONFIG_KEY = "43726e4ce752ea6cc300dc2fca3e8372"
-    const val WEIGHTS_KEY = "0128c19d610695f96c546cb8e04839fd"
-    const val BIAS_KEY = "61ef9b49f8fe353fe0d586220366ce92"
+    /** FUN_1800e9740: [outputFeature=2, inputFeature=32, 1, 1] weights. */
+    const val WEIGHTS_KEY = "61ef9b49f8fe353fe0d586220366ce92"
+    /** FUN_1800e9580: two output-feature bias values. */
+    const val BIAS_KEY = "0128c19d610695f96c546cb8e04839fd"
     const val SHAPE_METADATA_KEY = "4ba18a32e4fa1a2f3b293713692a3a2e"
     const val TYPED_PAYLOAD_KEY = "0ed3f4c15ca6d021d59b2b1038226a7f"
 }
@@ -14,10 +16,10 @@ object S5MegpoidCarrierFusionModelPath {
 /**
  * One carrier-fusion tensor object exactly as stored in VTB2.
  *
- * [descriptorMetadata] is retained as native model metadata and is not
- * renamed to a guessed matrix shape. The native carrier descriptor builder
- * FUN_1800bbf10 / FUN_1800d4610 still needs to be ported before these
- * tensors can be passed to a Dense operator.
+ * [descriptorMetadata] is retained exactly as stored. For the carrier
+ * descriptor, FUN_1800bbf10 supplies inputFeatures then outputFeatures=2,
+ * while FUN_1800d4610 receives the 64-element matrix tensor before the
+ * two-element bias tensor. That establishes a row-major [2][32] projection.
  */
 class S5MegpoidCarrierFusionTensorReference internal constructor(
     val propertyName: String,
@@ -42,14 +44,55 @@ class S5MegpoidCarrierFusionTensorReference internal constructor(
 /**
  * Exact model references for the optional +0xD60 carrier Dense descriptor.
  *
- * This index preserves the vendor's metadata/data pair and checks it against
- * the encoded tensor length. It deliberately does not yet reinterpret the
- * weights [2] and bias [2,32,1,1] records as a conventional Dense matrix.
+ * This index preserves the vendor's metadata/data pairs, validates the
+ * native [output=2][input=32] matrix and two-value bias, and can assemble
+ * the corresponding model-backed Dense operator.
  */
 class S5MegpoidCarrierFusionTensorIndex private constructor(
     val weights: S5MegpoidCarrierFusionTensorReference,
     val bias: S5MegpoidCarrierFusionTensorReference
 ) {
+    /** Dense descriptor contract confirmed by FUN_1800bbf10 / FUN_1800d4610. */
+    fun resolveDenseDimensions(): S5MegpoidDenseProjectionDimensions {
+        require(weights.descriptorMetadata.size == 4) {
+            "Carrier Dense weights must retain the native four-axis descriptor."
+        }
+        val metadata = weights.descriptorMetadata
+        val outputFeatures = metadata[0]
+        val inputFeatures = metadata.drop(1).fold(1L) { product, dimension ->
+            require(product <= Int.MAX_VALUE.toLong() / dimension.toLong()) {
+                "Carrier Dense input width exceeds the supported integer range."
+            }
+            product * dimension.toLong()
+        }.toInt()
+        require(outputFeatures == 2) {
+            "The recovered carrier Dense descriptor requires two output features."
+        }
+        require(inputFeatures > 0)
+        require(bias.descriptorMetadata == listOf(outputFeatures) &&
+            bias.elementCount == outputFeatures) {
+            "Carrier Dense bias must contain one value per output feature."
+        }
+        require(weights.elementCount.toLong() ==
+            outputFeatures.toLong() * inputFeatures.toLong()) {
+            "Carrier Dense matrix element count does not match its native dimensions."
+        }
+        return S5MegpoidDenseProjectionDimensions(inputFeatures, outputFeatures)
+    }
+
+    /** Builds the exact [output=2][input=32] carrier Dense operator from VTB2. */
+    fun buildDenseProjection(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidDenseProjection {
+        val dimensions = resolveDenseDimensions()
+        return S5MegpoidDenseProjection(
+            inputFeatures = dimensions.inputFeatures,
+            outputFeatures = dimensions.outputFeatures,
+            weights = weights.decodeFloatArray(tensorDecoder),
+            bias = bias.decodeFloatArray(tensorDecoder)
+        )
+    }
+
     companion object {
         fun build(modelTree: S5ModelObjectTree): S5MegpoidCarrierFusionTensorIndex {
             fun read(
@@ -91,11 +134,10 @@ class S5MegpoidCarrierFusionTensorIndex private constructor(
                     "Carrier-fusion property '$propertyName' has empty dimension metadata."
                 }
                 val metadataCount = metadata.fold(1L) { product, dimension ->
-                    val next = product * dimension.toLong()
-                    require(next <= Int.MAX_VALUE.toLong()) {
+                    require(product <= Int.MAX_VALUE.toLong() / dimension.toLong()) {
                         "Carrier-fusion metadata '$propertyName' exceeds the supported tensor size."
                     }
-                    next
+                    product * dimension.toLong()
                 }.toInt()
 
                 val encoded = objectValue.fields.getValue(
