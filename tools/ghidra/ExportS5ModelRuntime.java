@@ -45,7 +45,9 @@ public class ExportS5ModelRuntime extends GhidraScript {
             // Post-residual output-head and model-to-spectrum boundary.
             "1800c3930", "1800d52b0", "1800d5610",
             "1800cea30", "1800ceba0", "1800c7920",
-            "1800c3740", "18012c740"
+            "1800c3740", "18012c740",
+            // Model-option key getter for the final direct/polar spectrum selector.
+            "1800e6c20"
         };
 
         LinkedHashMap<Address, Function> selected = new LinkedHashMap<>();
