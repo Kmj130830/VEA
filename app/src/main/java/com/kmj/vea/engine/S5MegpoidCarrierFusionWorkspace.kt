@@ -159,18 +159,18 @@ class S5MegpoidCarrierFusionWorkspace(
     }
 
     /**
-     * Writes one interleaved complex spectrum frame to D86 and the D80 ring,
+     * Writes one two-float-per-bin carrier frame to D86 and the D80 ring,
      * then advances the native write slot modulo historySlotCount.
      *
      * @return the ring slot that received this frame.
      */
     @Synchronized
-    fun appendCarrierSpectrumFrame(interleavedSpectrum: FloatArray): Int {
+    fun appendCarrierFramePairs(interleavedSpectrum: FloatArray): Int {
         require(interleavedSpectrum.size == geometry.currentCarrierFrameElementCount) {
-            "Carrier spectrum frame must contain exactly ${geometry.currentCarrierFrameElementCount} floats."
+            "Carrier frame pair buffer must contain exactly ${geometry.currentCarrierFrameElementCount} floats."
         }
         require(interleavedSpectrum.all { it.isFinite() }) {
-            "Carrier spectrum frame contains a non-finite value."
+            "Carrier frame pair buffer contains a non-finite value."
         }
 
         interleavedSpectrum.copyInto(currentCarrierFrame)
