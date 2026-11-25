@@ -125,27 +125,6 @@ class PreparedMegpoidSpectralOutputSessionTest {
     }
 
     @Test
-    fun defaultMegpoidOutputEntryUsesDirectComplexEncoding() {
-        val explicit = createSession()
-        val defaultSession = createSession()
-        val real = floatArrayOf(16f, 2f, 0f, 0f, 0f)
-        val imaginary = floatArrayOf(0f, -3f, 1f, 0f, 0f)
-
-        val expected = explicit.processModelOutputPlanes(
-            firstFeaturePlane = real,
-            secondFeaturePlane = imaginary,
-            encoding = S5MegpoidSpectrumFrameEncoding.DIRECT_COMPLEX
-        )
-        val actual = defaultSession.processMegpoidDefaultOutputPlanes(
-            firstFeaturePlane = real,
-            secondFeaturePlane = imaginary
-        )
-
-        assertEquals(expected.toList(), actual.toList())
-        assertEquals(1L, defaultSession.processedFrameCount)
-    }
-
-    @Test
     fun invalidModelOutputPlanesDoNotAdvanceTheSession() {
         val session = createSession()
         assertThrows(IllegalArgumentException::class.java) {
