@@ -116,6 +116,18 @@ data class PreparedMegpoidRuntime(
     val requiredPhoneFeatureWidth: Int
         get() = denseProjectionDimensionsFromModel.inputFeatures
 
+    /** Actual terminal spectrum representation read from this singer's VTB2 options. */
+    val terminalSpectrumEncoding: S5MegpoidSpectrumFrameEncoding
+        get() = runtimeOptions.terminalSpectrumEncoding
+
+    /** Whether the independent native carrier-fusion branch is active. */
+    val carrierFusionEnabled: Boolean
+        get() = runtimeOptions.carrierFusionEnabled
+
+    /** Exact optional carrier tensor references; null when this voicebank disables carrier fusion. */
+    val carrierFusionTensorIndex: S5MegpoidCarrierFusionTensorIndex?
+        get() = modelPackage.carrierFusionTensorIndex
+
     fun prepareAlignedPhoneFeatures(
         phoneEvents: List<VsmPhoneEvent>,
         minimumPhoneSeconds: Float,
