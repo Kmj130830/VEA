@@ -32,7 +32,11 @@ data class S5MegpoidSequenceTransitionOutput(
 )
 
 /**
- * Exact FUN_1800c7ad0 order for the supplied AI Megpoid V7 context:
+ * Standard Banked reverse-transition branch of FUN_1800c7ad0.
+ *
+ * This pipeline applies only when render-root byte +0x59 is zero. The
+ * supplied AI Megpoid V7 options set +0x59 to one and must use
+ * S5MegpoidAlternateSequenceTransitionPipeline instead.
  * param[5] = four feature slots; param[6] = two residual columns.
  *
  * Dense/norm -> Temporal[0] -> slot 1 -> Temporal[1] -> slot 2
