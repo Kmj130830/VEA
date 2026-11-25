@@ -128,10 +128,12 @@ contains labels including `sil`, `br`, `a`, `i`, `u`, `e`, `o`, `wo`,
 `z`, `zh`, `v`, `r`, `l`, `k`, `t`, `p`, `s`, `sh`, `h`, `f`, `ch`,
 `ts`, `cl` and `junk`, plus positional variants.
 
-The table establishes the vocabulary family, but the current report does
-not yet establish every runtime integer index or the initialization path
-for the global lookup tree. Do not assume that the read-only string order
-equals the classifier's numeric ID order.
+The numeric category map is now resolved separately from that
+alias table. FUN_180003a90 constructs the ordered 14-group list,
+FUN_1800111c0 copies it into DAT_1801c4160, and FUN_18006c520 assigns the
+outer group ordinal to each phone-label tree node at +0x40. FUN_180074a50
+returns that stored uint32. The string alias table still does not itself
+provide category IDs.
 
 ### Android consequence
 
