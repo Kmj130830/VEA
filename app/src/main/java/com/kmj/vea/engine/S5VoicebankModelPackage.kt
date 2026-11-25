@@ -107,6 +107,24 @@ data class S5VoicebankModelPackage(
         requireCarrierFusionTensorIndex().buildFallbackDenseProjection(tensorDecoder)
 
     /**
+     * Compiles the active carrier source matrix and control vectors from
+     * VTB2. The +0xD60 Dense descriptor supplies W/b; the shared [32]-element
+     * normalization scale/bias supply the two conditioning vectors.
+     */
+    fun prepareCarrierFusionActiveParameters(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidCarrierFusionActiveParameters {
+        val carrierTensors = requireCarrierFusionTensorIndex()
+        val outputHeadTensors = postResidualFallbackTensorIndex
+        return S5MegpoidCarrierFusionActiveParameters.build(
+            carrierTensors = carrierTensors,
+            normalizationScale = outputHeadTensors.normalizationScale.decodeFloatArray(tensorDecoder),
+            normalizationBias = outputHeadTensors.normalizationBias.decodeFloatArray(tensorDecoder),
+            tensorDecoder = tensorDecoder
+        )
+    }
+
+    /**
      * Creates carrier Dense and circular-spectrum history buffers from
      * render-context counts supplied by the active render session.
      *
