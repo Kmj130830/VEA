@@ -111,7 +111,18 @@ data class S5MegpoidMultipartOutputModulation(
     }
 }
 
-/** Exact scalar coefficient preparation recovered from FUN_1800c7ad0. */
+/**
+ * Native part-location implementation selected by the renderer's CPU route.
+ * The default S5API path uses the 4-lane SIMD table helper; setting the
+ * MRW_MODROT_SIMD override to "0" or using its scalar fallback selects
+ * inline roundf semantics.
+ */
+enum class S5MegpoidMultipartCoordinateKernel {
+    SIMD_TABLE_TRUNCATION,
+    INLINE_SCALAR_ROUNDF
+}
+
+/** Portable coefficient preparation for both recovered native routes. */
 object S5MegpoidMultipartOutputModulationBuilder {
     private const val TWO_PI = 6.2831855f
     private const val HALF_PI = 1.5707964f
@@ -140,7 +151,9 @@ object S5MegpoidMultipartOutputModulationBuilder {
         distanceExtensionParameter: Float,
         extendedThresholdMode: Boolean,
         nearestPartMaskEnabledAtRoot3405: Boolean,
-        thresholdModeEnabledAtRoot3411: Boolean
+        thresholdModeEnabledAtRoot3411: Boolean,
+        coordinateKernel: S5MegpoidMultipartCoordinateKernel =
+            S5MegpoidMultipartCoordinateKernel.SIMD_TABLE_TRUNCATION
     ): S5MegpoidMultipartOutputModulation {
         require(partCount >= 2) { "The multipart modulation path requires at least two parts." }
         require(positionCount > 0)
@@ -184,9 +197,14 @@ object S5MegpoidMultipartOutputModulationBuilder {
             // Native first pass: fill every part's location and distance arrays.
             for (part in 0 until partCount) {
                 val baseLocation = (part + 1).toFloat()
-                val cycleCount = roundHalfAwayFromZero(
+                val cycleValue =
                     (frequencyCoordinate - baseLocation) / partCount.toFloat()
-                )
+                val cycleCount = when (coordinateKernel) {
+                    S5MegpoidMultipartCoordinateKernel.SIMD_TABLE_TRUNCATION ->
+                        truncateCoordinateTowardsZero(cycleValue)
+                    S5MegpoidMultipartCoordinateKernel.INLINE_SCALAR_ROUNDF ->
+                        roundHalfAwayFromZero(cycleValue)
+                }
                 val candidateLocation =
                     cycleCount * partCount.toFloat() + baseLocation
                 val phaseLocation = maxOf(baseLocation, candidateLocation)
@@ -243,6 +261,15 @@ object S5MegpoidMultipartOutputModulationBuilder {
             rotationReal = rotationReal,
             nativeRotationSine = rotationSine
         )
+    }
+
+    /** The native 4-lane table path explicitly converts the quotient to int32. */
+    private fun truncateCoordinateTowardsZero(value: Float): Float {
+        require(value.isFinite() && value >= Int.MIN_VALUE.toFloat() &&
+            value <= Int.MAX_VALUE.toFloat()) {
+            "Multipart cycle coordinate cannot be narrowed to the native int32 field."
+        }
+        return value.toInt().toFloat()
     }
 
     /** C/C++ roundf semantics: nearest integer, half values away from zero. */
