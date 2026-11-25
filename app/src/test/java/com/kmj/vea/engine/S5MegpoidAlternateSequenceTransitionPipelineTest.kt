@@ -105,8 +105,8 @@ class S5MegpoidAlternateSequenceTransitionPipelineTest {
             ),
             fixture.calls
         )
-        assertEquals(32, output.featureCount)
-        assertEquals(56, output.positionCount)
+        assertEquals(32, output.channels)
+        assertEquals(56, output.positions)
         assertEquals(32 * 56, output.features.size)
     }
 
