@@ -100,16 +100,46 @@ interleaved complex bins. Two encodings are present:
   `real = magnitude * cos(plane1)`, `imag = magnitude * sin(plane1)`.
 
 VEA adds `S5MegpoidSpectrumFrameEncoder` for both exact terminal transforms.
-`PreparedMegpoidSpectralOutputSession.processModelOutputPlanes()` then
-feeds the encoded complex frame into the already ported inverse-FFT and
-overlap-add stage. The two encodings are selectable explicitly; the active
-AI Megpoid value for the native root `+0x48` selector has not yet been
-proven, so no default mode is chosen.
+The native getter `FUN_1800e6c20()` resolves to key
+`d22b2750ccebc1459f7a9d9ea7186bbf`, and the selected AI Megpoid runtime-
+options object contains boolean `true`; therefore this bank uses
+`LOG_MAGNITUDE_PHASE`. `S5MegpoidRuntimeOptionsDescriptor` reads that value,
+and `PreparedMegpoidRuntime.processModelOutputPlanes()` passes the selected
+encoding to the output session before the inverse-FFT/overlap-add stage.
 
 This is only the terminal representation conversion. The additional
 post-residual Dense/global-normalization head, the optional multi-part
 feature branch, carrier-mix history and their model descriptors remain
 unconnected. The full output graph is therefore still unavailable.
+
+## Model-confirmed carrier and terminal spectrum options
+
+The selected AI Megpoid VTB2 runtime-options object contains both output
+flags used by the native render-state initializer:
+
+- `d22b2750ccebc1459f7a9d9ea7186bbf` = `true`: terminal log-magnitude /
+  phase encoding at render-root byte `+0x48`.
+- `66bfcc4a31ba796aca88c5eae36870fc` = `true`: carrier fusion at
+  render-root byte `+0x3559`.
+
+These are independent settings. The four-part head configuration
+(`D00=4`, `D01=true`) separately derives an eight-feature output width.
+The Android runtime options descriptor now exposes all three values and
+maps the terminal flag to `S5MegpoidSpectrumFrameEncoding`; the prepared
+runtime passes this encoding automatically to the spectral output session.
+
+When carrier fusion is enabled, the selected VTB2 configuration contains
+these optional carrier-Dense tensor records:
+
+| Role | Metadata | Typed payload count |
+|---|---|---:|
+| Weights | `[2]` | 2 × F32 |
+| Bias | `[2,32,1,1]` | 64 × F32 |
+
+Android now indexes and validates both nested metadata/payload objects.
+The index deliberately preserves their vendor metadata without guessing
+how `FUN_1800bbf10` / `FUN_1800d4610` use the unusual dimensions. The
+carrier descriptor and per-part output path remain under implementation.
 
 ## Exact boundaries that remain
 
@@ -118,6 +148,6 @@ unconnected. The full output graph is therefore still unavailable.
 - The mode-0 feature builder needs the active render descriptor fields. Category width must be at least 14, but actual width and context counts are runtime data and are not hard-coded.
 - Alternate phone-feature layout mode +0x25 != 0 is not implemented.
 - The complete root render-state descriptor, runtime-derived tensor dimensions, and active workspace bindings are not yet populated.
-- The second post-residual Dense/global-normalization head, multi-part/carrier branch and active spectrum-encoding selector remain unresolved; terminal two-plane-to-complex conversion and spectral overlap-add are now separate tested components, but the verified PCM/WAV contract remains incomplete.
+- The second post-residual Dense/global-normalization head and full multi-part/carrier processing remain unresolved. The active spectrum-encoding and carrier-fusion options are now read from VTB2, and the carrier weight/bias tensor objects are indexed, but the carrier descriptor axis/stride mapping and verified PCM/WAV contract remain incomplete.
 
 Consequently, SynthesisEngine.render() does not emit placeholder WAV data and EngineStatus remains unavailable until the full path has been implemented and verified on Android ARM64.
