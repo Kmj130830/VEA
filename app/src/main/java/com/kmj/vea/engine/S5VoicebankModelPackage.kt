@@ -134,6 +134,26 @@ data class S5VoicebankModelPackage(
         return S5MegpoidCarrierFusionWorkspace(geometry, projection)
     }
 
+    /**
+     * Model-backed non-multi-part fallback output head at render-root +0xC4/+0xCE.
+     * The tensors are present even when the four-part output head is selected.
+     */
+    val postResidualFallbackTensorIndex: S5MegpoidPostResidualFallbackTensorIndex by lazy(
+        LazyThreadSafetyMode.PUBLICATION
+    ) {
+        S5MegpoidPostResidualFallbackTensorIndex.build(residualRuntimeConfigTree)
+    }
+
+    /** Builds the fallback head only when the native D00/D01 branch selects it. */
+    fun preparePostResidualFallbackStage(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidPostResidualFallbackStage {
+        check(!runtimeOptionsDescriptor.usesMultiPartOutputHead) {
+            "The selected AI Megpoid options use the multi-part output head, not the fallback Dense head."
+        }
+        return postResidualFallbackTensorIndex.buildStage(tensorDecoder)
+    }
+
     /** Exact sequence-indexed Temporal/Banked factory tables populated by FUN_1800ced10. */
     val sequenceOperatorTensorIndex: S5MegpoidSequenceOperatorTensorIndex by lazy(
         LazyThreadSafetyMode.PUBLICATION
