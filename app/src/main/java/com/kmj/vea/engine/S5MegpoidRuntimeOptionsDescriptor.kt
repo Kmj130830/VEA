@@ -24,7 +24,9 @@ data class S5MegpoidRuntimeOptionsDescriptor(
     val paramD02: Double,
     val paramD03: Double,
     val paramD04: Boolean,
-    val paramD05: Double
+    val paramD05: Double,
+    val terminalSpectrumLogMagnitudePhase: Boolean,
+    val carrierFusionEnabled: Boolean
 ) {
     init {
         require(param5 > 0) { "Native param[5] sequence-slot count must be positive." }
@@ -91,6 +93,14 @@ data class S5MegpoidRuntimeOptionsDescriptor(
                 "Post-residual output-head width is outside the supported integer range."
             }
             return width.toInt()
+        }
+
+    /** Native render-root +0x48: true selects log-magnitude/phase terminal planes. */
+    val terminalSpectrumEncoding: S5MegpoidSpectrumFrameEncoding
+        get() = if (terminalSpectrumLogMagnitudePhase) {
+            S5MegpoidSpectrumFrameEncoding.LOG_MAGNITUDE_PHASE
+        } else {
+            S5MegpoidSpectrumFrameEncoding.DIRECT_COMPLEX
         }
 
     /** Number of feature buffers owned by the native render context. */
@@ -181,7 +191,11 @@ data class S5MegpoidRuntimeOptionsDescriptor(
                 paramD02 = double(S5MegpoidRuntimeOptionKeys.PARAM_D02),
                 paramD03 = double(S5MegpoidRuntimeOptionKeys.PARAM_D03),
                 paramD04 = boolean(S5MegpoidRuntimeOptionKeys.PARAM_D04),
-                paramD05 = double(S5MegpoidRuntimeOptionKeys.PARAM_D05)
+                paramD05 = double(S5MegpoidRuntimeOptionKeys.PARAM_D05),
+                terminalSpectrumLogMagnitudePhase =
+                    boolean(S5MegpoidRuntimeOptionKeys.TERMINAL_SPECTRUM_LOG_MAGNITUDE_PHASE),
+                carrierFusionEnabled =
+                    boolean(S5MegpoidRuntimeOptionKeys.CARRIER_FUSION_ENABLED)
             )
         }
     }
@@ -205,6 +219,10 @@ object S5MegpoidRuntimeOptionKeys {
     const val PARAM_D03 = "0aa79e92bcffa1a3a8b54fed33e6d511"
     const val PARAM_D04 = "c93358e17f2fe6605677e96149ca3b9c"
     const val PARAM_D05 = "d3767e0b7af5dfd6cb065658fd38853a"
+    /** FUN_1800e6c20 -> render-root byte +0x48. */
+    const val TERMINAL_SPECTRUM_LOG_MAGNITUDE_PHASE = "d22b2750ccebc1459f7a9d9ea7186bbf"
+    /** FUN_1800dfb50 -> render-root byte +0x3559. */
+    const val CARRIER_FUSION_ENABLED = "66bfcc4a31ba796aca88c5eae36870fc"
 }
 
 /**
