@@ -93,6 +93,9 @@ public class ExportS5RendererPath extends GhidraScript {
                 // Force its initializer and adjacent subobject constructors
                 // into the report instead of relying on the bounded closure.
                 "180050aa0", "180013410", "180012030", "180011be0",
+                // The default phone-feature descriptor is constructed at +0xD0
+                // by FUN_180013830 from FUN_180011680's owning object.
+                "180013830", "180013c00",
                 // Phone descriptor and feature-context constructor helpers.
                 "180011680", "180011e80", "18005a980", "180032750",
                 // The phone-label -> category-index map builder walks the
@@ -208,6 +211,8 @@ public class ExportS5RendererPath extends GhidraScript {
                 {"180011680", "phone context subobject initializer A"},
                 {"180011e80", "phone context subobject initializer B"},
                 {"180013410", "phone feature context constructor"},
+                {"180013830", "default phone-feature descriptor constructor"},
+                {"180013c00", "alternate phone context constructor"},
                 {"180012030", "alternate feature context constructor"},
                 {"1800591d0", "render phone/feature configuration loader"},
                 {"180050aa0", "render-context scalar and feature configuration copier"},
