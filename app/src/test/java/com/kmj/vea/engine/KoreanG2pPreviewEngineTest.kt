@@ -52,6 +52,53 @@ class KoreanG2pPreviewEngineTest {
     }
 
     @Test
+    fun previewsScheduledNotesWithoutChangingTheirTimingOrStoredPhonemes() {
+        val note = VsmScheduledNote(
+            trackId = "track",
+            clipId = "clip",
+            noteId = "note-1",
+            absoluteStartTick = 120L,
+            durationTicks = 480L,
+            absoluteStartSample = 50L,
+            frameOffsetInChunk = 50,
+            pitch = 60,
+            durationSamples = 100L,
+            sampleRate = 44_100,
+            lyric = "가라",
+            phoneme = ""
+        )
+        val schedule = VsmRenderSchedule(
+            sampleRate = 44_100,
+            chunkSamples = 256,
+            totalSampleCount = 512L,
+            chunks = listOf(
+                VsmInputChunk(0, 0L, 256, 256, listOf(note)),
+                VsmInputChunk(1, 256L, 256, 256, emptyList())
+            )
+        )
+
+        val previews = KoreanG2pPreviewEngine.previewSchedule(schedule, "Korean")
+
+        assertEquals(1, previews.size)
+        assertEquals("note-1", previews.single().noteId)
+        assertEquals(50L, previews.single().absoluteStartSample)
+        assertEquals(100L, previews.single().durationSamples)
+        assertEquals(44_100, previews.single().sampleRate)
+        assertEquals("가라", previews.single().lyric)
+        assertEquals(listOf("g", "a", "r", "a"), previews.single().preview.phoneLabels)
+        assertFalse(previews.single().preview.isComplete)
+        assertEquals("", schedule.chunks.first().noteStarts.single().phoneme)
+    }
+
+    @Test
+    fun refusesToUseTheKoreanPreviewForAnotherLanguage() {
+        val schedule = VsmRenderSchedule(44_100, 256, 0L, emptyList())
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            KoreanG2pPreviewEngine.previewSchedule(schedule, "Japanese")
+        }
+    }
+
+    @Test
     fun emptyAndDelimiterOnlyInputProduceAnEmptyIncompletePreview() {
         val empty = KoreanG2pPreviewEngine.preview("")
         val delimiterOnly = KoreanG2pPreviewEngine.preview(" \t\u3000\n")
