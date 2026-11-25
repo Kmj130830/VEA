@@ -50,6 +50,13 @@ class S5MegpoidMultipartOutputModulationTest {
             listOf(1f, 0f, 0f, 0f),
             table.copyGains().copyOfRange(4, 8).toList()
         )
+
+        // At position 2, both 37.5 and 137.5 are within the 158 threshold.
+        // The native rule is within-threshold OR nearest-part, not AND.
+        assertEquals(
+            listOf(1f, 1f, 0f, 0f),
+            table.copyGains().copyOfRange(8, 12).toList()
+        )
     }
 
     @Test
