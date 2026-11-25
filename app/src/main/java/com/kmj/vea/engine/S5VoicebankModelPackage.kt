@@ -123,15 +123,18 @@ data class S5VoicebankModelPackage(
         require(runtimeOptionsDescriptor.carrierFusionEnabled) {
             "Carrier fusion is disabled by the selected AI Megpoid runtime options."
         }
-        val projection = prepareCarrierFusionDenseProjection(tensorDecoder)
+        // The active carrier-fusion path uses a runtime-generated 2xK
+        // source matrix at root +0x15E. The VTB2 +0xD60 Dense projection
+        // is only the native fallback when the dynamic source path is absent.
+        val inputFeatures = 32
         val geometry = S5MegpoidCarrierFusionBufferGeometry(
-            inputFeatures = projection.inputFeatures,
+            inputFeatures = inputFeatures,
             carrierPositions = carrierPositions,
             spectrumBins = runtimeOptionsDescriptor.buildSpectrumOutputShape().complexBinCount,
             historySlotsFromRoot181 = historySlotsFromRoot181,
             historySlotsFromRoot182 = historySlotsFromRoot182
         )
-        return S5MegpoidCarrierFusionWorkspace(geometry, projection)
+        return S5MegpoidCarrierFusionWorkspace(geometry)
     }
 
     /**
