@@ -425,17 +425,27 @@ It exposes the duration scalar, optional two-flag region and category
 segment offsets for this layout. It does not populate category values or
 choose context-event ordering; those still require the recovered live
 render-context phone map and fully named descriptor construction.
-## Phone feature descriptor constructor location — 2026-11-25
 
-`Func_417eec3e` passes `param_1 + 0xD0` to `FUN_18003ab70` as the phone
-feature descriptor. A matching constructor offset is visible in the native
-initializer chain: `FUN_180013410` calls `FUN_180011680(owner + 0x08)`, and
-`FUN_180011680` calls `FUN_180013830(param_1 + 200)`. The resulting address
-is `owner + 0x08 + 0xC8 = owner + 0xD0`.
+## Correction: descriptor owner remains unresolved — 2026-11-25
 
-This makes `FUN_180013830` the concrete descriptor-construction target to
-inspect. Its decompilation and write xrefs are now included in the
-repeatable renderer-path analysis. The exact relationship between all
-export callers and this constructor owner still needs confirmation, and
-constructor defaults must not be confused with the values active after
-render-context configuration.
+The previous note incorrectly equated the `FUN_180013830` constructor
+address with the phone descriptor at `Func_417eec3e`'s `param_1 + 0xD0`.
+That calculation omitted a pointer adjustment:
+
+- `FUN_180012b40` receives `lVar7` and calls `FUN_180013410(param_1 + 6)`;
+  because `param_1` is a `uint*`, this is `lVar7 + 0x18`.
+- `FUN_180013410` calls `FUN_180011680(param_1 + 8)`, yielding
+  `lVar7 + 0x20`.
+- `FUN_180011680` calls `FUN_180013830(param_1 + 200)`, yielding
+  `lVar7 + 0xE8`.
+
+This is not `lVar7 + 0xD0`. Meanwhile `Func_417eec3e` passes its own
+`param_1 + 0xD0` to `FUN_18003ab70`; there is no proven identity between
+these two owner pointers. `FUN_180013830` also initializes a large DSP
+subobject with a 256-float generated window, not the phone descriptor fields
+at +0x10..+0x26.
+
+The earlier constructor-match claim is withdrawn. The verified field
+offsets consumed by `FUN_18006c720` remain valid, but their active values
+and actual owner construction path still need to be recovered from the
+`Func_417eec3e` caller side and its render-context setup.
