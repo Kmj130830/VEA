@@ -65,6 +65,22 @@ class PreparedMegpoidSpectralOutputSession(
         return processSpectrumFrame(spectrum)
     }
 
+    /**
+     * Uses the spectrum representation read from the selected VTB2
+     * runtime-options object. This is the preferred AI Megpoid entry point;
+     * no encoding mode is hard-coded in the output session.
+     */
+    @Synchronized
+    fun processModelOutputPlanes(
+        firstFeaturePlane: FloatArray,
+        secondFeaturePlane: FloatArray,
+        runtimeOptions: S5MegpoidRuntimeOptionsDescriptor
+    ): FloatArray = processModelOutputPlanes(
+        firstFeaturePlane = firstFeaturePlane,
+        secondFeaturePlane = secondFeaturePlane,
+        encoding = runtimeOptions.terminalSpectrumEncoding
+    )
+
     /** Clears overlap history and starts a fresh utterance-local frame count. */
     @Synchronized
     fun reset() {
