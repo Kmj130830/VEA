@@ -18,9 +18,16 @@ by `FUN_1800e6de0`. The exact lookup key is
 initializer stores false; otherwise it requires a Boolean and copies that
 value to root `+0x59`.
 
-The key is now included in the offline all-model-resource inspection.
-Its presence and value in the exact selected AI Megpoid render-options
-subtree must be verified before selecting the Android reverse path.
+The offline model-resource inspection in
+[workflow run 45590025813](https://github.com/Kmj130830/VEA/actions/runs/45590025813)
+found the key exactly once in the AI Megpoid VTB2 options object:
+
+`$.5be3f5d6495f68286523e230e2d0d9a4.154c806ba4d274fad9c7484acdc1779e.a4ba655a061e6151f80574e6088492a0.119558af50f9c8919539abd8e064b287`
+
+Its value is Boolean `true`. The same options object also contains the
+confirmed terminal-spectrum and carrier-fusion flags. Therefore AI Megpoid
+V7 selects Alternate: the native initializer writes `+0x59 = 1`, and
+`FUN_1800c7ad0` dispatches to `FUN_1800c72d0`.
 
 ## Operator contract: FUN_1800c72d0
 
@@ -116,15 +123,23 @@ For each reverse transition i=0..2, it runs Alternate[i] and then Residual
 row `2-i`. Unlike standard Banked projection, Alternate always doubles the
 position count; its output is `[M][2*N]`, not `[M][N][bank]`.
 
-The Android Alternate operator is currently a tested standalone stage,
-not yet selected by the end-to-end Megpoid sequence pipeline. Integration
-still requires:
+Android now reads the optional `119558af...` Boolean through
+`S5MegpoidRuntimeOptionsDescriptor.alternateTransitionEnabled` (missing key
+defaults to false, matching the native initializer) and maps it to
+`S5MegpoidReverseTransitionMode`. The actual AI Megpoid model reports true.
 
-1. Verify the Boolean value of the `119558af...` key in the selected model
-   configuration and map it to the active render-state branch.
-2. Confirm the raw Alternate tensor axis order against the native
-   descriptor's row-major weight interpretation.
-3. Add an Alternate-specific sequence pipeline and compare the native
-   dispatch path against a reference output.
+The model package now exposes
+`createMegpoidV7AlternateSequenceTransitionPipeline()`. It validates the
+four-by-two residual grid, derives the first Dense dimensions from the
+selected tensors, prepares all three Temporal `[32,32,3,1]` stages and all
+three Alternate `[32,32,3,1]` stages, then runs the native order:
+Residual row 3, Alternate[0]/Residual row 2, Alternate[1]/Residual row 1,
+Alternate[2]/Residual row 0. Each Alternate transition doubles the active
+position count. The sequence-pipeline test checks the required 49-position
+input boundary, residual-row call order, and final 56-position output.
 
-No end-to-end vocal render or PCM/WAV output is claimed.
+The remaining operator-level verification is the exact raw VTB2 Alternate
+weight-axis interpretation relative to the native `[M][3*C]` GEMM rows,
+followed by comparison against a reference native render. Note-to-phone
+timing and the active phone-feature descriptor are also still separate
+upstream inputs. No end-to-end vocal render or PCM/WAV output is claimed.
