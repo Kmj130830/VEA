@@ -53,6 +53,8 @@ public class ExportS5ModelRuntime extends GhidraScript {
             // Carrier Dense descriptor shape and generic model tensor attachment helpers.
             "1800bbf10", "1800c06c0", "1800d5970", "1800d4610",
             "1800beaa0",
+            // Both interpolation implementations behind the post-residual wrapper.
+            "1800c4080", "1800c39f0", "1800dc2e0",
             // Related keys guarding multi-part model interpolation data.
             "1800e0250", "1800e2cb0", "1800e2930", "1800e2af0",
             "1800e2770", "1800dfed0"
