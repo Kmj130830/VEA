@@ -35,6 +35,37 @@ non-Hangul characters not supported by the final mapper are reported as
 ignored. This preview is not equivalent to the complete Yamaha Korean G2P
 manager.
 
+## Reverse-engineering notes for the two missing stages
+
+The successful static report shows that `FUN_180007390` is not a simple
+normalizer:
+
+- It allocates a mutable UTF-16 working string and two byte arrays with
+  capacity tied to the source UTF-16 length.
+- Its first scan treats hyphen and slash as control characters. It can
+  replace source characters with Hangul filler `아` and writes flag values
+  including 1 and 2 into the parallel arrays.
+- It looks up the recovered internal syllable code for each character and
+  applies context-sensitive changes using the initial/medial/final code
+  fields.
+- Later passes validate code points, remove or rewrite spaces, turn period
+  markers into word spacing, mark hyphen positions in a separate flag array,
+  and compact duplicate/edge spaces.
+
+The next stage, `FUN_180008730`, copies the transformed string and uses the
+same internal Hangul lookup tables to inspect adjacent syllable codes. It
+rewrites consonant/vowel combinations by calling `FUN_180008660`, including
+special rules gated by the source flag array. The function is a sizeable
+ordered rule set; its numeric internal IDs should not be renamed to phoneme
+labels until the referenced tables and each branch's data flow are mapped.
+
+The existing preview intentionally does not emulate these behaviors. In
+particular, its zero-flag output must not be mistaken for a neutral/default
+Yamaha G2P result. A full port needs the mutable string plus both flag arrays
+as one state object, then separate, tested implementations of
+`FUN_180007390` and `FUN_180008730` before the existing final mapper can
+be called in production mode.
+
 ## Model-category compatibility
 
 The preview reports every phone label that maps to fallback category 13 in
