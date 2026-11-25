@@ -118,7 +118,11 @@ data class S5MegpoidMultipartOutputModulation(
  * inline roundf semantics.
  */
 enum class S5MegpoidMultipartCoordinateKernel {
-    SIMD_TABLE_TRUNCATION,
+    /** FUN_1800c4080: int32 truncation for location and turn reduction. */
+    SIMD_SSE_TABLE_TRUNCATION,
+    /** FUN_1800c39f0: vroundps with the default MXCSR nearest-even mode. */
+    SIMD_AVX_TABLE_NEAREST_EVEN,
+    /** FUN_1800c7ad0 inline fallback: roundf, half away from zero, libm trig. */
     INLINE_SCALAR_ROUNDF
 }
 
@@ -153,7 +157,7 @@ object S5MegpoidMultipartOutputModulationBuilder {
         nearestPartMaskEnabledAtRoot3405: Boolean,
         thresholdModeEnabledAtRoot3411: Boolean,
         coordinateKernel: S5MegpoidMultipartCoordinateKernel =
-            S5MegpoidMultipartCoordinateKernel.SIMD_TABLE_TRUNCATION
+            S5MegpoidMultipartCoordinateKernel.SIMD_SSE_TABLE_TRUNCATION
     ): S5MegpoidMultipartOutputModulation {
         require(partCount >= 2) { "The multipart modulation path requires at least two parts." }
         require(positionCount > 0)
@@ -200,8 +204,10 @@ object S5MegpoidMultipartOutputModulationBuilder {
                 val cycleValue =
                     (frequencyCoordinate - baseLocation) / partCount.toFloat()
                 val cycleCount = when (coordinateKernel) {
-                    S5MegpoidMultipartCoordinateKernel.SIMD_TABLE_TRUNCATION ->
+                    S5MegpoidMultipartCoordinateKernel.SIMD_SSE_TABLE_TRUNCATION ->
                         truncateCoordinateTowardsZero(cycleValue)
+                    S5MegpoidMultipartCoordinateKernel.SIMD_AVX_TABLE_NEAREST_EVEN ->
+                        roundToNearestEven(cycleValue)
                     S5MegpoidMultipartCoordinateKernel.INLINE_SCALAR_ROUNDF ->
                         roundHalfAwayFromZero(cycleValue)
                 }
@@ -242,10 +248,23 @@ object S5MegpoidMultipartOutputModulationBuilder {
 
                 if (voiced) {
                     when (coordinateKernel) {
-                        S5MegpoidMultipartCoordinateKernel.SIMD_TABLE_TRUNCATION -> {
+                        S5MegpoidMultipartCoordinateKernel.SIMD_SSE_TABLE_TRUNCATION -> {
                             val turns = thetaCenterRadians * 0.15915494f * phaseLocation
-                            rotationReal[index] = nativeTableSine(turns)
-                            rotationSine[index] = nativeTableNegativeCosine(turns)
+                            rotationReal[index] = nativeTableSine(
+                                turns, S5MegpoidMultipartCoordinateKernel.SIMD_SSE_TABLE_TRUNCATION
+                            )
+                            rotationSine[index] = nativeTableNegativeCosine(
+                                turns, S5MegpoidMultipartCoordinateKernel.SIMD_SSE_TABLE_TRUNCATION
+                            )
+                        }
+                        S5MegpoidMultipartCoordinateKernel.SIMD_AVX_TABLE_NEAREST_EVEN -> {
+                            val turns = thetaCenterRadians * 0.15915494f * phaseLocation
+                            rotationReal[index] = nativeTableSine(
+                                turns, S5MegpoidMultipartCoordinateKernel.SIMD_AVX_TABLE_NEAREST_EVEN
+                            )
+                            rotationSine[index] = nativeTableNegativeCosine(
+                                turns, S5MegpoidMultipartCoordinateKernel.SIMD_AVX_TABLE_NEAREST_EVEN
+                            )
                         }
                         S5MegpoidMultipartCoordinateKernel.INLINE_SCALAR_ROUNDF -> {
                             val phase = (thetaCenterRadians * phaseLocation) % TWO_PI
@@ -276,27 +295,45 @@ object S5MegpoidMultipartOutputModulationBuilder {
      * FUN_1800c4080 / FUN_1800c39f0 approximate sine with the same minimax
      * polynomial and quadrant reduction. Input is turns, not radians.
      */
-    private fun nativeTableSine(turns: Float): Float {
-        val fractionalTurn = turns - truncateCoordinateTowardsZero(turns)
+    private fun nativeTableSine(
+        turns: Float,
+        kernel: S5MegpoidMultipartCoordinateKernel
+    ): Float {
+        val fractionalTurn = turns - reduceToInteger(turns, kernel)
         val doubled = fractionalTurn + fractionalTurn
-        val quadrant = doubled.toInt()
-        val x = (doubled - quadrant.toFloat()) * 2.0f
+        val quadrant = reduceToInteger(doubled, kernel)
+        val x = (doubled - quadrant) * 2.0f
         val square = x * x
         val magnitude = nativeQuarterWavePolynomial(square) * x
-        return if ((quadrant and 1) == 0) magnitude else -magnitude
+        return if ((quadrant.toInt() and 1) == 0) magnitude else -magnitude
     }
 
     /** Native D4C is the negative cosine of the same phase. */
-    private fun nativeTableNegativeCosine(turns: Float): Float {
+    private fun nativeTableNegativeCosine(
+        turns: Float,
+        kernel: S5MegpoidMultipartCoordinateKernel
+    ): Float {
         val shifted = turns + 0.25f
-        val fractionalTurn = shifted - truncateCoordinateTowardsZero(shifted)
+        val fractionalTurn = shifted - reduceToInteger(shifted, kernel)
         val doubled = fractionalTurn + fractionalTurn
-        val quadrant = doubled.toInt()
-        val x = (doubled - quadrant.toFloat()) * 2.0f
+        val quadrant = reduceToInteger(doubled, kernel)
+        val x = (doubled - quadrant) * 2.0f
         val square = x * x
         val magnitude = nativeQuarterWavePolynomial(square) * x
-        val cosine = if ((quadrant and 1) == 0) magnitude else -magnitude
+        val cosine = if ((quadrant.toInt() and 1) == 0) magnitude else -magnitude
         return -cosine
+    }
+
+    private fun reduceToInteger(
+        value: Float,
+        kernel: S5MegpoidMultipartCoordinateKernel
+    ): Float = when (kernel) {
+        S5MegpoidMultipartCoordinateKernel.SIMD_SSE_TABLE_TRUNCATION ->
+            truncateCoordinateTowardsZero(value)
+        S5MegpoidMultipartCoordinateKernel.SIMD_AVX_TABLE_NEAREST_EVEN ->
+            roundToNearestEven(value)
+        S5MegpoidMultipartCoordinateKernel.INLINE_SCALAR_ROUNDF ->
+            roundHalfAwayFromZero(value)
     }
 
     private fun nativeQuarterWavePolynomial(square: Float): Float {
@@ -314,6 +351,15 @@ object S5MegpoidMultipartOutputModulationBuilder {
             "Multipart cycle coordinate cannot be narrowed to the native int32 field."
         }
         return value.toInt().toFloat()
+    }
+
+    /** MXCSR default rounding: nearest integer, halfway cases to even. */
+    private fun roundToNearestEven(value: Float): Float {
+        require(value.isFinite() && value >= Int.MIN_VALUE.toFloat() &&
+            value <= Int.MAX_VALUE.toFloat()) {
+            "Multipart coordinate cannot be rounded to the native int32 range."
+        }
+        return Math.rint(value.toDouble()).toFloat()
     }
 
     /** C/C++ roundf semantics: nearest integer, half values away from zero. */
