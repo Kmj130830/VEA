@@ -27,11 +27,18 @@ class S5ApiPhoneCategoryMapTest {
             val labels = S5ApiPhoneCategoryMap.labelsInCategory(categoryIndex)
             assertEquals("category=$categoryIndex", expectedSize, labels.size)
             labels.forEach { label ->
-                // FUN_180074a50 has four explicit case-sensitive overrides:
-                // "Sil" and "SIL" are stored in group 0 but return ID 1.
-                val expectedIndex = if (categoryIndex == 0 && label != "sil") 1 else categoryIndex
+                // The native resolver canonicalizes aliases before looking up
+                // the numeric group. Some original group-2 spellings therefore
+                // resolve to the canonical glide group (for example yE_r+1 -> y).
+                val canonical = VsmPhoneLabelCanonicalizer.canonicalize(label)
+                val expectedIndex = when (canonical) {
+                    "SIL", "Sil", "Br", "BR" -> 1
+                    else -> (0 until S5ApiPhoneCategoryMap.FALLBACK_CATEGORY_INDEX)
+                        .firstOrNull { canonical in S5ApiPhoneCategoryMap.labelsInCategory(it) }
+                        ?: S5ApiPhoneCategoryMap.FALLBACK_CATEGORY_INDEX
+                }
                 assertEquals(
-                    "label=$label nativeGroup=$categoryIndex",
+                    "label=$label nativeGroup=$categoryIndex canonical=$canonical",
                     expectedIndex,
                     S5ApiPhoneCategoryMap.resolve(label)
                 )
