@@ -195,8 +195,8 @@ class S5MegpoidCarrierFusionWorkspaceTest {
         assertArrayEquals(
             floatArrayOf(
                 0f, 0f, 0f, 0f,
-                1f, 2f, 3f, 4f,
-                0f, 0f, 0f, 0f
+                0f, 0f, 0f, 0f,
+                1f, 2f, 3f, 4f
             ),
             workspace.copyHistoryOldestToNewest(),
             0f
