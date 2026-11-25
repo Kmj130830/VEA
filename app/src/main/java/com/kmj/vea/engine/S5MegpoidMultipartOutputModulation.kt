@@ -241,9 +241,18 @@ object S5MegpoidMultipartOutputModulationBuilder {
                 }
 
                 if (voiced) {
-                    val phase = (thetaCenterRadians * phaseLocation) % TWO_PI
-                    rotationReal[index] = cos(phase - HALF_PI)
-                    rotationSine[index] = sin(phase - HALF_PI)
+                    when (coordinateKernel) {
+                        S5MegpoidMultipartCoordinateKernel.SIMD_TABLE_TRUNCATION -> {
+                            val turns = thetaCenterRadians * 0.15915494f * phaseLocation
+                            rotationReal[index] = nativeTableSine(turns)
+                            rotationSine[index] = nativeTableNegativeCosine(turns)
+                        }
+                        S5MegpoidMultipartCoordinateKernel.INLINE_SCALAR_ROUNDF -> {
+                            val phase = (thetaCenterRadians * phaseLocation) % TWO_PI
+                            rotationReal[index] = cos(phase - HALF_PI)
+                            rotationSine[index] = sin(phase - HALF_PI)
+                        }
+                    }
                 } else {
                     // The native unvoiced branch uses identity rotation.
                     rotationReal[index] = 1f
@@ -261,6 +270,41 @@ object S5MegpoidMultipartOutputModulationBuilder {
             rotationReal = rotationReal,
             nativeRotationSine = rotationSine
         )
+    }
+
+    /**
+     * FUN_1800c4080 / FUN_1800c39f0 approximate sine with the same minimax
+     * polynomial and quadrant reduction. Input is turns, not radians.
+     */
+    private fun nativeTableSine(turns: Float): Float {
+        val fractionalTurn = turns - truncateCoordinateTowardsZero(turns)
+        val doubled = fractionalTurn + fractionalTurn
+        val quadrant = doubled.toInt()
+        val x = (doubled - quadrant.toFloat()) * 2.0f
+        val square = x * x
+        val magnitude = nativeQuarterWavePolynomial(square) * x
+        return if ((quadrant and 1) == 0) magnitude else -magnitude
+    }
+
+    /** Native D4C is the negative cosine of the same phase. */
+    private fun nativeTableNegativeCosine(turns: Float): Float {
+        val shifted = turns + 0.25f
+        val fractionalTurn = shifted - truncateCoordinateTowardsZero(shifted)
+        val doubled = fractionalTurn + fractionalTurn
+        val quadrant = doubled.toInt()
+        val x = (doubled - quadrant.toFloat()) * 2.0f
+        val square = x * x
+        val magnitude = nativeQuarterWavePolynomial(square) * x
+        val cosine = if ((quadrant and 1) == 0) magnitude else -magnitude
+        return -cosine
+    }
+
+    private fun nativeQuarterWavePolynomial(square: Float): Float {
+        var value = square * 0.00016044118f + -0.004681754f
+        value = value * square + 0.079692625f
+        value = value * square + -0.6459641f
+        value = value * square + 1.5707964f
+        return value
     }
 
     /** The native 4-lane table path explicitly converts the quotient to int32. */
