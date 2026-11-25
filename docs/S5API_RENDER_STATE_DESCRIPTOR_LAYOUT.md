@@ -123,8 +123,9 @@ The output-feature buffer contains two contiguous float32 planes, each with
 `param[2]` values. The function converts them to `param[2]` interleaved
 complex bins and passes the result to `FUN_18012c740` together with the
 descriptor at root `+0x20`. The selector at root `+0x48` chooses between
-direct real/imaginary planes and log-magnitude/phase planes. Its active
-AI Megpoid value has not yet been linked to a specific runtime-option key.
+direct real/imaginary planes and log-magnitude/phase planes. Its key is
+`d22b2750ccebc1459f7a9d9ea7186bbf` from `FUN_1800e6c20()`; the supplied
+AI Megpoid VTB2 contains boolean `true`, selecting log-magnitude/phase.
 
 For the supplied AI Megpoid runtime options, `param[2] = 513`, so the
 terminal output contains 513 complex bins / 1,026 float32 values. The
