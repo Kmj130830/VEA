@@ -43,8 +43,8 @@ CONFIG_KEYS = {
 RENDER_OPTION_KEYS = {
     "terminal_spectrum_log_magnitude_phase": "d22b2750ccebc1459f7a9d9ea7186bbf",
     "carrier_fusion_enabled": "66bfcc4a31ba796aca88c5eae36870fc",
-    "carrier_dense_weights": "0128c19d610695f96c546cb8e04839fd",
-    "carrier_dense_bias": "61ef9b49f8fe353fe0d586220366ce92",
+    "carrier_dense_weights": "61ef9b49f8fe353fe0d586220366ce92",
+    "carrier_dense_bias": "0128c19d610695f96c546cb8e04839fd",
 }
 
 
