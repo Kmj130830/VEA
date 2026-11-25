@@ -24,20 +24,22 @@ branch using root flag `param_1[0xd01]` (byte position `+0x3404`). The
 multi-part branch also reads `param_1[0xd00]` (root `+0x3400`) as a loop
 count and only enters its multi-part body when the count is at least two.
 
-The ordinary path performs a further global feature normalization and dense
-projection through descriptors at root `+0x310` and `+0x338`
-(`param_1 + 0xc4` and `param_1 + 0xce`, expressed as 32-bit-word indices):
+The non-multi-part fallback path performs a further global feature
+normalization and dense projection through descriptors at root `+0x310`
+and `+0x338` (`param_1 + 0xc4` and `param_1 + 0xce`, expressed as
+32-bit-word indices):
 
 - `FUN_1800c7920(param_1 + 0xc4, inputFeatureBuffer)`
 - `FUN_1800c5260(param_1 + 0xce, normalizedFeatureBuffer, outputFeatureBuffer)`
 
-These are additional output-head operators, distinct from the first
-pre-residual Dense/normalization descriptors at root `+0x1F8` and
-`+0x228`. Their model-property keys, dimensions, and weight provenance
-have not yet been mapped. The debug-dump branch for render modes 10 and 11
-calls the same operators directly while writing intermediate buffers to
-the optional trace file; those debug modes must not be mistaken for separate
-model architecture.
+These are additional operators, distinct from the first pre-residual
+Dense/normalization descriptors at root `+0x1F8` and `+0x228`. Their
+model-property keys, dimensions, and weight provenance have not yet been
+mapped. This fallback branch is not the same as the selected D01 multi-part
+branch used by the current AI Megpoid options. The debug-dump branch for
+render modes 10 and 11 calls the same operators directly while writing
+intermediate buffers to the optional trace file; those debug modes must not
+be mistaken for separate model architecture.
 
 ### AI Megpoid branch selection from the installed VTB2 options
 
@@ -66,7 +68,32 @@ fallback and integer overflow rejection. The per-part projection,
 interpolation, carrier-history and final reduction kernels are still not
 wired to VTB2 tensors.
 
-## 2. Multi-part feature/modulation branch
+## 2. Independent carrier-fusion selector
+
+The model loader separately reads another boolean option through
+`FUN_1800dfb50()` and stores it at root byte `+0x3559`. The forward
+renderer checks this byte independently of the D00/D01 multi-part selector.
+When enabled, it prepares an additional carrier-fusion path; this path
+allocates per-frame carrier history at root words `+0xD80` and a second
+feature buffer at root word `+0xD74`, with auxiliary dimensions/cursors at
+`+0xD7C` and `+0xD7E`.
+
+When the carrier-fusion path is enabled, the configuration loader constructs
+a separate Dense descriptor at root word `+0xD60` (byte offset `+0x3580`)
+using the shared VTB2 matrix descriptor factory. The forward path also
+contains a fallback sub-branch that copies the current feature tensor,
+applies the global normalizer at word `+0xC4`, and projects with that
+`+0xD60` Dense descriptor. In the active carrier-fusion sub-branch, the
+renderer instead builds a carrier-conditioned two-feature input, projects
+and combines the output over retained carrier frames, then mixes the result
+with the complex per-part output.
+
+The carrier selector is therefore not implied by D00/D01. VEA must resolve
+the `FUN_1800dfb50()` property key separately and check whether it exists in
+the selected AI Megpoid VTB2 tree before choosing whether to build the
+carrier Dense descriptor or allocate carrier-history workspaces. This also
+decides whether the optional `+0xD60` Dense branch is active.
+## 3. Multi-part feature/modulation branch
 
 When root `+0x3404` is enabled and the count at root `+0x3400` is at least
 two, the function prepares per-part interpolation/control buffers from the
@@ -87,7 +114,7 @@ sources are reserved for a focused trace of `FUN_1800c3930`,
 `FUN_1800d52b0` and `FUN_1800d5610`. VEA's current Android pipeline does
 not implement this multi-part or carrier-mix branch.
 
-## 3. Terminal two-plane to complex-spectrum conversion
+## 4. Terminal two-plane to complex-spectrum conversion
 
 Immediately before the inverse-FFT/output-transform call, the function reads
 two contiguous real feature planes from the output feature buffer. Each
@@ -128,7 +155,7 @@ is the selected default for this path. Android's
 log-magnitude/phase mode remains available for other render-state paths that
 may set the selector differently.
 
-## 4. Inverse transform and output block
+## 5. Inverse transform and output block
 
 The resulting interleaved spectrum is passed with the output-transform
 descriptor pointer at root `+0x20` to:
@@ -157,7 +184,7 @@ from the helper and matched to the installed AI Megpoid VTB2 tree. The two
 modes are operator implementations, not a claim that the full neural graph
 has generated those feature planes.
 
-## 5. Remaining output-head work
+## 6. Remaining output-head work
 
 1. Recover the hashed boolean option returned by `FUN_1800e6c20()` and identify its value in AI Megpoid VTB2; this controls root `+0x48` direct-complex versus log-magnitude/phase encoding.
 2. Map the second global-normalization and dense descriptors at root `+0x310` and `+0x338` to VTB2 keys and active dimensions.
