@@ -425,3 +425,17 @@ It exposes the duration scalar, optional two-flag region and category
 segment offsets for this layout. It does not populate category values or
 choose context-event ordering; those still require the recovered live
 render-context phone map and fully named descriptor construction.
+## Phone feature descriptor constructor location — 2026-11-25
+
+`Func_417eec3e` passes `param_1 + 0xD0` to `FUN_18003ab70` as the phone
+feature descriptor. A matching constructor offset is visible in the native
+initializer chain: `FUN_180013410` calls `FUN_180011680(owner + 0x08)`, and
+`FUN_180011680` calls `FUN_180013830(param_1 + 200)`. The resulting address
+is `owner + 0x08 + 0xC8 = owner + 0xD0`.
+
+This makes `FUN_180013830` the concrete descriptor-construction target to
+inspect. Its decompilation and write xrefs are now included in the
+repeatable renderer-path analysis. The exact relationship between all
+export callers and this constructor owner still needs confirmation, and
+constructor defaults must not be confused with the values active after
+render-context configuration.
