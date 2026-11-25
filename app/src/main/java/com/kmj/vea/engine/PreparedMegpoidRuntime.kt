@@ -124,6 +124,20 @@ data class PreparedMegpoidRuntime(
     val carrierFusionEnabled: Boolean
         get() = runtimeOptions.carrierFusionEnabled
 
+    /** True only when the native non-multi-part Dense fallback branch is selected. */
+    val postResidualFallbackHeadActive: Boolean
+        get() = !runtimeOptions.usesMultiPartOutputHead
+
+    /** Builds the non-multi-part fallback output head only when its native branch is selected. */
+    fun preparePostResidualFallbackStage(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidPostResidualFallbackStage {
+        check(postResidualFallbackHeadActive) {
+            "The loaded Megpoid options select the multi-part output head, not the fallback Dense head."
+        }
+        return modelPackage.preparePostResidualFallbackStage(tensorDecoder)
+    }
+
     /** Exact optional carrier tensor references; null when this voicebank disables carrier fusion. */
     val carrierFusionTensorIndex: S5MegpoidCarrierFusionTensorIndex?
         get() = modelPackage.carrierFusionTensorIndex
