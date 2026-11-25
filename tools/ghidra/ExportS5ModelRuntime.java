@@ -49,6 +49,9 @@ public class ExportS5ModelRuntime extends GhidraScript {
             "1800c3930", "1800d52b0", "1800d5610",
             "1800cea30", "1800ceba0", "1800c7920",
             "1800c3740", "18012c740",
+            // The Boolean model property written to render-context +0x59 selects
+            // standard Banked (+0) versus Alternate (+nonzero) transitions.
+            "1800e6de0", "1800dc260", "1800c0960", "1800b6d40",
             // Model-option key getters for output representation and carrier-fuse selectors.
             "1800e6c20", "1800dfb50",
             // Optional carrier-fusion Dense weight and bias key getters.
