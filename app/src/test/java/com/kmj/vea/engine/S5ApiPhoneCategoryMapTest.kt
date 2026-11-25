@@ -19,6 +19,27 @@ class S5ApiPhoneCategoryMapTest {
     }
 
     @Test
+    fun everyStaticCategoryMemberResolvesToItsNativeGroupOrdinal() {
+        val expectedGroupSizes = listOf(3, 3, 76, 6, 7, 4, 2, 19, 4, 8, 9, 8, 1, 1)
+        assertEquals(S5ApiPhoneCategoryMap.CATEGORY_COUNT, expectedGroupSizes.size)
+
+        expectedGroupSizes.forEachIndexed { categoryIndex, expectedSize ->
+            val labels = S5ApiPhoneCategoryMap.labelsInCategory(categoryIndex)
+            assertEquals("category=$categoryIndex", expectedSize, labels.size)
+            labels.forEach { label ->
+                // FUN_180074a50 has four explicit case-sensitive overrides:
+                // "Sil" and "SIL" are stored in group 0 but return ID 1.
+                val expectedIndex = if (categoryIndex == 0 && label != "sil") 1 else categoryIndex
+                assertEquals(
+                    "label=$label nativeGroup=$categoryIndex",
+                    expectedIndex,
+                    S5ApiPhoneCategoryMap.resolve(label)
+                )
+            }
+        }
+    }
+
+    @Test
     fun preservesCaseSensitiveOverrides() {
         assertEquals(0, S5ApiPhoneCategoryMap.resolve("sil"))
         listOf("SIL", "Sil", "Br", "BR", "br").forEach { label ->
