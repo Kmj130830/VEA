@@ -222,3 +222,27 @@ package but is not used for that configuration.
 - The second post-residual Dense/global-normalization head and full multi-part/carrier processing remain unresolved. The active spectrum-encoding and carrier-fusion options are read from VTB2. The optional fallback carrier Dense tensor objects and their 2×32 descriptor are indexed separately from the active runtime-generated source matrix. Carrier source/control preparation, four-part interpolation scheduling and the verified PCM/WAV contract remain incomplete.
 
 Consequently, SynthesisEngine.render() does not emit placeholder WAV data and EngineStatus remains unavailable until the full path has been implemented and verified on Android ARM64.
+
+## Actual Megpoid sequence-transition tensors and branch selection
+
+The selected AI Megpoid V7 VTB2 subtree contains three per-sequence
+Alternate transition weight/bias pairs at indices 0..2. Each weight is
+3,072 F32 with native metadata `[32,32,3,1]`; each bias has 32 F32
+values with metadata `[32]`. The same three indices are populated for
+Temporal weights/biases. The standard Banked-linear weight and bias
+factories are absent from this selected Megpoid model subtree.
+
+The native dispatcher does not decide by tensor presence. It checks the
+render-context byte at `+0x59`: zero invokes standard
+`FUN_1800c6390`; nonzero invokes Alternate `FUN_1800c72d0`.
+The active value of that byte still needs to be traced, so the Android
+runtime must not assume the branch from the model inventory alone.
+
+The sequence tensor index now retains and validates every native shape
+metadata array instead of storing only the flattened element count. The
+three Alternate matrices and biases can therefore be selected by their
+exact four-axis shapes, while the standard Banked adapter remains separate.
+The Ghidra model-runtime pass explicitly decompiles both transition
+operators next; the Alternate operator is not executed in Android until
+its matrix layout, temporal addressing, padding and output shape are
+confirmed.
