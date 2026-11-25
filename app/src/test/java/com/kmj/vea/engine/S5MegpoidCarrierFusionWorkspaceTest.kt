@@ -1,0 +1,184 @@
+package com.kmj.vea.engine
+
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
+import org.junit.Test
+
+class S5MegpoidCarrierFusionWorkspaceTest {
+    private fun projection(): S5MegpoidDenseProjection {
+        val weights = FloatArray(2 * 32)
+        weights[0] = 1f
+        weights[32 + 1] = 1f
+        return S5MegpoidDenseProjection(
+            inputFeatures = 32,
+            outputFeatures = 2,
+            weights = weights,
+            bias = floatArrayOf(0.5f, -0.5f)
+        )
+    }
+
+    @Test
+    fun derivesNativeCarrierDenseAndHistoryBufferLengths() {
+        val geometry = S5MegpoidCarrierFusionBufferGeometry(
+            inputFeatures = 32,
+            carrierPositions = 7,
+            spectrumBins = 513,
+            historySlotsFromRoot181 = 2,
+            historySlotsFromRoot182 = 1
+        )
+
+        assertEquals(4, geometry.historySlotCount)
+        assertEquals(224, geometry.denseInputElementCount)
+        assertEquals(14, geometry.denseOutputElementCount)
+        assertEquals(64, geometry.carrierSourceVectorElementCount)
+        assertEquals(1026, geometry.currentCarrierFrameElementCount)
+        assertEquals(1026, geometry.carrierHistoryFrameStride)
+        assertEquals(4104, geometry.carrierRingElementCount)
+        assertEquals(2, geometry.carrierAccumulationVectorElementCount)
+    }
+
+    @Test
+    fun projectsNormalizedFeatureMajorCarrierInputToTwoRows() {
+        val geometry = S5MegpoidCarrierFusionBufferGeometry(
+            inputFeatures = 32,
+            carrierPositions = 2,
+            spectrumBins = 4,
+            historySlotsFromRoot181 = 1,
+            historySlotsFromRoot182 = 1
+        )
+        val workspace = S5MegpoidCarrierFusionWorkspace(geometry, projection())
+        val input = FloatArray(32 * 2)
+        input[0] = 1f
+        input[1] = 2f
+        input[2] = 3f
+        input[3] = 4f
+
+        val output = workspace.projectNormalizedCarrierFeatures(
+            inputFeatureMajor = input,
+            gemm = ReferenceS5MegpoidGemmKernel
+        )
+
+        assertArrayEquals(floatArrayOf(1.5f, 2.5f, 2.5f, 3.5f), output, 0.00001f)
+        assertArrayEquals(input, workspace.denseInputFeatureMajor, 0f)
+        assertArrayEquals(output, workspace.denseOutputFeatureMajor, 0f)
+    }
+
+    @Test
+    fun storesCarrierSpectrumFramesInNativeCircularRingOrder() {
+        val geometry = S5MegpoidCarrierFusionBufferGeometry(
+            inputFeatures = 32,
+            carrierPositions = 1,
+            spectrumBins = 2,
+            historySlotsFromRoot181 = 1,
+            historySlotsFromRoot182 = 1
+        )
+        val workspace = S5MegpoidCarrierFusionWorkspace(geometry, projection())
+
+        assertEquals(0, workspace.appendCarrierSpectrumFrame(floatArrayOf(1f, 2f, 3f, 4f)))
+        assertEquals(1, workspace.appendCarrierSpectrumFrame(floatArrayOf(5f, 6f, 7f, 8f)))
+        assertEquals(2, workspace.appendCarrierSpectrumFrame(floatArrayOf(9f, 10f, 11f, 12f)))
+        assertEquals(0, workspace.appendCarrierSpectrumFrame(floatArrayOf(13f, 14f, 15f, 16f)))
+
+        assertEquals(1, workspace.nextHistoryWriteIndex)
+        assertEquals(3L, workspace.historyFramesWritten)
+        assertArrayEquals(
+            floatArrayOf(
+                5f, 6f, 7f, 8f,
+                9f, 10f, 11f, 12f,
+                13f, 14f, 15f, 16f
+            ),
+            workspace.copyHistoryOldestToNewest(),
+            0f
+        )
+        assertArrayEquals(
+            floatArrayOf(13f, 14f, 15f, 16f),
+            workspace.copyMostRecentCarrierFrame(),
+            0f
+        )
+    }
+
+    @Test
+    fun unwrittenHistorySlotsRemainZeroAndResetClearsTheRing() {
+        val geometry = S5MegpoidCarrierFusionBufferGeometry(
+            inputFeatures = 32,
+            carrierPositions = 1,
+            spectrumBins = 2,
+            historySlotsFromRoot181 = 1,
+            historySlotsFromRoot182 = 1
+        )
+        val workspace = S5MegpoidCarrierFusionWorkspace(geometry, projection())
+
+        workspace.appendCarrierSpectrumFrame(floatArrayOf(1f, 2f, 3f, 4f))
+        assertArrayEquals(
+            floatArrayOf(
+                0f, 0f, 0f, 0f,
+                1f, 2f, 3f, 4f,
+                0f, 0f, 0f, 0f
+            ),
+            workspace.copyHistoryOldestToNewest(),
+            0f
+        )
+
+        workspace.resetHistory()
+        assertEquals(0, workspace.nextHistoryWriteIndex)
+        assertEquals(0L, workspace.historyFramesWritten)
+        assertArrayEquals(FloatArray(12), workspace.copyHistoryOldestToNewest(), 0f)
+        assertArrayEquals(FloatArray(4), workspace.copyMostRecentCarrierFrame(), 0f)
+    }
+
+    @Test
+    fun rejectsWrongDenseAndSpectrumShapes() {
+        val geometry = S5MegpoidCarrierFusionBufferGeometry(
+            inputFeatures = 32,
+            carrierPositions = 2,
+            spectrumBins = 2,
+            historySlotsFromRoot181 = 1,
+            historySlotsFromRoot182 = 0
+        )
+        val workspace = S5MegpoidCarrierFusionWorkspace(geometry, projection())
+
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.projectNormalizedCarrierFeatures(FloatArray(31 * 2))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.appendCarrierSpectrumFrame(FloatArray(3))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            workspace.appendCarrierSpectrumFrame(floatArrayOf(0f, 0f, Float.NaN, 0f))
+        }
+    }
+
+    @Test
+    fun rejectsInvalidHistoryDimensionsAndDenseProjectionMismatch() {
+        assertThrows(IllegalArgumentException::class.java) {
+            S5MegpoidCarrierFusionBufferGeometry(
+                inputFeatures = 32,
+                carrierPositions = 1,
+                spectrumBins = 0,
+                historySlotsFromRoot181 = 0,
+                historySlotsFromRoot182 = 0
+            )
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            S5MegpoidCarrierFusionBufferGeometry(
+                inputFeatures = 32,
+                carrierPositions = 1,
+                spectrumBins = 1,
+                historySlotsFromRoot181 = -1,
+                historySlotsFromRoot182 = 0
+            )
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            S5MegpoidCarrierFusionWorkspace(
+                geometry = S5MegpoidCarrierFusionBufferGeometry(32, 1, 1, 0, 0),
+                carrierDenseProjection = S5MegpoidDenseProjection(
+                    inputFeatures = 16,
+                    outputFeatures = 2,
+                    weights = FloatArray(32),
+                    bias = FloatArray(2)
+                )
+            )
+        }
+    }
+}
