@@ -55,6 +55,11 @@ public class ExportS5ModelRuntime extends GhidraScript {
             "1800beaa0",
             // Both interpolation implementations behind the post-residual wrapper.
             "1800c4080", "1800c39f0", "1800dc2e0",
+            // Carrier fallback normalizer and second output-head tensor keys.
+            "1800e9900", "1800e9ac0", "1800e9c80", "1800e9e40",
+            // Carrier input transforms, feature copy and GEMM helpers.
+            "1800c7920", "1800c5260", "1800c3740", "1800df720",
+            "1800dc260", "1800c0960",
             // Related keys guarding multi-part model interpolation data.
             "1800e0250", "1800e2cb0", "1800e2930", "1800e2af0",
             "1800e2770", "1800dfed0"
