@@ -13,6 +13,8 @@ data class KoreanG2pPreviewToken(
     val lexicalForm: String,
     val syllablePhoneGroups: List<String>,
     val phoneLabels: List<String>,
+    /** Labels routed to fallback by the currently recovered S5API static category table. */
+    val categoryFallbackLabels: List<String>,
     val ignoredCharacters: List<Char>,
     val containsUnresolvedHyphen: Boolean
 )
@@ -125,6 +127,11 @@ object KoreanG2pPreviewEngine {
                 lexicalForm = lexical,
                 syllablePhoneGroups = groups,
                 phoneLabels = labels,
+                categoryFallbackLabels = labels.filter { label ->
+                    S5ApiPhoneCategoryMap.resolve(label) ==
+                        S5ApiPhoneCategoryMap.FALLBACK_CATEGORY_INDEX &&
+                        VsmPhoneLabelCanonicalizer.canonicalize(label) != "junk"
+                }.distinct(),
                 ignoredCharacters = ignored,
                 containsUnresolvedHyphen = '-' in lexical
             )
