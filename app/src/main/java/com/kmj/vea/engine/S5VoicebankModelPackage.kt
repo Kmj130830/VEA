@@ -77,6 +77,29 @@ data class S5VoicebankModelPackage(
         S5MegpoidPreResidualTensorIndex.build(residualRuntimeConfigTree)
     }
 
+    /**
+     * Optional carrier Dense tensors. AI Megpoid V7's selected runtime
+     * options enable carrier fusion, so its exact two model tensor records
+     * are indexed from the selected residual configuration subtree.
+     *
+     * The references retain native metadata/data pairs; they are not yet
+     * reinterpreted as a conventional Dense matrix.
+     */
+    val carrierFusionTensorIndex: S5MegpoidCarrierFusionTensorIndex? by lazy(
+        LazyThreadSafetyMode.PUBLICATION
+    ) {
+        if (runtimeOptionsDescriptor.carrierFusionEnabled) {
+            S5MegpoidCarrierFusionTensorIndex.build(residualRuntimeConfigTree)
+        } else {
+            null
+        }
+    }
+
+    fun requireCarrierFusionTensorIndex(): S5MegpoidCarrierFusionTensorIndex =
+        carrierFusionTensorIndex ?: throw IllegalStateException(
+            "Carrier fusion is disabled in the selected AI Megpoid runtime options."
+        )
+
     /** Exact sequence-indexed Temporal/Banked factory tables populated by FUN_1800ced10. */
     val sequenceOperatorTensorIndex: S5MegpoidSequenceOperatorTensorIndex by lazy(
         LazyThreadSafetyMode.PUBLICATION
