@@ -60,15 +60,40 @@ class S5MegpoidMultipartOutputModulationTest {
     }
 
     @Test
-    fun alternateThresholdModeUsesTheFrequencyWindowWhenItsFlagIsClear() {
+    fun clearThresholdModeFlagUsesTheMaximumOfTheTwoNativeThresholdCandidates() {
         val table = build(thresholdMode = false)
         val gains = table.copyGains()
 
-        // threshold = min(truncate(133.34) + 25, max(F0, 1e-5) - 2*31.25)
-        //             = min(158, 37.5) = 37.5
-        assertEquals(listOf(0f, 0f, 0f, 0f), gains.copyOfRange(0, 4).toList())
-        assertEquals(listOf(0f, 0f, 0f, 0f), gains.copyOfRange(4, 8).toList())
-        assertEquals(listOf(1f, 0f, 0f, 0f), gains.copyOfRange(8, 12).toList())
+        // threshold = max(F0 - 2*31.25, truncate(133.34) + 25)
+        //             = max(37.5, 158) = 158
+        assertEquals(listOf(1f, 0f, 0f, 0f), gains.copyOfRange(0, 4).toList())
+        assertEquals(listOf(1f, 0f, 0f, 0f), gains.copyOfRange(4, 8).toList())
+        assertEquals(listOf(1f, 1f, 0f, 0f), gains.copyOfRange(8, 12).toList())
+    }
+
+    @Test
+    fun clearThresholdModeFlagCanExtendTheGateBeyondTheConfiguredDistanceSum() {
+        val table = S5MegpoidMultipartOutputModulationBuilder.build(
+            partCount = 4,
+            positionCount = 35,
+            frequencyStep = 31.25f,
+            fundamentalFrequencyHz = 500f,
+            thetaCenterRadians = 0.5f,
+            maximumDistanceParameter = 133.34f,
+            distanceExtensionParameter = 25f,
+            extendedThresholdMode = true,
+            nearestPartMaskEnabledAtRoot3405 = true,
+            thresholdModeEnabledAtRoot3411 = false
+        )
+        val gains = table.copyGains()
+
+        // At position 34 the four distances are 562.5, 62.5, 437.5, 937.5.
+        // Native threshold is max(500 - 62.5, 133 + 25) = 437.5:
+        // part 2 is nearest, and part 3 is also active exactly on the threshold.
+        assertEquals(
+            listOf(0f, 1f, 1f, 0f),
+            gains.copyOfRange(34 * 4, 35 * 4).toList()
+        )
     }
 
     @Test
