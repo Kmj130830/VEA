@@ -76,6 +76,29 @@ A separate Korean method traverses note entries for phoneme normalization/consis
 
 See `docs/G2P_STATIC_FINDINGS.md` for evidence and method-specific details.
 
+## New Korean call-chain recovery
+
+The latest focused Ghidra pass now explicitly decompiles the internal Korean
+functions that were missing from the earlier export/call-closure report.
+The top-level Korean converter is confirmed to call lexical replacement,
+per-code-unit lyric preprocessing, context-dependent Hangul conversion,
+and final syllable-to-phone output in this order:
+`FUN_180007210` → `FUN_180007390` → `FUN_180008730` →
+`FUN_180007f80`.
+
+The new report also confirms that the note-manager layer calls this
+converter from `FUN_1800063c0`, while the manager-facing
+`FUN_180001350` first tokenizes and splits lyric input before updating
+the note/syllable containers. These layers must be ported separately from
+the syllable-to-phone table.
+
+The Android code now adds the reverse half of `FUN_180008660`: vendor
+16-bit syllable code to Unicode Hangul. Together with the existing forward
+mapping, every one of the 11,172 precomposed Hangul syllables can be
+round-tripped through the sparse vendor onset/medial/coda index scheme.
+The two preceding Korean string/phonological transformations remain
+unported, so this does not enable Korean G2P.
+
 ## Android native bridge status
 
 The repository now builds `libveag2p.so` for `arm64-v8a` using NDK 27.2.12479018 and CMake 3.22.1.
