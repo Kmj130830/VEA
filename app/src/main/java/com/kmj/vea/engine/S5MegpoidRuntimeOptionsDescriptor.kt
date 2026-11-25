@@ -28,7 +28,9 @@ data class S5MegpoidRuntimeOptionsDescriptor(
     val terminalSpectrumLogMagnitudePhase: Boolean,
     val carrierFusionEnabled: Boolean,
     /** Native render-root byte +0x59: true selects FUN_1800c72d0 Alternate. */
-    val alternateTransitionEnabled: Boolean
+    val alternateTransitionEnabled: Boolean,
+    /** Native render-root byte +0x3411, optional and false when absent. */
+    val multipartThresholdModeEnabled: Boolean
 ) {
     init {
         require(param5 > 0) { "Native param[5] sequence-slot count must be positive." }
@@ -108,7 +110,7 @@ data class S5MegpoidRuntimeOptionsDescriptor(
         fundamentalFrequencyHz: Float,
         thetaCenterRadians: Float,
         nearestPartMaskEnabledAtRoot3405: Boolean,
-        thresholdModeEnabledAtRoot3411: Boolean
+        thresholdModeEnabledAtRoot3411: Boolean = multipartThresholdModeEnabled
     ): S5MegpoidMultipartOutputModulation {
         require(usesMultiPartOutputHead) {
             "The active model options do not select the multipart output head."
@@ -248,7 +250,9 @@ data class S5MegpoidRuntimeOptionsDescriptor(
                 carrierFusionEnabled =
                     boolean(S5MegpoidRuntimeOptionKeys.CARRIER_FUSION_ENABLED),
                 alternateTransitionEnabled =
-                    optionalBoolean(S5MegpoidRuntimeOptionKeys.ALTERNATE_TRANSITION_ENABLED)
+                    optionalBoolean(S5MegpoidRuntimeOptionKeys.ALTERNATE_TRANSITION_ENABLED),
+                multipartThresholdModeEnabled =
+                    optionalBoolean(S5MegpoidRuntimeOptionKeys.MULTIPART_THRESHOLD_MODE_ENABLED)
             )
         }
     }
@@ -284,6 +288,8 @@ object S5MegpoidRuntimeOptionKeys {
     const val CARRIER_FUSION_ENABLED = "66bfcc4a31ba796aca88c5eae36870fc"
     /** FUN_1800e6de0 -> render-root byte +0x59: false=Banked, true=Alternate. */
     const val ALTERNATE_TRANSITION_ENABLED = "119558af50f9c8919539abd8e064b287"
+    /** FUN_1800e2770 -> render-root byte +0x3411: optional, absent=false. */
+    const val MULTIPART_THRESHOLD_MODE_ENABLED = "ef12c1f702abd89b2e1f07a126cc5411"
 }
 
 /**
