@@ -2,7 +2,6 @@ package com.kmj.vea.engine
 
 import kotlin.math.PI
 import kotlin.math.ln
-import kotlin.math.sqrt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
