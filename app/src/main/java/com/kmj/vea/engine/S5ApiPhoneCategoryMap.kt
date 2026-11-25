@@ -1,6 +1,14 @@
 package com.kmj.vea.engine
 
-/** Static phone groups recovered from FUN_180003a90 / FUN_18006c520. */
+/**
+ * Static phone groups recovered from FUN_180003a90 / FUN_18006c520.
+ *
+ * These list positions are the native numeric IDs, not a guessed ordering:
+ * FUN_180003a90 builds the 14-entry group vector in this exact order,
+ * FUN_1800111c0 copies it to DAT_1801c4160, and FUN_18006c520 iterates the
+ * outer group index and writes that index to each label node at +0x40.
+ * FUN_180074a50 then reads the stored uint32 index from the context-map value.
+ */
 object S5ApiPhoneCategoryMap {
     const val CATEGORY_COUNT = 14
     const val FALLBACK_CATEGORY_INDEX = 13
