@@ -134,6 +134,18 @@ data class PreparedMegpoidRuntime(
     val requiredPhoneFeatureWidth: Int
         get() = denseProjectionDimensionsFromModel.inputFeatures
 
+    /** Builds part modulation using the validated VTB2 mask and threshold flags. */
+    fun prepareMultipartOutputModulation(
+        positionCount: Int,
+        fundamentalFrequencyHz: Float,
+        thetaCenterRadians: Float
+    ): S5MegpoidMultipartOutputModulation =
+        runtimeOptions.buildMultipartOutputModulation(
+            positionCount = positionCount,
+            fundamentalFrequencyHz = fundamentalFrequencyHz,
+            thetaCenterRadians = thetaCenterRadians
+        )
+
     /** Actual terminal spectrum representation read from this singer's VTB2 options. */
     val terminalSpectrumEncoding: S5MegpoidSpectrumFrameEncoding
         get() = runtimeOptions.terminalSpectrumEncoding
