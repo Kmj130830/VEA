@@ -167,6 +167,23 @@ two history counts. The 32-wide carrier feature input, its normalization
 parameters and the optional interpolation/control path are not yet built.
 The full model output therefore remains unavailable.
 
+## Non-multi-part fallback output head
+
+The non-multi-part fallback descriptors are now independently indexed from
+the selected VTB2 subtree. Native population confirms a 32-channel global
+normalizer followed by a biased Dense projection from 32 features to 8.
+The normalization tensors contain 32 scale and 32 bias values; the Dense
+weights use metadata `[8,32,1,1]` and the bias has 8 values. The epsilon
+is the native float32 constant `1.0e-6`.
+
+`S5MegpoidPostResidualFallbackTensorIndex` validates the four exact keys
+and metadata, and `S5MegpoidPostResidualFallbackStage.forward()` executes
+normalize → Dense, matching the fallback branch's call order. This is
+available only when the native options select the fallback branch. The
+installed AI Megpoid V7 has `D00=4`, `D01=true`, so its main output path
+remains the multi-part head; this fallback stage is present in the model
+package but is not used for that configuration.
+
 ## Exact boundaries that remain
 
 - The app still does not derive timed per-phone events from VeaNote.phoneme. That field is editor display text, not already aligned phones.
