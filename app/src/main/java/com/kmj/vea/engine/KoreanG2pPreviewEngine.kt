@@ -65,7 +65,47 @@ data class KoreanG2pPreviewResult(
  * It intentionally does not generate missing source flags, infer timing,
  * or declare its output to be a production Yamaha phonemizer.
  */
+data class KoreanG2pScheduledNotePreview(
+    val noteId: String,
+    val absoluteStartSample: Long,
+    val durationSamples: Long,
+    val sampleRate: Int,
+    val lyric: String,
+    val preview: KoreanG2pPreviewResult
+)
+
 object KoreanG2pPreviewEngine {
+    /**
+     * Creates note-scoped previews from an app-owned schedule.
+     * Only Korean-language tracks are accepted; no note timing or phoneme
+     * text is mutated by this diagnostic path.
+     */
+    fun previewSchedule(
+        schedule: VsmRenderSchedule,
+        language: String
+    ): List<KoreanG2pScheduledNotePreview> {
+        val normalizedLanguage = language.trim().lowercase()
+        require(normalizedLanguage in setOf("ko", "ko-kr", "kor", "korean")) {
+            "The partial G2P preview currently supports Korean language tags only."
+        }
+        return schedule.chunks
+            .flatMap { it.noteStarts }
+            .sortedWith(
+                compareBy<VsmScheduledNote> { it.absoluteStartSample }
+                    .thenBy { it.noteId }
+            )
+            .map { note ->
+                KoreanG2pScheduledNotePreview(
+                    noteId = note.noteId,
+                    absoluteStartSample = note.absoluteStartSample,
+                    durationSamples = note.durationSamples,
+                    sampleRate = note.sampleRate,
+                    lyric = note.lyric,
+                    preview = preview(note.lyric)
+                )
+            }
+    }
+
     fun preview(lyric: String): KoreanG2pPreviewResult {
         val normalized = NativeG2pBridge.normalizeKoreanInput(lyric)
         val sourceTokens = KoreanG2pInputTokenizer.tokenize(normalized)
