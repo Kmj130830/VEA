@@ -106,7 +106,31 @@ window, rather than establishing the phone descriptor's +0x10..+0x26
 fields.
 
 Therefore `FUN_180013830` is **not** evidence for the phone descriptor's
-constructor. The actual owner and field-population path for the descriptor
-passed to `FUN_18003ab70` remain unresolved. The byte decoder added in
-Android is only a validated parser for the already recovered field offsets;
-it does not claim to obtain those values from the live Windows context.
+constructor. A separate, offset-consistent constructor path has now been
+recovered:
+
+```text
+FUN_1800591d0(renderContext, ...)
+  -> FUN_180050aa0(renderContext + 0x08, ...)
+       -> when its mode argument equals 2:
+            FUN_180059c90(renderContext + 0xD0, ...)
+```
+
+The pointer arithmetic is exact: `FUN_1800591d0` passes an `int *`
+at `renderContext + 2` to `FUN_180050aa0`; that function passes
+`param_1 + 0x32` to `FUN_180059c90`. Since this is 32-bit pointer
+arithmetic, the latter address is `renderContext + 0x08 + 0x32 * 4 =
+renderContext + 0xD0`. The exported `Func_417eec3e` later passes its
+`param_1 + 0xD0` to `FUN_18003ab70`, which forwards the descriptor's
+fields to `FUN_18006c720`.
+
+This establishes the constructor entry point and the exact object address.
+It does **not yet** establish which arguments populate category width,
+duration limits, context counts and flags, or whether the mode-2 branch is
+the active branch for every voice/render configuration. A focused Ghidra
+export now includes `FUN_180059c90` and the callsite argument setup so
+those field assignments can be checked before any Android default is
+introduced.
+
+The Android byte decoder remains only a validated parser for an already
+captured descriptor; it does not itself read a live Windows context.
