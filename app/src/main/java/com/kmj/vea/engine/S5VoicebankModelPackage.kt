@@ -303,6 +303,18 @@ data class S5VoicebankModelPackage(
     ): S5MegpoidAlternateTransitionTensorPair? =
         sequenceOperatorTensorIndex.alternateTransitionPairOrNull(sequenceIndex)
 
+    /** Builds a concrete Alternate upsampling/projection operator from one indexed model pair. */
+    fun prepareAlternateTemporalProjection(
+        sequenceIndex: Int,
+        channels: Int = 32,
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidAlternateTemporalProjection =
+        sequenceOperatorTensorIndex.buildMegpoidV7AlternateTemporalProjection(
+            index = sequenceIndex,
+            channels = channels,
+            tensorDecoder = tensorDecoder
+        )
+
     /**
      * Builds Dense -> three forward Temporal transitions -> native reverse
      * residual path: Residual[3], then Banked[0]/Residual[2],
