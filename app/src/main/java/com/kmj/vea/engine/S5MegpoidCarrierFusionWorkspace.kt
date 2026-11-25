@@ -102,8 +102,7 @@ data class S5MegpoidCarrierFusionBufferGeometry(
  * vectors before Dense. That conditioning step is not synthesized here.
  */
 class S5MegpoidCarrierFusionWorkspace(
-    val geometry: S5MegpoidCarrierFusionBufferGeometry,
-    private val carrierDenseProjection: S5MegpoidDenseProjection
+    val geometry: S5MegpoidCarrierFusionBufferGeometry
 ) {
     val denseInputFeatureMajor = FloatArray(geometry.denseInputElementCount)
     val denseOutputFeatureMajor = FloatArray(geometry.denseOutputElementCount)
@@ -123,33 +122,101 @@ class S5MegpoidCarrierFusionWorkspace(
     var historyFramesWritten: Long = 0L
         private set
 
-    init {
-        require(carrierDenseProjection.inputFeatures == geometry.inputFeatures) {
-            "Carrier Dense input width does not match the native workspace geometry."
-        }
-        require(carrierDenseProjection.outputFeatures == 2) {
-            "Carrier Dense projection must produce exactly two output features."
-        }
-    }
-
     /**
-     * Runs the recovered 32-input/2-output Dense projection over a prepared
-     * feature-major [inputFeature][position] carrier tensor. Returns a
-     * defensive copy of the [2][position] result.
+     * Active carrier branch: multiply the runtime-created [2][inputFeatures]
+     * source matrix at root +0x15E by the current [inputFeatures][positions]
+     * feature tensor. The native call is FUN_1800c3740(M=2,N=positions,K=inputFeatures).
+     *
+     * This path does not consume the optional VTB2 +0xD60 Dense descriptor.
+     * It applies the two row-specific affine controls after GEMM:
+     *
+     *   adjustment[r] = -scale * amplitude * control166[r] + control162[r]
+     *   output[r,n] = output[r,n] * scale + adjustment[r]
      */
     @Synchronized
-    fun projectPreparedCarrierFeatures(
+    fun projectCarrierConditionedFeatures(
         inputFeatureMajor: FloatArray,
+        sourceMatrixTwoByInput: FloatArray,
+        scale: Float,
+        amplitude: Float,
+        control162: FloatArray,
+        control166: FloatArray,
         gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel
     ): FloatArray {
         require(inputFeatureMajor.size == geometry.denseInputElementCount) {
-            "Carrier input must contain ${geometry.denseInputElementCount} feature-major values."
+            "Carrier feature input must contain ${geometry.denseInputElementCount} feature-major values."
+        }
+        require(sourceMatrixTwoByInput.size == geometry.carrierSourceVectorElementCount) {
+            "Carrier source matrix must contain exactly 2 * inputFeatures values."
+        }
+        require(control162.size == 2 && control166.size == 2) {
+            "Carrier affine-control vectors must each contain two values."
+        }
+        require(scale.isFinite() && amplitude.isFinite() &&
+            inputFeatureMajor.all { it.isFinite() } &&
+            sourceMatrixTwoByInput.all { it.isFinite() } &&
+            control162.all { it.isFinite() } && control166.all { it.isFinite() }) {
+            "Carrier-conditioned projection contains a non-finite input."
+        }
+
+        inputFeatureMajor.copyInto(denseInputFeatureMajor)
+        sourceMatrixTwoByInput.copyInto(carrierSourceVector)
+        control162.copyInto(carrierAccumulationVectorA)
+        control166.copyInto(carrierAccumulationVectorB)
+
+        val projected = gemm.multiply(
+            a = carrierSourceVector,
+            b = denseInputFeatureMajor,
+            c = denseOutputFeatureMajor,
+            m = 2,
+            n = geometry.carrierPositions,
+            k = geometry.inputFeatures
+        )
+        require(projected.size == geometry.denseOutputElementCount) {
+            "Carrier GEMM returned an unexpected number of output values."
+        }
+
+        val positions = geometry.carrierPositions
+        for (row in 0 until 2) {
+            val adjustment = -scale * amplitude * carrierAccumulationVectorB[row] +
+                carrierAccumulationVectorA[row]
+            val rowStart = row * positions
+            for (position in 0 until positions) {
+                val index = rowStart + position
+                denseOutputFeatureMajor[index] =
+                    denseOutputFeatureMajor[index] * scale + adjustment
+            }
+        }
+        require(denseOutputFeatureMajor.all { it.isFinite() }) {
+            "Carrier-conditioned projection produced a non-finite output."
+        }
+        return denseOutputFeatureMajor.copyOf()
+    }
+
+    /**
+     * Fallback-only route: apply the optional VTB2 +0xD60 32-to-2 Dense
+     * descriptor to the selected fallback input. The native forward path
+     * uses this when MRW_CARRIER_FUSE is disabled, root +0x16C is false, or
+     * the dynamic +0x15E source matrix is absent.
+     */
+    @Synchronized
+    fun projectFallbackCarrierFeatures(
+        inputFeatureMajor: FloatArray,
+        fallbackProjection: S5MegpoidDenseProjection,
+        gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel
+    ): FloatArray {
+        require(fallbackProjection.inputFeatures == geometry.inputFeatures &&
+            fallbackProjection.outputFeatures == 2) {
+            "Fallback carrier Dense projection must match the native 32-to-2 descriptor."
+        }
+        require(inputFeatureMajor.size == geometry.denseInputElementCount) {
+            "Carrier fallback input must contain ${geometry.denseInputElementCount} feature-major values."
         }
         require(inputFeatureMajor.all { it.isFinite() }) {
-            "Carrier Dense input contains a non-finite value."
+            "Carrier fallback input contains a non-finite value."
         }
         inputFeatureMajor.copyInto(denseInputFeatureMajor)
-        val projected = carrierDenseProjection.project(
+        val projected = fallbackProjection.project(
             input = denseInputFeatureMajor,
             positions = geometry.carrierPositions,
             gemm = gemm
