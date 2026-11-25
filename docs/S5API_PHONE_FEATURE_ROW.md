@@ -57,3 +57,32 @@ The native phone-feature routine writes row-major [position][feature] values. Th
 ## Remaining work
 
 The app can build this matrix only after timed VsmPhoneEvent objects and the active S5ApiDefaultPhoneFeatureLayout have been supplied. Note-level phoneme display text is not yet converted into aligned phone events, and active render-state descriptor fields are not fully populated.
+## Descriptor owner and constructor offset — 2026-11-25
+
+The `Func_417eec3e` export calls `FUN_18003ab70` with
+`param_1 + 0xD0` as the phone feature descriptor. The descriptor fields
+consumed downstream by `FUN_18006c720` are relative to that pointer:
+category width at +0x10, minimum duration at +0x14, maximum duration at
++0x18, following/preceding context counts at +0x1C/+0x20, optional flag
+pair at +0x24, and layout mode at +0x25.
+
+The constructor chain has a matching subobject location:
+
+```text
+FUN_180013410(owner)
+  -> FUN_180011680(owner + 0x08)
+       -> FUN_180013830((owner + 0x08) + 200)
+```
+
+The decimal offset 200 is 0xC8, so the final constructor target is exactly
+`owner + 0xD0`. This is an offset-level match to the descriptor pointer
+passed by `Func_417eec3e`. The constructor target is now explicitly included
+in the Ghidra render-path export so its initialized fields and later
+overwrites can be distinguished.
+
+This establishes a concrete constructor candidate for the descriptor; it
+does not yet prove that every caller passes the same owner type or that the
+constructor's defaults are the final active render values. In particular,
+the category width, duration limits, context counts, optional flag and mode
+must be traced past constructor initialization before they can be used to
+prepare Megpoid input.
