@@ -80,6 +80,20 @@ data class PreparedMegpoidRuntime(
         )
     }
 
+    /**
+     * Consumes the last two output-head feature planes using the encoding
+     * selected by this loaded AI Megpoid model's VTB2 runtime options.
+     */
+    fun processModelOutputPlanes(
+        outputSession: PreparedMegpoidSpectralOutputSession,
+        firstFeaturePlane: FloatArray,
+        secondFeaturePlane: FloatArray
+    ): FloatArray = outputSession.processModelOutputPlanes(
+        firstFeaturePlane = firstFeaturePlane,
+        secondFeaturePlane = secondFeaturePlane,
+        runtimeOptions = runtimeOptions
+    )
+
     val scheduledNotes: List<VsmScheduledNote>
         get() = inputSchedules.flatMap { schedule ->
             schedule.chunks.flatMap { chunk -> chunk.noteStarts }
