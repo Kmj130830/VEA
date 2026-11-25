@@ -8,7 +8,8 @@ import org.junit.Test
 
 class S5MegpoidRuntimeOptionsDescriptorTest {
     private fun tree(
-        overrides: Map<String, S5ModelValue> = emptyMap()
+        overrides: Map<String, S5ModelValue> = emptyMap(),
+        includeAlternateSelector: Boolean = true
     ): S5ModelObjectTree {
         val defaults = linkedMapOf<String, S5ModelValue>(
             S5MegpoidRuntimeOptionKeys.PARAM_0 to S5ModelValue.NumberValue(217.0),
@@ -29,8 +30,12 @@ class S5MegpoidRuntimeOptionsDescriptorTest {
             S5MegpoidRuntimeOptionKeys.PARAM_D05 to S5ModelValue.NumberValue(0.01),
             S5MegpoidRuntimeOptionKeys.TERMINAL_SPECTRUM_LOG_MAGNITUDE_PHASE to
                 S5ModelValue.BooleanValue(true),
-            S5MegpoidRuntimeOptionKeys.CARRIER_FUSION_ENABLED to S5ModelValue.BooleanValue(true)
+            S5MegpoidRuntimeOptionKeys.CARRIER_FUSION_ENABLED to S5ModelValue.BooleanValue(true),
+            S5MegpoidRuntimeOptionKeys.ALTERNATE_TRANSITION_ENABLED to S5ModelValue.BooleanValue(true)
         )
+        if (!includeAlternateSelector) {
+            defaults.remove(S5MegpoidRuntimeOptionKeys.ALTERNATE_TRANSITION_ENABLED)
+        }
         defaults.putAll(overrides)
         val entries = defaults.entries.joinToString(",") { (key, value) ->
             val encoded = when (value) {
@@ -66,7 +71,28 @@ class S5MegpoidRuntimeOptionsDescriptorTest {
         assertEquals(S5MegpoidSpectrumFrameEncoding.LOG_MAGNITUDE_PHASE,
             options.terminalSpectrumEncoding)
         assertTrue(options.carrierFusionEnabled)
+        assertTrue(options.alternateTransitionEnabled)
+        assertEquals(S5MegpoidReverseTransitionMode.ALTERNATE, options.reverseTransitionMode)
         options.requireMegpoidV7BlockGrid()
+    }
+
+    @Test
+    fun readsAlternateTransitionSelectorAndDefaultsToStandardWhenTheKeyIsAbsent() {
+        val alternate = S5MegpoidRuntimeOptionsDescriptor.from(tree())
+        assertTrue(alternate.alternateTransitionEnabled)
+        assertEquals(S5MegpoidReverseTransitionMode.ALTERNATE, alternate.reverseTransitionMode)
+
+        val standard = S5MegpoidRuntimeOptionsDescriptor.from(
+            tree(includeAlternateSelector = false)
+        )
+        assertFalse(standard.alternateTransitionEnabled)
+        assertEquals(S5MegpoidReverseTransitionMode.STANDARD_BANKED, standard.reverseTransitionMode)
+
+        val explicitlyStandard = S5MegpoidRuntimeOptionsDescriptor.from(tree(mapOf(
+            S5MegpoidRuntimeOptionKeys.ALTERNATE_TRANSITION_ENABLED to
+                S5ModelValue.BooleanValue(false)
+        )))
+        assertFalse(explicitlyStandard.alternateTransitionEnabled)
     }
 
     @Test
