@@ -142,8 +142,8 @@ For one pair of post-residual feature planes x and y, the scalar native
 accumulator uses:
 
 ```text
-out.real += (x * D46 + y * D4C) * gain
-out.imag += (y * D46 - x * D4C) * gain
+out.real += (x * D46 - y * D4C) * gain
+out.imag += (y * D46 + x * D4C) * gain
 ```
 
 This is implemented by
