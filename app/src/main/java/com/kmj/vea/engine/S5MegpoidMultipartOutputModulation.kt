@@ -213,9 +213,12 @@ object S5MegpoidMultipartOutputModulationBuilder {
                             )
                         )
                     }
-                    gains[index] = if (
-                        nearestOtherDistance >= distance && distance <= threshold
-                    ) 1f else 0f
+                    // Native branch: under the threshold every part remains
+                    // active; outside it, only a nearest part remains active.
+                    // Ties are retained because the native comparison is strict.
+                    val isNearestPart = nearestOtherDistance >= distance
+                    val isWithinThreshold = distance <= threshold
+                    gains[index] = if (isNearestPart || isWithinThreshold) 1f else 0f
                 }
 
                 if (voiced) {
