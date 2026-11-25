@@ -256,7 +256,7 @@ output is claimed.
 
 Consequently, SynthesisEngine.render() does not emit placeholder WAV data and EngineStatus remains unavailable until the full path has been implemented and verified on Android ARM64.
 
-## Actual Megpoid sequence-transition tensors and branch selection
+## Actual Megpoid sequence-transition tensors and selected branch
 
 The selected AI Megpoid V7 VTB2 subtree contains three per-sequence
 Alternate transition weight/bias pairs at indices 0..2. Each weight is
@@ -265,17 +265,19 @@ values with metadata `[32]`. The same three indices are populated for
 Temporal weights/biases. The standard Banked-linear weight and bias
 factories are absent from this selected Megpoid model subtree.
 
-The native dispatcher does not decide by tensor presence. It checks the
-render-context byte at `+0x59`: zero invokes standard
-`FUN_1800c6390`; nonzero invokes Alternate `FUN_1800c72d0`.
-The active value of that byte still needs to be traced, so the Android
-runtime must not assume the branch from the model inventory alone.
+The native dispatcher checks render-context byte `+0x59`: zero invokes
+standard `FUN_1800c6390`; nonzero invokes Alternate
+`FUN_1800c72d0`. The optional model key
+`119558af50f9c8919539abd8e064b287` was found as Boolean `true` in the
+selected AI Megpoid runtime-options object by offline workflow run
+[45590025813](https://github.com/Kmj130830/VEA/actions/runs/45590025813).
+AI Megpoid therefore writes `+0x59=1` and selects Alternate.
 
-The sequence tensor index now retains and validates every native shape
-metadata array instead of storing only the flattened element count. The
-three Alternate matrices and biases can therefore be selected by their
-exact four-axis shapes, while the standard Banked adapter remains separate.
-The Ghidra model-runtime pass explicitly decompiles both transition
-operators next; the Alternate operator is not executed in Android until
-its matrix layout, temporal addressing, padding and output shape are
-confirmed.
+Android reads this flag through
+`S5MegpoidRuntimeOptionsDescriptor.alternateTransitionEnabled` and
+constructs the model-backed
+`S5MegpoidAlternateSequenceTransitionPipeline`. It executes Temporal[0..2],
+Residual row 3, then Alternate[0]/Residual row 2,
+Alternate[1]/Residual row 1 and Alternate[2]/Residual row 0.
+The three Alternate stages each double the active position count. The
+standard Banked builder is guarded and rejects this model configuration.
