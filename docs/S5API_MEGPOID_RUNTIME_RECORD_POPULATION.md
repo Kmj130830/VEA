@@ -259,3 +259,39 @@ upstream-prepared feature tensors for each row, uses a separate workspace pair
 per row, and keeps each block's own history state. The feature-generation and
 transition stages that create those four tensors remain unconnected to notes
 and phonemes.
+
+
+## Active carrier model-parameter folding
+
+The carrier branch under `FUN_1800ced10` reads the four typed property
+families below from the selected VTB2 configuration object:
+
+- `FUN_1800e9740`: carrier Dense matrix, metadata `[2,32,1,1]`
+- `FUN_1800e9580`: two-value carrier bias
+- `FUN_1800e9ac0`: 32-value per-input normalization scale
+- `FUN_1800e9900`: 32-value per-input normalization offset
+
+The descriptor at render-root `+0xD60` is the fallback branch's ordinary
+2×32 Dense operator, but the same W/b tensors also feed construction of
+the active source matrix at `+0x15E`. The active setup allocates two
+2-value vectors at `+0x162` and `+0x166` and folds the normalization
+parameters into them:
+
+```text
+sourceMatrix[r,k] = W[r,k] * scale[k]
+control162[r] = bias[r] + sum_k(W[r,k] * offset[k])
+control166[r] = sum_k(sourceMatrix[r,k])
+```
+
+This is separate from the runtime GEMM and final carrier-spectrum mixing
+inside `FUN_1800c7ad0`. Android now exposes
+`S5MegpoidCarrierFusionActiveParameters.build()`, which validates and
+constructs these three buffers from the exact VTB2 tensor references.
+`S5VoicebankModelPackage.prepareCarrierFusionActiveParameters()` combines
+the carrier Dense pair with the shared post-residual normalization pair,
+and `PreparedMegpoidRuntime` provides the model-backed workspace projection
+overload.
+
+The native scalar controls at `+0x16A/+0x16B`, active carrier history lag
+values at `+0x181/+0x182`, and the final audio-output contract remain
+separate runtime inputs. No end-to-end render or WAV output is claimed.
