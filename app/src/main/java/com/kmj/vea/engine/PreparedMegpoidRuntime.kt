@@ -152,6 +152,38 @@ data class PreparedMegpoidRuntime(
         return modelPackage.prepareCarrierFusionFallbackDenseProjection(tensorDecoder)
     }
 
+    /** Builds the active carrier matrix and affine controls from this singer's VTB2 tensors. */
+    fun prepareCarrierFusionActiveParameters(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidCarrierFusionActiveParameters {
+        check(carrierFusionEnabled) {
+            "Carrier fusion is disabled by the selected voicebank runtime options."
+        }
+        return modelPackage.prepareCarrierFusionActiveParameters(tensorDecoder)
+    }
+
+    /** Runs the active model-backed carrier GEMM and native affine-control step. */
+    fun projectCarrierConditionedFeatures(
+        workspace: S5MegpoidCarrierFusionWorkspace,
+        inputFeatureMajor: FloatArray,
+        scale: Float,
+        amplitude: Float,
+        activeParameters: S5MegpoidCarrierFusionActiveParameters =
+            prepareCarrierFusionActiveParameters(),
+        gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel
+    ): FloatArray {
+        check(carrierFusionEnabled) {
+            "Carrier fusion is disabled by the selected voicebank runtime options."
+        }
+        return workspace.projectCarrierConditionedFeatures(
+            inputFeatureMajor = inputFeatureMajor,
+            activeParameters = activeParameters,
+            scale = scale,
+            amplitude = amplitude,
+            gemm = gemm
+        )
+    }
+
     /** Builds the carrier Dense workspace using active render-context geometry. */
     fun createCarrierFusionWorkspace(
         carrierPositions: Int,
