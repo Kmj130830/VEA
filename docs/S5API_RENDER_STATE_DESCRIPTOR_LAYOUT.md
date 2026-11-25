@@ -302,3 +302,44 @@ object and keeps the separate `+0xD60` fallback Dense projection distinct.
 This does not supply the live scalar controls at `+0x16A/+0x16B`, the
 carrier history lag values at `+0x181/+0x182`, or the missing spectrum/audio
 callback.
+
+
+## AI Megpoid V7 actual reverse-transition tensor inventory — 2026-11-25
+
+A fresh recursive scan of the selected AI Megpoid VTB2 render subtree
+(`MODEL_CONTEXT_KEY / RESIDUAL_RUNTIME_CONFIG_KEY`) compared the six
+sequence-factory key families against the actual typed tensor objects.
+The model contains three Alternate transition pairs (indices 0..2) and no
+matching standard Banked-linear weight or bias leaves for those transitions.
+
+| Transition index | Alternate weight metadata | Alternate bias metadata | Payload |
+|---:|---|---|---|
+| 0 | `[32,32,3,1]` | `[32]` | 3,072 + 32 F32 |
+| 1 | `[32,32,3,1]` | `[32]` | 3,072 + 32 F32 |
+| 2 | `[32,32,3,1]` | `[32]` | 3,072 + 32 F32 |
+
+The same selected subtree has Temporal weight and bias pairs at indices
+0..2, each with metadata `[32,32,3,1]` and `[32]` respectively.
+The standard Banked-linear factories `FUN_1801256a0` and
+`FUN_180122880` have no matching populated leaves in this model subtree.
+This is a model-data observation, not proof by itself that the runtime
+selector is set to the alternate branch.
+
+The dispatcher makes the distinction explicitly from the render-context
+byte at `+0x59`: zero selects `FUN_1800c6390` with the standard Banked
+descriptor/workspace arrays; nonzero selects `FUN_1800c72d0` with the
+alternate descriptor/workspace arrays. The active value written to
+`+0x59` for AI Megpoid still needs to be traced. Do not route to the
+alternate operator solely because its tensors are present.
+
+Android's sequence tensor index now retains the exact four-axis metadata
+for every typed sequence tensor, and verifies that the metadata product
+equals the decoded payload element count. This makes the three Alternate
+`[32,32,3,1]` matrices and `[32]` biases available to a shape-aware
+operator adapter without coercing them into the standard banked format.
+
+`FUN_1800c72d0` is now an explicit Ghidra decompilation seed alongside
+`FUN_1800c6390`. Its full arithmetic, padding, output orientation and
+bias handling must be recovered before implementing an Alternate CPU/JNI
+kernel. Until then, the exact metadata is indexed but no unverified
+operator calculation is performed.
