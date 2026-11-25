@@ -125,6 +125,9 @@ public class ExportS5RendererPath extends GhidraScript {
                 "18004e580", "18004e620", "18002ace0", "180010110",
                 "180040630", "180082a30", "18007d700", "18007fca0",
                 "18007a000", "18000fc20",
+                // Active carrier source arrays and their native tensor-property factories.
+                "1800e9ac0", "1800e9900", "1800e9740", "1800e9580",
+                "1800d5970", "1800c0960", "1800adca0",
                 // Populate the root scalar fields consumed by FUN_1800d5a00.
                 "1800ced10", "1800bc5e0", "1800d4bf0", "1800d5a00",
                 "1800ccafd"
