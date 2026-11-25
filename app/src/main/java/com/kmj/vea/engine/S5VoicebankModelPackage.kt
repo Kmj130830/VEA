@@ -106,6 +106,34 @@ data class S5VoicebankModelPackage(
     ): S5MegpoidDenseProjection =
         requireCarrierFusionTensorIndex().buildDenseProjection(tensorDecoder)
 
+    /**
+     * Creates carrier Dense and circular-spectrum history buffers from
+     * render-context counts supplied by the active render session.
+     *
+     * carrierPositions maps to the native count read through root +0x18.
+     * The two history contributions map to root words +0x181 / +0x182.
+     * Spectrum bins are taken from the selected model runtime options.
+     */
+    fun createCarrierFusionWorkspace(
+        carrierPositions: Int,
+        historySlotsFromRoot181: Int,
+        historySlotsFromRoot182: Int,
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidCarrierFusionWorkspace {
+        require(runtimeOptionsDescriptor.carrierFusionEnabled) {
+            "Carrier fusion is disabled by the selected AI Megpoid runtime options."
+        }
+        val projection = prepareCarrierFusionDenseProjection(tensorDecoder)
+        val geometry = S5MegpoidCarrierFusionBufferGeometry(
+            inputFeatures = projection.inputFeatures,
+            carrierPositions = carrierPositions,
+            spectrumBins = runtimeOptionsDescriptor.buildSpectrumOutputShape().complexBinCount,
+            historySlotsFromRoot181 = historySlotsFromRoot181,
+            historySlotsFromRoot182 = historySlotsFromRoot182
+        )
+        return S5MegpoidCarrierFusionWorkspace(geometry, projection)
+    }
+
     /** Exact sequence-indexed Temporal/Banked factory tables populated by FUN_1800ced10. */
     val sequenceOperatorTensorIndex: S5MegpoidSequenceOperatorTensorIndex by lazy(
         LazyThreadSafetyMode.PUBLICATION
