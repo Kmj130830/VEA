@@ -337,8 +337,7 @@ The two option getters are:
 
 Both are present as Boolean `true` in the selected AI Megpoid runtime
 options object. When +0x3405 is true, native also requires the string value
-at key `184ef4ded83d0b35e1f07a126cc5411`? No: the verified key is
-`184ef4ded83d0b35d809a7f1b09b1066`, with value
+at key `184ef4ded83d0b35d809a7f1b09b1066` to equal
 `117fd5ea7e76f7852c197a284c4dd3bc`. The Android loader validates this
 exact identifier and refuses to prepare the mask mode when it is absent
 or differs.
