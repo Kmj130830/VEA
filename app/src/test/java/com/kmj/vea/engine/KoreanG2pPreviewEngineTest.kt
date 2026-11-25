@@ -43,6 +43,14 @@ class KoreanG2pPreviewEngineTest {
     }
 
     @Test
+    fun flagsPhoneLabelsNotCoveredByTheRecoveredS5ApiCategoryGroups() {
+        val result = KoreanG2pPreviewEngine.preview("각")
+
+        assertTrue(result.phoneLabels.contains("gp"))
+        assertTrue(result.tokens.single().categoryFallbackLabels.contains("gp"))
+    }
+
+    @Test
     fun reportsNonHangulCharactersThatTheRecoveredFinalMapperSkips() {
         val result = KoreanG2pPreviewEngine.preview("가!나")
 
