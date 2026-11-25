@@ -78,8 +78,8 @@ class S5MegpoidCarrierFusionTensorIndex private constructor(
         return S5MegpoidDenseProjectionDimensions(inputFeatures, outputFeatures)
     }
 
-    /** Builds the exact [output=2][input=32] carrier Dense operator from VTB2. */
-    fun buildDenseProjection(
+    /** Builds the optional +0xD60 fallback [output=2][input=32] Dense operator from VTB2. */
+    fun buildFallbackDenseProjection(
         tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
     ): S5MegpoidDenseProjection {
         val dimensions = resolveDenseDimensions()
