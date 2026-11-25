@@ -34,6 +34,49 @@ class KoreanHangulPhoneMapperTest {
         }
     }
     @Test
+    fun reversesEveryVendorInternalCodeToItsOriginalHangulSyllable() {
+        for (codePoint in 0xAC00..0xD7A3) {
+            val source = codePoint.toChar()
+            val code = KoreanHangulPhoneMapper.internalSyllableCode(source)
+            assertNotNull("missing vendor code for U+${codePoint.toString(16)}", code)
+            assertEquals(
+                "round-trip failed for U+${codePoint.toString(16)}",
+                source,
+                KoreanHangulPhoneMapper.syllableFromInternalCode(code!!)
+            )
+            assertEquals(
+                source,
+                KoreanHangulPhoneMapper.lookupHangulSyllable(code)
+            )
+        }
+    }
+
+    @Test
+    fun returnsNullForReservedOrMalformedInternalSyllableCodes() {
+        listOf(
+            0,
+            0x8000,
+            0xFFFF,
+            0x8800,
+            0x8860,
+            0x9001,
+            -1,
+            0x1_0000
+        ).forEach { code ->
+            assertEquals(null, KoreanHangulPhoneMapper.syllableFromInternalCode(code))
+        }
+        assertEquals('\u0000', KoreanHangulPhoneMapper.lookupHangulSyllable(0x8000))
+    }
+
+    @Test
+    fun mirrorsNativeCharacterToCodeAndCodeToCharacterLookup() {
+        assertEquals(0x8861, KoreanHangulPhoneMapper.lookupInternalSyllable('가'))
+        assertEquals('가', KoreanHangulPhoneMapper.lookupHangulSyllable(0x8861))
+        assertEquals(0, KoreanHangulPhoneMapper.lookupInternalSyllable('A'))
+        assertEquals('\u0000', KoreanHangulPhoneMapper.lookupHangulSyllable(0x1234))
+    }
+
+    @Test
     fun mapsAllStandardHangulVowelAndFinalIndices() {
         val text = buildString {
             for (codePoint in 0xAC00..0xD7A3) append(codePoint.toChar())
