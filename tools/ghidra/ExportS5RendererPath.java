@@ -93,8 +93,9 @@ public class ExportS5RendererPath extends GhidraScript {
                 // Force its initializer and adjacent subobject constructors
                 // into the report instead of relying on the bounded closure.
                 "180050aa0", "180013410", "180012030", "180011be0",
-                // The default phone-feature descriptor is constructed at +0xD0
-                // by FUN_180013830 from FUN_180011680's owning object.
+                // Large DSP subobject constructors reached from FUN_180012b40.
+                // Their owner-relative address is lVar7 + 0xE8, not the
+                // Func_417eec3e phone descriptor at its separate param_1 + 0xD0.
                 "180013830", "180013c00",
                 // Phone descriptor and feature-context constructor helpers.
                 "180011680", "180011e80", "18005a980", "180032750",
@@ -211,8 +212,8 @@ public class ExportS5RendererPath extends GhidraScript {
                 {"180011680", "phone context subobject initializer A"},
                 {"180011e80", "phone context subobject initializer B"},
                 {"180013410", "phone feature context constructor"},
-                {"180013830", "default phone-feature descriptor constructor"},
-                {"180013c00", "alternate phone context constructor"},
+                {"180013830", "large DSP state subobject constructor (lVar7 + 0xE8)"},
+                {"180013c00", "adjacent large DSP state subobject constructor"},
                 {"180012030", "alternate feature context constructor"},
                 {"1800591d0", "render phone/feature configuration loader"},
                 {"180050aa0", "render-context scalar and feature configuration copier"},
@@ -220,7 +221,8 @@ public class ExportS5RendererPath extends GhidraScript {
                 {"180032750", "phone-category context map initializer"},
                 {"18006c520", "phone-category label-to-index builder"},
                 {"18003ab70", "timed-phone event feature-row builder"},
-                {"18006c720", "phone feature matrix core"}
+                {"18006c720", "phone feature matrix core"},
+                {"180085d10", "Func_417eec3e export passing param_1 + 0xD0"}
             };
             int phoneReferenceCount = 0;
             for (String[] target : phoneTargets) {
