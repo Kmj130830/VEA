@@ -128,6 +128,16 @@ data class PreparedMegpoidRuntime(
     val carrierFusionTensorIndex: S5MegpoidCarrierFusionTensorIndex?
         get() = modelPackage.carrierFusionTensorIndex
 
+    /** Prepares the 32-input / 2-output carrier Dense layer when carrier fusion is enabled. */
+    fun prepareCarrierFusionDenseProjection(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidDenseProjection {
+        check(carrierFusionEnabled) {
+            "Carrier fusion is disabled by the selected voicebank runtime options."
+        }
+        return modelPackage.prepareCarrierFusionDenseProjection(tensorDecoder)
+    }
+
     fun prepareAlignedPhoneFeatures(
         phoneEvents: List<VsmPhoneEvent>,
         minimumPhoneSeconds: Float,
