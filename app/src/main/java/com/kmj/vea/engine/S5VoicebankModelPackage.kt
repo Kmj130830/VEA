@@ -101,10 +101,10 @@ data class S5VoicebankModelPackage(
         )
 
     /** Builds the optional carrier Dense layer using the recovered 2-output matrix contract. */
-    fun prepareCarrierFusionDenseProjection(
+    fun prepareCarrierFusionFallbackDenseProjection(
         tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
     ): S5MegpoidDenseProjection =
-        requireCarrierFusionTensorIndex().buildDenseProjection(tensorDecoder)
+        requireCarrierFusionTensorIndex().buildFallbackDenseProjection(tensorDecoder)
 
     /**
      * Creates carrier Dense and circular-spectrum history buffers from
@@ -117,8 +117,7 @@ data class S5VoicebankModelPackage(
     fun createCarrierFusionWorkspace(
         carrierPositions: Int,
         historySlotsFromRoot181: Int,
-        historySlotsFromRoot182: Int,
-        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+        historySlotsFromRoot182: Int
     ): S5MegpoidCarrierFusionWorkspace {
         require(runtimeOptionsDescriptor.carrierFusionEnabled) {
             "Carrier fusion is disabled by the selected AI Megpoid runtime options."
@@ -126,7 +125,7 @@ data class S5VoicebankModelPackage(
         // The active carrier-fusion path uses a runtime-generated 2xK
         // source matrix at root +0x15E. The VTB2 +0xD60 Dense projection
         // is only the native fallback when the dynamic source path is absent.
-        val inputFeatures = 32
+        val inputFeatures = requireCarrierFusionTensorIndex().resolveDenseDimensions().inputFeatures
         val geometry = S5MegpoidCarrierFusionBufferGeometry(
             inputFeatures = inputFeatures,
             carrierPositions = carrierPositions,
