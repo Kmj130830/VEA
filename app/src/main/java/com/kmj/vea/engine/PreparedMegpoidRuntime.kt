@@ -337,6 +337,16 @@ data class PreparedMegpoidRuntime(
         )
     }
 
+    /** Creates the native-selected Alternate model sequence path for AI Megpoid V7. */
+    fun createAlternateSequenceTransitionPipeline(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder,
+        firstInputWorkspace: S5MegpoidWorkspaceSlot = S5MegpoidWorkspaceSlot.FIRST
+    ): S5MegpoidAlternateSequenceTransitionPipeline =
+        modelPackage.createMegpoidV7AlternateSequenceTransitionPipeline(
+            tensorDecoder = tensorDecoder,
+            firstInputWorkspace = firstInputWorkspace
+        )
+
     fun createResidualBlockExecutor(
         firstInputWorkspace: S5MegpoidWorkspaceSlot = S5MegpoidWorkspaceSlot.FIRST
     ): S5MegpoidResidualBlockExecutor =
