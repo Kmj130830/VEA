@@ -50,6 +50,9 @@ public class ExportS5ModelRuntime extends GhidraScript {
             "1800e6c20", "1800dfb50",
             // Optional carrier-fusion Dense weight and bias key getters.
             "1800e9580", "1800e9740",
+            // Carrier Dense descriptor shape and generic model tensor attachment helpers.
+            "1800bbf10", "1800c06c0", "1800d5970", "1800d4610",
+            "1800beaa0",
             // Related keys guarding multi-part model interpolation data.
             "1800e0250", "1800e2cb0", "1800e2930", "1800e2af0",
             "1800e2770", "1800dfed0"
