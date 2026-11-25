@@ -143,6 +143,30 @@ constructs an input-width-by-two-output Dense descriptor;
 model-backed `2 × 32` Dense projection. Carrier-conditioned input creation,
 history scheduling and the per-part output mix remain under implementation.
 
+## Carrier workspace and planar history ring
+
+The optional carrier path now has a dedicated Android workspace. Its native
+buffer dimensions are read from active render context values:
+
+- `D6C = inputFeatures × carrierPositions` (Dense input)
+- `D74 = 2 × carrierPositions` (two-row carrier Dense output)
+- `D80 = historySlots × 2 × spectrumBins` (carrier frame ring)
+- `D86 = 2 × spectrumBins` (current carrier frame)
+- `historySlots = root[0x181] + root[0x182] + 1`
+
+The native history frame is planar, not bin-interleaved:
+`[firstPlane[0..bins), secondPlane[0..bins)]`. Android's
+`appendCarrierFramePlanes()` and `copyHistoryOldestToNewest()` preserve
+that layout and the native write cursor. The new
+`accumulateDelayedCarrierFrameInto()` also ports the final carrier-history
+complex multiply using the oldest slot selected by the native lag formula.
+
+The workspace is created from the model-backed 32→2 carrier Dense layer,
+but caller-supplied geometry is still required for carrier positions and the
+two history counts. The 32-wide carrier feature input, its normalization
+parameters and the optional interpolation/control path are not yet built.
+The full model output therefore remains unavailable.
+
 ## Exact boundaries that remain
 
 - The app still does not derive timed per-phone events from VeaNote.phoneme. That field is editor display text, not already aligned phones.
