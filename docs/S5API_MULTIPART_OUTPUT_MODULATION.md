@@ -144,22 +144,22 @@ is validated by the same descriptor before a table is created.
 `PreparedMegpoidRuntime.prepareMultipartOutputModulation()` accepts only
 the frame-specific position count, F0 and `theta_ctr`.
 
-Tests cover the four part locations/distances, both native coordinate
-rounding routes (SIMD-table truncation and inline-scalar `roundf`), the
-native SIMD quarter-wave polynomial, the nearest/threshold OR rule,
+Tests cover the four part locations/distances, all three native coordinate
+rounding routes (SSE truncation, AVX nearest-even and inline-scalar
+`roundf`), the native SIMD quarter-wave polynomial, the nearest/threshold OR rule,
 strict nearest-distance tie behavior, inclusive threshold equality, both
 threshold-selector modes, unvoiced identity rotation, and the complex
 accumulation sign/order.
 
 ## Boundary: this is not the complete output head
 
-This work prepares the per-part rotation and gain tables and ports their
-scalar complex accumulator. It does not yet:
+This work prepares the per-part location, distance, gain and rotation
+tables and ports the complex accumulator. It does not yet:
 
 1. Split the eight post-residual feature channels into the four per-part
    x/y feature planes.
-2. Port the independent input interpolation in `FUN_1800c4080` and
-   `FUN_1800c39f0` or the SIMD dispatch in `FUN_1800c3930`.
+2. Integrate the modulation buffers into the VTMG four-part output-head
+   operator callsites and their native interpolation/conditioning stages.
 3. Build the carrier-conditioned feature input and run its full per-frame
    scheduling path.
 4. Reduce/fuse the completed part streams into the final two terminal
