@@ -23,7 +23,7 @@ public class ExportS5PhoneFeatureContext extends GhidraScript {
         "18006c720", "18003ab70", "18006fdb0", "180074a50",
         "18006c520", "180003a90", "180021c50",
         "18005b9a0", "18005c890", "18005cba0",
-        "18004be40", "18004cb90"
+        "18004be40", "18004cb90", "18004d660"
     };
     private static final String[] TARGETS = {
         "180050aa0", "1800591d0", "18005a980", "180032750",
@@ -41,7 +41,7 @@ public class ExportS5PhoneFeatureContext extends GhidraScript {
         LinkedHashMap<Address, Function> functions = new LinkedHashMap<>();
         for (String hex : SEEDS) {
             monitor.checkCancelled();
-            Function f = getFunction(hex);
+            Function f = findFunctionAtAddress(hex);
             if (f != null) functions.put(f.getEntryPoint(), f);
         }
 
@@ -62,7 +62,7 @@ public class ExportS5PhoneFeatureContext extends GhidraScript {
             out.println("|---:|---|---:|");
             for (String hex : SEEDS) {
                 Address address = toAddr(hex);
-                Function f = getFunction(hex);
+                Function f = findFunctionAtAddress(hex);
                 if (f == null) out.printf("| %s | not recovered | - |%n", address);
                 else out.printf("| %s | %s | %d |%n",
                     address, f.getName(), f.getBody().getNumAddresses());
@@ -74,7 +74,7 @@ public class ExportS5PhoneFeatureContext extends GhidraScript {
             for (String hex : TARGETS) {
                 monitor.checkCancelled();
                 Address target = toAddr(hex);
-                Function targetFunction = getFunction(hex);
+                Function targetFunction = findFunctionAtAddress(hex);
                 out.println("### Target " + target + " (" +
                     (targetFunction == null ? "not recovered" : targetFunction.getName()) + ")");
                 out.println();
@@ -136,7 +136,7 @@ public class ExportS5PhoneFeatureContext extends GhidraScript {
         println("S5API phone-feature context report written: " + output.getAbsolutePath());
     }
 
-    private Function getFunction(String hex) {
+    private Function findFunctionAtAddress(String hex) {
         Address address = toAddr(hex);
         Function f = currentProgram.getFunctionManager().getFunctionAt(address);
         if (f == null) f = currentProgram.getFunctionManager().getFunctionContaining(address);
