@@ -166,7 +166,6 @@ public class ExportS5ModelRuntime extends GhidraScript {
                     }
                     out.println();
                 }
-            }
 
             out.println("## Callsite instruction windows for the post-residual output path");
             out.println();
