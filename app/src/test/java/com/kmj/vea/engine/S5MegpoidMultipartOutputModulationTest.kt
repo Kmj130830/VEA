@@ -144,6 +144,32 @@ class S5MegpoidMultipartOutputModulationTest {
     }
 
     @Test
+    fun defaultSimdTableUsesTheRecoveredNativeQuarterWavePolynomial() {
+        val theta = (2.0 * Math.PI * 0.24).toFloat()
+        val table = S5MegpoidMultipartOutputModulationBuilder.build(
+            partCount = 4,
+            positionCount = 1,
+            frequencyStep = 31.25f,
+            fundamentalFrequencyHz = 100f,
+            thetaCenterRadians = theta,
+            maximumDistanceParameter = 133f,
+            distanceExtensionParameter = 25f,
+            extendedThresholdMode = true,
+            nearestPartMaskEnabledAtRoot3405 = false,
+            thresholdModeEnabledAtRoot3411 = true
+        )
+
+        val phase = theta.toDouble()
+        // FUN_1800c4080 uses a minimax polynomial rather than sinf/cosf.
+        assertEquals(kotlin.math.sin(phase).toFloat(), table.rotationReal[0], 0.006f)
+        assertEquals((-kotlin.math.cos(phase)).toFloat(), table.nativeRotationSine[0], 0.006f)
+        // The polynomial's characteristic output is preserved rather than
+        // replaced with a platform libm result.
+        assertEquals(0.99802905f, table.rotationReal[0], 0.00002f)
+        assertEquals(-0.0683494f, table.nativeRotationSine[0], 0.00002f)
+    }
+
+    @Test
     fun disablingNearestPartMaskLeavesAllPartsActiveButKeepsTheirRotations() {
         val masked = build(mask = true)
         val unmasked = build(mask = false)
