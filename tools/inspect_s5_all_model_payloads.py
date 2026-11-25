@@ -6,6 +6,7 @@ model resource rather than assuming all tensors live in AI_Megpoid.vtb2.
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import re
@@ -36,6 +37,16 @@ CONFIG_KEYS = {
     "layer_config_d31a": "d31a34cf5e8888d62df2d9b4e32b80f1",
 }
 
+# Four S5API option/tensor keys derived from the exact 32-bit words emitted by
+# FUN_1800e6c20, FUN_1800dfb50, FUN_1800e9580 and FUN_1800e9740.
+# The hash formatter writes each uint32 as eight lowercase hex digits.
+RENDER_OPTION_KEYS = {
+    "terminal_spectrum_log_magnitude_phase": "d22b2750ccebc1459f7a9d9ea7186bbf",
+    "carrier_fusion_enabled": "66bfcc4a31ba796aca88c5eae36870fc",
+    "carrier_dense_weights": "0128c19d610695f96c546cb8e04839fd",
+    "carrier_dense_bias": "61ef9b49f8fe353fe0d586220366ce92",
+}
+
 
 def key_variants(name: str) -> set[str]:
     digest = hashlib.md5(name.encode("ascii") + SALT).digest()
@@ -60,6 +71,47 @@ def walk(value, keys: set[str], counters: dict[str, int]) -> None:
         counters["strings"] += 1
         if value.startswith(("*F32", "*F16", "*S32")):
             counters["typed"] += 1
+
+def value_summary(value) -> str:
+    if isinstance(value, bool):
+        return f"boolean={str(value).lower()}"
+    if isinstance(value, (int, float)):
+        return f"number={value!r}"
+    if isinstance(value, str) and value.startswith(("*F32", "*F16", "*S32")):
+        marker, body = value[:4], value[4:]
+        try:
+            raw = base64.b64decode(body, validate=True)
+            scalar_bytes = {"*F32": 4, "*S32": 4, "*F16": 2}[marker]
+            return f"{marker} tensor, {len(raw) // scalar_bytes} elements, {len(raw)} bytes"
+        except (ValueError, KeyError):
+            return f"{marker} tensor string (payload decode failed)"
+    if isinstance(value, str):
+        return f"string={value[:120]!r}"
+    if isinstance(value, dict):
+        return f"object with {len(value)} keys"
+    if isinstance(value, list):
+        return f"array with {len(value)} elements"
+    return type(value).__name__
+
+
+def locate_option_values(value, path: str = "$") -> dict[str, list[tuple[str, object]]]:
+    found = {name: [] for name in RENDER_OPTION_KEYS}
+    wanted = {key: name for name, key in RENDER_OPTION_KEYS.items()}
+
+    def walk_options(node, node_path: str) -> None:
+        if isinstance(node, dict):
+            for key, child in node.items():
+                child_path = node_path + "." + key
+                option_name = wanted.get(key)
+                if option_name is not None:
+                    found[option_name].append((child_path, child))
+                walk_options(child, child_path)
+        elif isinstance(node, list):
+            for index, child in enumerate(node):
+                walk_options(child, f"{node_path}[{index}]")
+
+    walk_options(value, path)
+    return found
 
 
 def inspect_member(
@@ -115,6 +167,18 @@ def inspect_member(
     config_matches = [name for name, digest in CONFIG_KEYS.items() if digest in keys]
     lines.append("- S5API layer-config property keys: " +
                  (", ".join(config_matches) if config_matches else "none"))
+
+    render_options = locate_option_values(parsed)
+    lines.append("- S5API post-residual/carrier option and tensor keys:")
+    for name, lookup_key in RENDER_OPTION_KEYS.items():
+        matches = render_options[name]
+        if not matches:
+            lines.append(f"  - {name}: absent (key {lookup_key})")
+            continue
+        for object_path, value in matches:
+            lines.append(f"  - {name}: {object_path} -> {value_summary(value)}")
+        if len(matches) > 1:
+            lines.append(f"    - WARNING: {len(matches)} occurrences; the selected render subtree must be disambiguated")
 
     recurrent_names = []
     for layer in range(32):
