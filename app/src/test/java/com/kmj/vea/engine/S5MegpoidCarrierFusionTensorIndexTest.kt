@@ -1,6 +1,7 @@
 package com.kmj.vea.engine
 
 import java.util.Base64
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -90,6 +91,71 @@ class S5MegpoidCarrierFusionTensorIndexTest {
         val dense = index.buildFallbackDenseProjection(fixture.decoder)
         assertEquals(32, dense.inputFeatures)
         assertEquals(2, dense.outputFeatures)
+    }
+
+    @Test
+    fun buildsActiveCarrierSourceMatrixAndAffineControlsFromModelTensors() {
+        val weights = FloatArray(64) { index ->
+            val withinRow = index % 32
+            if (index < 32) (withinRow + 1) * 0.125f else -(withinRow + 1) * 0.0625f
+        }
+        val bias = floatArrayOf(0.75f, -1.25f)
+        val fixture = fixture(weightValues = weights, biasValues = bias)
+        val index = S5MegpoidCarrierFusionTensorIndex.build(fixture.tree)
+        val normalizationScale = FloatArray(32) { 0.5f + it * 0.03125f }
+        val normalizationBias = FloatArray(32) { -0.25f + it * 0.015625f }
+
+        val active = S5MegpoidCarrierFusionActiveParameters.build(
+            carrierTensors = index,
+            normalizationScale = normalizationScale,
+            normalizationBias = normalizationBias,
+            tensorDecoder = fixture.decoder
+        )
+
+        val expectedMatrix = FloatArray(64)
+        val expectedControl162 = bias.copyOf()
+        val expectedControl166 = FloatArray(2)
+        for (row in 0 until 2) {
+            var biasAdjustment = 0f
+            var scaleSum = 0f
+            for (feature in 0 until 32) {
+                val weight = weights[row * 32 + feature]
+                val scaled = weight * normalizationScale[feature]
+                expectedMatrix[row * 32 + feature] = scaled
+                biasAdjustment += weight * normalizationBias[feature]
+                scaleSum += scaled
+            }
+            expectedControl162[row] += biasAdjustment
+            expectedControl166[row] = scaleSum
+        }
+
+        assertEquals(32, active.inputFeatures)
+        assertArrayEquals(expectedMatrix, active.copySourceMatrixTwoByInput(), 0f)
+        assertArrayEquals(expectedControl162, active.copyControl162(), 0.0001f)
+        assertArrayEquals(expectedControl166, active.copyControl166(), 0.0001f)
+    }
+
+    @Test
+    fun rejectsActiveCarrierNormalizationVectorsWithTheWrongWidthOrNonFiniteValues() {
+        val fixture = fixture()
+        val index = S5MegpoidCarrierFusionTensorIndex.build(fixture.tree)
+
+        assertThrows(IllegalArgumentException::class.java) {
+            S5MegpoidCarrierFusionActiveParameters.build(
+                carrierTensors = index,
+                normalizationScale = FloatArray(31),
+                normalizationBias = FloatArray(32),
+                tensorDecoder = fixture.decoder
+            )
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            S5MegpoidCarrierFusionActiveParameters.build(
+                carrierTensors = index,
+                normalizationScale = FloatArray(32) { if (it == 4) Float.NaN else 1f },
+                normalizationBias = FloatArray(32),
+                tensorDecoder = fixture.decoder
+            )
+        }
     }
 
     @Test
