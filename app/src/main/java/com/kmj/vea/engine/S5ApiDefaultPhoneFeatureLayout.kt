@@ -1,5 +1,8 @@
 package com.kmj.vea.engine
 
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+
 /** Recovered default-layout fields consumed by S5API FUN_18006c720. */
 data class S5ApiDefaultPhoneFeatureLayout(
     val categoryWidth: Int,             // descriptor +0x10
@@ -93,6 +96,49 @@ data class S5ApiDefaultPhoneFeatureDescriptor(
         require(auxiliaryByteAt26 in 0..255) {
             "Phone auxiliary byte must fit in one byte."
         }
+    }
+
+    companion object {
+        /**
+         * Decodes only the verified fields from an in-memory native descriptor.
+         *
+         * All offsets are relative to descriptor base. The function does not
+         * read or infer the opaque fields before +0x10 or mode-specific fields
+         * after +0x26. It is a transport/parser boundary for a future captured
+         * S5API context; the current Android renderer does not own this native
+         * Windows object.
+         */
+        fun fromNativeBytes(bytes: ByteArray, baseOffset: Int = 0): S5ApiDefaultPhoneFeatureDescriptor {
+            require(baseOffset >= 0) { "Descriptor base offset cannot be negative." }
+            require(baseOffset.toLong() + NATIVE_MINIMUM_SIZE.toLong() <= bytes.size.toLong()) {
+                "Native phone descriptor requires at least $NATIVE_MINIMUM_SIZE bytes from its base."
+            }
+            val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+            fun intAt(relativeOffset: Int): Int = buffer.getInt(baseOffset + relativeOffset)
+            fun floatAt(relativeOffset: Int): Float = buffer.getFloat(baseOffset + relativeOffset)
+            fun byteAt(relativeOffset: Int): Int = buffer.get(baseOffset + relativeOffset).toInt() and 0xff
+
+            return S5ApiDefaultPhoneFeatureDescriptor(
+                categoryWidthAt10 = intAt(CATEGORY_WIDTH_OFFSET),
+                minimumPhoneSecondsAt14 = floatAt(MINIMUM_DURATION_OFFSET),
+                maximumPhoneSecondsAt18 = floatAt(MAXIMUM_DURATION_OFFSET),
+                followingContextCountAt1C = intAt(FOLLOWING_CONTEXT_OFFSET),
+                precedingContextCountAt20 = intAt(PRECEDING_CONTEXT_OFFSET),
+                includeLeadingFlagPairAt24 = byteAt(FLAG_PAIR_OFFSET) != 0,
+                layoutModeAt25 = byteAt(LAYOUT_MODE_OFFSET),
+                auxiliaryByteAt26 = byteAt(AUXILIARY_BYTE_OFFSET)
+            )
+        }
+
+        const val CATEGORY_WIDTH_OFFSET = 0x10
+        const val MINIMUM_DURATION_OFFSET = 0x14
+        const val MAXIMUM_DURATION_OFFSET = 0x18
+        const val FOLLOWING_CONTEXT_OFFSET = 0x1c
+        const val PRECEDING_CONTEXT_OFFSET = 0x20
+        const val FLAG_PAIR_OFFSET = 0x24
+        const val LAYOUT_MODE_OFFSET = 0x25
+        const val AUXILIARY_BYTE_OFFSET = 0x26
+        const val NATIVE_MINIMUM_SIZE = 0x27
     }
 
     fun requireDefaultMode0(): S5ApiDefaultPhoneFeatureLayout {
