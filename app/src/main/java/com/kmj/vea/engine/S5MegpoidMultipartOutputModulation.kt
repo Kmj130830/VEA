@@ -163,7 +163,7 @@ object S5MegpoidMultipartOutputModulationBuilder {
             val extended = d02 + d03
             if (!thresholdModeEnabledAtRoot3411) {
                 val frequencyBound = frequency - (frequencyStep + frequencyStep)
-                if (frequencyBound <= extended) frequencyBound else extended
+                maxOf(frequencyBound, extended)
             } else {
                 extended
             }
