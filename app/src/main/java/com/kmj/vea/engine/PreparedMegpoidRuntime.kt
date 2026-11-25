@@ -62,6 +62,18 @@ data class PreparedMegpoidRuntime(
     ): List<S5MegpoidPreparedAlternateTransition> =
         modelPackage.prepareAlternateTransitionParameters(tensorDecoder)
 
+    /** Builds one reverse-transition operator from the exact model tensors. */
+    fun prepareAlternateTemporalProjection(
+        sequenceIndex: Int,
+        channels: Int = 32,
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidAlternateTemporalProjection =
+        modelPackage.prepareAlternateTemporalProjection(
+            sequenceIndex = sequenceIndex,
+            channels = channels,
+            tensorDecoder = tensorDecoder
+        )
+
     /** Model-output spectrum dimensions recovered from root fields +0x04 and +0x08. */
     val spectrumOutputShape: S5MegpoidSpectrumOutputShape
         get() = runtimeOptions.buildSpectrumOutputShape()
