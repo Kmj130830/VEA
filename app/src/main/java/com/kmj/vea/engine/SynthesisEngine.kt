@@ -91,8 +91,8 @@ class VocaloidAiEngineAdapter(
                 "preview-only Korean phone mapping are available. Full Yamaha G2PA conversion and the " +
                 "VOCALOID7 singing renderer are not implemented."
         } else {
-            "Android ARM64 JNI bridge is not loaded. The G2P phoneme engine and VOCALOID7 singing renderer " +
-                "are not ported yet."
+            "Android ARM64 JNI bridge is not loaded. The Kotlin Korean phone preview remains available, " +
+                "but full Yamaha G2PA conversion and the VOCALOID7 singing renderer are not implemented."
         }
 
         val message = vsmMessage + tensorMessage + if (NativeG2pBridge.isLoaded) {
