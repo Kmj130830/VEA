@@ -136,6 +136,13 @@ public class ExportS5RendererPath extends GhidraScript {
                 "1800b8b20", "1800c0320", "1800b0590",
                 "1800d44b0", "1800d47c0", "1800c72d0", "1800c6390",
                 "1800e6de0", "1800dc260", "1800b6d40",
+                // Multi-part output head: force the four-part interpolation,
+                // complex modulation, and per-vector affine helpers into the
+                // bounded static decompilation report. These helpers are the
+                // missing bridge from 32-channel residual features to the
+                // two terminal spectrum planes.
+                "1800c3930", "1800c4080", "1800c39f0",
+                "1800d52b0", "1800d5610", "1800cea30", "1800ceba0",
                 // Populate the root scalar fields consumed by FUN_1800d5a00.
                 "1800ced10", "1800bc5e0", "1800d4bf0", "1800d5a00",
                 "1800ccafd"
