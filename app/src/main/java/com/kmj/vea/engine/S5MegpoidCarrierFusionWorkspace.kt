@@ -60,7 +60,7 @@ data class S5MegpoidCarrierFusionBufferGeometry(
 
     /** D80/D86 slot stride: two planar float arrays, each containing spectrumBins values. */
     val currentCarrierFrameElementCount: Int
-        get() = checkedProduct(2, spectrumBins, "Carrier complex frame")
+        get() = checkedProduct(2, spectrumBins, "Carrier planar frame")
 
     val carrierHistoryFrameStride: Int
         get() = currentCarrierFrameElementCount
