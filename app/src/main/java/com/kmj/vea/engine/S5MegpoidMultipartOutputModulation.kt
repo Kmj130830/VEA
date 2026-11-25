@@ -54,8 +54,8 @@ data class S5MegpoidMultipartOutputModulation(
      * buffer. Input planes are [position], output is [real0,imag0,...].
      *
      * The arithmetic order follows the caller in FUN_1800c7ad0:
-     * real += (x * D46 + y * D4C) * D40
-     * imag += (y * D46 - x * D4C) * D40
+     * real += (x * D46 - y * D4C) * D40
+     * imag += (y * D46 + x * D4C) * D40
      */
     fun accumulatePartInto(
         outputInterleaved: FloatArray,
@@ -85,8 +85,8 @@ data class S5MegpoidMultipartOutputModulation(
             val d4c = nativeRotationSine[tableIndex]
             val gain = gains[tableIndex]
 
-            val realContribution = (x * d46 + y * d4c) * gain
-            val imaginaryContribution = (y * d46 - x * d4c) * gain
+            val realContribution = (x * d46 - y * d4c) * gain
+            val imaginaryContribution = (y * d46 + x * d4c) * gain
             val outputIndex = position * 2
             outputInterleaved[outputIndex] += realContribution
             outputInterleaved[outputIndex + 1] += imaginaryContribution
