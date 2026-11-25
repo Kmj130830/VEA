@@ -409,6 +409,11 @@ data class S5VoicebankModelPackage(
         firstInputWorkspace: S5MegpoidWorkspaceSlot = S5MegpoidWorkspaceSlot.FIRST
     ): S5MegpoidSequenceTransitionPipeline {
         runtimeOptionsDescriptor.requireMegpoidV7BlockGrid()
+        require(runtimeOptionsDescriptor.reverseTransitionMode ==
+            S5MegpoidReverseTransitionMode.STANDARD_BANKED) {
+            "This model selects the Alternate reverse-transition path. " +
+                "Use createMegpoidV7AlternateSequenceTransitionPipeline() instead of the standard Banked builder."
+        }
         val transitionCount = runtimeOptionsDescriptor.temporalTransitionCount
         require(
             temporalOutputFeatures.size == transitionCount &&
