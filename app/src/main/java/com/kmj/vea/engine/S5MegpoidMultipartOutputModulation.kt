@@ -96,6 +96,39 @@ data class S5MegpoidMultipartOutputModulation(
         }
     }
 
+    /**
+     * Accumulates all part feature pairs in native part-index order
+     * (0 through partCount-1) into one interleaved complex output buffer.
+     *
+     * The feature-to-part mapping must be supplied by the active output-head
+     * graph. This method intentionally does not assume how the eight channels
+     * are split into four x/y pairs.
+     */
+    fun accumulateAllPartsInto(
+        outputInterleaved: FloatArray,
+        firstFeaturePlaneByPart: List<FloatArray>,
+        secondFeaturePlaneByPart: List<FloatArray>
+    ) {
+        require(firstFeaturePlaneByPart.size == partCount &&
+            secondFeaturePlaneByPart.size == partCount) {
+            "The multipart output head requires exactly $partCount feature-plane pairs."
+        }
+        require(outputInterleaved.size.toLong() == positionCount.toLong() * 2L) {
+            "Multipart complex output must contain two interleaved values per position."
+        }
+
+        // Match the native outer part loop: accumulate one complete part
+        // across positions, then advance to the next part.
+        for (partIndex in 0 until partCount) {
+            accumulatePartInto(
+                outputInterleaved = outputInterleaved,
+                firstFeaturePlane = firstFeaturePlaneByPart[partIndex],
+                secondFeaturePlane = secondFeaturePlaneByPart[partIndex],
+                partIndex = partIndex
+            )
+        }
+    }
+
     fun copyPhaseLocations(): FloatArray = phaseLocations.copyOf()
     fun copyDistances(): FloatArray = distances.copyOf()
     fun copyGains(): FloatArray = gains.copyOf()
