@@ -116,6 +116,19 @@ data class S5MegpoidMultipartOutputModulation(
         require(outputInterleaved.size.toLong() == positionCount.toLong() * 2L) {
             "Multipart complex output must contain two interleaved values per position."
         }
+        require(outputInterleaved.all { it.isFinite() }) {
+            "Multipart complex output accumulator contains a non-finite value."
+        }
+        for (partIndex in 0 until partCount) {
+            val first = firstFeaturePlaneByPart[partIndex]
+            val second = secondFeaturePlaneByPart[partIndex]
+            require(first.size == positionCount && second.size == positionCount) {
+                "Multipart feature pair $partIndex must contain exactly $positionCount positions."
+            }
+            require(first.all { it.isFinite() } && second.all { it.isFinite() }) {
+                "Multipart feature pair $partIndex contains a non-finite value."
+            }
+        }
 
         // Match the native outer part loop: accumulate one complete part
         // across positions, then advance to the next part.
