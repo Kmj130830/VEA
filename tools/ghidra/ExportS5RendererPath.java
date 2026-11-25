@@ -136,6 +136,9 @@ public class ExportS5RendererPath extends GhidraScript {
                 "1800b8b20", "1800c0320", "1800b0590",
                 "1800d44b0", "1800d47c0", "1800c72d0", "1800c6390",
                 "1800e6de0", "1800dc260", "1800b6d40",
+                // Optional per-part output-head mask controls stored at
+                // render-root +0x3405 and +0x3411.
+                "1800e3030", "1800e2770",
                 // Multi-part output head: force the four-part interpolation,
                 // complex modulation, and per-vector affine helpers into the
                 // bounded static decompilation report. These helpers are the
