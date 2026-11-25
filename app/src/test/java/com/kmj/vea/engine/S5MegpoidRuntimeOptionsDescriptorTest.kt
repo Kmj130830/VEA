@@ -63,6 +63,41 @@ class S5MegpoidRuntimeOptionsDescriptorTest {
     }
 
     @Test
+    fun derivesTheActiveFourPartOutputHeadWidthFromMegpoidOptions() {
+        val options = S5MegpoidRuntimeOptionsDescriptor.from(tree())
+
+        assertTrue(options.usesMultiPartOutputHead)
+        assertEquals(8, options.postResidualHeadFeatureWidth)
+    }
+
+    @Test
+    fun fallsBackToTwoOutputPlanesWhenTheMultiPartBranchIsDisabled() {
+        val disabled = S5MegpoidRuntimeOptionsDescriptor.from(tree(mapOf(
+            S5MegpoidRuntimeOptionKeys.PARAM_D01 to S5ModelValue.BooleanValue(false)
+        )))
+        assertFalse(disabled.usesMultiPartOutputHead)
+        assertEquals(2, disabled.postResidualHeadFeatureWidth)
+
+        val onePart = S5MegpoidRuntimeOptionsDescriptor.from(tree(mapOf(
+            S5MegpoidRuntimeOptionKeys.PARAM_D00 to S5ModelValue.NumberValue(1.0)
+        )))
+        assertFalse(onePart.usesMultiPartOutputHead)
+        assertEquals(2, onePart.postResidualHeadFeatureWidth)
+    }
+
+    @Test
+    fun rejectsOverflowingMultiPartOutputHeadWidth() {
+        val options = S5MegpoidRuntimeOptionsDescriptor.from(tree(mapOf(
+            S5MegpoidRuntimeOptionKeys.PARAM_D00 to
+                S5ModelValue.NumberValue(Int.MAX_VALUE.toDouble())
+        )))
+        assertTrue(options.usesMultiPartOutputHead)
+        assertThrows(IllegalArgumentException::class.java) {
+            options.postResidualHeadFeatureWidth
+        }
+    }
+
+    @Test
     fun derivesMegpoidOutputTransformInputsFromModelOptionsAndNativeRootDefaults() {
         val options = S5MegpoidRuntimeOptionsDescriptor.from(tree())
         val inputs = options.buildOutputTransformInputsFromNativeMegpoidDefaults()
