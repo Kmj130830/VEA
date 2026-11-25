@@ -12,8 +12,8 @@ package com.kmj.vea.engine
  * - root words +0x181 and +0x182 -> the two history-count contributions
  * - root +0xD6C -> [inputFeature][position] carrier Dense input
  * - root +0xD74 -> [outputFeature=2][position] carrier Dense output
- * - root +0xD80 -> [historySlot][complexBin][real,imag] carrier ring
- * - root +0xD86 -> current interleaved complex frame
+ * - root +0xD80 -> [historySlot][firstPlane[bins], secondPlane[bins]] ring
+ * - root +0xD86 -> current two-plane carrier frame
  * - root +0x15E -> two input-feature vectors
  * - root +0x162 / +0x166 -> two-element accumulation vectors
  */
@@ -58,7 +58,7 @@ data class S5MegpoidCarrierFusionBufferGeometry(
     val carrierSourceVectorElementCount: Int
         get() = checkedProduct(2, inputFeatures, "Carrier source vector")
 
-    /** D80/D86 slot stride: two floats per complex spectrum bin. */
+    /** D80/D86 slot stride: two planar float arrays, each containing spectrumBins values. */
     val currentCarrierFrameElementCount: Int
         get() = checkedProduct(2, spectrumBins, "Carrier complex frame")
 
@@ -94,7 +94,7 @@ data class S5MegpoidCarrierFusionBufferGeometry(
 
 /**
  * State for the carrier branch's separate Dense input/output buffers and
- * complex-spectrum history ring.
+ * two-plane carrier-frame history ring.
  *
  * The Dense input is expected to have already passed the native global
  * normalization at root +0xC4. This class does not substitute a guessed
@@ -159,21 +159,24 @@ class S5MegpoidCarrierFusionWorkspace(
     }
 
     /**
-     * Writes one two-float-per-bin carrier frame to D86 and the D80 ring,
-     * then advances the native write slot modulo historySlotCount.
+     * Writes the two planar carrier arrays to D86 and the D80 ring:
+     * [firstPlane[0..bins), secondPlane[0..bins)]. This ordering is explicit
+     * in the native copy loop at FUN_1800c7ad0; it is not interleaved by bin.
      *
      * @return the ring slot that received this frame.
      */
     @Synchronized
-    fun appendCarrierFramePairs(interleavedSpectrum: FloatArray): Int {
-        require(interleavedSpectrum.size == geometry.currentCarrierFrameElementCount) {
-            "Carrier frame pair buffer must contain exactly ${geometry.currentCarrierFrameElementCount} floats."
+    fun appendCarrierFramePlanes(firstPlane: FloatArray, secondPlane: FloatArray): Int {
+        val bins = geometry.spectrumBins
+        require(firstPlane.size == bins && secondPlane.size == bins) {
+            "Each carrier frame plane must contain exactly $bins values."
         }
-        require(interleavedSpectrum.all { it.isFinite() }) {
-            "Carrier frame pair buffer contains a non-finite value."
+        require(firstPlane.all { it.isFinite() } && secondPlane.all { it.isFinite() }) {
+            "Carrier frame planes contain a non-finite value."
         }
 
-        interleavedSpectrum.copyInto(currentCarrierFrame)
+        firstPlane.copyInto(currentCarrierFrame, destinationOffset = 0)
+        secondPlane.copyInto(currentCarrierFrame, destinationOffset = bins)
         val writtenSlot = nextHistoryWriteIndex
         val offset = writtenSlot * geometry.carrierHistoryFrameStride
         currentCarrierFrame.copyInto(
@@ -187,8 +190,44 @@ class S5MegpoidCarrierFusionWorkspace(
     }
 
     /**
-     * Copies the complete ring in oldest-to-newest order, matching the native
-     * start slot at the next write cursor. Unwritten slots remain zero-filled.
+     * Reproduces the final carrier-history complex multiply from FUN_1800c7ad0.
+     * The native slot expression selects the oldest ring slot at the current
+     * write cursor: writeIndex - root[0x181] - root[0x182] - 1 == writeIndex-H.
+     * D74 is two planar rows; the output buffer is interleaved complex bins.
+     */
+    @Synchronized
+    fun accumulateDelayedCarrierFrameInto(outputInterleaved: FloatArray): FloatArray {
+        val bins = geometry.spectrumBins
+        require(geometry.carrierPositions == bins) {
+            "Native carrier fusion requires the D74 position count to match the spectrum-bin count."
+        }
+        require(outputInterleaved.size == geometry.currentCarrierFrameElementCount) {
+            "Carrier fusion output must contain exactly ${geometry.currentCarrierFrameElementCount} floats."
+        }
+        require(outputInterleaved.all { it.isFinite() } && denseOutputFeatureMajor.all { it.isFinite() }) {
+            "Carrier fusion contains a non-finite value."
+        }
+
+        val oldestSlot = nextHistoryWriteIndex
+        val frameOffset = oldestSlot * geometry.carrierHistoryFrameStride
+        for (bin in 0 until bins) {
+            val carrierFirst = historyRing[frameOffset + bin]
+            val carrierSecond = historyRing[frameOffset + bins + bin]
+            val denseFirst = denseOutputFeatureMajor[bin]
+            val denseSecond = denseOutputFeatureMajor[bins + bin]
+            val outputOffset = bin * 2
+            outputInterleaved[outputOffset] += denseSecond * carrierFirst - denseFirst * carrierSecond
+            outputInterleaved[outputOffset + 1] += denseFirst * carrierFirst + denseSecond * carrierSecond
+        }
+        require(outputInterleaved.all { it.isFinite() }) {
+            "Carrier history accumulation produced a non-finite output."
+        }
+        return outputInterleaved
+    }
+
+    /**
+     * Copies the complete planar ring in oldest-to-newest slot order, matching
+     * the native selected delayed slot at the next write cursor. Unwritten slots remain zero-filled.
      */
     @Synchronized
     fun copyHistoryOldestToNewest(): FloatArray {
@@ -206,7 +245,7 @@ class S5MegpoidCarrierFusionWorkspace(
         return result
     }
 
-    /** Returns the most recently written frame, or an all-zero frame before the first write. */
+    /** Returns the most recent planar frame [firstPlane, secondPlane], or zeros before the first write. */
     @Synchronized
     fun copyMostRecentCarrierFrame(): FloatArray {
         if (historyFramesWritten == 0L) return FloatArray(geometry.currentCarrierFrameElementCount)
