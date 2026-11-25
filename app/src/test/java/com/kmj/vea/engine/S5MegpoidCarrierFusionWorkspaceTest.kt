@@ -55,7 +55,7 @@ class S5MegpoidCarrierFusionWorkspaceTest {
         input[2] = 3f
         input[3] = 4f
 
-        val output = workspace.projectNormalizedCarrierFeatures(
+        val output = workspace.projectPreparedCarrierFeatures(
             inputFeatureMajor = input,
             gemm = ReferenceS5MegpoidGemmKernel
         )
