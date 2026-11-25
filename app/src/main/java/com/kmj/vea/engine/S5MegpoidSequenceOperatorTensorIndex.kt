@@ -266,6 +266,31 @@ class S5MegpoidSequenceOperatorTensorIndex private constructor(
             )
         }
 
+    /**
+     * Compiles one model-backed Alternate transition into the verified
+     * FUN_1800c72d0 operator contract. AI Megpoid V7 supplies 32 input/output
+     * channels and a three-tap kernel at every reverse-transition index.
+     */
+    fun buildMegpoidV7AlternateTemporalProjection(
+        index: Int,
+        channels: Int = 32,
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidAlternateTemporalProjection {
+        val pair = requireMegpoidV7AlternateTransitionPair(index)
+        require(channels == 32) {
+            "AI Megpoid V7 Alternate transitions currently require 32 channels."
+        }
+        require(pair.weights.descriptorMetadata == listOf(channels, channels, 3, 1)) {
+            "Alternate transition metadata does not match the active 32x32x3 descriptor."
+        }
+        return S5MegpoidAlternateTemporalProjection(
+            inputFeatures = channels,
+            outputFeatures = channels,
+            weights = pair.weights.decodeFloatArray(tensorDecoder),
+            bias = pair.bias.decodeFloatArray(tensorDecoder)
+        )
+    }
+
     companion object {
         fun build(tree: S5ModelObjectTree): S5MegpoidSequenceOperatorTensorIndex {
             val entriesByKey = S5MegpoidSequenceOperatorFactoryKeys.all().groupBy { it.lookupKey }
