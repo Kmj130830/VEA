@@ -75,10 +75,10 @@ class S5MegpoidCarrierFusionWorkspaceTest {
         )
         val workspace = S5MegpoidCarrierFusionWorkspace(geometry, projection())
 
-        assertEquals(0, workspace.appendCarrierSpectrumFrame(floatArrayOf(1f, 2f, 3f, 4f)))
-        assertEquals(1, workspace.appendCarrierSpectrumFrame(floatArrayOf(5f, 6f, 7f, 8f)))
-        assertEquals(2, workspace.appendCarrierSpectrumFrame(floatArrayOf(9f, 10f, 11f, 12f)))
-        assertEquals(0, workspace.appendCarrierSpectrumFrame(floatArrayOf(13f, 14f, 15f, 16f)))
+        assertEquals(0, workspace.appendCarrierFramePairs(floatArrayOf(1f, 2f, 3f, 4f)))
+        assertEquals(1, workspace.appendCarrierFramePairs(floatArrayOf(5f, 6f, 7f, 8f)))
+        assertEquals(2, workspace.appendCarrierFramePairs(floatArrayOf(9f, 10f, 11f, 12f)))
+        assertEquals(0, workspace.appendCarrierFramePairs(floatArrayOf(13f, 14f, 15f, 16f)))
 
         assertEquals(1, workspace.nextHistoryWriteIndex)
         assertEquals(3L, workspace.historyFramesWritten)
@@ -109,7 +109,7 @@ class S5MegpoidCarrierFusionWorkspaceTest {
         )
         val workspace = S5MegpoidCarrierFusionWorkspace(geometry, projection())
 
-        workspace.appendCarrierSpectrumFrame(floatArrayOf(1f, 2f, 3f, 4f))
+        workspace.appendCarrierFramePairs(floatArrayOf(1f, 2f, 3f, 4f))
         assertArrayEquals(
             floatArrayOf(
                 0f, 0f, 0f, 0f,
@@ -142,10 +142,10 @@ class S5MegpoidCarrierFusionWorkspaceTest {
             workspace.projectNormalizedCarrierFeatures(FloatArray(31 * 2))
         }
         assertThrows(IllegalArgumentException::class.java) {
-            workspace.appendCarrierSpectrumFrame(FloatArray(3))
+            workspace.appendCarrierFramePairs(FloatArray(3))
         }
         assertThrows(IllegalArgumentException::class.java) {
-            workspace.appendCarrierSpectrumFrame(floatArrayOf(0f, 0f, Float.NaN, 0f))
+            workspace.appendCarrierFramePairs(floatArrayOf(0f, 0f, Float.NaN, 0f))
         }
     }
 
