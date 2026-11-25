@@ -103,8 +103,8 @@ The two carrier Dense properties use the exact keys returned by
 
 | Role | Lookup key | VTB2 metadata | Payload |
 |---|---|---|---:|
-| Carrier weights | `0128c19d610695f96c546cb8e04839fd` | `[2]` | 2 × F32 |
-| Carrier bias | `61ef9b49f8fe353fe0d586220366ce92` | `[2,32,1,1]` | 64 × F32 |
+| Carrier weights | `61ef9b49f8fe353fe0d586220366ce92` | `[2,32,1,1]` | 64 × F32 |
+| Carrier bias | `0128c19d610695f96c546cb8e04839fd` | `[2]` | 2 × F32 |
 
 Both objects are under the selected residual configuration subtree at
 `43726e4ce752ea6cc300dc2fca3e8372`. Each property is an object containing
@@ -113,11 +113,16 @@ typed payload at `0ed3f4c15ca6d021d59b2b1038226a7f`. Android's
 `S5MegpoidCarrierFusionTensorIndex` validates the metadata product against
 the encoded payload length and retains the native dimensions verbatim.
 
-This does not yet establish how `FUN_1800bbf10` and `FUN_1800d4610`
-interpret the two-element weight vector together with the 64-element
-bias tensor. The descriptor construction and exact axis/stride contract
-must be recovered before these values are passed to the carrier Dense
-operator; Android does not reinterpret them as a conventional matrix yet.
+The call sequence resolves the layout: `FUN_1800bbf10` constructs the
+carrier Dense descriptor with the shared input width and two output features,
+then `FUN_1800d4610` receives the 64-element tensor from
+`FUN_1800e9740()` as the matrix before the two-element tensor from
+`FUN_1800e9580()` as the bias. The metadata `[2,32,1,1]` therefore gives
+a row-major `[output=2][input=32]` carrier weight matrix; `[2]` is the
+two-value output bias. Android now validates these roles and creates the
+corresponding `S5MegpoidDenseProjection(inputFeatures=32, outputFeatures=2)`
+through the model-package preparation API. The carrier-conditioned input
+construction and history/mix scheduling remain separate.
 
 ## 3. Multi-part feature/modulation branch
 
