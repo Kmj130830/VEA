@@ -166,6 +166,63 @@ public class ExportS5ModelRuntime extends GhidraScript {
                     }
                     out.println();
                 }
+            }
+
+            out.println("## Callsite instruction windows for the post-residual output path");
+            out.println();
+            out.println("The windows preserve Win64 register and stack setup immediately before each call. This supplements high-level decompilation, which can omit stack-passed arguments when wrappers are involved.");
+            out.println();
+            Function renderOwner = currentProgram.getFunctionManager().getFunctionAt(toAddr("1800c7ad0"));
+            if (renderOwner == null) {
+                out.println("- FUN_1800c7ad0 was not recovered.");
+            } else {
+                String[][] targets = {
+                    {"1800c3930", "multipart/carrier interpolation wrapper"},
+                    {"1800d52b0", "AVX2 complex modulation accumulator"},
+                    {"1800d5610", "general complex modulation accumulator"},
+                    {"1800cea30", "carrier affine vector path A"},
+                    {"1800ceba0", "carrier affine vector path B"},
+                    {"1800c7920", "global normalization operator"},
+                    {"1800c5260", "Dense projection operator"},
+                    {"18012c740", "terminal spectral inverse/overlap operator"}
+                };
+                for (String[] target : targets) {
+                    Address targetAddress = toAddr(target[0]);
+                    out.println("### " + targetAddress + " — " + target[1]);
+                    out.println();
+                    InstructionIterator instructions =
+                        currentProgram.getListing().getInstructions(renderOwner.getBody(), true);
+                    ArrayDeque<Instruction> previous = new ArrayDeque<>();
+                    int calls = 0;
+                    while (instructions.hasNext()) {
+                        monitor.checkCancelled();
+                        Instruction instruction = instructions.next();
+                        boolean match = false;
+                        for (Reference reference : instruction.getReferencesFrom()) {
+                            if (reference.getReferenceType().isCall() &&
+                                reference.getToAddress().equals(targetAddress)) {
+                                match = true;
+                                break;
+                            }
+                        }
+                        if (match) {
+                            calls++;
+                            out.println("Callsite: " + instruction.getAddress());
+                            out.println("~~~asm");
+                            for (Instruction prior : previous) {
+                                out.println(prior.getAddress() + "  " + prior.toString());
+                            }
+                            out.println(instruction.getAddress() + "  " + instruction.toString());
+                            out.println("~~~");
+                            out.println();
+                        }
+                        previous.addLast(instruction);
+                        while (previous.size() > 56) previous.removeFirst();
+                    }
+                    if (calls == 0) out.println("- No direct call instruction recovered.");
+                    out.println();
+                }
+            }
             } finally {
                 decompiler.dispose();
             }
