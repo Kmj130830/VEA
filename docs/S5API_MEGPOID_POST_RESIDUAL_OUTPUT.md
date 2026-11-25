@@ -149,18 +149,22 @@ representations, and `PreparedMegpoidSpectralOutputSession` can now accept
 the two model output planes and pass their encoded complex spectrum into the
 existing overlap-add processor.
 
-The caller must explicitly select `DIRECT_COMPLEX` or
-`LOG_MAGNITUDE_PHASE`; VEA does not yet map root `+0x48` to a confirmed
-AI Megpoid runtime option. The two new modes are operator implementations,
-not a claim that the full neural graph has generated those feature planes.
+The active value of root `+0x48` is loaded by `FUN_1800ced10` from a
+separate boolean option key returned by `FUN_1800e6c20()`. The root
+constructor's zero initialization is therefore not the final configured
+value. VEA keeps the encoding explicit until that hashed key is recovered
+from the helper and matched to the installed AI Megpoid VTB2 tree. The two
+modes are operator implementations, not a claim that the full neural graph
+has generated those feature planes.
 
 ## 5. Remaining output-head work
 
-1. Map the second global-normalization and dense descriptors at root `+0x310` and `+0x338` to VTB2 keys and active dimensions.
-2. Trace `FUN_1800c3930`, `FUN_1800d52b0` and `FUN_1800d5610` for the per-part interpolation and carrier-mix branches.
-3. Implement the model-backed 8-feature output head, its per-part modulation and final reduction to the two terminal feature planes.
-4. Connect the completed upstream sequence pipeline to the second head and the carrier-history branch.
-5. Compare complex spectra and overlap-add output against authorized native reference frames before enabling WAV rendering.
+1. Recover the hashed boolean option returned by `FUN_1800e6c20()` and identify its value in AI Megpoid VTB2; this controls root `+0x48` direct-complex versus log-magnitude/phase encoding.
+2. Map the second global-normalization and dense descriptors at root `+0x310` and `+0x338` to VTB2 keys and active dimensions.
+3. Trace `FUN_1800c3930`, `FUN_1800d52b0` and `FUN_1800d5610` for the per-part interpolation and carrier-mix branches.
+4. Implement the model-backed 8-feature output head, its per-part modulation and final reduction to the two terminal feature planes.
+5. Connect the completed upstream sequence pipeline to the second head and the carrier-history branch.
+6. Compare complex spectra and overlap-add output against authorized native reference frames before enabling WAV rendering.
 
 Until these are resolved and tested on Android ARM64, `SynthesisEngine.render()`
 must remain unavailable and must not emit placeholder audio.
