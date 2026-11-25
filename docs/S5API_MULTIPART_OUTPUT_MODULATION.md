@@ -144,12 +144,12 @@ is validated by the same descriptor before a table is created.
 `PreparedMegpoidRuntime.prepareMultipartOutputModulation()` accepts only
 the frame-specific position count, F0 and `theta_ctr`.
 
-Tests cover the four part locations/distances, all three native coordinate
-rounding routes (SSE truncation, AVX nearest-even and inline-scalar
-`roundf`), the native SIMD quarter-wave polynomial, the nearest/threshold OR rule,
-strict nearest-distance tie behavior, inclusive threshold equality, both
-threshold-selector modes, unvoiced identity rotation, and the complex
-accumulation sign/order.
+Tests cover the four part locations/distances, all three native
+coordinate rounding routes (SSE truncation, AVX nearest-even and
+inline-scalar `roundf`), the native SIMD quarter-wave polynomial, the
+nearest/threshold OR rule, strict nearest-distance tie behavior, inclusive
+threshold equality, both threshold-selector modes, unvoiced identity
+rotation, and the complex accumulation sign/order.
 
 ## Boundary: this is not the complete output head
 
