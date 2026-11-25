@@ -27,6 +27,7 @@ class S5MegpoidPostResidualFallbackTensorIndexTest {
         denseWeights: FloatArray = FloatArray(8 * 32).also { weights ->
             for (feature in 0 until 8) weights[feature * 32 + feature] = 1f
         },
+        denseWeightMetadata: List<Int> = listOf(8, 32, 1, 1),
         denseBias: FloatArray = FloatArray(8)
     ): Fixture {
         fun encoded(values: FloatArray, salt: Int): String {
@@ -49,7 +50,7 @@ class S5MegpoidPostResidualFallbackTensorIndexTest {
             S5MegpoidPostResidualFallbackTensorKeys.NORMALIZATION_BIAS to
                 (listOf(32) to encoded(normalizationBias, 2)),
             S5MegpoidPostResidualFallbackTensorKeys.DENSE_WEIGHTS to
-                (listOf(8, 32, 1, 1) to encoded(denseWeights, 3)),
+                (denseWeightMetadata to encoded(denseWeights, 3)),
             S5MegpoidPostResidualFallbackTensorKeys.DENSE_BIAS to
                 (listOf(8) to encoded(denseBias, 4))
         )
@@ -133,25 +134,18 @@ class S5MegpoidPostResidualFallbackTensorIndexTest {
 
     @Test
     fun rejectsAValidElementCountWithWrongAxisMetadata() {
-        val fixture = fixture()
-        val source = fixture.tree
-        val wrongAxisJson = """
-            {
-              "a": {
-                "${S5MegpoidPostResidualFallbackTensorKeys.DENSE_WEIGHTS}": {
-                  "${S5MegpoidPostResidualFallbackTensorKeys.SHAPE_METADATA_KEY}": [8,16,2,1],
-                  "${S5MegpoidPostResidualFallbackTensorKeys.TYPED_PAYLOAD_KEY}":
-                    "${indexDummyPayload(256)}"
-                }
-              }
-            }
-        """.trimIndent()
-        val wrongAxisTree = S5ModelObjectTree.parseUtf8(wrongAxisJson)
-        val onlyDense = S5MegpoidPostResidualFallbackTensorIndex.build(
-            // Build must reject the missing sibling tensor keys before trying to execute anything.
-            wrongAxisTree
+        val fixture = fixture(
+            denseWeightMetadata = listOf(8, 16, 2, 1),
+            denseWeights = FloatArray(256)
         )
-        assertEquals(256, onlyDense.denseWeights.elementCount)
+        val index = S5MegpoidPostResidualFallbackTensorIndex.build(fixture.tree)
+        assertEquals(256, index.denseWeights.elementCount)
+        assertThrows(IllegalArgumentException::class.java) {
+            index.resolveDimensions()
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            index.buildStage(fixture.decoder)
+        }
     }
 
     @Test
