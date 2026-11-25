@@ -57,32 +57,31 @@ The native phone-feature routine writes row-major [position][feature] values. Th
 ## Remaining work
 
 The app can build this matrix only after timed VsmPhoneEvent objects and the active S5ApiDefaultPhoneFeatureLayout have been supplied. Note-level phoneme display text is not yet converted into aligned phone events, and active render-state descriptor fields are not fully populated.
-## Descriptor owner and constructor offset — 2026-11-25
+## Constructor-path correction — 2026-11-25
 
-The `Func_417eec3e` export calls `FUN_18003ab70` with
-`param_1 + 0xD0` as the phone feature descriptor. The descriptor fields
-consumed downstream by `FUN_18006c720` are relative to that pointer:
-category width at +0x10, minimum duration at +0x14, maximum duration at
-+0x18, following/preceding context counts at +0x1C/+0x20, optional flag
-pair at +0x24, and layout mode at +0x25.
+The earlier proposed match between the phone descriptor at
+`Func_417eec3e`'s `param_1 + 0xD0` and `FUN_180013830` was incorrect.
+It omitted the `+0x18` pointer adjustment at the preceding callsite.
 
-The constructor chain has a matching subobject location:
+The actual constructor path recovered from `FUN_180012b40` is:
 
 ```text
-FUN_180013410(owner)
-  -> FUN_180011680(owner + 0x08)
-       -> FUN_180013830((owner + 0x08) + 200)
+FUN_180012b40(param_1 = lVar7)
+  -> FUN_180013410(param_1 + 6)       // uint* arithmetic: lVar7 + 0x18
+       -> FUN_180011680(param_1 + 8)  // lVar7 + 0x20
+            -> FUN_180013830(param_1 + 200) // lVar7 + 0xE8
 ```
 
-The decimal offset 200 is 0xC8, so the final constructor target is exactly
-`owner + 0xD0`. This is an offset-level match to the descriptor pointer
-passed by `Func_417eec3e`. The constructor target is now explicitly included
-in the Ghidra render-path export so its initialized fields and later
-overwrites can be distinguished.
+By contrast, `Func_417eec3e` passes its own `param_1 + 0xD0` to
+`FUN_18003ab70`. The roots are not proven to be the same object, and the
+computed offsets do not match: the large `FUN_180013830` subobject begins
+at `lVar7 + 0xE8`, not `lVar7 + 0xD0`. Its observed constructor also
+initializes a much larger DSP state object, including a 256-float generated
+window, rather than establishing the phone descriptor's +0x10..+0x26
+fields.
 
-This establishes a concrete constructor candidate for the descriptor; it
-does not yet prove that every caller passes the same owner type or that the
-constructor's defaults are the final active render values. In particular,
-the category width, duration limits, context counts, optional flag and mode
-must be traced past constructor initialization before they can be used to
-prepare Megpoid input.
+Therefore `FUN_180013830` is **not** evidence for the phone descriptor's
+constructor. The actual owner and field-population path for the descriptor
+passed to `FUN_18003ab70` remain unresolved. The byte decoder added in
+Android is only a validated parser for the already recovered field offsets;
+it does not claim to obtain those values from the live Windows context.
