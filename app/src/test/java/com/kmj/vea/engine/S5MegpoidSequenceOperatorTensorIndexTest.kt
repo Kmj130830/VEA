@@ -16,7 +16,8 @@ class S5MegpoidSequenceOperatorTensorIndexTest {
     private data class Fixture(val tree: S5ModelObjectTree, val decoder: S5TypedTensorDecoder)
 
     private fun fixture(
-        tensors: Map<Pair<S5MegpoidSequenceOperatorFactory, Int>, FloatArray>
+        tensors: Map<Pair<S5MegpoidSequenceOperatorFactory, Int>, FloatArray>,
+        metadata: Map<Pair<S5MegpoidSequenceOperatorFactory, Int>, List<Int>> = emptyMap()
     ): Fixture {
         val decoded = mutableMapOf<String, FloatArray>()
         val fields = tensors.entries.map { entry ->
@@ -75,6 +76,41 @@ class S5MegpoidSequenceOperatorTensorIndexTest {
             .buildBankedLinearProjection(2, 2, 2, 2, true, f.decoder)
         assertEquals(listOf(1f,5f,3f,7f,2f,6f,4f,8f), stage.copyPackedWeights().toList())
         assertEquals(listOf(0.25f,-0.25f), stage.copyBias()?.toList())
+    }
+
+    @Test
+    fun preservesTheNativeAlternateTransitionShapeMetadata() {
+        val weightKey = S5MegpoidSequenceOperatorFactory.ALTERNATE_WEIGHTS to 0
+        val biasKey = S5MegpoidSequenceOperatorFactory.ALTERNATE_BIAS to 0
+        val f = fixture(
+            tensors = mapOf(
+                weightKey to FloatArray(32 * 32 * 3),
+                biasKey to FloatArray(32)
+            ),
+            metadata = mapOf(
+                weightKey to listOf(32, 32, 3, 1),
+                biasKey to listOf(32)
+            )
+        )
+        val pair = S5MegpoidSequenceOperatorTensorIndex.build(f.tree)
+            .alternateTransitionPairOrNull(0)
+
+        assertNotNull(pair)
+        assertEquals(listOf(32, 32, 3, 1), pair?.weights?.descriptorMetadata)
+        assertEquals(listOf(32), pair?.bias?.descriptorMetadata)
+        assertEquals(32 * 32 * 3, pair?.weights?.elementCount)
+    }
+
+    @Test
+    fun rejectsSequenceTensorMetadataThatDoesNotMatchItsPayload() {
+        val weightKey = S5MegpoidSequenceOperatorFactory.ALTERNATE_WEIGHTS to 0
+        val f = fixture(
+            tensors = mapOf(weightKey to FloatArray(32 * 32 * 3)),
+            metadata = mapOf(weightKey to listOf(32, 32, 2, 1))
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            S5MegpoidSequenceOperatorTensorIndex.build(f.tree)
+        }
     }
 
     @Test fun keepsAlternateTransitionSeparateFromStandardBankedProjection() {
