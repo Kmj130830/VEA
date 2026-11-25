@@ -106,6 +106,40 @@ FUN_1800cdbb0 copies the block-data vector using FUN_1800afc30 and the
 0x100-byte stride. FUN_1800c47a0 copies the state vector using FUN_1800af720
 and the 0x88-byte stride.
 
+
+## Terminal model-output buffers and representation selector
+
+The trailing section of `FUN_1800c7ad0` establishes the terminal buffer
+contract after the output-head and optional modulation/carrier branches:
+
+| Root-relative field | Observed role |
+|---|---|
+| `+0x48` | Byte selector for the final two-plane representation |
+| `+0x4F8` | Pointer to the interleaved complex-spectrum output buffer |
+| `+0x13E * 4` | Word-index form of the same output-buffer pointer field used by the decompiler |
+| `+0x20` | Output-transform descriptor passed to `FUN_18012c740` |
+
+The output-feature buffer contains two contiguous float32 planes, each with
+`param[2]` values. The function converts them to `param[2]` interleaved
+complex bins and passes the result to `FUN_18012c740` together with the
+descriptor at root `+0x20`. The selector at root `+0x48` chooses between
+direct real/imaginary planes and log-magnitude/phase planes. Its active
+AI Megpoid value has not yet been linked to a specific runtime-option key.
+
+For the supplied AI Megpoid runtime options, `param[2] = 513`, so the
+terminal output contains 513 complex bins / 1,026 float32 values. The
+separate output-transform descriptor consumes this frame and produces
+`param[3] = 320` time-domain samples.
+
+The output-head descriptors at root `+0x310` and `+0x338` are additional
+Dense/global-normalization objects reached after the sequence/residual
+operators in the non-carrier branch. Their model-property provenance is not
+the same as the pre-residual descriptors at `+0x1F8` and `+0x228`.
+The optional multi-part and carrier-mix paths use further state at offsets
+around `+0x3400`, `+0x3559`, `+0xD40`, `+0xD6C`, `+0xD74` and
+`+0xD80`; their complete ownership and model-value mapping remain under
+investigation.
+
 ## Object-relative offset caution
 
 FUN_180015d10 and FUN_180016dc0 are destructors for other nested object
