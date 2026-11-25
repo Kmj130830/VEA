@@ -45,6 +45,26 @@ class PreparedMegpoidSpectralOutputSession(
         return output
     }
 
+    /**
+     * Converts the terminal pair of model feature planes to an interleaved
+     * complex spectrum using an explicitly selected native output encoding,
+     * then runs the same inverse-FFT/overlap-add path as processSpectrumFrame.
+     */
+    @Synchronized
+    fun processModelOutputPlanes(
+        firstFeaturePlane: FloatArray,
+        secondFeaturePlane: FloatArray,
+        encoding: S5MegpoidSpectrumFrameEncoding
+    ): FloatArray {
+        val spectrum = S5MegpoidSpectrumFrameEncoder.encode(
+            firstFeaturePlane = firstFeaturePlane,
+            secondFeaturePlane = secondFeaturePlane,
+            shape = spectrumShape,
+            encoding = encoding
+        )
+        return processSpectrumFrame(spectrum)
+    }
+
     /** Clears overlap history and starts a fresh utterance-local frame count. */
     @Synchronized
     fun reset() {
