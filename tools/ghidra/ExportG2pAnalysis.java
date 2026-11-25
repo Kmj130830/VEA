@@ -12,6 +12,7 @@ import ghidra.program.model.listing.InstructionIterator;
 import ghidra.program.model.mem.MemoryAccessException;
 import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.symbol.Reference;
+import ghidra.program.model.symbol.ReferenceIterator;
 import ghidra.program.model.symbol.Symbol;
 import ghidra.program.model.symbol.SymbolIterator;
 import ghidra.program.model.symbol.SymbolType;
@@ -194,6 +195,54 @@ public class ExportG2pAnalysis extends GhidraScript {
             if (function != null && !selected.containsKey(function.getEntryPoint())) {
                 selected.put(function.getEntryPoint(), function);
                 queue.add(new WorkItem(function, 0));
+            }
+        }
+
+        // The Korean manager's exported factory call graph does not reach the
+        // later lyric parser and syllable-conversion pipeline. Keep those
+        // internal entry points in the report even when the host wrapper's
+        // factory/vtable closure is otherwise complete.
+        if (currentProgram.getName().toLowerCase().contains("g2pamanager_kor")) {
+            String[] koreanParserSeeds = {
+                "180007210", // literal lexical pronunciation rewrites
+                "180007390", // lyric preprocessing / per-code-unit state
+                "180007f80", // Hangul syllable-to-phone mapping
+                "180008730", // downstream Korean parser / converter
+                "180006bc0", // parser helper reached by the transform path
+                "180006f80", // segment / string conversion helper
+                "1800063c0", // internal module preparation
+                "180001350"  // manager-facing note/result processing
+            };
+            for (String hex : koreanParserSeeds) {
+                Address address = currentProgram.getAddressFactory()
+                    .getDefaultAddressSpace().getAddress(Long.parseUnsignedLong(hex, 16));
+                Function function = currentProgram.getFunctionManager().getFunctionAt(address);
+                if (function == null) {
+                    function = currentProgram.getFunctionManager().getFunctionContaining(address);
+                }
+                if (function == null) {
+                    printerr("Korean parser seed was not recovered at " + address);
+                    continue;
+                }
+                if (!selected.containsKey(function.getEntryPoint())) {
+                    selected.put(function.getEntryPoint(), function);
+                    queue.addLast(new WorkItem(function, 0));
+                }
+
+                // Add direct callers of each forced seed so the report records
+                // the arguments and ownership boundary at the call site.
+                ReferenceIterator callers =
+                    currentProgram.getReferenceManager().getReferencesTo(function.getEntryPoint());
+                while (callers.hasNext()) {
+                    Reference reference = callers.next();
+                    if (!reference.getReferenceType().isCall()) continue;
+                    Function caller = currentProgram.getFunctionManager()
+                        .getFunctionContaining(reference.getFromAddress());
+                    if (caller != null && !selected.containsKey(caller.getEntryPoint())) {
+                        selected.put(caller.getEntryPoint(), caller);
+                        queue.addLast(new WorkItem(caller, 0));
+                    }
+                }
             }
         }
 
