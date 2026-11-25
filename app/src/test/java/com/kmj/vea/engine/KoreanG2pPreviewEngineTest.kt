@@ -14,9 +14,7 @@ class KoreanG2pPreviewEngineTest {
         assertEquals("디귿이 가라", result.normalizedText)
         assertEquals(2, result.tokens.size)
         assertEquals("디그시", result.tokens[0].lexicalForm)
-        assertEquals(listOf("가라"), result.tokens[1].syllablePhoneGroups.let {
-            listOf(it.joinToString(" "))
-        }.filter { it == "가라" }) // Guard that the token remains independently scoped.
+        assertEquals(listOf("g a", "r a"), result.tokens[1].syllablePhoneGroups)
         assertEquals(listOf("g", "a", "r", "a"), result.tokens[1].phoneLabels)
     }
 
