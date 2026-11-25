@@ -128,6 +128,14 @@ public class ExportS5RendererPath extends GhidraScript {
                 // Active carrier source arrays and their native tensor-property factories.
                 "1800e9ac0", "1800e9900", "1800e9740", "1800e9580",
                 "1800d5970", "1800c0960", "1800adca0",
+                // Trace the Alternate reverse-transition tensor materialization.
+                // FUN_1800ced10 selects hash -> FUN_1800d5970 -> typed value decode
+                // FUN_1800b8b20 -> shared float-vector attach FUN_1800c0320.
+                // These helpers establish whether the VTB2 payload order is
+                // preserved before FUN_1800c72d0 consumes the [M][3*C] matrix.
+                "1800b8b20", "1800c0320", "1800b0590",
+                "1800d44b0", "1800d47c0", "1800c72d0", "1800c6390",
+                "1800e6de0", "1800dc260", "1800b6d40",
                 // Populate the root scalar fields consumed by FUN_1800d5a00.
                 "1800ced10", "1800bc5e0", "1800d4bf0", "1800d5a00",
                 "1800ccafd"
