@@ -162,66 +162,46 @@ data class PreparedMegpoidRuntime(
         )
 
     /**
-     * Builds the active model-backed 32-to-8 multipart output head.
-     * This is the path selected by AI Megpoid V7's D00=4, D01=true options.
+     * Splits a feature-major tensor already produced by the active native
+     * multi-part graph into its verified real/imaginary feature-plane pairs.
+     *
+     * This method deliberately does not project the 32-channel sequence
+     * result: the VTB2 32-to-8 Dense tensors currently indexed by
+     * S5MegpoidPostResidualFallbackTensorIndex belong to the inactive
+     * non-multipart fallback branch.
      */
-    fun prepareMultipartOutputHeadStage(
-        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
-    ): S5MegpoidMultipartOutputHeadStage {
-        check(runtimeOptions.usesMultiPartOutputHead) {
-            "The selected voicebank does not use the multipart output head."
-        }
-        return modelPackage.prepareMultipartOutputHeadStage(tensorDecoder)
-    }
-
-    /**
-     * Runs the model-backed output projection on the 32-channel sequence
-     * result and splits the resulting 2*D00 feature rows into real/imaginary
-     * pairs in the native per-part order.
-     */
-    fun projectMultipartOutputHead(
-        sequenceOutput: S5MegpoidSequenceTransitionOutput,
-        stage: S5MegpoidMultipartOutputHeadStage =
-            prepareMultipartOutputHeadStage(),
-        gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel,
-        statistics: S5MegpoidStatisticsKernel = NativeS5MegpoidStatisticsKernel
+    fun splitMultipartOutputFeatures(
+        outputFeatureMajor: FloatArray,
+        positionCount: Int
     ): S5MegpoidMultipartFeaturePlanes {
         check(runtimeOptions.usesMultiPartOutputHead) {
-            "The selected voicebank does not use the multipart output head."
+            "The selected voicebank does not use the multipart output path."
         }
-        require(stage.partCount == runtimeOptions.paramD00) {
-            "Multipart output-head stage has ${stage.partCount} parts; model options require ${runtimeOptions.paramD00}."
-        }
-        return stage.project(
-            sequenceOutput = sequenceOutput,
-            gemm = gemm,
-            statistics = statistics
+        return S5MegpoidMultipartFeaturePlaneExtractor.extract(
+            outputFeatureMajor = outputFeatureMajor,
+            partCount = runtimeOptions.paramD00,
+            positionCount = positionCount
         )
     }
 
     /**
-     * Executes the portable four-part complex accumulation after the
-     * model-backed 32-to-8 projection. The returned interleaved complex pairs
-     * are the S5API multipart accumulator before carrier-history addition
-     * and inverse-FFT/overlap-add output.
+     * Applies the recovered per-part rotation/gain and complex accumulation
+     * to an already-produced active multi-part feature tensor.
+     * The upstream feature-generation/interpolation graph remains a separate
+     * prerequisite and is not inferred or replaced by fallback weights.
      */
     fun accumulateMultipartComplexOutput(
-        sequenceOutput: S5MegpoidSequenceTransitionOutput,
-        modulation: S5MegpoidMultipartOutputModulation,
-        stage: S5MegpoidMultipartOutputHeadStage =
-            prepareMultipartOutputHeadStage(),
-        gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel,
-        statistics: S5MegpoidStatisticsKernel = NativeS5MegpoidStatisticsKernel
+        outputFeatureMajor: FloatArray,
+        positionCount: Int,
+        modulation: S5MegpoidMultipartOutputModulation
     ): FloatArray {
-        val planes = projectMultipartOutputHead(
-            sequenceOutput = sequenceOutput,
-            stage = stage,
-            gemm = gemm,
-            statistics = statistics
-        )
         require(modulation.partCount == runtimeOptions.paramD00) {
             "Multipart modulation part count does not match the active model options."
         }
+        require(modulation.positionCount == positionCount) {
+            "Multipart modulation position count does not match the output feature tensor."
+        }
+        val planes = splitMultipartOutputFeatures(outputFeatureMajor, positionCount)
         val accumulator = planes.newInterleavedComplexAccumulator()
         planes.accumulateInto(accumulator, modulation)
         return accumulator
