@@ -252,14 +252,13 @@ class S5MegpoidCarrierFusionWorkspace(
 
     /**
      * Completes one active carrier-history frame in native order:
-     * 1) apply the model-backed [2][K] carrier projection and affine controls;
-     * 2) store its two planar rows in the D80 ring and advance the write cursor;
-     * 3) read the native delayed slot at the updated cursor and add its complex
-     *    product to the caller's interleaved multipart accumulator.
+     * 1) store the separately generated carrier frame in the D80 ring;
+     * 2) run the model-backed [2][K] carrier projection and affine controls;
+     * 3) read the native delayed slot and add its complex product to the
+     *    caller's interleaved multipart accumulator.
      *
-     * The source feature tensor is supplied explicitly. This method does not
-     * invent the upstream carrier-input construction or its per-frame scale /
-     * amplitude values.
+     * The carrier-history planes and Dense input tensor are separate upstream
+     * inputs. Neither is derived from the D74 projection result here.
      */
     fun processActiveCarrierFrame(
         outputInterleaved: FloatArray,
