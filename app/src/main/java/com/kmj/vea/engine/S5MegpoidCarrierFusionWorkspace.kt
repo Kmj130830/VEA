@@ -93,6 +93,36 @@ data class S5MegpoidCarrierFusionBufferGeometry(
 }
 
 /**
+ * All externally prepared inputs required for one native active carrier frame.
+ *
+ * The carrier generator producing history planes and the feature source feeding
+ * the active Dense projection are independent upstream stages. This holder
+ * makes both sources explicit instead of synthesizing either from the other.
+ */
+data class S5MegpoidCarrierFusionFrameInput(
+    val workspace: S5MegpoidCarrierFusionWorkspace,
+    val inputFeatureMajor: FloatArray,
+    val carrierHistoryFirstPlane: FloatArray,
+    val carrierHistorySecondPlane: FloatArray,
+    val scale: Float,
+    val amplitude: Float,
+    val activeParameters: S5MegpoidCarrierFusionActiveParameters? = null
+) {
+    init {
+        require(scale.isFinite() && amplitude.isFinite()) {
+            "Carrier frame scale and amplitude must be finite."
+        }
+        require(inputFeatureMajor.all { it.isFinite() }) {
+            "Carrier Dense input contains a non-finite value."
+        }
+        require(carrierHistoryFirstPlane.all { it.isFinite() } &&
+            carrierHistorySecondPlane.all { it.isFinite() }) {
+            "Carrier history frame contains a non-finite value."
+        }
+    }
+}
+
+/**
  * State for the carrier branch's separate Dense input/output buffers and
  * two-plane carrier-frame history ring.
  *
