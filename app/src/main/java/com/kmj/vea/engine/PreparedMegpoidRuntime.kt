@@ -295,6 +295,41 @@ data class PreparedMegpoidRuntime(
         )
     }
 
+    /**
+     * Applies one active carrier-history frame to an existing multipart
+     * complex accumulator. The incoming history planes are produced by the
+     * separate carrier generator; they are not the D74 projection output.
+     */
+    fun processCarrierFusionFrame(
+        workspace: S5MegpoidCarrierFusionWorkspace,
+        outputInterleaved: FloatArray,
+        inputFeatureMajor: FloatArray,
+        carrierHistoryFirstPlane: FloatArray,
+        carrierHistorySecondPlane: FloatArray,
+        scale: Float,
+        amplitude: Float,
+        activeParameters: S5MegpoidCarrierFusionActiveParameters =
+            prepareCarrierFusionActiveParameters(),
+        gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel
+    ): FloatArray {
+        check(carrierFusionEnabled) {
+            "Carrier fusion is disabled by the selected voicebank runtime options."
+        }
+        require(activeParameters.inputFeatures == workspace.geometry.inputFeatures) {
+            "Carrier parameters and workspace feature widths do not match."
+        }
+        return workspace.processActiveCarrierFrame(
+            outputInterleaved = outputInterleaved,
+            inputFeatureMajor = inputFeatureMajor,
+            carrierHistoryFirstPlane = carrierHistoryFirstPlane,
+            carrierHistorySecondPlane = carrierHistorySecondPlane,
+            activeParameters = activeParameters,
+            scale = scale,
+            amplitude = amplitude,
+            gemm = gemm
+        )
+    }
+
     /** Builds the carrier Dense workspace using active render-context geometry. */
     fun createCarrierFusionWorkspace(
         carrierPositions: Int,
