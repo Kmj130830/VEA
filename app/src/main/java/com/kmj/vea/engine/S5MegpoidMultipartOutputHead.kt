@@ -1,52 +1,61 @@
 package com.kmj.vea.engine
 
 /**
- * The shared complex feature pair consumed by the native four-part output
- * modulation loop in FUN_1800c7ad0.
+ * The four complex feature pairs consumed by the native D00-part output loop
+ * in FUN_1800c7ad0.
  *
- * The active native path writes two contiguous planes to +0x136:
- *   [first/real: positionCount values][second/imaginary: positionCount values]
- *
- * The outer loop iterates D00 parts, but it reuses this same pair for every
- * part. Per-part locations, rotation and gain are stored in separate
- * part-major tables and applied by S5MegpoidMultipartOutputModulation.
+ * The active output buffer is feature-major:
+ *   [part0.real][part0.imag][part1.real][part1.imag] ... [part3.real][part3.imag]
+ * Each plane contains positionCount consecutive float32 values. Native
+ * advances the first-plane and second-plane pointers by 2*positionCount for
+ * each outer-loop part, while modulation tables advance by positionCount.
  */
-class S5MegpoidMultipartComplexFeaturePair internal constructor(
+class S5MegpoidMultipartFeaturePlanes internal constructor(
+    val partCount: Int,
     val positionCount: Int,
-    firstFeaturePlane: FloatArray,
-    secondFeaturePlane: FloatArray
+    firstFeaturePlaneByPart: List<FloatArray>,
+    secondFeaturePlaneByPart: List<FloatArray>
 ) {
-    private val first = firstFeaturePlane.copyOf()
-    private val second = secondFeaturePlane.copyOf()
+    private val firstPlanes = firstFeaturePlaneByPart.map { it.copyOf() }
+    private val secondPlanes = secondFeaturePlaneByPart.map { it.copyOf() }
 
     init {
-        require(positionCount > 0)
-        require(first.size == positionCount && second.size == positionCount) {
-            "The active multipart feature pair must contain exactly $positionCount values per plane."
+        require(partCount >= 2 && positionCount > 0)
+        require(firstPlanes.size == partCount && secondPlanes.size == partCount) {
+            "Multipart output must contain exactly $partCount real/imaginary feature pairs."
         }
-        require(first.all { it.isFinite() } && second.all { it.isFinite() }) {
-            "The active multipart feature pair contains a non-finite value."
-        }
+        require(firstPlanes.all { plane ->
+            plane.size == positionCount && plane.all { it.isFinite() }
+        })
+        require(secondPlanes.all { plane ->
+            plane.size == positionCount && plane.all { it.isFinite() }
+        })
     }
 
-    fun firstFeaturePlane(): FloatArray = first.copyOf()
+    fun firstFeaturePlane(partIndex: Int): FloatArray {
+        require(partIndex in 0 until partCount)
+        return firstPlanes[partIndex].copyOf()
+    }
 
-    fun secondFeaturePlane(): FloatArray = second.copyOf()
+    fun secondFeaturePlane(partIndex: Int): FloatArray {
+        require(partIndex in 0 until partCount)
+        return secondPlanes[partIndex].copyOf()
+    }
 
-    /**
-     * Applies the same complex pair to each part in native part-index order.
-     */
     fun accumulateInto(
         outputInterleaved: FloatArray,
         modulation: S5MegpoidMultipartOutputModulation
     ) {
+        require(modulation.partCount == partCount) {
+            "Multipart modulation has ${modulation.partCount} parts; feature tensor has $partCount."
+        }
         require(modulation.positionCount == positionCount) {
-            "Multipart modulation has ${modulation.positionCount} positions; feature pair has $positionCount."
+            "Multipart modulation has ${modulation.positionCount} positions; feature tensor has $positionCount."
         }
         modulation.accumulateAllPartsInto(
             outputInterleaved = outputInterleaved,
-            firstFeaturePlane = first,
-            secondFeaturePlane = second
+            firstFeaturePlaneByPart = firstPlanes,
+            secondFeaturePlaneByPart = secondPlanes
         )
     }
 
@@ -63,30 +72,49 @@ class S5MegpoidMultipartComplexFeaturePair internal constructor(
 }
 
 /**
- * Extracts the two shared real/imaginary planes from the active output tensor.
+ * Splits the active post-residual feature-major tensor into the exact
+ * part-specific real/imaginary plane pairs read by FUN_1800c7ad0.
  *
- * This is intentionally not a 2*D00 tensor split: the native render code
- * offsets the second plane by the output width and reuses the same pair for
- * every one of the D00 modulation parts.
+ * For AI Megpoid V7 D00=4, the input contains eight rows:
+ *   [real0][imag0][real1][imag1][real2][imag2][real3][imag3].
+ * This mapping is derived from the native per-part pointer stride of
+ * 2*positionCount values, not from a guessed channel interpretation.
  */
 object S5MegpoidMultipartFeaturePlaneExtractor {
     fun extract(
         outputFeatureMajor: FloatArray,
+        partCount: Int,
         positionCount: Int
-    ): S5MegpoidMultipartComplexFeaturePair {
-        require(positionCount > 0)
-        val expectedValues = checkedProduct(2, positionCount)
+    ): S5MegpoidMultipartFeaturePlanes {
+        require(partCount >= 2 && positionCount > 0)
+        val featurePlaneCount = checkedProduct(partCount, 2)
+        val expectedValues = checkedProduct(featurePlaneCount, positionCount)
         require(outputFeatureMajor.size == expectedValues) {
-            "Active multipart feature tensor must contain exactly two planes * $positionCount positions."
+            "Active multipart feature tensor must contain $featurePlaneCount planes * $positionCount positions."
         }
         require(outputFeatureMajor.all { it.isFinite() }) {
             "Active multipart feature tensor contains a non-finite value."
         }
 
-        return S5MegpoidMultipartComplexFeaturePair(
+        val first = ArrayList<FloatArray>(partCount)
+        val second = ArrayList<FloatArray>(partCount)
+        for (part in 0 until partCount) {
+            val firstOffset = checkedProduct(part * 2, positionCount)
+            val secondOffset = checkedProduct(part * 2 + 1, positionCount)
+            first += outputFeatureMajor.copyOfRange(
+                firstOffset,
+                firstOffset + positionCount
+            )
+            second += outputFeatureMajor.copyOfRange(
+                secondOffset,
+                secondOffset + positionCount
+            )
+        }
+        return S5MegpoidMultipartFeaturePlanes(
+            partCount = partCount,
             positionCount = positionCount,
-            firstFeaturePlane = outputFeatureMajor.copyOfRange(0, positionCount),
-            secondFeaturePlane = outputFeatureMajor.copyOfRange(positionCount, expectedValues)
+            firstFeaturePlaneByPart = first,
+            secondFeaturePlaneByPart = second
         )
     }
 
