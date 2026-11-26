@@ -1,0 +1,185 @@
+package com.kmj.vea.engine
+
+/**
+ * Four-part post-residual output-head bridge recovered from FUN_1800c7ad0.
+ *
+ * The native render path first produces an outputFeature-major [8, positions]
+ * tensor, then reads it as four consecutive (real, imaginary) plane pairs:
+ *
+ *   part 0: [channel 0][channel 1]
+ *   part 1: [channel 2][channel 3]
+ *   part 2: [channel 4][channel 5]
+ *   part 3: [channel 6][channel 7]
+ *
+ * Within each channel, positions are contiguous. This is not an arbitrary
+ * channel interpretation: it follows the native pointer increments by
+ * 2 * positionCount for each part and by positionCount between the two planes.
+ */
+class S5MegpoidMultipartFeaturePlanes internal constructor(
+    val partCount: Int,
+    val positionCount: Int,
+    firstFeaturePlaneByPart: List<FloatArray>,
+    secondFeaturePlaneByPart: List<FloatArray>
+) {
+    private val firstPlanes = firstFeaturePlaneByPart.map(FloatArray::copyOf)
+    private val secondPlanes = secondFeaturePlaneByPart.map(FloatArray::copyOf)
+
+    init {
+        require(partCount >= 2 && positionCount > 0)
+        require(firstPlanes.size == partCount && secondPlanes.size == partCount)
+        require(firstPlanes.all { it.size == positionCount && it.all(Float::isFinite) })
+        require(secondPlanes.all { it.size == positionCount && it.all(Float::isFinite) })
+    }
+
+    fun firstFeaturePlane(partIndex: Int): FloatArray {
+        require(partIndex in 0 until partCount)
+        return firstPlanes[partIndex].copyOf()
+    }
+
+    fun secondFeaturePlane(partIndex: Int): FloatArray {
+        require(partIndex in 0 until partCount)
+        return secondPlanes[partIndex].copyOf()
+    }
+
+    /**
+     * Adds the four part contributions to an interleaved complex accumulator
+     * using the modulation table generated from the same frame's F0/theta.
+     */
+    fun accumulateInto(
+        outputInterleaved: FloatArray,
+        modulation: S5MegpoidMultipartOutputModulation
+    ) {
+        require(modulation.partCount == partCount) {
+            "Multipart modulation has ${modulation.partCount} parts; feature tensor has $partCount."
+        }
+        require(modulation.positionCount == positionCount) {
+            "Multipart modulation has ${modulation.positionCount} positions; feature tensor has $positionCount."
+        }
+        modulation.accumulateAllPartsInto(
+            outputInterleaved = outputInterleaved,
+            firstFeaturePlaneByPart = firstPlanes,
+            secondFeaturePlaneByPart = secondPlanes
+        )
+    }
+
+    fun newInterleavedComplexAccumulator(): FloatArray =
+        FloatArray(checkedProduct(positionCount, 2))
+}
+
+/**
+ * Splits the post-residual output-head tensor into the exact four real/imaginary
+ * plane pairs consumed by the native multipart modulation loop.
+ *
+ * Input is row-major [feature][position], i.e. feature * positionCount + position.
+ * The native D00=4, D01=true Megpoid configuration requires exactly 8 feature rows.
+ */
+object S5MegpoidMultipartFeaturePlaneExtractor {
+    fun extract(
+        outputFeatureMajor: FloatArray,
+        partCount: Int,
+        positionCount: Int
+    ): S5MegpoidMultipartFeaturePlanes {
+        require(partCount >= 2) {
+            "The native multipart output head requires at least two parts."
+        }
+        require(positionCount > 0)
+        val featureCount = checkedProduct(partCount, 2)
+        val expectedValues = checkedProduct(featureCount, positionCount)
+        require(outputFeatureMajor.size == expectedValues) {
+            "Multipart output tensor must contain exactly $featureCount * $positionCount values."
+        }
+        require(outputFeatureMajor.all(Float::isFinite)) {
+            "Multipart output tensor contains a non-finite value."
+        }
+
+        val first = ArrayList<FloatArray>(partCount)
+        val second = ArrayList<FloatArray>(partCount)
+        for (part in 0 until partCount) {
+            val firstChannelOffset = checkedProduct(part * 2, positionCount)
+            val secondChannelOffset = checkedProduct(part * 2 + 1, positionCount)
+            first += outputFeatureMajor.copyOfRange(
+                firstChannelOffset,
+                firstChannelOffset + positionCount
+            )
+            second += outputFeatureMajor.copyOfRange(
+                secondChannelOffset,
+                secondChannelOffset + positionCount
+            )
+        }
+        return S5MegpoidMultipartFeaturePlanes(
+            partCount = partCount,
+            positionCount = positionCount,
+            firstFeaturePlaneByPart = first,
+            secondFeaturePlaneByPart = second
+        )
+    }
+
+    private fun checkedProduct(a: Int, b: Int): Int {
+        val product = a.toLong() * b.toLong()
+        require(a > 0 && b > 0 && product <= Int.MAX_VALUE) {
+            "Multipart output tensor size is invalid or exceeds the Kotlin array limit."
+        }
+        return product.toInt()
+    }
+}
+
+/**
+ * Portable active multipart head. It uses the same VTB2 normalization and
+ * 32-to-(D00*2) Dense tensors that FUN_1800ced10 fuses into native root
+ * buffers +0x150/+0x154/+0x158. Calling global-normalization then Dense is
+ * algebraically equivalent to the native fused projection and keeps the
+ * recovered float32 operator order explicit in this Android implementation.
+ */
+class S5MegpoidMultipartOutputHeadStage internal constructor(
+    private val normalizedDenseProjection: S5MegpoidPostResidualFallbackStage,
+    val partCount: Int
+) {
+    val inputFeatures: Int get() = normalizedDenseProjection.inputFeatures
+    val outputFeatures: Int get() = normalizedDenseProjection.outputFeatures
+
+    init {
+        require(partCount >= 2)
+        require(outputFeatures == partCount * 2) {
+            "The multipart Dense head must produce exactly two planes per part."
+        }
+    }
+
+    fun project(
+        inputFeatureMajor: FloatArray,
+        inputPositions: Int,
+        gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel,
+        statistics: S5MegpoidStatisticsKernel = NativeS5MegpoidStatisticsKernel
+    ): S5MegpoidMultipartFeaturePlanes {
+        val projected = normalizedDenseProjection.forward(
+            inputFeatureMajor = inputFeatureMajor,
+            positions = inputPositions,
+            gemm = gemm,
+            statistics = statistics
+        )
+        return S5MegpoidMultipartFeaturePlaneExtractor.extract(
+            outputFeatureMajor = projected,
+            partCount = partCount,
+            positionCount = inputPositions
+        )
+    }
+
+    fun project(
+        sequenceOutput: S5MegpoidSequenceTransitionOutput,
+        gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel,
+        statistics: S5MegpoidStatisticsKernel = NativeS5MegpoidStatisticsKernel
+    ): S5MegpoidMultipartFeaturePlanes {
+        require(sequenceOutput.channels == inputFeatures) {
+            "Sequence output has ${sequenceOutput.channels} channels; multipart head expects $inputFeatures."
+        }
+        require(sequenceOutput.features.size.toLong() ==
+            inputFeatures.toLong() * sequenceOutput.positions.toLong()) {
+            "Sequence output tensor dimensions do not match its backing feature array."
+        }
+        return project(
+            inputFeatureMajor = sequenceOutput.features,
+            inputPositions = sequenceOutput.positions,
+            gemm = gemm,
+            statistics = statistics
+        )
+    }
+}
