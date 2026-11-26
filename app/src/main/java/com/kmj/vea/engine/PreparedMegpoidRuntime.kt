@@ -161,6 +161,72 @@ data class PreparedMegpoidRuntime(
             coordinateKernel = coordinateKernel
         )
 
+    /**
+     * Builds the active model-backed 32-to-8 multipart output head.
+     * This is the path selected by AI Megpoid V7's D00=4, D01=true options.
+     */
+    fun prepareMultipartOutputHeadStage(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidMultipartOutputHeadStage {
+        check(runtimeOptions.usesMultiPartOutputHead) {
+            "The selected voicebank does not use the multipart output head."
+        }
+        return modelPackage.prepareMultipartOutputHeadStage(tensorDecoder)
+    }
+
+    /**
+     * Runs the model-backed output projection on the 32-channel sequence
+     * result and splits the resulting 2*D00 feature rows into real/imaginary
+     * pairs in the native per-part order.
+     */
+    fun projectMultipartOutputHead(
+        sequenceOutput: S5MegpoidSequenceTransitionOutput,
+        stage: S5MegpoidMultipartOutputHeadStage =
+            prepareMultipartOutputHeadStage(),
+        gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel,
+        statistics: S5MegpoidStatisticsKernel = NativeS5MegpoidStatisticsKernel
+    ): S5MegpoidMultipartFeaturePlanes {
+        check(runtimeOptions.usesMultiPartOutputHead) {
+            "The selected voicebank does not use the multipart output head."
+        }
+        require(stage.partCount == runtimeOptions.paramD00) {
+            "Multipart output-head stage has ${stage.partCount} parts; model options require ${runtimeOptions.paramD00}."
+        }
+        return stage.project(
+            sequenceOutput = sequenceOutput,
+            gemm = gemm,
+            statistics = statistics
+        )
+    }
+
+    /**
+     * Executes the portable four-part complex accumulation after the
+     * model-backed 32-to-8 projection. The returned interleaved complex pairs
+     * are the S5API multipart accumulator before carrier-history addition
+     * and inverse-FFT/overlap-add output.
+     */
+    fun accumulateMultipartComplexOutput(
+        sequenceOutput: S5MegpoidSequenceTransitionOutput,
+        modulation: S5MegpoidMultipartOutputModulation,
+        stage: S5MegpoidMultipartOutputHeadStage =
+            prepareMultipartOutputHeadStage(),
+        gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel,
+        statistics: S5MegpoidStatisticsKernel = NativeS5MegpoidStatisticsKernel
+    ): FloatArray {
+        val planes = projectMultipartOutputHead(
+            sequenceOutput = sequenceOutput,
+            stage = stage,
+            gemm = gemm,
+            statistics = statistics
+        )
+        require(modulation.partCount == runtimeOptions.paramD00) {
+            "Multipart modulation part count does not match the active model options."
+        }
+        val accumulator = planes.newInterleavedComplexAccumulator()
+        planes.accumulateInto(accumulator, modulation)
+        return accumulator
+    }
+
     /** Actual terminal spectrum representation read from this singer's VTB2 options. */
     val terminalSpectrumEncoding: S5MegpoidSpectrumFrameEncoding
         get() = runtimeOptions.terminalSpectrumEncoding
