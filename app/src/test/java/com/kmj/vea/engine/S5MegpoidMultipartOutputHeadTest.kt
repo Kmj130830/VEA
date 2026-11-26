@@ -40,7 +40,7 @@ class S5MegpoidMultipartOutputHeadTest {
             ),
             nativeRotationSine = floatArrayOf(
                 0f, 0f, 1f, 1f,
-                0f, 0f, 0f, 0f
+                0f, 0f, -1f, 0f
             )
         )
 
