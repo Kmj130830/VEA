@@ -162,25 +162,26 @@ data class PreparedMegpoidRuntime(
         )
 
     /**
-     * Extracts the shared real/imaginary feature pair consumed by all
-     * D00 modulation parts in the active native path.
+     * Extracts the D00 part-specific real/imaginary feature pairs from the
+     * active post-residual output tensor. The model options determine D00.
      */
     fun splitMultipartOutputFeatures(
         outputFeatureMajor: FloatArray,
         positionCount: Int
-    ): S5MegpoidMultipartComplexFeaturePair {
+    ): S5MegpoidMultipartFeaturePlanes {
         check(runtimeOptions.usesMultiPartOutputHead) {
             "The selected voicebank does not use the multipart output path."
         }
         return S5MegpoidMultipartFeaturePlaneExtractor.extract(
             outputFeatureMajor = outputFeatureMajor,
+            partCount = runtimeOptions.paramD00,
             positionCount = positionCount
         )
     }
 
     /**
-     * Applies the per-part rotation/gain tables to one shared complex feature
-     * pair and accumulates all native D00 parts into one interleaved spectrum.
+     * Applies each part's own complex feature pair with its part-major
+     * rotation/gain table, accumulating one interleaved complex spectrum.
      */
     fun accumulateMultipartComplexOutput(
         outputFeatureMajor: FloatArray,
@@ -193,9 +194,9 @@ data class PreparedMegpoidRuntime(
         require(modulation.positionCount == positionCount) {
             "Multipart modulation position count does not match the output feature tensor."
         }
-        val featurePair = splitMultipartOutputFeatures(outputFeatureMajor, positionCount)
-        val accumulator = featurePair.newInterleavedComplexAccumulator()
-        featurePair.accumulateInto(accumulator, modulation)
+        val featurePlanes = splitMultipartOutputFeatures(outputFeatureMajor, positionCount)
+        val accumulator = featurePlanes.newInterleavedComplexAccumulator()
+        featurePlanes.accumulateInto(accumulator, modulation)
         return accumulator
     }
 
