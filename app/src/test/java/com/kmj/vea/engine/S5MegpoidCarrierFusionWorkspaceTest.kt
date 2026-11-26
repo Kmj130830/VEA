@@ -221,7 +221,7 @@ class S5MegpoidCarrierFusionWorkspaceTest {
     }
 
     @Test
-    fun processesActiveCarrierProjectionHistoryWriteAndDelayedComplexAccumulationInNativeOrder() {
+    fun processesSeparateCarrierFrameHistoryAndDelayedComplexAccumulationInNativeOrder() {
         val geometry = S5MegpoidCarrierFusionBufferGeometry(
             inputFeatures = 2,
             carrierPositions = 2,
@@ -240,9 +240,13 @@ class S5MegpoidCarrierFusionWorkspaceTest {
         )
         val output = floatArrayOf(10f, 20f, 30f, 40f)
 
+        val carrierFrameFirstPlane = floatArrayOf(2f, 3f)
+        val carrierFrameSecondPlane = floatArrayOf(5f, 7f)
         val returned = workspace.processActiveCarrierFrame(
             outputInterleaved = output,
             inputFeatureMajor = inputFeatureMajor,
+            carrierHistoryFirstPlane = carrierFrameFirstPlane,
+            carrierHistorySecondPlane = carrierFrameSecondPlane,
             sourceMatrixTwoByInput = sourceMatrix,
             scale = 1f,
             amplitude = 1f,
@@ -252,10 +256,14 @@ class S5MegpoidCarrierFusionWorkspaceTest {
         )
 
         assertSame(output, returned)
-        // The current frame is stored as two planar arrays in the one-slot ring.
-        assertArrayEquals(floatArrayOf(1f, 2f, 3f, 4f), workspace.copyMostRecentCarrierFrame(), 0f)
-        // A one-slot ring selects the just-written frame as the zero-lag carrier.
-        assertArrayEquals(floatArrayOf(10f, 30f, 30f, 60f), output, 0f)
+        // The separate carrier-generator frame is stored in the one-slot ring.
+        assertArrayEquals(
+            floatArrayOf(2f, 3f, 5f, 7f),
+            workspace.copyMostRecentCarrierFrame(),
+            0f
+        )
+        // D74 [1,2;3,4] multiplies the delayed carrier frame into the complex accumulator.
+        assertArrayEquals(floatArrayOf(11f, 37f, 28f, 74f), output, 0f)
         assertEquals(0, workspace.nextHistoryWriteIndex)
         assertEquals(1L, workspace.historyFramesWritten)
     }
