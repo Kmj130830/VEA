@@ -374,6 +374,22 @@ data class PreparedMegpoidRuntime(
             firstInputWorkspace = firstInputWorkspace
         )
 
+    /**
+     * Creates a stateful endpoint from scheduled notes to the loaded
+     * Megpoid V7 Dense/Temporal/Alternate/Residual graph. Explicit phone labels
+     * and the active mode-0 render descriptor are still required.
+     */
+    fun createExplicitPhoneSequenceSession(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder,
+        firstInputWorkspace: S5MegpoidWorkspaceSlot = S5MegpoidWorkspaceSlot.FIRST
+    ): PreparedMegpoidExplicitPhoneSequenceSession =
+        PreparedMegpoidExplicitPhoneSequenceSession(
+            pipeline = createAlternateSequenceTransitionPipeline(
+                tensorDecoder = tensorDecoder,
+                firstInputWorkspace = firstInputWorkspace
+            )
+        )
+
     fun createResidualBlockExecutor(
         firstInputWorkspace: S5MegpoidWorkspaceSlot = S5MegpoidWorkspaceSlot.FIRST
     ): S5MegpoidResidualBlockExecutor =
