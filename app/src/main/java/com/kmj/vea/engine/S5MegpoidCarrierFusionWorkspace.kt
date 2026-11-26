@@ -231,13 +231,33 @@ class S5MegpoidCarrierFusionWorkspace(
      * invent the upstream carrier-input construction or its per-frame scale /
      * amplitude values.
      */
-    @Synchronized
     fun processActiveCarrierFrame(
         outputInterleaved: FloatArray,
         inputFeatureMajor: FloatArray,
         activeParameters: S5MegpoidCarrierFusionActiveParameters,
         scale: Float,
         amplitude: Float,
+        gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel
+    ): FloatArray = processActiveCarrierFrame(
+        outputInterleaved = outputInterleaved,
+        inputFeatureMajor = inputFeatureMajor,
+        sourceMatrixTwoByInput = activeParameters.copySourceMatrixTwoByInput(),
+        scale = scale,
+        amplitude = amplitude,
+        control162 = activeParameters.copyControl162(),
+        control166 = activeParameters.copyControl166(),
+        gemm = gemm
+    )
+
+    @Synchronized
+    fun processActiveCarrierFrame(
+        outputInterleaved: FloatArray,
+        inputFeatureMajor: FloatArray,
+        sourceMatrixTwoByInput: FloatArray,
+        scale: Float,
+        amplitude: Float,
+        control162: FloatArray,
+        control166: FloatArray,
         gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel
     ): FloatArray {
         require(geometry.carrierPositions == geometry.spectrumBins) {
@@ -248,9 +268,11 @@ class S5MegpoidCarrierFusionWorkspace(
         }
         val projected = projectCarrierConditionedFeatures(
             inputFeatureMajor = inputFeatureMajor,
-            activeParameters = activeParameters,
+            sourceMatrixTwoByInput = sourceMatrixTwoByInput,
             scale = scale,
             amplitude = amplitude,
+            control162 = control162,
+            control166 = control166,
             gemm = gemm
         )
         val positions = geometry.carrierPositions
