@@ -75,11 +75,12 @@ class S5MegpoidMultipartFeaturePlanes internal constructor(
 }
 
 /**
- * Splits the post-residual output-head tensor into the exact four real/imaginary
- * plane pairs consumed by the native multipart modulation loop.
+ * Applies the native multipart plane-pair address mapping to a caller-supplied
+ * feature-major tensor. The upstream graph that produces this tensor is not
+ * synthesized here.
  *
  * Input is row-major [feature][position], i.e. feature * positionCount + position.
- * The native D00=4, D01=true Megpoid configuration requires exactly 8 feature rows.
+ * For AI Megpoid V7 (D00=4, D01=true), the active boundary expects eight rows.
  */
 object S5MegpoidMultipartFeaturePlaneExtractor {
     fun extract(
