@@ -196,12 +196,13 @@ class S5MegpoidRuntimeOptionsDescriptorTest {
         assertEquals(4, table.partCount)
         assertEquals(3, table.positionCount)
         // Native ratio is root +0x10 / root +0x04 = 32000 / 1024 = 31.25.
+        // Coefficient buffers are part-major: all positions for part zero first.
         assertEquals(
-            listOf(100f, 200f, 300f, 400f),
+            listOf(100f, 68.75f, 37.5f, 200f),
             table.copyDistances().copyOfRange(0, 4).toList()
         )
         // Native stores D02 in an int-backed word, so 133.34 is narrowed to 133.
-        assertEquals(listOf(1f, 0f, 0f, 0f), table.copyGains().copyOfRange(0, 4).toList())
+        assertEquals(listOf(1f, 1f, 1f, 0f), table.copyGains().copyOfRange(0, 4).toList())
     }
 
     @Test
