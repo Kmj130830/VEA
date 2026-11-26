@@ -250,29 +250,41 @@ class S5MegpoidMultipartOutputModulationTest {
     }
 
     @Test
-    fun accumulatesTheSharedComplexPairInNativePartOrder() {
+    fun accumulatesEachPartsOwnComplexPairInNativePartOrder() {
         val table = build(f0 = 0f, mask = true)
-        val first = floatArrayOf(1f, 2f, 3f)
-        val second = floatArrayOf(-1f, -2f, -3f)
+        val first = listOf(
+            floatArrayOf(1f, 2f, 3f),
+            floatArrayOf(10f, 20f, 30f),
+            floatArrayOf(100f, 200f, 300f),
+            floatArrayOf(1000f, 2000f, 3000f)
+        )
+        val second = listOf(
+            floatArrayOf(-1f, -2f, -3f),
+            floatArrayOf(-10f, -20f, -30f),
+            floatArrayOf(-100f, -200f, -300f),
+            floatArrayOf(-1000f, -2000f, -3000f)
+        )
         val output = FloatArray(6)
 
         table.accumulateAllPartsInto(output, first, second)
 
         assertEquals(
-            listOf(4f, -4f, 8f, -8f, 12f, -12f),
+            listOf(1111f, -1111f, 2222f, -2222f, 3333f, -3333f),
             output.toList()
         )
     }
 
     @Test
-    fun rejectsMismatchedSharedFeaturePlanesBeforeMutatingTheOutput() {
+    fun rejectsMismatchedPerPartFeaturePlanesBeforeMutatingTheOutput() {
         val table = build(f0 = 0f)
         val output = FloatArray(6) { 7f }
+        val validPlanes = List(4) { FloatArray(3) }
+
         assertThrows(IllegalArgumentException::class.java) {
             table.accumulateAllPartsInto(
                 outputInterleaved = output,
-                firstFeaturePlane = FloatArray(2),
-                secondFeaturePlane = FloatArray(3)
+                firstFeaturePlaneByPart = listOf(FloatArray(3)),
+                secondFeaturePlaneByPart = validPlanes
             )
         }
         assertEquals(List(6) { 7f }, output.toList())
@@ -280,8 +292,8 @@ class S5MegpoidMultipartOutputModulationTest {
         assertThrows(IllegalArgumentException::class.java) {
             table.accumulateAllPartsInto(
                 outputInterleaved = output,
-                firstFeaturePlane = FloatArray(3),
-                secondFeaturePlane = FloatArray(4)
+                firstFeaturePlaneByPart = validPlanes,
+                secondFeaturePlaneByPart = validPlanes.dropLast(1) + listOf(floatArrayOf(1f))
             )
         }
         assertEquals(List(6) { 7f }, output.toList())
