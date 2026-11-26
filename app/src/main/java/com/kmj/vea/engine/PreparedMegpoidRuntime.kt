@@ -217,6 +217,7 @@ data class PreparedMegpoidRuntime(
      * carrier inputs. This method intentionally does not fake the VTMG/
      * interpolation output or carrier generator.
      */
+    @Synchronized
     fun processMultipartOutputFrameToPcm(
         outputFeatureMajor: FloatArray,
         positionCount: Int,
@@ -262,6 +263,20 @@ data class PreparedMegpoidRuntime(
         }
 
         return spectralOutputSession.processSpectrumFrame(spectrum)
+    }
+
+    /**
+     * Resets both stateful stages used by processMultipartOutputFrameToPcm()
+     * at an utterance boundary. The explicit-phone/sequence sessions have
+     * their own resetHistory() and are reset by their owner.
+     */
+    @Synchronized
+    fun resetMultipartOutputFrameState(
+        spectralOutputSession: PreparedMegpoidSpectralOutputSession,
+        carrierWorkspace: S5MegpoidCarrierFusionWorkspace? = null
+    ) {
+        spectralOutputSession.reset()
+        carrierWorkspace?.resetHistory()
     }
 
     /** Actual terminal spectrum representation read from this singer's VTB2 options. */
