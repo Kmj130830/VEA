@@ -260,7 +260,7 @@ object S5MegpoidMultipartOutputModulationBuilder {
             // Native second pass: compare the completed distance row, then
             // prepare the complex rotation used by the accumulator.
             for (part in 0 until partCount) {
-                val index = position * partCount + part
+                val index = part * positionCount + position
                 val phaseLocation = locations[index]
                 val distance = distances[index]
 
