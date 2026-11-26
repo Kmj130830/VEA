@@ -221,6 +221,47 @@ class S5MegpoidCarrierFusionWorkspace(
     }
 
     /**
+     * Completes one active carrier-history frame in native order:
+     * 1) apply the model-backed [2][K] carrier projection and affine controls;
+     * 2) store its two planar rows in the D80 ring and advance the write cursor;
+     * 3) read the native delayed slot at the updated cursor and add its complex
+     *    product to the caller's interleaved multipart accumulator.
+     *
+     * The source feature tensor is supplied explicitly. This method does not
+     * invent the upstream carrier-input construction or its per-frame scale /
+     * amplitude values.
+     */
+    @Synchronized
+    fun processActiveCarrierFrame(
+        outputInterleaved: FloatArray,
+        inputFeatureMajor: FloatArray,
+        activeParameters: S5MegpoidCarrierFusionActiveParameters,
+        scale: Float,
+        amplitude: Float,
+        gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel
+    ): FloatArray {
+        require(geometry.carrierPositions == geometry.spectrumBins) {
+            "Native active carrier fusion requires carrier positions to equal spectrum bins."
+        }
+        require(outputInterleaved.size == geometry.currentCarrierFrameElementCount) {
+            "Multipart complex output must contain exactly two values per spectrum bin."
+        }
+        val projected = projectCarrierConditionedFeatures(
+            inputFeatureMajor = inputFeatureMajor,
+            activeParameters = activeParameters,
+            scale = scale,
+            amplitude = amplitude,
+            gemm = gemm
+        )
+        val positions = geometry.carrierPositions
+        appendCarrierFramePlanes(
+            firstPlane = projected.copyOfRange(0, positions),
+            secondPlane = projected.copyOfRange(positions, positions * 2)
+        )
+        return accumulateDelayedCarrierFrameInto(outputInterleaved)
+    }
+
+    /**
      * Fallback-only route: apply the optional VTB2 +0xD60 32-to-2 Dense
      * descriptor to the selected fallback input. The native forward path
      * uses this when MRW_CARRIER_FUSE is disabled, root +0x16C is false, or
