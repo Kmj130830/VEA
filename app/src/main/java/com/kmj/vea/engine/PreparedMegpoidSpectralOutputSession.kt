@@ -22,6 +22,15 @@ class PreparedMegpoidSpectralOutputSession(
         }
     }
 
+    /** Number of complex bins expected in each native one-sided spectrum frame. */
+    val complexBinCount: Int get() = spectrumShape.complexBinCount
+
+    /** FFT size used by the current overlap-add session. */
+    val fftSize: Int get() = spectrumShape.fftSize
+
+    /** Number of PCM samples emitted by each processed spectral frame. */
+    val outputSampleCount: Int get() = outputSamples
+
     /** Number of spectrum frames successfully consumed since the last reset. */
     val processedFrameCount: Long
         @Synchronized get() = processedFrameCountValue
