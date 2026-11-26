@@ -97,36 +97,43 @@ data class S5MegpoidMultipartOutputModulation(
     }
 
     /**
-     * Accumulates the same shared complex feature pair once for every part in
-     * native part-index order (0 through partCount-1).
-     *
-     * FUN_1800c7ad0 reads the two planes from one output tensor and reuses
-     * those addresses for each outer-loop part. Only the modulation tables
-     * change with the part index; the feature pair does not.
+     * Accumulates the per-part real/imaginary feature pairs in native part
+     * order. The feature tensor is [part][plane][position], while the
+     * coefficient tables are [part][position].
      */
     fun accumulateAllPartsInto(
         outputInterleaved: FloatArray,
-        firstFeaturePlane: FloatArray,
-        secondFeaturePlane: FloatArray
+        firstFeaturePlaneByPart: List<FloatArray>,
+        secondFeaturePlaneByPart: List<FloatArray>
     ) {
+        require(firstFeaturePlaneByPart.size == partCount &&
+            secondFeaturePlaneByPart.size == partCount) {
+            "The active multipart output requires exactly $partCount feature-plane pairs."
+        }
         require(outputInterleaved.size.toLong() == positionCount.toLong() * 2L) {
             "Multipart complex output must contain two interleaved values per position."
         }
-        require(outputInterleaved.all { it.isFinite() } &&
-            firstFeaturePlane.size == positionCount &&
-            secondFeaturePlane.size == positionCount &&
-            firstFeaturePlane.all { it.isFinite() } &&
-            secondFeaturePlane.all { it.isFinite() }) {
-            "The shared multipart feature pair or output accumulator is invalid."
+        require(outputInterleaved.all { it.isFinite() }) {
+            "Multipart complex output accumulator contains a non-finite value."
+        }
+        for (partIndex in 0 until partCount) {
+            val first = firstFeaturePlaneByPart[partIndex]
+            val second = secondFeaturePlaneByPart[partIndex]
+            require(first.size == positionCount && second.size == positionCount) {
+                "Multipart feature pair $partIndex must contain exactly $positionCount positions."
+            }
+            require(first.all { it.isFinite() } && second.all { it.isFinite() }) {
+                "Multipart feature pair $partIndex contains a non-finite value."
+            }
         }
 
-        // Native increments the modulation-table base by positionCount for
-        // each part, while it keeps the same two feature-plane pointers.
+        // Match the native outer part loop: process each part's own pair across
+        // all positions, then advance to the next part.
         for (partIndex in 0 until partCount) {
             accumulatePartInto(
                 outputInterleaved = outputInterleaved,
-                firstFeaturePlane = firstFeaturePlane,
-                secondFeaturePlane = secondFeaturePlane,
+                firstFeaturePlane = firstFeaturePlaneByPart[partIndex],
+                secondFeaturePlane = secondFeaturePlaneByPart[partIndex],
                 partIndex = partIndex
             )
         }
