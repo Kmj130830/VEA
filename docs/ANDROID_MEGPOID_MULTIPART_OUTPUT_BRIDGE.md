@@ -2,60 +2,117 @@
 
 Date: 2026-11-26
 
-## Scope
+## Scope and evidence
 
-This note records the current Android implementation boundary for the AI Megpoid V7 multi-part output path. The S5API Windows DLL was statically inspected; it was not executed as an Android runtime, and no bit-exact native audio comparison has been completed.
+This note records the current Android implementation boundary for the AI
+Megpoid V7 multi-part output path. The Windows S5API module was analyzed
+statically with Ghidra; it was not executed as an Android renderer. No
+bit-exact native audio comparison or end-to-end vocal render is claimed.
 
-## Important correction: the 32-to-8 Dense is fallback-only
+## Important branch distinction: fallback Dense versus active multipart path
 
-The VTB2 properties indexed by `S5MegpoidPostResidualFallbackTensorIndex`:
+The VTB2 properties indexed by
+`S5MegpoidPostResidualFallbackTensorIndex`:
 
 - `d55956a69b51b6f6dd43bd0cc2467bcf` (normalization scale),
 - `bf96a6e83ab8bb7d33509f2d3a1a348f` (normalization bias),
 - `051fe4a0e8e7e92c3c8791bd28f24da8` (Dense weights),
 - `3a9561654ca2e128021a59d14813a88f` (Dense bias),
 
-construct a 32-to-8 post-residual projection used by the non-multipart fallback branch. The AI Megpoid V7 options select D00=4 and D01=true, so this projection must not be inserted into the active four-part path.
+construct a 32-to-8 post-residual projection for the non-multipart fallback
+branch. The installed AI Megpoid V7 options select D00=4 and D01=true, so this
+fallback projection must not be inserted into the active multipart path.
 
-Android therefore does **not** use this fallback stage to synthesize the active multipart feature tensor. The model-package API `preparePostResidualFallbackStage()` remains guarded so it refuses when the multi-part path is active.
+The Android model-package API `preparePostResidualFallbackStage()` remains
+guarded and refuses when the active options select multipart output.
 
-## Ported pieces
+## Active two-plane feature pair
 
-### Four-pair feature-plane address mapping
+The active `FUN_1800c7ad0` path consumes one shared complex feature pair:
 
-The native per-part loop consumes a sequence of consecutive feature planes in pairs. `S5MegpoidMultipartFeaturePlaneExtractor` accepts an already-produced feature-major tensor with `2 * partCount` rows and separates each adjacent row pair into the corresponding part's first and second plane.
+- first plane: one float32 value per output position;
+- second plane: one float32 value per output position.
 
-For AI Megpoid V7, the expected count is eight rows (four pairs). The extractor validates the tensor length and finite values. It does not claim to generate this tensor from note/phoneme inputs.
+The two planes are contiguous in the active feature buffer. The native outer
+loop then iterates the four D00 parts, reusing the same feature-plane pointers
+for each part. It does not require an eight-row tensor split into four distinct
+complex pairs.
 
-### Per-part modulation
+Android represents this input as
+`S5MegpoidMultipartComplexFeaturePair`. The
+`S5MegpoidMultipartFeaturePlaneExtractor` validates a feature-major array
+containing exactly `2 * positionCount` values, then extracts the two planes.
+The upstream model graph that creates those values is not yet connected.
 
-`S5MegpoidMultipartOutputModulationBuilder` and `S5MegpoidMultipartOutputModulation` provide the recovered four-part location, distance, gain and real/imaginary rotation values. The scalar accumulation order is:
+## Part modulation and complex accumulation
+
+`S5MegpoidMultipartOutputModulationBuilder` prepares the four-part
+position, distance, gain and rotation coefficients using the recovered
+runtime options and per-frame F0/theta controls.
+
+Native coefficient arrays are **part-major**:
 
 ```text
-real += gain * (rotationReal * first - rotationImag * second)
-imag += gain * (rotationImag * first + rotationReal * second)
+tableIndex = partIndex * positionCount + position
 ```
 
-`PreparedMegpoidRuntime.accumulateMultipartComplexOutput()` applies those coefficients to the caller-supplied multipart feature tensor and returns one interleaved complex accumulator.
+The same input pair `x[position]`, `y[position]` is reused for every
+part. Each part applies its own complex rotation and gain:
 
-### Carrier fusion
+```text
+out.real += (x * D46 - y * D4C) * D40
+out.imag += (y * D46 + x * D4C) * D40
+```
 
-The selected AI Megpoid options independently enable carrier fusion. `S5MegpoidCarrierFusionWorkspace` ports the active 2-by-K projection, affine controls, two-plane ring history, native delayed-slot selection and complex accumulation.
+`S5MegpoidMultipartOutputModulation.accumulateAllPartsInto()` follows the
+native part loop and adds the contributions into one interleaved complex
+spectrum buffer.
 
-The history frame comes from a separate carrier-generation input at native render-state +0x2E4; it is not the D74 projection output. `S5MegpoidCarrierFusionFrameInput` keeps the feature input and the two history planes as explicit independent inputs. The upstream source that creates those buffers is not yet implemented in Android.
+## Carrier fusion
 
-### Spectral block output
+The selected AI Megpoid options independently enable carrier fusion.
+`S5MegpoidCarrierFusionWorkspace` ports the active 2-by-K projection,
+affine controls, two-plane history ring, native delayed-slot selection and
+complex accumulation.
 
-`PreparedMegpoidRuntime.processMultipartOutputFrameToPcm()` combines the already-prepared multipart feature tensor, modulation, optional active carrier inputs and `PreparedMegpoidSpectralOutputSession`. For AI Megpoid it requires the carrier input because that option is enabled.
+The history frame comes from a separate carrier-generation input at native
+render-state +0x2E4; it is not the output of the D74 carrier Dense projection.
+`S5MegpoidCarrierFusionFrameInput` keeps the Dense feature input and the two
+history planes as explicit independent inputs. The upstream generator that
+creates those buffers is not yet integrated into Android.
 
-The spectral session validates the one-sided complex-bin count, runs the 1024-point inverse transform and overlap-add, and returns one 320-sample PCM block. This is a downstream frame processor, not yet an end-to-end voice renderer.
+## Spectral frame reconstruction
+
+`PreparedMegpoidRuntime.processMultipartOutputFrameToPcm()` currently
+combines:
+
+1. a caller-supplied active two-plane feature tensor;
+2. the per-frame four-part modulation table;
+3. the separate carrier feature/history inputs required by this voicebank;
+4. the stateful `PreparedMegpoidSpectralOutputSession`.
+
+The spectral session checks the expected one-sided complex-bin count,
+executes the 1024-point inverse transform and overlap-add, and returns a
+320-sample PCM block. The per-utterance reset helper clears the spectral
+session and optional carrier history state.
+
+This is a downstream frame-processing API. It is not yet a complete renderer
+from piano-roll notes to PCM.
 
 ## Still missing before note-to-WAV synthesis
 
-1. Produce the active multi-part feature tensor from the real VTMG/sequence forward path. The currently available explicit-phone session ends at an intermediate 32-channel VTB2 sequence tensor; it is not yet proven to be the active multi-part input.
-2. Implement the upstream carrier generator that supplies the independent two-plane history frame and the correct carrier-conditioned feature input.
-3. Connect the real-time F0, theta, scale and amplitude controls to the modulation and carrier input stages.
-4. Compare Android complex spectra and PCM blocks against authorized native reference frames, including history warm-up, voiced/unvoiced transitions and chunk boundaries.
-5. Only after those checks, connect the complete path to `SynthesisEngine.render()` and enable WAV export.
+1. Produce the shared active two-plane feature tensor from the actual
+   note/phoneme-conditioned VTMG/VTB2 forward path. The current explicit-phone
+   session ends at an intermediate 32-channel sequence tensor; its mapping
+   to the active two-plane output has not been proven or implemented.
+2. Implement the upstream carrier generator that supplies the independent
+   two-plane history frame and the correct carrier-conditioned feature input.
+3. Connect real-time F0, theta, scale and amplitude controls to the modulation
+   and carrier input stages.
+4. Compare Android complex spectra and PCM frames against authorized native
+   reference frames, including history warm-up, voiced/unvoiced transitions,
+   and chunk boundaries.
+5. Only after those checks, connect the complete path to
+   `SynthesisEngine.render()` and enable WAV export.
 
 No end-to-end Megpoid vocal render or verified WAV is claimed at this stage.
