@@ -131,16 +131,16 @@ class S5MegpoidMultipartOutputModulationTest {
         )
 
         assertEquals(
-            listOf(29f, 33f),
-            List(2) { position -> nativeDefault.copyPhaseLocations()[position] }
+            listOf(29f, 30f, 31f, 28f),
+            List(4) { part -> nativeDefault.copyPhaseLocations()[part * 2 + 1] }
         )
         assertEquals(
-            listOf(29f, 33f),
-            List(2) { position -> scalarFallback.copyPhaseLocations()[position] }
+            listOf(33f, 30f, 31f, 32f),
+            List(4) { part -> scalarFallback.copyPhaseLocations()[part * 2 + 1] }
         )
         assertEquals(
-            listOf(2.25f, 2.25f),
-            List(2) { position -> nativeDefault.copyDistances()[position] }
+            listOf(2.25f, 1.25f, 0.25f, 3.25f),
+            List(4) { part -> nativeDefault.copyDistances()[part * 2 + 1] }
         )
     }
 
