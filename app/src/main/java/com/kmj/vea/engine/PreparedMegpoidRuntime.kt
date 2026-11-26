@@ -162,33 +162,25 @@ data class PreparedMegpoidRuntime(
         )
 
     /**
-     * Splits a feature-major tensor already produced by the active native
-     * multi-part graph into its verified real/imaginary feature-plane pairs.
-     *
-     * This method deliberately does not project the 32-channel sequence
-     * result: the VTB2 32-to-8 Dense tensors currently indexed by
-     * S5MegpoidPostResidualFallbackTensorIndex belong to the inactive
-     * non-multipart fallback branch.
+     * Extracts the shared real/imaginary feature pair consumed by all
+     * D00 modulation parts in the active native path.
      */
     fun splitMultipartOutputFeatures(
         outputFeatureMajor: FloatArray,
         positionCount: Int
-    ): S5MegpoidMultipartFeaturePlanes {
+    ): S5MegpoidMultipartComplexFeaturePair {
         check(runtimeOptions.usesMultiPartOutputHead) {
             "The selected voicebank does not use the multipart output path."
         }
         return S5MegpoidMultipartFeaturePlaneExtractor.extract(
             outputFeatureMajor = outputFeatureMajor,
-            partCount = runtimeOptions.paramD00,
             positionCount = positionCount
         )
     }
 
     /**
-     * Applies the recovered per-part rotation/gain and complex accumulation
-     * to an already-produced active multi-part feature tensor.
-     * The upstream feature-generation/interpolation graph remains a separate
-     * prerequisite and is not inferred or replaced by fallback weights.
+     * Applies the per-part rotation/gain tables to one shared complex feature
+     * pair and accumulates all native D00 parts into one interleaved spectrum.
      */
     fun accumulateMultipartComplexOutput(
         outputFeatureMajor: FloatArray,
@@ -201,9 +193,9 @@ data class PreparedMegpoidRuntime(
         require(modulation.positionCount == positionCount) {
             "Multipart modulation position count does not match the output feature tensor."
         }
-        val planes = splitMultipartOutputFeatures(outputFeatureMajor, positionCount)
-        val accumulator = planes.newInterleavedComplexAccumulator()
-        planes.accumulateInto(accumulator, modulation)
+        val featurePair = splitMultipartOutputFeatures(outputFeatureMajor, positionCount)
+        val accumulator = featurePair.newInterleavedComplexAccumulator()
+        featurePair.accumulateInto(accumulator, modulation)
         return accumulator
     }
 
