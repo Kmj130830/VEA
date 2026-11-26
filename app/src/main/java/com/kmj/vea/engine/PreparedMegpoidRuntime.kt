@@ -207,6 +207,63 @@ data class PreparedMegpoidRuntime(
         return accumulator
     }
 
+    /**
+     * Executes the already-prepared active multipart spectral frame through
+     * carrier fusion (when enabled) and the stateful inverse-FFT/overlap-add
+     * session. Returns one PCM block.
+     *
+     * The caller must still provide the actual active multipart feature tensor
+     * and, for AI Megpoid's enabled carrier path, the two independent upstream
+     * carrier inputs. This method intentionally does not fake the VTMG/
+     * interpolation output or carrier generator.
+     */
+    fun processMultipartOutputFrameToPcm(
+        outputFeatureMajor: FloatArray,
+        positionCount: Int,
+        modulation: S5MegpoidMultipartOutputModulation,
+        spectralOutputSession: PreparedMegpoidSpectralOutputSession,
+        carrierFrame: S5MegpoidCarrierFusionFrameInput? = null,
+        gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel
+    ): FloatArray {
+        require(positionCount == spectralOutputSession.complexBinCount) {
+            "Active multipart output has $positionCount positions but the spectral session expects " +
+                "${spectralOutputSession.complexBinCount} complex bins."
+        }
+
+        val spectrum = accumulateMultipartComplexOutput(
+            outputFeatureMajor = outputFeatureMajor,
+            positionCount = positionCount,
+            modulation = modulation
+        )
+
+        if (carrierFusionEnabled) {
+            val input = requireNotNull(carrierFrame) {
+                "AI Megpoid enables carrier fusion; an explicit carrier frame input is required."
+            }
+            require(input.workspace.geometry.carrierPositions == positionCount &&
+                input.workspace.geometry.spectrumBins == positionCount) {
+                "Carrier workspace positions/bins must match the active spectral frame."
+            }
+            processCarrierFusionFrame(
+                workspace = input.workspace,
+                outputInterleaved = spectrum,
+                inputFeatureMajor = input.inputFeatureMajor,
+                carrierHistoryFirstPlane = input.carrierHistoryFirstPlane,
+                carrierHistorySecondPlane = input.carrierHistorySecondPlane,
+                scale = input.scale,
+                amplitude = input.amplitude,
+                activeParameters = input.activeParameters ?: prepareCarrierFusionActiveParameters(),
+                gemm = gemm
+            )
+        } else {
+            require(carrierFrame == null) {
+                "Carrier frame input was supplied but this voicebank disables carrier fusion."
+            }
+        }
+
+        return spectralOutputSession.processSpectrumFrame(spectrum)
+    }
+
     /** Actual terminal spectrum representation read from this singer's VTB2 options. */
     val terminalSpectrumEncoding: S5MegpoidSpectrumFrameEncoding
         get() = runtimeOptions.terminalSpectrumEncoding
