@@ -13,7 +13,7 @@ import kotlin.math.sin
  * For each spectrum position, the S5API scalar path computes a cycle-aligned
  * coordinate for every part, a distance from that coordinate, an optional
  * nearest-part gate, and the complex rotation pair consumed by the output
- * accumulator. The arrays are position-major: [position * partCount + part].
+ * accumulator. The native arrays are part-major: [part * positionCount + position].
  *
  * This class covers only that verified modulation/gating operation. It does
  * not split the 8-channel post-residual head into four part-feature pairs;
@@ -78,7 +78,7 @@ data class S5MegpoidMultipartOutputModulation(
         }
 
         for (position in 0 until positionCount) {
-            val tableIndex = position * partCount + partIndex
+            val tableIndex = partIndex * positionCount + position
             val x = firstFeaturePlane[position]
             val y = secondFeaturePlane[position]
             val d46 = rotationReal[tableIndex]
@@ -97,46 +97,36 @@ data class S5MegpoidMultipartOutputModulation(
     }
 
     /**
-     * Accumulates all part feature pairs in native part-index order
-     * (0 through partCount-1) into one interleaved complex output buffer.
+     * Accumulates the same shared complex feature pair once for every part in
+     * native part-index order (0 through partCount-1).
      *
-     * The feature-to-part mapping must be supplied by the active output-head
-     * graph. This method intentionally does not assume how the eight channels
-     * are split into four x/y pairs.
+     * FUN_1800c7ad0 reads the two planes from one output tensor and reuses
+     * those addresses for each outer-loop part. Only the modulation tables
+     * change with the part index; the feature pair does not.
      */
     fun accumulateAllPartsInto(
         outputInterleaved: FloatArray,
-        firstFeaturePlaneByPart: List<FloatArray>,
-        secondFeaturePlaneByPart: List<FloatArray>
+        firstFeaturePlane: FloatArray,
+        secondFeaturePlane: FloatArray
     ) {
-        require(firstFeaturePlaneByPart.size == partCount &&
-            secondFeaturePlaneByPart.size == partCount) {
-            "The multipart output head requires exactly $partCount feature-plane pairs."
-        }
         require(outputInterleaved.size.toLong() == positionCount.toLong() * 2L) {
             "Multipart complex output must contain two interleaved values per position."
         }
-        require(outputInterleaved.all { it.isFinite() }) {
-            "Multipart complex output accumulator contains a non-finite value."
-        }
-        for (partIndex in 0 until partCount) {
-            val first = firstFeaturePlaneByPart[partIndex]
-            val second = secondFeaturePlaneByPart[partIndex]
-            require(first.size == positionCount && second.size == positionCount) {
-                "Multipart feature pair $partIndex must contain exactly $positionCount positions."
-            }
-            require(first.all { it.isFinite() } && second.all { it.isFinite() }) {
-                "Multipart feature pair $partIndex contains a non-finite value."
-            }
+        require(outputInterleaved.all { it.isFinite() } &&
+            firstFeaturePlane.size == positionCount &&
+            secondFeaturePlane.size == positionCount &&
+            firstFeaturePlane.all { it.isFinite() } &&
+            secondFeaturePlane.all { it.isFinite() }) {
+            "The shared multipart feature pair or output accumulator is invalid."
         }
 
-        // Match the native outer part loop: accumulate one complete part
-        // across positions, then advance to the next part.
+        // Native increments the modulation-table base by positionCount for
+        // each part, while it keeps the same two feature-plane pointers.
         for (partIndex in 0 until partCount) {
             accumulatePartInto(
                 outputInterleaved = outputInterleaved,
-                firstFeaturePlane = firstFeaturePlaneByPart[partIndex],
-                secondFeaturePlane = secondFeaturePlaneByPart[partIndex],
+                firstFeaturePlane = firstFeaturePlane,
+                secondFeaturePlane = secondFeaturePlane,
                 partIndex = partIndex
             )
         }
@@ -260,7 +250,7 @@ object S5MegpoidMultipartOutputModulationBuilder {
                 val candidateLocation =
                     cycleCount * partCount.toFloat() + baseLocation
                 val phaseLocation = maxOf(baseLocation, candidateLocation)
-                val index = position * partCount + part
+                val index = part * positionCount + position
 
                 locations[index] = phaseLocation
                 distances[index] =
@@ -280,7 +270,7 @@ object S5MegpoidMultipartOutputModulationBuilder {
                         if (otherPart == part) continue
                         nearestOtherDistance = minOf(
                             nearestOtherDistance,
-                            distances[position * partCount + otherPart]
+                            distances[otherPart * positionCount + position]
                         )
                     }
 
