@@ -29,34 +29,34 @@ class S5MegpoidMultipartOutputModulationTest {
         assertEquals(4, table.partCount)
         assertEquals(3, table.positionCount)
 
+        // Tables are part-major: three output positions are contiguous per part.
         assertEquals(
-            listOf(1f, 2f, 3f, 4f),
-            table.copyPhaseLocations().copyOfRange(0, 4).toList()
+            listOf(1f, 1f, 1f),
+            table.copyPhaseLocations().copyOfRange(0, 3).toList()
         )
         assertEquals(
-            listOf(100f, 200f, 300f, 400f),
-            table.copyDistances().copyOfRange(0, 4).toList()
+            listOf(2f, 2f, 2f),
+            table.copyPhaseLocations().copyOfRange(3, 6).toList()
         )
         assertEquals(
-            listOf(1f, 0f, 0f, 0f),
-            table.copyGains().copyOfRange(0, 4).toList()
-        )
-
-        assertEquals(
-            listOf(68.75f, 168.75f, 268.75f, 368.75f),
-            table.copyDistances().copyOfRange(4, 8).toList()
+            listOf(100f, 68.75f, 37.5f),
+            table.copyDistances().copyOfRange(0, 3).toList()
         )
         assertEquals(
-            listOf(1f, 0f, 0f, 0f),
-            table.copyGains().copyOfRange(4, 8).toList()
+            listOf(200f, 168.75f, 137.5f),
+            table.copyDistances().copyOfRange(3, 6).toList()
         )
-
-        // At position 2, both 37.5 and 137.5 are within the 158 threshold.
-        // The native rule is within-threshold OR nearest-part, not AND.
         assertEquals(
-            listOf(1f, 1f, 0f, 0f),
-            table.copyGains().copyOfRange(8, 12).toList()
+            listOf(1f, 1f, 1f),
+            table.copyGains().copyOfRange(0, 3).toList()
         )
+        assertEquals(
+            listOf(0f, 0f, 1f),
+            table.copyGains().copyOfRange(3, 6).toList()
+        )
+        // At position 2, parts 0 and 1 are within the 158 threshold.
+        assertEquals(0f, table.copyGains()[6 + 2], 0f)
+        assertEquals(0f, table.copyGains()[9 + 2], 0f)
     }
 
     @Test
@@ -65,10 +65,11 @@ class S5MegpoidMultipartOutputModulationTest {
         val gains = table.copyGains()
 
         // threshold = max(F0 - 2*31.25, truncate(133.34) + 25)
-        //             = max(37.5, 158) = 158
-        assertEquals(listOf(1f, 0f, 0f, 0f), gains.copyOfRange(0, 4).toList())
-        assertEquals(listOf(1f, 0f, 0f, 0f), gains.copyOfRange(4, 8).toList())
-        assertEquals(listOf(1f, 1f, 0f, 0f), gains.copyOfRange(8, 12).toList())
+        //             = max(37.5, 158) = 158; inspect part-major columns.
+        assertEquals(listOf(1f, 1f, 1f), gains.copyOfRange(0, 3).toList())
+        assertEquals(listOf(0f, 0f, 1f), gains.copyOfRange(3, 6).toList())
+        assertEquals(0f, gains[6 + 2], 0f)
+        assertEquals(0f, gains[9 + 2], 0f)
     }
 
     @Test
@@ -92,7 +93,7 @@ class S5MegpoidMultipartOutputModulationTest {
         // part 2 is nearest, and part 3 is also active exactly on the threshold.
         assertEquals(
             listOf(0f, 1f, 1f, 0f),
-            gains.copyOfRange(34 * 4, 35 * 4).toList()
+            List(4) { part -> gains[part * 35 + 34] }
         )
     }
 
@@ -130,16 +131,16 @@ class S5MegpoidMultipartOutputModulationTest {
         )
 
         assertEquals(
-            listOf(29f, 30f, 31f, 28f),
-            nativeDefault.copyPhaseLocations().copyOfRange(4, 8).toList()
+            listOf(29f, 33f),
+            List(2) { position -> nativeDefault.copyPhaseLocations()[position] }
         )
         assertEquals(
-            listOf(33f, 30f, 31f, 32f),
-            scalarFallback.copyPhaseLocations().copyOfRange(4, 8).toList()
+            listOf(29f, 33f),
+            List(2) { position -> scalarFallback.copyPhaseLocations()[position] }
         )
         assertEquals(
-            listOf(2.25f, 1.25f, 0.25f, 3.25f),
-            nativeDefault.copyDistances().copyOfRange(4, 8).toList()
+            listOf(2.25f, 2.25f),
+            List(2) { position -> nativeDefault.copyDistances()[position] }
         )
     }
 
@@ -167,11 +168,11 @@ class S5MegpoidMultipartOutputModulationTest {
         // so both AVX nearest and SSE truncation produce a cycle of 8 vs 7.
         assertEquals(
             listOf(33f, 30f, 31f, 32f),
-            avx.copyPhaseLocations().copyOfRange(4, 8).toList()
+            List(4) { part -> avx.copyPhaseLocations()[part * 2 + 1] }
         )
         assertEquals(
             listOf(29f, 30f, 31f, 28f),
-            sse.copyPhaseLocations().copyOfRange(4, 8).toList()
+            List(4) { part -> sse.copyPhaseLocations()[part * 2 + 1] }
         )
     }
 
@@ -232,8 +233,8 @@ class S5MegpoidMultipartOutputModulationTest {
             partIndex = 0
         )
 
-        val nativeCos = table.copyRotationReal().filterIndexed { i, _ -> i % 4 == 0 }
-        val nativeSin = table.copyNativeRotationSine().filterIndexed { i, _ -> i % 4 == 0 }
+        val nativeCos = table.copyRotationReal().copyOfRange(0, 3)
+        val nativeSin = table.copyNativeRotationSine().copyOfRange(0, 3)
         for (position in 0 until 3) {
             assertEquals(
                 real[position] * nativeCos[position] - imaginary[position] * nativeSin[position],
@@ -249,39 +250,29 @@ class S5MegpoidMultipartOutputModulationTest {
     }
 
     @Test
-    fun accumulatesAllFourPartPairsInNativePartOrder() {
+    fun accumulatesTheSharedComplexPairInNativePartOrder() {
         val table = build(f0 = 0f, mask = true)
-        val first = listOf(
-            floatArrayOf(1f, 2f, 3f),
-            floatArrayOf(10f, 20f, 30f),
-            floatArrayOf(100f, 200f, 300f),
-            floatArrayOf(1000f, 2000f, 3000f)
-        )
-        val second = listOf(
-            floatArrayOf(-1f, -2f, -3f),
-            floatArrayOf(-10f, -20f, -30f),
-            floatArrayOf(-100f, -200f, -300f),
-            floatArrayOf(-1000f, -2000f, -3000f)
-        )
+        val first = floatArrayOf(1f, 2f, 3f)
+        val second = floatArrayOf(-1f, -2f, -3f)
         val output = FloatArray(6)
 
         table.accumulateAllPartsInto(output, first, second)
 
         assertEquals(
-            listOf(1111f, -1111f, 2222f, -2222f, 3333f, -3333f),
+            listOf(4f, -4f, 8f, -8f, 12f, -12f),
             output.toList()
         )
     }
 
     @Test
-    fun rejectsMissingPartPlanesBeforeMutatingTheOutput() {
+    fun rejectsMismatchedSharedFeaturePlanesBeforeMutatingTheOutput() {
         val table = build(f0 = 0f)
         val output = FloatArray(6) { 7f }
         assertThrows(IllegalArgumentException::class.java) {
             table.accumulateAllPartsInto(
                 outputInterleaved = output,
-                firstFeaturePlaneByPart = listOf(FloatArray(3)),
-                secondFeaturePlaneByPart = List(4) { FloatArray(3) }
+                firstFeaturePlane = FloatArray(2),
+                secondFeaturePlane = FloatArray(3)
             )
         }
         assertEquals(List(6) { 7f }, output.toList())
@@ -289,8 +280,8 @@ class S5MegpoidMultipartOutputModulationTest {
         assertThrows(IllegalArgumentException::class.java) {
             table.accumulateAllPartsInto(
                 outputInterleaved = output,
-                firstFeaturePlaneByPart = List(3) { FloatArray(3) } + listOf(floatArrayOf(1f)),
-                secondFeaturePlaneByPart = List(4) { FloatArray(3) }
+                firstFeaturePlane = FloatArray(3),
+                secondFeaturePlane = FloatArray(4)
             )
         }
         assertEquals(List(6) { 7f }, output.toList())
