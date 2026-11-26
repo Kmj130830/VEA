@@ -221,6 +221,46 @@ class S5MegpoidCarrierFusionWorkspaceTest {
     }
 
     @Test
+    fun processesActiveCarrierProjectionHistoryWriteAndDelayedComplexAccumulationInNativeOrder() {
+        val geometry = S5MegpoidCarrierFusionBufferGeometry(
+            inputFeatures = 2,
+            carrierPositions = 2,
+            spectrumBins = 2,
+            historySlotsFromRoot181 = 0,
+            historySlotsFromRoot182 = 0
+        )
+        val workspace = S5MegpoidCarrierFusionWorkspace(geometry)
+        val sourceMatrix = floatArrayOf(
+            1f, 0f,
+            0f, 1f
+        )
+        val inputFeatureMajor = floatArrayOf(
+            1f, 2f,
+            3f, 4f
+        )
+        val output = floatArrayOf(10f, 20f, 30f, 40f)
+
+        val returned = workspace.processActiveCarrierFrame(
+            outputInterleaved = output,
+            inputFeatureMajor = inputFeatureMajor,
+            sourceMatrixTwoByInput = sourceMatrix,
+            scale = 1f,
+            amplitude = 1f,
+            control162 = FloatArray(2),
+            control166 = FloatArray(2),
+            gemm = ReferenceS5MegpoidGemmKernel
+        )
+
+        assertSame(output, returned)
+        // The current frame is stored as two planar arrays in the one-slot ring.
+        assertArrayEquals(floatArrayOf(1f, 2f, 3f, 4f), workspace.copyMostRecentCarrierFrame(), 0f)
+        // A one-slot ring selects the just-written frame as the zero-lag carrier.
+        assertArrayEquals(floatArrayOf(10f, 30f, 30f, 60f), output, 0f)
+        assertEquals(0, workspace.nextHistoryWriteIndex)
+        assertEquals(1L, workspace.historyFramesWritten)
+    }
+
+    @Test
     fun runsTheOptionalFallbackDenseProjectionSeparatelyFromTheActiveCarrierPath() {
         val geometry = S5MegpoidCarrierFusionBufferGeometry(
             inputFeatures = 32,
