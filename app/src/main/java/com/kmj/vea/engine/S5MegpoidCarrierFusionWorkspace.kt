@@ -234,6 +234,8 @@ class S5MegpoidCarrierFusionWorkspace(
     fun processActiveCarrierFrame(
         outputInterleaved: FloatArray,
         inputFeatureMajor: FloatArray,
+        carrierHistoryFirstPlane: FloatArray,
+        carrierHistorySecondPlane: FloatArray,
         activeParameters: S5MegpoidCarrierFusionActiveParameters,
         scale: Float,
         amplitude: Float,
@@ -241,6 +243,8 @@ class S5MegpoidCarrierFusionWorkspace(
     ): FloatArray = processActiveCarrierFrame(
         outputInterleaved = outputInterleaved,
         inputFeatureMajor = inputFeatureMajor,
+        carrierHistoryFirstPlane = carrierHistoryFirstPlane,
+        carrierHistorySecondPlane = carrierHistorySecondPlane,
         sourceMatrixTwoByInput = activeParameters.copySourceMatrixTwoByInput(),
         scale = scale,
         amplitude = amplitude,
@@ -249,10 +253,20 @@ class S5MegpoidCarrierFusionWorkspace(
         gemm = gemm
     )
 
+    /**
+     * One active frame using an explicitly supplied carrier-history frame.
+     *
+     * Native FUN_1800c7ad0 records the separate carrier frame in D80/D86
+     * before it executes the D74 carrier projection and delayed complex
+     * multiplication. The two input planes therefore must not be derived from
+     * the D74 projection returned by this same call.
+     */
     @Synchronized
     fun processActiveCarrierFrame(
         outputInterleaved: FloatArray,
         inputFeatureMajor: FloatArray,
+        carrierHistoryFirstPlane: FloatArray,
+        carrierHistorySecondPlane: FloatArray,
         sourceMatrixTwoByInput: FloatArray,
         scale: Float,
         amplitude: Float,
@@ -266,7 +280,15 @@ class S5MegpoidCarrierFusionWorkspace(
         require(outputInterleaved.size == geometry.currentCarrierFrameElementCount) {
             "Multipart complex output must contain exactly two values per spectrum bin."
         }
-        val projected = projectCarrierConditionedFeatures(
+
+        // This frame originates in the separate carrier generator (+0x2e4),
+        // not from the D74 Dense projection computed below.
+        appendCarrierFramePlanes(
+            firstPlane = carrierHistoryFirstPlane,
+            secondPlane = carrierHistorySecondPlane
+        )
+
+        projectCarrierConditionedFeatures(
             inputFeatureMajor = inputFeatureMajor,
             sourceMatrixTwoByInput = sourceMatrixTwoByInput,
             scale = scale,
@@ -274,11 +296,6 @@ class S5MegpoidCarrierFusionWorkspace(
             control162 = control162,
             control166 = control166,
             gemm = gemm
-        )
-        val positions = geometry.carrierPositions
-        appendCarrierFramePlanes(
-            firstPlane = projected.copyOfRange(0, positions),
-            secondPlane = projected.copyOfRange(positions, positions * 2)
         )
         return accumulateDelayedCarrierFrameInto(outputInterleaved)
     }
