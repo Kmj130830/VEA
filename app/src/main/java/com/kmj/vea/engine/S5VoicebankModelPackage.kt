@@ -194,45 +194,6 @@ data class S5VoicebankModelPackage(
         return postResidualFallbackTensorIndex.buildStage(tensorDecoder)
     }
 
-    /**
-     * Builds the active four-part output head. The native initializer uses
-     * these same four VTB2 tensors to fuse normalization and Dense parameters
-     * into render-root +0x150/+0x154/+0x158 before the multipart loop.
-     */
-    val activeMultipartOutputHeadStage: S5MegpoidMultipartOutputHeadStage by lazy(
-        LazyThreadSafetyMode.PUBLICATION
-    ) {
-        buildMultipartOutputHeadStage(NativeS5TypedTensorDecoder)
-    }
-
-    fun prepareMultipartOutputHeadStage(
-        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
-    ): S5MegpoidMultipartOutputHeadStage =
-        if (tensorDecoder === NativeS5TypedTensorDecoder) {
-            activeMultipartOutputHeadStage
-        } else {
-            buildMultipartOutputHeadStage(tensorDecoder)
-        }
-
-    private fun buildMultipartOutputHeadStage(
-        tensorDecoder: S5TypedTensorDecoder
-    ): S5MegpoidMultipartOutputHeadStage {
-        check(runtimeOptionsDescriptor.usesMultiPartOutputHead) {
-            "The selected AI Megpoid options do not enable the multipart output head."
-        }
-        val projection = postResidualFallbackTensorIndex.buildStage(tensorDecoder)
-        check(projection.inputFeatures == 32) {
-            "The recovered Megpoid multipart output head expects 32 input channels."
-        }
-        check(projection.outputFeatures == runtimeOptionsDescriptor.postResidualHeadFeatureWidth) {
-            "The loaded Dense output width does not match the D00/D01 multipart configuration."
-        }
-        return S5MegpoidMultipartOutputHeadStage(
-            normalizedDenseProjection = projection,
-            partCount = runtimeOptionsDescriptor.paramD00
-        )
-    }
-
     /** Exact sequence-indexed Temporal/Banked factory tables populated by FUN_1800ced10. */
     val sequenceOperatorTensorIndex: S5MegpoidSequenceOperatorTensorIndex by lazy(
         LazyThreadSafetyMode.PUBLICATION
