@@ -21,14 +21,14 @@ class S5MegpoidMultipartFeaturePlanes internal constructor(
     firstFeaturePlaneByPart: List<FloatArray>,
     secondFeaturePlaneByPart: List<FloatArray>
 ) {
-    private val firstPlanes = firstFeaturePlaneByPart.map(FloatArray::copyOf)
-    private val secondPlanes = secondFeaturePlaneByPart.map(FloatArray::copyOf)
+    private val firstPlanes = firstFeaturePlaneByPart.map { it.copyOf() }
+    private val secondPlanes = secondFeaturePlaneByPart.map { it.copyOf() }
 
     init {
         require(partCount >= 2 && positionCount > 0)
         require(firstPlanes.size == partCount && secondPlanes.size == partCount)
-        require(firstPlanes.all { it.size == positionCount && it.all(Float::isFinite) })
-        require(secondPlanes.all { it.size == positionCount && it.all(Float::isFinite) })
+        require(firstPlanes.all { plane -> plane.size == positionCount && plane.all { it.isFinite() } })
+        require(secondPlanes.all { plane -> plane.size == positionCount && plane.all { it.isFinite() } })
     }
 
     fun firstFeaturePlane(partIndex: Int): FloatArray {
@@ -64,6 +64,14 @@ class S5MegpoidMultipartFeaturePlanes internal constructor(
 
     fun newInterleavedComplexAccumulator(): FloatArray =
         FloatArray(checkedProduct(positionCount, 2))
+
+    private fun checkedProduct(a: Int, b: Int): Int {
+        val product = a.toLong() * b.toLong()
+        require(a > 0 && b > 0 && product <= Int.MAX_VALUE) {
+            "Multipart complex accumulator exceeds the supported FloatArray size."
+        }
+        return product.toInt()
+    }
 }
 
 /**
@@ -88,7 +96,7 @@ object S5MegpoidMultipartFeaturePlaneExtractor {
         require(outputFeatureMajor.size == expectedValues) {
             "Multipart output tensor must contain exactly $featureCount * $positionCount values."
         }
-        require(outputFeatureMajor.all(Float::isFinite)) {
+        require(outputFeatureMajor.all { it.isFinite() }) {
             "Multipart output tensor contains a non-finite value."
         }
 
@@ -138,7 +146,7 @@ class S5MegpoidMultipartOutputHeadStage internal constructor(
     val outputFeatures: Int get() = normalizedDenseProjection.outputFeatures
 
     init {
-        require(partCount >= 2)
+        require(partCount in 2..(Int.MAX_VALUE / 2))
         require(outputFeatures == partCount * 2) {
             "The multipart Dense head must produce exactly two planes per part."
         }
