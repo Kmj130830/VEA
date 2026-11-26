@@ -1,6 +1,10 @@
 # S5API four-part output modulation
 
-Date: 2026-11-25
+Date: 2026-11-26
+
+## Evidence scope
+
+This note describes static Ghidra analysis of the supplied Windows S5API module and the corresponding Android scalar port. The DLL was not executed as an Android renderer, and no bit-exact native audio comparison is claimed.
 
 ## Native option fields
 
@@ -122,10 +126,8 @@ gain(k)      = isNearest(k) OR isWithin(k) ? 1 : 0
 ```
 
 This is **not** an AND gate. Distances inside the threshold keep every
-corresponding part active; outside the threshold, only a nearest part stays
-active. The threshold comparison is inclusive. The implementation was
-corrected against the native scalar branch and has regression coverage for
-the exact threshold boundary.
+corresponding part active; outside it, only a nearest part stays active.
+Ties and threshold equality are retained.
 
 Threshold selection:
 
@@ -136,46 +138,82 @@ Threshold selection:
 - D04 true and `+0x3411` false:
   `threshold = max(f0 - 2*step, D02 + D03)`
 
-## Complex accumulation
+## Active feature-pair layout and complex accumulation
 
-For one pair of post-residual feature planes x and y, the scalar native
-accumulator uses:
+The active AI Megpoid multi-part branch does **not** split an eight-channel
+post-residual tensor into four independent feature pairs.
+
+In `FUN_1800c7ad0`, the active branch reads one pair of contiguous
+feature planes from the render-state output buffer:
+
+- first plane: `positionCount` float32 values;
+- second plane: `positionCount` float32 values, at the second-plane
+  offset held by the render-state descriptor.
+
+The outer native loop iterates the D00 parts. It reuses the same two feature
+plane pointers for each part, while advancing the modulation-table pointers
+by `partIndex * positionCount`. The output is one interleaved complex
+spectrum with `[real0, imag0, real1, imag1, ...]` layout.
+
+The coefficient arrays are therefore **part-major**:
 
 ```text
-out.real += (x * D46 - y * D4C) * gain
-out.imag += (y * D46 + x * D4C) * gain
+tableIndex = partIndex * positionCount + position
 ```
 
-This is implemented by
-`S5MegpoidMultipartOutputModulation.accumulatePartInto()`. The table
-builder is `S5MegpoidMultipartOutputModulationBuilder`; its input geometry
-and D02/D03/D04 and both mask flags are taken from
-`S5MegpoidRuntimeOptionsDescriptor`. The native part-modulation identifier
-is validated by the same descriptor before a table is created.
-`PreparedMegpoidRuntime.prepareMultipartOutputModulation()` accepts only
-the frame-specific position count, F0 and `theta_ctr`.
+For the same input pair `x[position]` and `y[position]`, each part
+contributes:
 
-Tests cover the four part locations/distances, all three native
-coordinate rounding routes (SSE truncation, AVX nearest-even and
-inline-scalar `roundf`), the native SIMD quarter-wave polynomial, the
-nearest/threshold OR rule, strict nearest-distance tie behavior, inclusive
-threshold equality, both threshold-selector modes, unvoiced identity
-rotation, and the complex accumulation sign/order.
+```text
+out.real += (x * D46 - y * D4C) * D40
+out.imag += (y * D46 + x * D4C) * D40
+```
 
-## Boundary: this is not the complete output head
+The native outer loop accumulates one whole part across positions, then
+advances to the next part. The Android port reflects this with
+`S5MegpoidMultipartComplexFeaturePair`, which holds the one shared pair,
+and `S5MegpoidMultipartOutputModulation.accumulateAllPartsInto()`, which
+applies it to each part in order. The builder stores each coefficient table
+at `partIndex * positionCount + position`.
 
-This work prepares the per-part location, distance, gain and rotation
-tables and ports the complex accumulator. It does not yet:
+This is a correction to the earlier eight-plane interpretation. The earlier
+`S5MegpoidMultipartFeaturePlaneExtractor` implementation that divided a
+tensor into four different real/imaginary pairs has been removed. The current
+`S5MegpoidMultipartFeaturePlaneExtractor` only extracts the two contiguous
+planes consumed by the active loop.
 
-1. Split the eight post-residual feature channels into the four per-part
-   x/y feature planes.
-2. Integrate the modulation buffers into the VTMG four-part output-head
-   operator callsites and their native interpolation/conditioning stages.
-3. Build the carrier-conditioned feature input and run its full per-frame
-   scheduling path.
-4. Reduce/fuse the completed part streams into the final two terminal
-   feature planes.
+## Android implementation boundary
 
-The VTMG-to-active-output-head mapping and carrier-conditioned input path
-remain separate work. No end-to-end vocal render or PCM/WAV output is
+The Android port currently implements:
+
+- four-part coordinate, distance and threshold/gain table construction;
+- SSE-style truncation, AVX nearest-even and scalar `roundf` comparison paths;
+- the native polynomial rotation approximation;
+- the part-major table layout;
+- repeated accumulation of one shared complex feature pair over all D00 parts.
+
+It does not yet implement:
+
+1. The active upstream graph that produces the shared two-plane feature tensor
+   from note/phoneme-conditioned input and VTMG/VTB2 model state.
+2. The upstream carrier-generation path and its exact per-frame buffers.
+3. The complete real-time F0, theta, scale and amplitude scheduling path.
+4. Differential comparison of complex spectra against authorized native
+   reference frames across voiced/unvoiced transitions and chunk boundaries.
+
+The VTMG-to-active-output path and carrier-conditioned input remain separate
+dependencies. No end-to-end vocal render or verified PCM/WAV output is
 claimed by this operator port.
+
+## Regression coverage
+
+Tests cover:
+
+- four-part locations, distances and gain thresholds;
+- SSE truncation, AVX nearest-even and inline scalar `roundf` routes;
+- the native SIMD quarter-wave polynomial;
+- the nearest/threshold OR rule, ties and inclusive threshold equality;
+- unvoiced identity rotation;
+- part-major coefficient indexing;
+- reuse of a single shared real/imaginary feature pair across all four parts;
+- complex accumulation signs and arithmetic order.
