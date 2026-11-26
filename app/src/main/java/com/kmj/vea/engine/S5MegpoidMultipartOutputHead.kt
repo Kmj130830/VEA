@@ -103,8 +103,11 @@ object S5MegpoidMultipartFeaturePlaneExtractor {
         val first = ArrayList<FloatArray>(partCount)
         val second = ArrayList<FloatArray>(partCount)
         for (part in 0 until partCount) {
-            val firstChannelOffset = checkedProduct(part * 2, positionCount)
-            val secondChannelOffset = checkedProduct(part * 2 + 1, positionCount)
+            // The full tensor size was validated above, so these offsets
+            // are bounded by expectedValues. The first plane of part zero
+            // legitimately starts at offset zero.
+            val firstChannelOffset = (part * 2) * positionCount
+            val secondChannelOffset = (part * 2 + 1) * positionCount
             first += outputFeatureMajor.copyOfRange(
                 firstChannelOffset,
                 firstChannelOffset + positionCount
