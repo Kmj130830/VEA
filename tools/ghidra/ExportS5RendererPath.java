@@ -74,7 +74,8 @@ public class ExportS5RendererPath extends GhidraScript {
                 "1801272b0", "180127120", "180127330", "180126c20",
                 "180126e30", "180126d40", "1801271a0",
                 "18006c720", "180074a50", "180076080", "180077520",
-                "180028cf0", "180039ae0", "18003ab70", "18006fdb0",
+                "180028cf0", "180039ae0", "18003ab70", "18003e920",
+                "18007a0a0", "18003be50", "18006fdb0",
                 "18006b8b0", "18006eb60", "18003e540", "180040d50",
                 "180074350", "180074400", "180074580", "180074a10",
                 "180074a50", "180074580", "180074400", "180074350",
@@ -528,6 +529,104 @@ public class ExportS5RendererPath extends GhidraScript {
                     out.println();
                 }
             }
+
+            out.println("## VSM frame-stack and pre-projection callsite windows");
+            out.println();
+            out.println("These callsite windows trace the generic VSM frame stack independently from the Megpoid VTB2 multipart spectral head. FUN_18003e920 is the direct wrapper around two pre-projections and the FUN_180076080/FUN_180077520 pair; Func_417eec3e owns the outer call context.");
+            out.println();
+
+            String[][] frameStackTargets = {
+                {"18007a0a0", "pre-frame vector projection operator"},
+                {"180076080", "stateful frame-history and operator preparation"},
+                {"180077520", "branch-indexed frame vector projection stack"},
+                {"18003e920", "pre-projection/residual wrapper"},
+                {"18003ab70", "timed-phone event feature preparation"}
+            };
+            Function[] frameStackOwners = {
+                currentProgram.getFunctionManager().getFunctionAt(toAddr("18003e920")),
+                currentProgram.getFunctionManager().getFunctionAt(toAddr("180085d10"))
+            };
+            String[] frameStackOwnerNames = {
+                "FUN_18003e920",
+                "Func_417eec3e"
+            };
+
+            for (int ownerIndex = 0; ownerIndex < frameStackOwners.length; ownerIndex++) {
+                Function owner = frameStackOwners[ownerIndex];
+                if (owner == null) continue;
+                out.println("### Callsite owner: " + frameStackOwnerNames[ownerIndex] +
+                    " at " + owner.getEntryPoint());
+                out.println();
+                for (String[] target : frameStackTargets) {
+                    Address targetAddress = toAddr(target[0]);
+                    out.println("#### " + targetAddress + " — " + target[1]);
+                    out.println();
+                    InstructionIterator instructions =
+                        currentProgram.getListing().getInstructions(owner.getBody(), true);
+                    ArrayDeque<Instruction> preceding = new ArrayDeque<>();
+                    int matchingCalls = 0;
+                    while (instructions.hasNext()) {
+                        monitor.checkCancelled();
+                        Instruction ins = instructions.next();
+                        boolean match = false;
+                        for (Reference ref : ins.getReferencesFrom()) {
+                            if (ref.getReferenceType().isCall() &&
+                                ref.getToAddress().equals(targetAddress)) {
+                                match = true;
+                                break;
+                            }
+                        }
+                        if (match) {
+                            matchingCalls++;
+                            out.println("Callsite: " + ins.getAddress());
+                            out.println("~~~asm");
+                            for (Instruction prior : preceding) {
+                                out.println(prior.getAddress() + "  " + prior.toString());
+                            }
+                            out.println(ins.getAddress() + "  " + ins.toString());
+                            out.println("~~~");
+                            out.println();
+                        }
+                        preceding.addLast(ins);
+                        while (preceding.size() > 120) preceding.removeFirst();
+                    }
+                    if (matchingCalls == 0) out.println("- No direct call recovered in this owner.");
+                    out.println();
+                }
+            }
+
+            out.println("## VSM frame-stack direct caller references");
+            out.println();
+            out.println("| Target | Target function | Caller | Call site |");
+            out.println("|---:|---|---|---:|");
+            String[] frameTargets = {"18007a0a0", "180076080", "180077520"};
+            int frameCallerCount = 0;
+            for (String targetHex : frameTargets) {
+                Address targetAddress = toAddr(targetHex);
+                Function targetFunction =
+                    currentProgram.getFunctionManager().getFunctionAt(targetAddress);
+                if (targetFunction == null) {
+                    targetFunction = currentProgram.getFunctionManager().getFunctionContaining(targetAddress);
+                }
+                ReferenceIterator refs =
+                    currentProgram.getReferenceManager().getReferencesTo(targetAddress);
+                while (refs.hasNext()) {
+                    Reference ref = refs.next();
+                    if (!ref.getReferenceType().isCall()) continue;
+                    Function caller =
+                        currentProgram.getFunctionManager().getFunctionContaining(ref.getFromAddress());
+                    if (caller == null) continue;
+                    frameCallerCount++;
+                    out.printf("| %s | %s | %s at %s | %s |%n",
+                        targetAddress,
+                        targetFunction == null ? "not recovered" : targetFunction.getName(),
+                        caller.getName(), caller.getEntryPoint(), ref.getFromAddress());
+                }
+            }
+            if (frameCallerCount == 0) {
+                out.println("| - | - | no direct caller references recovered | - |");
+            }
+            out.println();
 
             out.println("## Frame-window generator callers");
             out.println();
