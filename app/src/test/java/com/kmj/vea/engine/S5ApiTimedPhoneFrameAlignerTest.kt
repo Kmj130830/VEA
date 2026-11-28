@@ -25,7 +25,7 @@ class S5ApiTimedPhoneFrameAlignerTest {
         )
 
         assertEquals(4, result.frameCount)
-        assertArrayEquals(intArrayOf(0, 0, 0, 1), result.copyEventIndices(), 0)
+        assertArrayEquals(intArrayOf(0, 0, 0, 1), result.copyEventIndices())
         assertEquals(-0.003f, result.relativeStartSecondsByFrame[0], 1.0e-7f)
         assertEquals(0.007f, result.relativeStartSecondsByFrame[1], 1.0e-6f)
         assertEquals(0.017f, result.relativeStartSecondsByFrame[2], 1.0e-6f)
@@ -52,7 +52,7 @@ class S5ApiTimedPhoneFrameAlignerTest {
         )
 
         assertEquals(3, result.frameCount)
-        assertArrayEquals(intArrayOf(0, 1, 1), result.copyEventIndices(), 0)
+        assertArrayEquals(intArrayOf(0, 1, 1), result.copyEventIndices())
         assertArrayEquals(floatArrayOf(-1f, 0.75f, 0.75f), result.copyEventControls(), 0f)
         assertArrayEquals(
             floatArrayOf(0.01f, 0.02f, 0.02f),
@@ -111,7 +111,7 @@ class S5ApiTimedPhoneFrameAlignerTest {
         // Total = int(0.025 / 0.01) = 2 frames. Event 0's end is ceil(1.5)=2,
         // so the first event owns both frames and the second has no frame row.
         assertEquals(2, result.frameCount)
-        assertArrayEquals(intArrayOf(0, 0), result.copyEventIndices(), 0)
+        assertArrayEquals(intArrayOf(0, 0), result.copyEventIndices())
     }
 
     @Test
