@@ -112,12 +112,76 @@ data class S5MegpoidCarrierFusionFrameInput(
         require(scale.isFinite() && amplitude.isFinite()) {
             "Carrier frame scale and amplitude must be finite."
         }
+        require(inputFeatureMajor.size.toLong() == workspace.geometry.denseInputElementCount.toLong()) {
+            "Carrier Dense input does not match the workspace [inputFeature][position] geometry."
+        }
         require(inputFeatureMajor.all { it.isFinite() }) {
             "Carrier Dense input contains a non-finite value."
+        }
+        require(carrierHistoryFirstPlane.size == workspace.geometry.spectrumBins &&
+            carrierHistorySecondPlane.size == workspace.geometry.spectrumBins) {
+            "Carrier history planes must match the workspace's one-sided spectrum-bin count."
         }
         require(carrierHistoryFirstPlane.all { it.isFinite() } &&
             carrierHistorySecondPlane.all { it.isFinite() }) {
             "Carrier history frame contains a non-finite value."
+        }
+    }
+
+    companion object {
+        /**
+         * Creates the active carrier-frame input from native-equivalent
+         * upstream values:
+         * - the final 32-channel sequence output feeds the active 2xK carrier Dense layer;
+         * - the separately generated carrier spectrum is interleaved [real,imag]
+         *   and is split into the two planar history buffers stored in D80/D86.
+         *
+         * This factory does not generate the carrier spectrum. The caller must
+         * provide the output of the independently prepared excitation/carrier
+         * generator corresponding to the same render frame.
+         */
+        fun fromSequenceOutputAndInterleavedCarrierSpectrum(
+            workspace: S5MegpoidCarrierFusionWorkspace,
+            sequenceOutput: S5MegpoidSequenceTransitionOutput,
+            carrierSpectrumInterleaved: FloatArray,
+            scale: Float,
+            amplitude: Float,
+            activeParameters: S5MegpoidCarrierFusionActiveParameters? = null
+        ): S5MegpoidCarrierFusionFrameInput {
+            val geometry = workspace.geometry
+            require(sequenceOutput.channels == geometry.inputFeatures) {
+                "Sequence output has ${sequenceOutput.channels} channels; carrier Dense expects ${geometry.inputFeatures}."
+            }
+            require(sequenceOutput.positions == geometry.carrierPositions) {
+                "Sequence output has ${sequenceOutput.positions} positions; carrier Dense expects ${geometry.carrierPositions}."
+            }
+            require(sequenceOutput.features.size.toLong() ==
+                geometry.denseInputElementCount.toLong()) {
+                "Sequence output tensor does not match the carrier Dense [feature][position] input."
+            }
+            require(carrierSpectrumInterleaved.size.toLong() ==
+                geometry.currentCarrierFrameElementCount.toLong()) {
+                "Carrier spectrum must contain exactly two interleaved values per workspace spectrum bin."
+            }
+            require(carrierSpectrumInterleaved.all { it.isFinite() }) {
+                "Carrier spectrum contains a non-finite value."
+            }
+
+            val first = FloatArray(geometry.spectrumBins)
+            val second = FloatArray(geometry.spectrumBins)
+            for (bin in 0 until geometry.spectrumBins) {
+                first[bin] = carrierSpectrumInterleaved[bin * 2]
+                second[bin] = carrierSpectrumInterleaved[bin * 2 + 1]
+            }
+            return S5MegpoidCarrierFusionFrameInput(
+                workspace = workspace,
+                inputFeatureMajor = sequenceOutput.features,
+                carrierHistoryFirstPlane = first,
+                carrierHistorySecondPlane = second,
+                scale = scale,
+                amplitude = amplitude,
+                activeParameters = activeParameters
+            )
         }
     }
 }
