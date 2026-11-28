@@ -135,9 +135,14 @@ The carrier Dense input, however, is the same final 32-channel sequence
 tensor at +0xE0. `S5MegpoidCarrierFusionFrameInput` now has a factory that
 takes that sequence output plus the separately generated interleaved complex
 carrier spectrum and splits the spectrum into the two planar D80 history
-inputs. The exact native carrier-spectrum generator behind FUN_18012b140 is
-being traced separately; it must not be replaced by the periodic/noise
-excitation transform FUN_18012b150 without evidence.
+inputs. FUN_18012b140 is only a thin wrapper: it calls FUN_18012b4a0 with the
+per-singer transform state, destination frame and mode 0. FUN_18012b320
+calls the same core through its alternate wrapper form. FUN_18012b330
+dispatches multiple transform states through the scalar FUN_18012b620 path
+or the batched/vectorized FUN_18012bb30 path. The core FUN_18012b4a0 and
+both transform kernels are now explicit Ghidra targets. The carrier spectrum
+must not be replaced by the periodic/noise excitation transform
+FUN_18012b150.
 
 ## Spectral frame reconstruction
 
