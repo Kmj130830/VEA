@@ -91,11 +91,40 @@ frame vector from `FUN_180076080`.
    `param_1 + 0xf8 == 1`.
 6. Copy the resulting output vector into the caller's final output buffer.
 
+## Native delayed-frame ring contract and Android port
+
+The history descriptors used by `FUN_180076080` share a compact ring
+contract. The write path uses element count, per-slot stride, a monotonic
+cursor, a power-of-two slot mask and a data pointer. Immediately after
+appending a frame, the initial operator loop reads:
+
+```text
+slot = (writeCursor - operatorIndex - 1) & slotMask
+source = ringData + slot * slotStride
+```
+
+Thus operator index zero sees the frame just written, index one sees the
+previous frame, and the ring's zero-filled allocation supplies startup history
+until those older frames have been written.
+
+`S5ApiFrameHistoryRing` now ports this generic buffer behavior. Its
+`elementCount`, `slotStride`, and power-of-two `historySlots` explicitly
+represent the native descriptor rather than guessing dimensions from a
+Megpoid VTB2 tensor. The tests cover delayed reads, zero-filled startup,
+wraparound, oldest-to-newest snapshots, per-slot padding and reset.
+
+This component does not invoke the native operator objects, run the nested
+0x38-byte stage descriptors, or combine the separate parameter-owned frame
+interpolation buffer at `param_1 + 0x14`. Those remain separate stateful
+parts of `FUN_180076080`.
+
 ## Android implementation added
 
 Two reusable components now port the arithmetic around this stateful
 frame path:
 
+- `S5ApiFrameHistoryRing.kt` ports the native append and delayed-slot read
+  contract for a power-of-two vector ring.
 - `S5ApiFramePreProjectionChain.kt` implements the two
   `FUN_18007a0a0` projection calls from `FUN_18003e920`, including the
   separate residual vector and tanh after each projection. It then appends
@@ -112,7 +141,7 @@ frame path:
     final projection, optional final bias and optional final tanh in native order.
 
 Unit tests cover two residual/tanh pre-projections, tail-only scaling and the
-optional scale sentinel, first/hidden vector projections, the 0.01 leaky-ReLU
+optional scale sentinel, delayed ring slots, wraparound and startup zeros; first/hidden vector projections, the 0.01 leaky-ReLU
 and clamp mode, a stack with no hidden projection, disabled bias, dimension
 validation and non-finite inputs.
 
