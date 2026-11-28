@@ -87,7 +87,7 @@ data class PreparedMegpoidRuntime(
      * their constructor provenance is known, but their physical units and
      * active values are not yet mapped to the VTB2 options.
      */
-    fun createExcitationGenerator(
+    internal fun createExcitationGenerator(
         phaseScale: Float,
         periodScale: Float,
         sineDenominatorThreshold: Float,
