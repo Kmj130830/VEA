@@ -412,18 +412,12 @@ data class PreparedMegpoidRuntime(
         gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel,
         statistics: S5MegpoidStatisticsKernel = NativeS5MegpoidStatisticsKernel
     ): FloatArray {
-        require(sequenceOutput.channels == 32) {
-            "The native active output head expects 32 sequence channels; got ${sequenceOutput.channels}."
+        require(stage.inputFeatures == 32 &&
+            stage.outputFeatures == runtimeOptions.postResidualHeadFeatureWidth) {
+            "The active projection dimensions do not match this voicebank's multipart output options."
         }
-        require(sequenceOutput.positions > 0 &&
-            sequenceOutput.features.size.toLong() ==
-            sequenceOutput.channels.toLong() * sequenceOutput.positions.toLong()) {
-            "Sequence output feature tensor dimensions do not match its channel/position metadata."
-        }
-        return projectActiveMultipartFeatures(
-            inputFeatureMajor = sequenceOutput.features,
-            positions = sequenceOutput.positions,
-            stage = stage,
+        return stage.forward(
+            sequenceOutput = sequenceOutput,
             gemm = gemm,
             statistics = statistics
         )
