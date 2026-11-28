@@ -143,8 +143,8 @@ data class PreparedMegpoidRuntime(
     fun createCarrierSpectrumSession(
         hopSamples: Int,
         windowCoreLength: Int,
-        windowShapeMode: Int,
         invertOddComplexBins: Boolean,
+        windowShapeMode: Int = 0,
         randomSeed: Int = S5MegpoidCarrierSpectrumSession.NATIVE_RANDOM_SEED
     ): S5MegpoidCarrierSpectrumSession =
         S5MegpoidCarrierSpectrumSession(
