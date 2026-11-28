@@ -1,5 +1,7 @@
 package com.kmj.vea.engine
 
+import kotlin.math.ceil
+
 /**
  * Native per-frame phone ownership/timing arrays produced inside
  * S5API.dll FUN_18003ab70 after the event-level FUN_18006c720 feature matrix
@@ -52,14 +54,16 @@ data class S5ApiTimedPhoneFrameAlignment(
  * min(totalFrameCount, ceil(event.endSeconds / framePeriodSeconds)).
  *
  * For every owned frame f:
- *   relativeStart = float(float(f - eventStartFrameCursor) * framePeriod)
- *                   + float(eventStartFrameCursor * framePeriod - eventStart)
+ *   relativeStart = float(float(f - eventStartFrameCursor) * framePeriod
+ *                   + (double(eventStartFrameCursor) * double(framePeriod) - eventStart))
  *   eventDuration = float(eventEnd - eventStart)
  *
  * The relative-start expression preserves the native float32 local-offset
  * multiply and double-precision base-time calculation before narrowing.
  */
 object S5ApiTimedPhoneFrameAligner {
+    /** Android-side allocation guard; the native format itself stores an Int frame count. */
+    const val MAX_SUPPORTED_FRAME_COUNT = 2_000_000
     fun align(
         events: List<VsmPhoneEvent>,
         descriptor: S5ApiDefaultPhoneFeatureDescriptor,
@@ -120,6 +124,9 @@ object S5ApiTimedPhoneFrameAligner {
         // The native cast to signed int truncates toward zero; all times are
         // non-negative, so this is floor(total end / frame period).
         val frameCount = totalFrameRatio.toInt()
+        require(frameCount <= MAX_SUPPORTED_FRAME_COUNT) {
+            "Native phone frame count exceeds the Android allocation safety limit of $MAX_SUPPORTED_FRAME_COUNT."
+        }
 
         val eventIndices = IntArray(frameCount) { -1 }
         val relativeStarts = FloatArray(frameCount)
