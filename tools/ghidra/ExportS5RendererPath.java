@@ -114,6 +114,12 @@ public class ExportS5RendererPath extends GhidraScript {
                 "18012b140", "18012b320", "18012b330",
                 "18012b4a0", "18012b620", "18012bb30",
                 "180129190", "180129450", "180128a50", "1800db6c0",
+                // Public/internal render wrappers and the actual render-context
+                // forward orchestrator. The sequence-to-spectral position map
+                // must be recovered from this path, not guessed from 513 bins.
+                "180126c20", "180126e30", "1800aec40", "1800aeea0",
+                "1800aed70", "1800aef40", "1800aeb10",
+                "1800c1a30", "1800ccdb0", "1800ccafd",
                 "180127720", "180127a40",
                 "18012b470", "18012b450", "18012c730", "1800c7ad0",
                 "180128c40", "180129240", "1800bca40", "1800af170",
@@ -377,6 +383,71 @@ public class ExportS5RendererPath extends GhidraScript {
                 }
             }
 
+            out.println("## Render-context and sequence-to-frame owner callsite windows");
+            out.println();
+            out.println("The following callers surround the native render-context entry and S5API forward path. These instruction windows preserve Win64 register/stack argument setup and buffer-pointer arithmetic so the phone-sequence position grid can be distinguished from the 513-bin spectral grid.");
+            out.println();
+
+            String[][] renderOwnerTargets = {
+                {"1800aec40", "render-context forward orchestration"},
+                {"1800aeea0", "public render request wrapper"},
+                {"1800aed70", "alternate public render request wrapper"},
+                {"1800aef40", "render request helper A"},
+                {"1800aeb10", "render request helper B"},
+                {"1800c1a30", "model forward transition wrapper"},
+                {"1800ccdb0", "render-context / model-state transition owner"},
+                {"1800c7ad0", "S5API per-frame render-state forward path"}
+            };
+            String[] renderOwnerNames = {
+                "1800aec40", "1800aeea0", "1800aed70", "1800aef40",
+                "1800aeb10", "1800c1a30", "1800ccdb0", "1800c7ad0"
+            };
+
+            for (int ownerIndex = 0; ownerIndex < renderOwnerNames.length; ownerIndex++) {
+                Address ownerAddress = toAddr(renderOwnerNames[ownerIndex]);
+                Function owner = currentProgram.getFunctionManager()
+                    .getFunctionAt(ownerAddress);
+                if (owner == null) continue;
+                out.println("### Owner " + owner.getName() + " at " + ownerAddress);
+                out.println();
+                for (String[] target : renderOwnerTargets) {
+                    Address targetAddress = toAddr(target[0]);
+                    out.println("#### " + targetAddress + " — " + target[1]);
+                    out.println();
+                    InstructionIterator instructions =
+                        currentProgram.getListing().getInstructions(owner.getBody(), true);
+                    ArrayDeque<Instruction> preceding = new ArrayDeque<>();
+                    int matches = 0;
+                    while (instructions.hasNext()) {
+                        monitor.checkCancelled();
+                        Instruction ins = instructions.next();
+                        boolean match = false;
+                        for (Reference ref : ins.getReferencesFrom()) {
+                            if (ref.getReferenceType().isCall() &&
+                                ref.getToAddress().equals(targetAddress)) {
+                                match = true;
+                                break;
+                            }
+                        }
+                        if (match) {
+                            matches++;
+                            out.println("Callsite: " + ins.getAddress());
+                            out.println("~~~asm");
+                            for (Instruction prior : preceding) {
+                                out.println(prior.getAddress() + "  " + prior.toString());
+                            }
+                            out.println(ins.getAddress() + "  " + ins.toString());
+                            out.println("~~~");
+                            out.println();
+                        }
+                        preceding.addLast(ins);
+                        while (preceding.size() > 112) preceding.removeFirst();
+                    }
+                    if (matches == 0) out.println("- No direct call recovered in this owner.");
+                    out.println();
+                }
+            }
+
             out.println("## Active multipart output-head and carrier callsite argument windows");
             out.println();
             out.println("These instruction windows retain the Win64 register/stack setup and pointer arithmetic immediately before the active output-head calls. They are intended to recover the per-part feature pointers, modulation-table strides, carrier Dense inputs and the order of complex accumulation.");
@@ -390,7 +461,12 @@ public class ExportS5RendererPath extends GhidraScript {
                 {"1800c3740", "active carrier Dense/GEMM projection"},
                 {"1800c7920", "global feature normalization"},
                 {"1800c5260", "fallback Dense projection"},
-                {"1800c3930", "multipart interpolation dispatcher"},
+                {"1800c3930", "multipart rotation/gating coefficient dispatcher"},
+                {"1800aec40", "render-context forward orchestration"},
+                {"1800aeea0", "public render request wrapper"},
+                {"1800aed70", "alternate public render request wrapper"},
+                {"1800c1a30", "model forward transition wrapper"},
+                {"1800ccdb0", "render-context / model-state transition owner"},
                 {"18012b140", "carrier-generator wrapper"},
                 {"18012b320", "alternate carrier-generator wrapper"},
                 {"18012b4a0", "carrier frame generator core"},
