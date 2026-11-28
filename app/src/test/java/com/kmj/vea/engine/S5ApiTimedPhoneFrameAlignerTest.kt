@@ -52,15 +52,18 @@ class S5ApiTimedPhoneFrameAlignerTest {
         )
 
         assertEquals(3, result.frameCount)
-        assertArrayEquals(intArrayOf(0, 1, 1), result.copyEventIndices())
-        assertArrayEquals(floatArrayOf(-1f, 0.75f, 0.75f), result.copyEventControls(), 0f)
+        // 0.01 / float32(0.01) is slightly greater than one, so native ceil()
+        // assigns frame 1 to the first event as well. The second event then
+        // owns the final frame after the frame cursor advances to 2.
+        assertArrayEquals(intArrayOf(0, 0, 1), result.copyEventIndices())
+        assertArrayEquals(floatArrayOf(-1f, -1f, 0.75f), result.copyEventControls(), 0f)
         assertArrayEquals(
-            floatArrayOf(0.01f, 0.02f, 0.02f),
+            floatArrayOf(0.01f, 0.01f, 0.02f),
             result.copyEventDurationSeconds(),
             1.0e-6f
         )
         assertArrayEquals(
-            floatArrayOf(0f, 0f, 0.01f),
+            floatArrayOf(0f, 0.01f, 0.01f),
             result.copyRelativeStartSeconds(),
             1.0e-6f
         )
