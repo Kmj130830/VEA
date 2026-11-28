@@ -80,6 +80,40 @@ data class PreparedMegpoidRuntime(
 
     /** Allocates a zeroed complex spectrum frame for the future neural forward pass. */
     fun newModelSpectrumFrame(): FloatArray = spectrumOutputShape.newInterleavedFrame()
+
+    /**
+     * Creates the stateful periodic/noise excitation source for this prepared
+     * S5API voicebank. The native transform-state scales are required inputs:
+     * their constructor provenance is known, but their physical units and
+     * active values are not yet mapped to the VTB2 options.
+     */
+    fun createExcitationGenerator(
+        phaseScale: Float,
+        periodScale: Float,
+        sineDenominatorThreshold: Float,
+        wrapPhase: Boolean,
+        randomSeed: Int = S5MegpoidNativeMersenneTwister.DEFAULT_SEED
+    ): S5MegpoidExcitationGenerator =
+        S5MegpoidExcitationGenerator.withRecoveredRandomSource(
+            phaseScale = phaseScale,
+            periodScale = periodScale,
+            sineDenominatorThreshold = sineDenominatorThreshold,
+            wrapPhase = wrapPhase,
+            randomSeed = randomSeed
+        )
+
+    /**
+     * Converts a complete, already windowed native-size excitation frame to
+     * one-sided complex bins. This requires fftSize samples (1024 for the
+     * supplied Megpoid model); it does not assemble the 320-sample chunk into
+     * a frame or manage the separate native excitation-history ring.
+     */
+    fun transformWindowedExcitationFrame(windowedFrame: FloatArray): FloatArray {
+        require(windowedFrame.size == spectrumOutputShape.fftSize) {
+            "Excitation FFT input must contain exactly ${spectrumOutputShape.fftSize} windowed samples."
+        }
+        return S5MegpoidForwardRealFft(spectrumOutputShape.fftSize).transform(windowedFrame)
+    }
     /** Creates a fresh stateful output executor for one render/utterance. */
     fun createSpectralOverlapAdd(): S5MegpoidSpectralOverlapAdd =
         outputTransformInputs.createSpectralOverlapAdd()
