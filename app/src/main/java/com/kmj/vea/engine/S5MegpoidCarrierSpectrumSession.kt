@@ -15,7 +15,7 @@ package com.kmj.vea.engine
  *   +0x00 hop/sample count
  *   +0x04 frame-window length
  *   +0x08 FFT size
- *   +0x10 lag block count = ceil(windowLength / hop) + 2
+ *   +0x10 lag block count = ceil(windowLength / hop) + 1
  *   +0x14 left padding = (fftSize - hop) / 2
  *   +0x18 window coefficients
  *   +0x30 FFT plan
@@ -67,8 +67,8 @@ class S5MegpoidCarrierSpectrumSession(
             "Carrier window core length cannot exceed the FFT size."
         }
 
-        // FUN_180128a50 stores ceil(windowLength / hopSamples) + 2 at +0x10.
-        lagBlocks = ceilDiv(fftSize, hopSamples) + 2
+        // FUN_180128a50 stores ceil(windowLength / hopSamples) + 1 at +0x10.
+        lagBlocks = ceilDiv(fftSize, hopSamples) + 1
 
         // Native signed integer division truncates toward zero. The supported
         // model geometry has fftSize >= hopSamples, so this is floor division.
@@ -76,9 +76,12 @@ class S5MegpoidCarrierSpectrumSession(
 
         // FUN_180128a50 allocates the next power-of-two ring covering the
         // delayed source frame, its left padding, and the current sample hop:
-        // (lagBlocks + 2)*hop + leftPadding + fftSize - 1 + hop.
+        // (ceil(windowLength / hopSamples) + 2)*hop
+        // + leftPadding + fftSize - 1 + hop.
+        // Since lagBlocks = ceil(windowLength / hopSamples) + 1, this is
+        // (lagBlocks + 1)*hop + leftPadding + fftSize - 1 + hop.
         val requiredCapacity =
-            (lagBlocks.toLong() + 2L) * hopSamples.toLong() +
+            (lagBlocks.toLong() + 1L) * hopSamples.toLong() +
                 leftPadding.toLong() +
                 fftSize.toLong() - 1L +
                 hopSamples.toLong()
