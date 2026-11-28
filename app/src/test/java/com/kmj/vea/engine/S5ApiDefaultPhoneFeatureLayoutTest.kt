@@ -140,6 +140,57 @@ class S5ApiDefaultPhoneFeatureLayoutTest {
     }
 
     @Test
+    fun decodesOptionalFramePeriodFromNativeOffset30() {
+        val base = 3
+        val bytes = ByteArray(base + S5ApiDefaultPhoneFeatureDescriptor.NATIVE_FRAME_PERIOD_SIZE)
+        val buffer = java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        buffer.putInt(base + 0x10, 14)
+        buffer.putFloat(base + 0x14, 0.01f)
+        buffer.putFloat(base + 0x18, 1.0f)
+        buffer.putInt(base + 0x1c, 1)
+        buffer.putInt(base + 0x20, 1)
+        buffer.put(base + 0x24, 0)
+        buffer.put(base + 0x25, 0)
+        buffer.put(base + 0x26, 0)
+        buffer.putFloat(base + 0x30, 0.01f)
+
+        val descriptor = S5ApiDefaultPhoneFeatureDescriptor.fromNativeBytes(bytes, base)
+        assertEquals(0.01f, descriptor.framePeriodSecondsAt30!!, 0f)
+        assertEquals(0.01f, descriptor.requireFramePeriodSeconds(), 0f)
+    }
+
+    @Test
+    fun olderNativeDescriptorCaptureLeavesFramePeriodUnavailable() {
+        val descriptor = S5ApiDefaultPhoneFeatureDescriptor.fromNativeBytes(
+            ByteArray(S5ApiDefaultPhoneFeatureDescriptor.NATIVE_MINIMUM_SIZE).also { bytes ->
+                val buffer = java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                buffer.putInt(0x10, 14)
+                buffer.putFloat(0x14, 0.01f)
+                buffer.putFloat(0x18, 1.0f)
+            }
+        )
+        assertNull(descriptor.framePeriodSecondsAt30)
+        assertThrows(IllegalStateException::class.java) {
+            descriptor.requireFramePeriodSeconds()
+        }
+    }
+
+    @Test
+    fun rejectsInvalidOptionalFramePeriod() {
+        for (invalidPeriod in listOf(0f, -0.01f, Float.NaN, Float.POSITIVE_INFINITY)) {
+            val bytes = ByteArray(S5ApiDefaultPhoneFeatureDescriptor.NATIVE_FRAME_PERIOD_SIZE)
+            val buffer = java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            buffer.putInt(0x10, 14)
+            buffer.putFloat(0x14, 0.01f)
+            buffer.putFloat(0x18, 1.0f)
+            buffer.putFloat(0x30, invalidPeriod)
+            assertThrows(IllegalArgumentException::class.java) {
+                S5ApiDefaultPhoneFeatureDescriptor.fromNativeBytes(bytes)
+            }
+        }
+    }
+
+    @Test
     fun rejectsMode1RatherThanTreatingItAsMode0() {
         val descriptor = S5ApiDefaultPhoneFeatureDescriptor(
             categoryWidthAt10 = 14,
