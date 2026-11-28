@@ -161,6 +161,13 @@ class S5ApiTimedPhoneFrameAlignerTest {
         }
         assertThrows(IllegalArgumentException::class.java) {
             S5ApiTimedPhoneFrameAligner.align(
+                listOf(event(0.0, 2_000_001.0, "a")),
+                1f,
+                1f
+            )
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            S5ApiTimedPhoneFrameAligner.align(
                 listOf(event(0.0, 0.01, "a")),
                 0.01f,
                 Float.NaN
