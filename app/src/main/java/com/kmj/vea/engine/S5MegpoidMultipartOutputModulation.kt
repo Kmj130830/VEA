@@ -85,8 +85,12 @@ data class S5MegpoidMultipartOutputModulation(
             val d4c = nativeRotationSine[tableIndex]
             val gain = gains[tableIndex]
 
-            val realContribution = (x * d46 - y * d4c) * gain
-            val imaginaryContribution = (y * d46 + x * d4c) * gain
+            // Native FUN_1800d52b0/FUN_1800d5610 scales both input
+            // planes first, then rotates the complex pair.
+            val scaledReal = x * gain
+            val scaledImaginary = y * gain
+            val realContribution = d46 * scaledReal - d4c * scaledImaginary
+            val imaginaryContribution = d4c * scaledReal + d46 * scaledImaginary
             val outputIndex = position * 2
             outputInterleaved[outputIndex] += realContribution
             outputInterleaved[outputIndex + 1] += imaginaryContribution
