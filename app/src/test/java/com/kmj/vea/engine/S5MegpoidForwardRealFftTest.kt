@@ -15,7 +15,7 @@ class S5MegpoidForwardRealFftTest {
 
         val spectrum = fft.transform(frame)
 
-        assertEquals(18, spectrum.size)
+        assertEquals(10, spectrum.size)
         for (bin in 0..4) {
             assertEquals(1f, spectrum[bin * 2], 1.0e-6f)
             assertEquals(0f, spectrum[bin * 2 + 1], 1.0e-6f)
