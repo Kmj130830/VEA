@@ -194,6 +194,26 @@ data class S5VoicebankModelPackage(
         return postResidualFallbackTensorIndex.buildStage(tensorDecoder)
     }
 
+    /**
+     * Builds the active D00*2 output projection from the shared VTB2
+     * normalizer/Dense tensors. Unlike preparePostResidualFallbackStage(),
+     * this creates the folded +0x150/+0x154/+0x158 buffers used by the
+     * active multi-part branch in FUN_1800c7ad0.
+     */
+    fun prepareActiveMultipartProjectionStage(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidActiveMultipartProjectionStage {
+        check(runtimeOptionsDescriptor.usesMultiPartOutputHead) {
+            "The selected AI Megpoid options do not enable the active multipart head."
+        }
+        val stage = postResidualFallbackTensorIndex.buildActiveMultipartProjectionStage(tensorDecoder)
+        require(stage.inputFeatures == 32 &&
+            stage.outputFeatures == runtimeOptionsDescriptor.postResidualHeadFeatureWidth) {
+            "Active multipart projection dimensions do not match the selected Megpoid model options."
+        }
+        return stage
+    }
+
     /** Exact sequence-indexed Temporal/Banked factory tables populated by FUN_1800ced10. */
     val sequenceOperatorTensorIndex: S5MegpoidSequenceOperatorTensorIndex by lazy(
         LazyThreadSafetyMode.PUBLICATION
