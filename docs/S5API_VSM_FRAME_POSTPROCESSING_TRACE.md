@@ -217,3 +217,25 @@ event duration and event control remain separate timing metadata; this
 builder does not fold them into phone-feature rows. It does not execute the
 stateful `FUN_180076080` operators, does not map their descriptors to VTB2
 weights, and does not claim an acoustic spectrum or PCM output.
+
+
+## Multi-ring history workspace and atomic delayed-input snapshots
+
+The native `FUN_180076080` path receives a workspace descriptor area with
+an input history ring at `param_2`, a following ring at `param_2 + 8`, and
+additional rings used by intermediate stages. Android now provides
+`S5ApiFrameHistoryWorkspace` to own multiple independent rings using the
+verified per-ring element count, slot stride and power-of-two capacity.
+
+`appendAndReadDelayed` performs the input-ring append and captures the
+requested delayed frames under one synchronized operation. Its returned
+indices match the recovered native history read rule: operator index 0 gets
+the frame just appended, index 1 gets the preceding frame, and older startup
+slots remain zero-filled. The snapshot owns its arrays, preventing a
+caller/operator from modifying either the ring or another operator's input.
+The workspace also resets all ring cursors together at an utterance boundary.
+
+This is the verified buffer orchestration boundary only. It does not decode
+the nested 0x38-byte stage descriptors, execute their vtable operators, or
+map their parameters to the nine VTMG layers. Those mappings remain required
+before this workspace can be used as a complete `FUN_180076080` port.

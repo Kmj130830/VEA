@@ -88,6 +88,30 @@ class S5ApiFrameHistoryRing(
         return storage.copyOfRange(offset, offset + elementCount)
     }
 
+    /**
+     * Appends one frame and snapshots the delayed inputs for a contiguous
+     * operator list under one lock.
+     *
+     * The returned delayed frame at index 0 is the just-appended frame,
+     * index 1 is the preceding frame, and so forth. Keeping the append and
+     * reads atomic prevents concurrent frame submissions from shifting the
+     * history between operators in the same native frame tick.
+     */
+    @Synchronized
+    fun appendAndReadDelayed(
+        frame: FloatArray,
+        delayedFrameCount: Int
+    ): S5ApiFrameHistoryReadBatch {
+        require(delayedFrameCount >= 0) {
+            "Delayed frame count cannot be negative."
+        }
+        val sequence = append(frame)
+        val delayed = List(delayedFrameCount) { operatorIndex ->
+            readDelayed(operatorIndex)
+        }
+        return S5ApiFrameHistoryReadBatch(sequence, delayed)
+    }
+
     /** Reads a physical ring slot by index, independent of the current cursor. */
     @Synchronized
     fun readSlot(slotIndex: Int): FloatArray {
@@ -119,4 +143,43 @@ class S5ApiFrameHistoryRing(
         storage.fill(0f)
         writeCursor = 0L
     }
+}
+
+
+/**
+ * Owned delayed-frame snapshot captured immediately after one ring append.
+ * Each access returns a fresh array so operator code cannot mutate the
+ * retained snapshot or the underlying history ring.
+ */
+class S5ApiFrameHistoryReadBatch internal constructor(
+    val writeSequence: Long,
+    delayedFrames: List<FloatArray>
+) {
+    private val frames = delayedFrames.map(FloatArray::copyOf)
+
+    init {
+        require(writeSequence >= 0L)
+        require(frames.all { it.all(Float::isFinite) }) {
+            "Delayed frame snapshot contains a non-finite value."
+        }
+        require(frames.map { it.size }.distinct().size <= 1) {
+            "Delayed frame snapshot rows must have a consistent width."
+        }
+    }
+
+    val frameCount: Int
+        get() = frames.size
+
+    val featureWidth: Int
+        get() = frames.firstOrNull()?.size ?: 0
+
+    fun delayedFrame(operatorIndex: Int): FloatArray {
+        require(operatorIndex in frames.indices) {
+            "Delayed operator index is outside this frame snapshot."
+        }
+        return frames[operatorIndex].copyOf()
+    }
+
+    fun copyDelayedFrames(): List<FloatArray> =
+        frames.map(FloatArray::copyOf)
 }
