@@ -151,8 +151,10 @@ hop length from render-root +0x0C, window length and FFT size from +0x04,
 window core length from +0x61C, odd-bin inversion from +0x620, seed 12345,
 and window shape mode from the corresponding render option (+0x3418 in the
 extended path). The ring geometry follows the native
-`ceil(windowLength/hop)+2` lag count, `(fftSize-hop)/2` left pad, and
-next-power-of-two allocation formula. The prepared runtime exposes a
+`ceil(windowLength/hop)+1` lag count, `(fftSize-hop)/2` left pad, and
+next-power-of-two allocation formula:
+`(ceil(windowLength/hop)+2)*hop + leftPad + fftSize - 1 + hop`.
+ The prepared runtime exposes a
 factory for this session and a sequence-output-to-PCM path that can generate
 the carrier spectrum internally.
 
