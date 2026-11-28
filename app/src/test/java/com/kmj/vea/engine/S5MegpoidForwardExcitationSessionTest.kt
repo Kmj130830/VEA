@@ -6,12 +6,12 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class S5MegpoidForwardExcitationSessionTest {
-    private fun generator() = S5MegpoidExcitationGenerator(
+    private fun generator(noise: () -> Float = { 0f }) = S5MegpoidExcitationGenerator(
         phaseScale = 32_000f,
         periodScale = 32_000f,
         sineDenominatorThreshold = 1.0e-6f,
         wrapPhase = true,
-        gaussianNoise = { 0f }
+        gaussianNoise = noise
     )
 
     @Test
@@ -38,9 +38,9 @@ class S5MegpoidForwardExcitationSessionTest {
     }
 
     @Test
-    fun keepsFrameHistoryAcrossSequentialExcitationChunks() {
+    fun keepsChronologicalHistoryAcrossSequentialChunksAndRingWrap() {
         val session = S5MegpoidForwardExcitationSession(
-            excitationGenerator = generator(),
+            excitationGenerator = generator { 1f },
             fftSize = 8,
             hopSamples = 3,
             frameWindow = FloatArray(8) { 1f }
@@ -49,12 +49,20 @@ class S5MegpoidForwardExcitationSessionTest {
         repeat(3) {
             session.processFrame(
                 targetF0 = 0f,
-                targetNoiseGain = 0f,
+                targetNoiseGain = 1f,
                 targetHarmonicGain = 0f
             )
         }
 
-        assertArrayEquals(FloatArray(8), session.copyHistoryOldestToNewest(), 0f)
+        // First chunk ramps noise gain from 0 to 2/3; following chunks start
+        // from the previous target gain and remain at full noise gain. After
+        // three 3-sample hops the ring cursor has wrapped once, retaining the
+        // latest eight samples in chronological (oldest-to-newest) order.
+        assertArrayEquals(
+            floatArrayOf(1f / 3f, 2f / 3f, 1f, 1f, 1f, 1f, 1f, 1f),
+            session.copyHistoryOldestToNewest(),
+            1.0e-6f
+        )
         assertEquals(3L, session.processedFrameCount)
     }
 
