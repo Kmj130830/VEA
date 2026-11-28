@@ -113,10 +113,16 @@ represent the native descriptor rather than guessing dimensions from a
 Megpoid VTB2 tensor. The tests cover delayed reads, zero-filled startup,
 wraparound, oldest-to-newest snapshots, per-slot padding and reset.
 
-This component does not invoke the native operator objects, run the nested
-0x38-byte stage descriptors, or combine the separate parameter-owned frame
-interpolation buffer at `param_1 + 0x14`. Those remain separate stateful
-parts of `FUN_180076080`.
+The separate parameter-owned frame history at `param_1 + 0x14` follows a
+different rule. When `param_8 < 0`, native code copies the physical history
+frame selected by `param_7`. Otherwise it blends frame `param_7` with frame
+`int(param_8)`, using `param_9` clamped to `[0,1]`. Android now exposes
+this as `S5ApiFrameHistoryInterpolator`, with separate direct-selection and
+blended-selection paths and tests for both endpoints and clamping.
+
+Neither helper invokes the native operator objects or runs the nested
+0x38-byte stage descriptors. Those remain separate stateful parts of
+`FUN_180076080`.
 
 ## Android implementation added
 
