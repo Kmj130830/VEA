@@ -111,6 +111,8 @@ public class ExportS5RendererPath extends GhidraScript {
                 // construction path; do not infer its fields from matching
                 // offsets in unrelated render-state objects.
                 "18012c740", "180040630", "18012b150", "18012ad70",
+                "18012b140", "18012b320", "18012b330", "180129190",
+                "180129450", "1800db6c0",
                 "18012b470", "18012b450", "18012c730", "1800c7ad0",
                 "180128c40", "180129240", "1800bca40", "1800af170",
                 "1800af230", "180126940", "180127220", "180127630",
@@ -183,6 +185,12 @@ public class ExportS5RendererPath extends GhidraScript {
                 {"180040630", "real FFT wrapper"},
                 {"1800c7ad0", "S5API render-state forward path"},
                 {"18012b150", "excitation frame forward transform"},
+                {"18012b140", "native excitation generator into complex carrier frame"},
+                {"18012b320", "alternate native excitation/carrier frame generator"},
+                {"18012b330", "excitation generator substage"},
+                {"180129190", "noise generator state constructor"},
+                {"180129450", "noise generator state destructor"},
+                {"1800db6c0", "render-state carrier frame buffer allocator"},
                 {"18012b470", "render-state transform feature copy A"},
                 {"18012b450", "render-state transform feature copy B"},
                 {"18004e580", "FFT plan builder"},
@@ -375,7 +383,10 @@ public class ExportS5RendererPath extends GhidraScript {
                 {"1800c3740", "active carrier Dense/GEMM projection"},
                 {"1800c7920", "global feature normalization"},
                 {"1800c5260", "fallback Dense projection"},
-                {"1800c3930", "multipart interpolation dispatcher"}
+                {"1800c3930", "multipart interpolation dispatcher"},
+                {"18012b140", "excitation generator feeding carrier history"},
+                {"18012b320", "alternate carrier generator"},
+                {"18012b330", "carrier generator substage"}
             };
             Function[] outputHeadOwners = {
                 modulationCaller,
