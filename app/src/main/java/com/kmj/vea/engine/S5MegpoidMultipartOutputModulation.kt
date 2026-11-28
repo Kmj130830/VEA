@@ -53,9 +53,12 @@ data class S5MegpoidMultipartOutputModulation(
      * Applies one part's exact scalar accumulation to an interleaved complex
      * buffer. Input planes are [position], output is [real0,imag0,...].
      *
-     * The arithmetic order follows the caller in FUN_1800c7ad0:
-     * real += (x * D46 - y * D4C) * D40
-     * imag += (y * D46 + x * D4C) * D40
+     * The native SIMD/scalar helpers multiply each input plane by D40
+     * before applying the complex rotation:
+     * scaledReal = x * D40
+     * scaledImag = y * D40
+     * real += D46 * scaledReal - D4C * scaledImag
+     * imag += D4C * scaledReal + D46 * scaledImag
      */
     fun accumulatePartInto(
         outputInterleaved: FloatArray,
