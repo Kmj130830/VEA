@@ -138,49 +138,51 @@ Threshold selection:
 - D04 true and `+0x3411` false:
   `threshold = max(f0 - 2*step, D02 + D03)`
 
-## Active feature-pair layout and complex accumulation
+## Active feature-plane layout and complex accumulation
 
-The active AI Megpoid multi-part branch does **not** split an eight-channel
-post-residual tensor into four independent feature pairs.
+The AI Megpoid V7 multi-part branch has D00=4 and D01=true. Its active
+post-residual feature width is therefore eight float planes. In
+`FUN_1800c7ad0`, the per-part loop advances the first- and second-feature
+pointers by `2 * positionCount` values per part. This establishes four
+distinct real/imaginary feature pairs:
 
-In `FUN_1800c7ad0`, the active branch reads one pair of contiguous
-feature planes from the render-state output buffer:
+```text
+part 0: [feature row 0 = real0][feature row 1 = imag0]
+part 1: [feature row 2 = real1][feature row 3 = imag1]
+part 2: [feature row 4 = real2][feature row 5 = imag2]
+part 3: [feature row 6 = real3][feature row 7 = imag3]
+```
 
-- first plane: `positionCount` float32 values;
-- second plane: `positionCount` float32 values, at the second-plane
-  offset held by the render-state descriptor.
+The output feature tensor is feature-major, with positions contiguous inside
+each row. The native pointer stride of two rows per part is the evidence for
+this mapping. The earlier shared-two-plane interpretation was incomplete and
+has been replaced by the four-pair representation in
+`S5MegpoidMultipartFeaturePlaneExtractor`.
 
-The outer native loop iterates the D00 parts. It reuses the same two feature
-plane pointers for each part, while advancing the modulation-table pointers
-by `partIndex * positionCount`. The output is one interleaved complex
-spectrum with `[real0, imag0, real1, imag1, ...]` layout.
-
-The coefficient arrays are therefore **part-major**:
+The coefficient arrays use a separate **part-major** layout:
 
 ```text
 tableIndex = partIndex * positionCount + position
 ```
 
-For the same input pair `x[position]` and `y[position]`, each part
-contributes:
+For part k and position p, the corresponding pair is `x[k][p]` and
+`y[k][p]`. The native accumulator applies that part's rotation and gain:
 
 ```text
-out.real += (x * D46 - y * D4C) * D40
-out.imag += (y * D46 + x * D4C) * D40
+out.real[p] += (x[k][p] * D46[k,p] - y[k][p] * D4C[k,p]) * D40[k,p]
+out.imag[p] += (y[k][p] * D46[k,p] + x[k][p] * D4C[k,p]) * D40[k,p]
 ```
 
-The native outer loop accumulates one whole part across positions, then
-advances to the next part. The Android port reflects this with
-`S5MegpoidMultipartComplexFeaturePair`, which holds the one shared pair,
-and `S5MegpoidMultipartOutputModulation.accumulateAllPartsInto()`, which
-applies it to each part in order. The builder stores each coefficient table
-at `partIndex * positionCount + position`.
+The outer loop processes one complete part across positions, then advances
+to the next part. Android represents the input as
+`S5MegpoidMultipartFeaturePlanes` and accumulates each part's own pair with
+`S5MegpoidMultipartOutputModulation.accumulatePartInto()`. The builder
+stores every coefficient at `partIndex * positionCount + position`.
 
-This is a correction to the earlier eight-plane interpretation. The earlier
-`S5MegpoidMultipartFeaturePlaneExtractor` implementation that divided a
-tensor into four different real/imaginary pairs has been removed. The current
-`S5MegpoidMultipartFeaturePlaneExtractor` only extracts the two contiguous
-planes consumed by the active loop.
+The non-multipart fallback is a separate branch. Its 32-to-8 normalization
+and Dense tensors at root descriptors +0xC4/+0xCE must not be inserted into
+the active multipart path. The active branch's upstream production of the
+eight feature planes remains a separate integration dependency.
 
 ## Android implementation boundary
 
@@ -194,8 +196,8 @@ The Android port currently implements:
 
 It does not yet implement:
 
-1. The active upstream graph that produces the shared two-plane feature tensor
-   from note/phoneme-conditioned input and VTMG/VTB2 model state.
+1. The active upstream graph that produces the eight part-specific feature planes
+   from note/phoneme-conditioned input and VTB2 model state.
 2. The upstream carrier-generation path and its exact per-frame buffers.
 3. The complete real-time F0, theta, scale and amplitude scheduling path.
 4. Differential comparison of complex spectra against authorized native
@@ -215,5 +217,5 @@ Tests cover:
 - the nearest/threshold OR rule, ties and inclusive threshold equality;
 - unvoiced identity rotation;
 - part-major coefficient indexing;
-- reuse of a single shared real/imaginary feature pair across all four parts;
+- extraction of four real/imaginary feature pairs from eight feature rows;
 - complex accumulation signs and arithmetic order.
