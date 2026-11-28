@@ -99,8 +99,11 @@ object S5MegpoidMultipartFeaturePlaneExtractor {
         val first = ArrayList<FloatArray>(partCount)
         val second = ArrayList<FloatArray>(partCount)
         for (part in 0 until partCount) {
-            val firstOffset = checkedProduct(part * 2, positionCount)
-            val secondOffset = checkedProduct(part * 2 + 1, positionCount)
+            // expectedValues was checked above. Offset zero is valid for the
+            // first real plane, so calculate offsets without the positive-size
+            // helper used for allocations.
+            val firstOffset = (part.toLong() * 2L * positionCount.toLong()).toInt()
+            val secondOffset = (part.toLong() * 2L + 1L).times(positionCount.toLong()).toInt()
             first += outputFeatureMajor.copyOfRange(
                 firstOffset,
                 firstOffset + positionCount
