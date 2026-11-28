@@ -24,27 +24,27 @@ class S5MegpoidCarrierSpectrumSessionTest {
         val session = session()
 
         // N=8, hop=4:
-        // lagBlocks=ceil(8/4)+2=4
+        // lagBlocks=ceil(8/4)+1=3
         // leftPadding=(8-4)/2=2
-        // required=(4+2)*4+2+8-1+4=37 -> capacity 64, mask 63.
-        assertEquals(4, session.nativeLagBlockCount)
+        // required=(3+1)*4+2+8-1+4=29 -> capacity 32, mask 31.
+        assertEquals(3, session.nativeLagBlockCount)
         assertEquals(2, session.nativeLeftPadding)
-        assertEquals(64, session.ringCapacity)
+        assertEquals(32, session.ringCapacity)
     }
 
     @Test
     fun delaysInitialFramesUntilTheNativeHistoryWindowIsAvailable() {
         val session = session()
 
-        repeat(4) { index ->
+        repeat(3) { index ->
             val spectrum = session.processFrame(
                 FloatArray(4) { index * 4f + it }
             )
             assertArrayEquals(FloatArray(10), spectrum, 0f)
         }
 
-        // Frame 5 has a partially valid source window starting at logical -2.
-        val partial = session.processFrame(floatArrayOf(16f, 17f, 18f, 19f))
+        // Frame 4 has a partially valid source window starting at logical -2.
+        val partial = session.processFrame(floatArrayOf(12f, 13f, 14f, 15f))
         val partialFrame = floatArrayOf(0f, 0f, 0f, 1f, 2f, 3f, 4f, 5f)
         val partialWindow = S5MegpoidFrameWindowBuilder.build(8, 0, 0)
         val partialExpected = S5MegpoidForwardRealFft(8).transform(
@@ -52,21 +52,21 @@ class S5MegpoidCarrierSpectrumSessionTest {
         )
         assertArrayEquals(partialExpected, partial, 1.0e-6f)
 
-        assertEquals(5L, session.processedFrameCount)
-        assertEquals(20L, session.logicalSampleCursor)
+        assertEquals(4L, session.processedFrameCount)
+        assertEquals(16L, session.logicalSampleCursor)
     }
 
     @Test
     fun selectsDelayedLogicalSamplesAppliesFrameWindowAndRunsForwardFft() {
         val session = session()
-        repeat(5) { frame ->
+        repeat(4) { frame ->
             session.processFrame(FloatArray(4) { frame * 4f + it })
         }
 
-        // On frame 6 the native source start is:
+        // On frame 5 the native source start is:
         // (cursor/hop - lagBlocks - 1)*hop - leftPadding
-        // = (6 - 4 - 1)*4 - 2 = 2.
-        val sixthSpectrum = session.processFrame(floatArrayOf(20f, 21f, 22f, 23f))
+        // = (5 - 3 - 1)*4 - 2 = 2.
+        val fifthSpectrum = session.processFrame(floatArrayOf(16f, 17f, 18f, 19f))
         val rawFrame = floatArrayOf(2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f)
         val window = S5MegpoidFrameWindowBuilder.build(
             totalLength = 8,
@@ -76,8 +76,8 @@ class S5MegpoidCarrierSpectrumSessionTest {
         val expectedWindowed = FloatArray(8) { rawFrame[it] * window[it] }
         val expected = S5MegpoidForwardRealFft(8).transform(expectedWindowed)
 
-        assertArrayEquals(expected, sixthSpectrum, 1.0e-6f)
-        assertEquals(6L, session.processedFrameCount)
+        assertArrayEquals(expected, fifthSpectrum, 1.0e-6f)
+        assertEquals(5L, session.processedFrameCount)
     }
 
     @Test
@@ -129,17 +129,17 @@ class S5MegpoidCarrierSpectrumSessionTest {
         session.processFrame(floatArrayOf(4f, 5f, 6f, 7f))
 
         val history = session.copyHistoryOldestToNewest()
-        assertEquals(64, history.size)
+        assertEquals(32, history.size)
         assertArrayEquals(
             floatArrayOf(0f, 1f, 2f, 3f, 4f, 5f, 6f, 7f),
-            history.copyOfRange(56, 64),
+            history.copyOfRange(24, 32),
             0f
         )
 
         session.reset()
         assertEquals(0L, session.logicalSampleCursor)
         assertEquals(0L, session.processedFrameCount)
-        assertArrayEquals(FloatArray(64), session.copyHistoryOldestToNewest(), 0f)
+        assertArrayEquals(FloatArray(32), session.copyHistoryOldestToNewest(), 0f)
     }
 
     @Test
