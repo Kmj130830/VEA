@@ -74,7 +74,9 @@ data class S5ApiDefaultPhoneFeatureDescriptor(
     val includeLeadingFlagPairAt24: Boolean,
     val layoutModeAt25: Int,
     /** Preserved from +0x26; the recovered mode-0 branch does not consume it. */
-    val auxiliaryByteAt26: Int = 0
+    val auxiliaryByteAt26: Int = 0,
+    /** FUN_18003ab70 frame period in seconds at descriptor +0x30; absent in older captures. */
+    val framePeriodSecondsAt30: Float? = null
 ) {
     init {
         require(categoryWidthAt10 >= S5ApiPhoneCategoryMap.CATEGORY_COUNT) {
@@ -96,7 +98,16 @@ data class S5ApiDefaultPhoneFeatureDescriptor(
         require(auxiliaryByteAt26 in 0..255) {
             "Phone auxiliary byte must fit in one byte."
         }
+        require(framePeriodSecondsAt30 == null ||
+            (framePeriodSecondsAt30.isFinite() && framePeriodSecondsAt30 > 0f)) {
+            "Phone frame period at +0x30 must be finite and positive when present."
+        }
     }
+
+    fun requireFramePeriodSeconds(): Float =
+        framePeriodSecondsAt30 ?: throw IllegalStateException(
+            "The native phone descriptor does not include its +0x30 frame period."
+        )
 
     companion object {
         /**
@@ -126,7 +137,14 @@ data class S5ApiDefaultPhoneFeatureDescriptor(
                 precedingContextCountAt20 = intAt(PRECEDING_CONTEXT_OFFSET),
                 includeLeadingFlagPairAt24 = byteAt(FLAG_PAIR_OFFSET) != 0,
                 layoutModeAt25 = byteAt(LAYOUT_MODE_OFFSET),
-                auxiliaryByteAt26 = byteAt(AUXILIARY_BYTE_OFFSET)
+                auxiliaryByteAt26 = byteAt(AUXILIARY_BYTE_OFFSET),
+                framePeriodSecondsAt30 = if (
+                    baseOffset.toLong() + NATIVE_FRAME_PERIOD_SIZE.toLong() <= bytes.size.toLong()
+                ) {
+                    floatAt(FRAME_PERIOD_SECONDS_OFFSET)
+                } else {
+                    null
+                }
             )
         }
 
@@ -138,7 +156,9 @@ data class S5ApiDefaultPhoneFeatureDescriptor(
         const val FLAG_PAIR_OFFSET = 0x24
         const val LAYOUT_MODE_OFFSET = 0x25
         const val AUXILIARY_BYTE_OFFSET = 0x26
+        const val FRAME_PERIOD_SECONDS_OFFSET = 0x30
         const val NATIVE_MINIMUM_SIZE = 0x27
+        const val NATIVE_FRAME_PERIOD_SIZE = 0x34
     }
 
     fun requireDefaultMode0(): S5ApiDefaultPhoneFeatureLayout {
