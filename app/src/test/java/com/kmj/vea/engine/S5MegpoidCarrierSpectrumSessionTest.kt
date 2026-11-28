@@ -102,6 +102,34 @@ class S5MegpoidCarrierSpectrumSessionTest {
     }
 
     @Test
+    fun delayedFrameRemainsCorrectAfterTheCircularRingWraps() {
+        val session = session()
+        var finalSpectrum = FloatArray(10)
+
+        repeat(12) { frame ->
+            finalSpectrum = session.processFrame(
+                FloatArray(4) { frame * 4f + it }
+            )
+        }
+
+        // After 12 hops the logical cursor is 48, while the 32-sample ring
+        // retains logical samples 16..47. The native delayed source begins at
+        // (12 - 3 - 1)*4 - 2 = 30, so this frame reads samples 30..37.
+        val rawFrame = FloatArray(8) { 30f + it }
+        val window = S5MegpoidFrameWindowBuilder.build(8, 0, 0)
+        val expected = S5MegpoidForwardRealFft(8).transform(
+            FloatArray(8) { rawFrame[it] * window[it] }
+        )
+        assertArrayEquals(expected, finalSpectrum, 1.0e-6f)
+        assertEquals(48L, session.logicalSampleCursor)
+
+        val history = session.copyHistoryOldestToNewest()
+        assertEquals(32, history.size)
+        assertEquals(16f, history.first(), 0f)
+        assertEquals(47f, history.last(), 0f)
+    }
+
+    @Test
     fun nativeGaussianSourceIsDeterministicAndResetRestoresItsSequence() {
         val first = session(seed = 12_345)
         val second = session(seed = 12_345)
@@ -145,13 +173,13 @@ class S5MegpoidCarrierSpectrumSessionTest {
     @Test
     fun rejectsInvalidFftHopAndInputDimensions() {
         assertThrows(IllegalArgumentException::class.java) {
-            S5MegpoidCarrierSpectrumSession(fftSize = 12, hopSamples = 4, 0, 0, false)
+            S5MegpoidCarrierSpectrumSession(fftSize = 12, hopSamples = 4, windowCoreLength = 0, windowShapeMode = 0, invertOddComplexBins = false)
         }
         assertThrows(IllegalArgumentException::class.java) {
-            S5MegpoidCarrierSpectrumSession(fftSize = 8, hopSamples = 9, 0, 0, false)
+            S5MegpoidCarrierSpectrumSession(fftSize = 8, hopSamples = 9, windowCoreLength = 0, windowShapeMode = 0, invertOddComplexBins = false)
         }
         assertThrows(IllegalArgumentException::class.java) {
-            S5MegpoidCarrierSpectrumSession(fftSize = 8, hopSamples = 4, 9, 0, false)
+            S5MegpoidCarrierSpectrumSession(fftSize = 8, hopSamples = 4, windowCoreLength = 9, windowShapeMode = 0, invertOddComplexBins = false)
         }
         assertThrows(IllegalArgumentException::class.java) {
             session().processFrame(floatArrayOf(1f, 2f, 3f))
