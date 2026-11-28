@@ -52,7 +52,7 @@ class S5ApiFrameHistoryRingTest {
         assertArrayEquals(floatArrayOf(4f), ring.readDelayed(2), 0f)
         assertArrayEquals(floatArrayOf(3f), ring.readDelayed(3), 0f)
         assertArrayEquals(
-            floatArrayOf(5f, 6f, 3f, 4f),
+            floatArrayOf(3f, 4f, 5f, 6f),
             ring.copyHistoryOldestToNewest(),
             0f
         )
