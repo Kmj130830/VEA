@@ -135,10 +135,12 @@ data class PreparedMegpoidRuntime(
     /**
      * Creates the separate FUN_18012b4a0 carrier/noise spectrum session.
      *
-     * Native AI Megpoid construction supplies hopSamples from render-root
-     * +0x0C, windowCoreLength from +0x61C, invertOddComplexBins from +0x620,
-     * and windowShapeMode from +0x3418. These remain explicit because the
-     * values are render-state fields, not fixed VTB2 model dimensions.
+     * Native AI Megpoid primary-state construction supplies hopSamples from
+     * render-root +0x0C, windowCoreLength from +0x61C, and the odd-bin
+     * inversion flag from +0x620. Its windowShapeMode is zero because the
+     * native caller zero-initializes the mode argument. The alternate state
+     * may explicitly pass render-root +0x3418. These are render-state values,
+     * not fixed VTB2 model dimensions.
      */
     fun createCarrierSpectrumSession(
         hopSamples: Int,
