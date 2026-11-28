@@ -169,8 +169,10 @@ For part k and position p, the corresponding pair is `x[k][p]` and
 `y[k][p]`. The native accumulator applies that part's rotation and gain:
 
 ```text
-out.real[p] += (x[k][p] * D46[k,p] - y[k][p] * D4C[k,p]) * D40[k,p]
-out.imag[p] += (y[k][p] * D46[k,p] + x[k][p] * D4C[k,p]) * D40[k,p]
+scaledReal = x[k][p] * D40[k,p]
+scaledImag = y[k][p] * D40[k,p]
+out.real[p] += D46[k,p] * scaledReal - D4C[k,p] * scaledImag
+out.imag[p] += D4C[k,p] * scaledReal + D46[k,p] * scaledImag
 ```
 
 The outer loop processes one complete part across positions, then advances
@@ -179,10 +181,27 @@ to the next part. Android represents the input as
 `S5MegpoidMultipartOutputModulation.accumulatePartInto()`. The builder
 stores every coefficient at `partIndex * positionCount + position`.
 
-The non-multipart fallback is a separate branch. Its 32-to-8 normalization
-and Dense tensors at root descriptors +0xC4/+0xCE must not be inserted into
-the active multipart path. The active branch's upstream production of the
-eight feature planes remains a separate integration dependency.
+The non-multipart fallback and active multipart path use different runtime
+descriptors. They share the same four VTB2 source tensors (32-element input
+normalization scale/bias, an [8,32] Dense matrix and an eight-element Dense
+bias), but the active branch folds them during render-state initialization
+into its own matrix and vectors at render-root word indices +0x150, +0x154
+and +0x158 (byte offsets +0x540, +0x550 and +0x560). The active fold is:
+
+```text
+foldedWeight[o,i] = denseWeight[o,i] * inputScale[i]
+foldedBias[o] = denseBias[o] + sum_i(denseWeight[o,i] * inputBias[i])
+foldedScale[o] = sum_i(foldedWeight[o,i])
+```
+
+At render time, S5API calculates one global mean/inverse-standard-deviation
+over the complete input feature/position tensor, projects it with
+`foldedWeight`, then applies
+`inverseStd * projected + ((-inverseStd * mean) * foldedScale + foldedBias)`.
+Android now builds this active folded projection separately from the direct
+fallback-stage API. The remaining upstream task is producing the actual
+32-channel render-context matrix from the note/phoneme-conditioned sequence
+and time/interpolation path.
 
 ## Android implementation boundary
 
