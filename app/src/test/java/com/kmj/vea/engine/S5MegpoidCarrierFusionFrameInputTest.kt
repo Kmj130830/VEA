@@ -47,6 +47,26 @@ class S5MegpoidCarrierFusionFrameInputTest {
     }
 
     @Test
+    fun copiesSequenceFeatureStorageSoLaterMutationCannotChangeCarrierInput() {
+        val workspace = workspace()
+        val sequence = S5MegpoidSequenceTransitionOutput(
+            features = floatArrayOf(1f, 2f, 3f, 4f, 5f, 6f),
+            channels = 2,
+            positions = 3
+        )
+        val frame = S5MegpoidCarrierFusionFrameInput.fromSequenceOutputAndInterleavedCarrierSpectrum(
+            workspace = workspace,
+            sequenceOutput = sequence,
+            carrierSpectrumInterleaved = FloatArray(6),
+            scale = 1f,
+            amplitude = 1f
+        )
+
+        sequence.features.fill(99f)
+        assertArrayEquals(floatArrayOf(1f, 2f, 3f, 4f, 5f, 6f), frame.inputFeatureMajor, 0f)
+    }
+
+    @Test
     fun rejectsSequenceGeometryAndCarrierSpectrumLengthMismatches() {
         val workspace = workspace()
         val correct = S5MegpoidSequenceTransitionOutput(
