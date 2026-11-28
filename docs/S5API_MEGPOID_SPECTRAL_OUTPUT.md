@@ -71,7 +71,7 @@ The polar sampler draws x then y, rejects radius squared >= 1 and zero coordinat
 
 At the `FUN_1800c7ad0` call site, the forward-transform wrapper receives the F0 control in XMM2, a render-state float at offset `+0x614` in XMM3, and a stack float constant `0.1` as the fifth argument. This supports the noise-gain and harmonic-gain roles above, but the vendor name for the `+0x614` field is not known.
 
-VEA now has `S5MegpoidNativeMersenneTwister` and a `S5MegpoidGaussianNoise.fromNativeSeed()` factory. `S5MegpoidExcitationGenerator.withRecoveredRandomSource()` connects that deterministic source to the isolated excitation generator. Transform-state scale values, the upstream F0/voicing generation path, and the final spectral/audio path remain unconnected.
+VEA now has `S5MegpoidNativeMersenneTwister` and a `S5MegpoidGaussianNoise.fromNativeSeed()` factory. `S5MegpoidExcitationGenerator.withRecoveredRandomSource()` connects that deterministic source to the frame-continuous excitation generator. `S5MegpoidForwardExcitationSession` adds explicit circular sample history, caller-supplied hop/window parameters and the portable forward real FFT. `PreparedMegpoidRuntime` exposes a factory for this session, but phase/period scales, denominator threshold, wrap flag, hop size and window are still required inputs; the native constructor values and frame-validity startup behavior have not yet been mapped or differentially checked. The VTMG/model feature path and final verified VSM PCM/WAV boundary remain unconnected.
 
 ## Spectral output conversion
 
