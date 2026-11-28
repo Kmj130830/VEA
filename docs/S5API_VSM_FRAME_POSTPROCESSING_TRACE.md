@@ -93,20 +93,32 @@ frame vector from `FUN_180076080`.
 
 ## Android implementation added
 
-`S5ApiFrameProjectionStack.kt` now ports the vector-stack arithmetic as a
-voicebank-neutral component:
+Two reusable components now port the arithmetic around this stateful
+frame path:
 
-- `S5ApiFrameVectorOperator` is the operator boundary for native vtable-backed
-  layers.
-- `S5ApiFrameDenseVectorOperator` provides a row-major dense implementation
-  using the existing GEMM contract.
-- `S5ApiFrameProjectionLayer` owns optional bias handling.
-- `S5ApiFrameProjectionStack` executes projection, bias, hidden activation,
-  final projection, optional final bias and optional final tanh in native order.
+- `S5ApiFramePreProjectionChain.kt` implements the two
+  `FUN_18007a0a0` projection calls from `FUN_18003e920`, including the
+  separate residual vector and tanh after each projection. It then appends
+  the caller-supplied tail, multiplies only that tail by the supplied scale,
+  and optionally appends the scale as the final sentinel element.
+- `S5ApiFrameProjectionStack.kt` implements the vector-stack arithmetic from
+  `FUN_180077520` as a voicebank-neutral component:
+  - `S5ApiFrameVectorOperator` is the operator boundary for native
+    vtable-backed layers.
+  - `S5ApiFrameDenseVectorOperator` provides a row-major dense implementation
+    using the existing GEMM contract.
+  - `S5ApiFrameProjectionLayer` owns optional bias handling.
+  - `S5ApiFrameProjectionStack` executes projection, bias, hidden activation,
+    final projection, optional final bias and optional final tanh in native order.
 
-Unit tests cover a first plus hidden layer, the 0.01 leaky-ReLU and clamp mode,
-a stack with no hidden projection, disabled bias, dimension validation and
-non-finite inputs.
+Unit tests cover two residual/tanh pre-projections, tail-only scaling and the
+optional scale sentinel, first/hidden vector projections, the 0.01 leaky-ReLU
+and clamp mode, a stack with no hidden projection, disabled bias, dimension
+validation and non-finite inputs.
+
+These classes intentionally stop at operator injection. They do not yet load
+the native vtable objects or infer their weights from a same-named Megpoid or
+VTMG tensor.
 
 ## Remaining integration work
 
