@@ -110,6 +110,32 @@ class S5MegpoidActiveMultipartProjectionStage internal constructor(
         return output
     }
 
+    /**
+     * Runs the native active output projection on the final sequence-slot
+     * tensor. The sequence graph must already have produced the complete
+     * [inputFeatures][positions] render-context matrix.
+     */
+    fun forward(
+        sequenceOutput: S5MegpoidSequenceTransitionOutput,
+        gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel,
+        statistics: S5MegpoidStatisticsKernel = NativeS5MegpoidStatisticsKernel
+    ): FloatArray {
+        require(sequenceOutput.channels == inputFeatures) {
+            "Sequence output contains ${sequenceOutput.channels} channels; active projection expects $inputFeatures."
+        }
+        require(sequenceOutput.positions > 0 &&
+            sequenceOutput.features.size.toLong() ==
+            sequenceOutput.channels.toLong() * sequenceOutput.positions.toLong()) {
+            "Sequence output feature tensor dimensions do not match its metadata."
+        }
+        return forward(
+            inputFeatureMajor = sequenceOutput.features,
+            positions = sequenceOutput.positions,
+            gemm = gemm,
+            statistics = statistics
+        )
+    }
+
     fun copyFoldedWeights(): FloatArray = foldedWeights.copyOf()
     fun copyFoldedBias(): FloatArray = foldedBias.copyOf()
     fun copyFoldedScale(): FloatArray = foldedScale.copyOf()
