@@ -166,6 +166,37 @@ current Android session follows the scalar `FUN_18012b4a0` route used by
 the direct wrapper. This carrier path must not be replaced by the distinct
 periodic/F0 excitation transform `FUN_18012b150`.
 
+## Timed phone-to-frame ownership
+
+The desktop S5API front end builds an event-level phone feature matrix with
+`FUN_18006c720`, then `FUN_18003ab70` constructs a separate timed frame map.
+The frame period is the float at phone descriptor +0x30 (seconds). The native
+frame count is the integer truncation of the final phone end time divided by
+that period. Each event owns frames from the previous event's end-frame cursor
+through `min(frameCount, ceil(eventEnd / framePeriod))`.
+
+For every owned frame, native S5API stores:
+- the source phone-event index;
+- the frame start relative to that event's start time;
+- the full event duration;
+- an event control of -1 for phone categories 0/1, otherwise the caller's
+  `param_8` value.
+
+Android now preserves optional descriptor +0x30 in
+`S5ApiDefaultPhoneFeatureDescriptor` and implements the timing/index arrays
+in `S5ApiTimedPhoneFrameAligner`. The explicit-phone sequence session can
+attach this plan to its result when the caller supplies the native
+category-2-to-13 control value. The plan indexes the post-preprocessing phone
+events that correspond row-for-row to the event-level feature matrix.
+
+This is the time ownership map only. The subsequent stateful
+`FUN_180076080` / `FUN_180077520` transformations that turn those event
+features and per-frame timing values into the actual frame-aligned model
+features are not yet ported. The current sequence pipeline still processes
+the event-level phone matrix separately; the new timing map is exposed for
+the next integration stage and is not claimed to be a VTMG output tensor or
+a 513-bin acoustic spectrum.
+
 ## Spectral frame reconstruction
 
 `PreparedMegpoidRuntime.processMultipartOutputFrameToPcm()` currently
@@ -210,21 +241,26 @@ excitation spectra into the active model feature tensors remain unverified.
 
 ## Still missing before note-to-WAV synthesis
 
-1. Connect the explicit-phone 32-channel sequence tensor to the native
-   VSM render-context frame grid. The current pipeline still does not
-   reproduce the complete time/interpolation schedule that aligns sequence
-   positions with the 513-bin spectral frame positions.
-2. Port the multi-state carrier dispatch route
+1. Port the stateful frame-feature path after
+   `S5ApiTimedPhoneFrameAligner`: native `FUN_180076080` / `FUN_180077520`
+   consume event features, event indexes and per-frame relative-time/duration
+   values to create the actual frame-aligned model features. The current
+   frame map is an intermediate timing/index plan, not that VTMG output.
+2. Reconstruct the exact mapping from those frame-aligned features to the
+   513-bin spectral frame positions; the present direct sequence-to-PCM API
+   only accepts a caller-provided position count that already matches the
+   spectral session and does not infer the missing mapping.
+3. Port the multi-state carrier dispatch route
    (`FUN_18012b330` -> scalar `FUN_18012b620` / vectorized
    `FUN_18012bb30`) and confirm which route is selected for each singer and
    CPU capability.
-3. Map the remaining per-frame control values (theta, F0, carrier scale,
+4. Map the remaining per-frame control values (theta, F0, carrier scale,
    amplitude, window core and shape flags) from the native render context
    rather than requiring the caller to provide them.
-4. Compare Android carrier spectra, active multipart spectra and PCM blocks
+5. Compare Android carrier spectra, active multipart spectra and PCM blocks
    against authorized native reference frames, including startup delay,
    odd-bin inversion, history wrap, SIMD/scalar paths and chunk boundaries.
-5. Only after those differential checks, connect the complete note-to-frame
+6. Only after those differential checks, connect the complete note-to-frame
    path to `SynthesisEngine.render()` and enable WAV export.
 
 No end-to-end Megpoid vocal render or verified WAV is claimed at this stage.
