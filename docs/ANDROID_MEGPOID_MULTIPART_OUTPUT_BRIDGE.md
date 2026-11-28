@@ -132,17 +132,37 @@ complex accumulation.
 The history frame comes from a separate carrier-generation input at native
 render-state +0x2E4; it is not the output of the D74 carrier Dense projection.
 The carrier Dense input, however, is the same final 32-channel sequence
-tensor at +0xE0. `S5MegpoidCarrierFusionFrameInput` now has a factory that
-takes that sequence output plus the separately generated interleaved complex
-carrier spectrum and splits the spectrum into the two planar D80 history
-inputs. FUN_18012b140 is only a thin wrapper: it calls FUN_18012b4a0 with the
-per-singer transform state, destination frame and mode 0. FUN_18012b320
-calls the same core through its alternate wrapper form. FUN_18012b330
-dispatches multiple transform states through the scalar FUN_18012b620 path
-or the batched/vectorized FUN_18012bb30 path. The core FUN_18012b4a0 and
-both transform kernels are now explicit Ghidra targets. The carrier spectrum
-must not be replaced by the periodic/noise excitation transform
-FUN_18012b150.
+tensor at +0xE0. `S5MegpoidCarrierFusionFrameInput` takes that sequence output
+plus the interleaved complex carrier spectrum and splits it into the two
+planar D80 history inputs.
+
+The carrier spectrum path is now ported separately as
+`S5MegpoidCarrierSpectrumSession`, based on the native
+`FUN_18012b140 -> FUN_18012b4a0` path. The wrapper passes a null optional
+sample pointer, so the scalar core fills the hop with its state-owned
+Gaussian source. The Android session uses the recovered MT19937/Marsaglia
+sampler with the native constructor seed 12345, writes samples into the
+power-of-two ring, selects the delayed windowed frame, runs the forward real
+FFT, and optionally flips both real and imaginary values for odd bins
+starting at bin 1.
+
+For the AI Megpoid initializer call sites, the state constructor receives
+hop length from render-root +0x0C, window length and FFT size from +0x04,
+window core length from +0x61C, odd-bin inversion from +0x620, seed 12345,
+and window shape mode from the corresponding render option (+0x3418 in the
+extended path). The ring geometry follows the native
+`ceil(windowLength/hop)+2` lag count, `(fftSize-hop)/2` left pad, and
+next-power-of-two allocation formula. The prepared runtime exposes a
+factory for this session and a sequence-output-to-PCM path that can generate
+the carrier spectrum internally.
+
+`FUN_18012b320` calls the same `FUN_18012b4a0` core through an alternate
+wrapper form. `FUN_18012b330` dispatches multiple transform states through
+the scalar `FUN_18012b620` path or the batched/vectorized
+`FUN_18012bb30` path. That multi-state SIMD route is not yet ported; the
+current Android session follows the scalar `FUN_18012b4a0` route used by
+the direct wrapper. This carrier path must not be replaced by the distinct
+periodic/F0 excitation transform `FUN_18012b150`.
 
 ## Spectral frame reconstruction
 
@@ -156,8 +176,8 @@ combines:
 
 The spectral session checks the expected 513-bin one-sided complex spectrum,
 executes the 1024-point inverse transform and overlap-add, and returns a
-320-sample PCM block. The per-utterance reset helper clears the spectral
-session and optional carrier history state.
+320-sample PCM block. The per-utterance reset helper clears the spectral session, optional
+carrier history workspace, and optional carrier spectrum generator state.
 
 This is a downstream frame-processing API. It is not yet a complete renderer
 from piano-roll notes to PCM.
@@ -188,18 +208,21 @@ excitation spectra into the active model feature tensors remain unverified.
 
 ## Still missing before note-to-WAV synthesis
 
-1. Produce the eight active feature planes from the actual note/phoneme-
-   conditioned VTB2 forward path. The current explicit-phone session ends at
-   an intermediate 32-channel sequence tensor; the mapping through the
-   active post-residual/interpolation graph is not yet implemented.
-2. Implement the upstream carrier generator that supplies the independent
-   two-plane history frame and the correct carrier-conditioned feature input.
-3. Reconstruct native excitation frame history/window scheduling and connect
-   F0, voicing, theta, scale and amplitude controls to their correct stages.
-4. Compare Android complex spectra and PCM frames against authorized native
-   reference frames, including history warm-up, voiced/unvoiced transitions,
-   and chunk boundaries.
-5. Only after those checks, connect the complete path to
-   `SynthesisEngine.render()` and enable WAV export.
+1. Connect the explicit-phone 32-channel sequence tensor to the native
+   VSM render-context frame grid. The current pipeline still does not
+   reproduce the complete time/interpolation schedule that aligns sequence
+   positions with the 513-bin spectral frame positions.
+2. Port the multi-state carrier dispatch route
+   (`FUN_18012b330` -> scalar `FUN_18012b620` / vectorized
+   `FUN_18012bb30`) and confirm which route is selected for each singer and
+   CPU capability.
+3. Map the remaining per-frame control values (theta, F0, carrier scale,
+   amplitude, window core and shape flags) from the native render context
+   rather than requiring the caller to provide them.
+4. Compare Android carrier spectra, active multipart spectra and PCM blocks
+   against authorized native reference frames, including startup delay,
+   odd-bin inversion, history wrap, SIMD/scalar paths and chunk boundaries.
+5. Only after those differential checks, connect the complete note-to-frame
+   path to `SynthesisEngine.render()` and enable WAV export.
 
 No end-to-end Megpoid vocal render or verified WAV is claimed at this stage.
