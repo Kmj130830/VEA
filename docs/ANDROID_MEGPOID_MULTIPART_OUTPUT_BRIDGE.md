@@ -110,16 +110,25 @@ from piano-roll notes to PCM.
 
 `S5MegpoidExcitationGenerator` already maintains continuous F0, harmonic/
 noise gain and phase state, and its optional Gaussian source uses the
-recovered seed-42 MT19937/Marsaglia path. A new
-`S5MegpoidForwardRealFft` provides a portable radix-2 real-to-complex
+recovered seed-42 MT19937/Marsaglia path. `S5MegpoidForwardRealFft` provides a portable radix-2 real-to-complex
 reference kernel for a complete, already-windowed excitation frame. It
 returns 513 complex bins for a 1024-sample frame and is paired with the
 existing inverse reference kernel in round-trip tests.
 
-This FFT is a mathematical Android reference, not a bit-exact reconstruction
-of the vendor plan tables. Native excitation history/window scheduling and
-the mapping from the generated excitation spectrum into the active model
-feature tensors remain unconnected.
+`S5MegpoidForwardExcitationSession` now combines the recovered excitation
+generator, a circular sample-history buffer, an explicitly supplied hop size
+and window, and the forward FFT. Each call generates one excitation hop,
+writes it into history, reconstructs a chronological N-sample frame, applies
+the caller's window, and returns one-sided complex bins. The prepared runtime
+factory requires phase/period scales, denominator threshold, wrap mode,
+hop size and window to be supplied; it does not guess the vendor's transform
+state values or assume that the 320-sample final output block is the input
+excitation hop.
+
+This FFT/session is a mathematical Android reference, not a bit-exact
+reconstruction of the vendor plan tables. The exact native initialization
+history, frame-validity gate, hop/window parity and mapping from generated
+excitation spectra into the active model feature tensors remain unverified.
 
 ## Still missing before note-to-WAV synthesis
 
