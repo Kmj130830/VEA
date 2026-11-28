@@ -118,6 +118,26 @@ class S5MegpoidPostResidualFallbackTensorIndex private constructor(
         )
     }
 
+    /**
+     * Builds the active D00*2 output projection from the same four VTB2
+     * tensors. The active native path folds them into render buffers
+     * +0x150/+0x154/+0x158 rather than invoking the fallback +0xCE descriptor.
+     */
+    fun buildActiveMultipartProjectionStage(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidActiveMultipartProjectionStage {
+        val dimensions = resolveDimensions()
+        return S5MegpoidActiveMultipartProjectionStage.build(
+            inputFeatures = dimensions.inputFeatures,
+            outputFeatures = dimensions.outputFeatures,
+            denseWeights = denseWeights.decodeFloatArray(tensorDecoder),
+            denseBias = denseBias.decodeFloatArray(tensorDecoder),
+            inputScale = normalizationScale.decodeFloatArray(tensorDecoder),
+            inputBias = normalizationBias.decodeFloatArray(tensorDecoder),
+            epsilon = S5MegpoidPostResidualFallbackTensorKeys.NORMALIZATION_EPSILON
+        )
+    }
+
     fun buildStage(
         tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
     ): S5MegpoidPostResidualFallbackStage {
