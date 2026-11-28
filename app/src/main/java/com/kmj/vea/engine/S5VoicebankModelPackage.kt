@@ -175,8 +175,10 @@ data class S5VoicebankModelPackage(
     }
 
     /**
-     * Model-backed non-multi-part fallback output head at render-root +0xC4/+0xCE.
-     * The tensors are present even when the four-part output head is selected.
+     * Shared VTB2 normalizer/Dense source tensors used by the direct fallback
+     * descriptors (+0xC4/+0xCE) and by the active multipart folded buffers
+     * (+0x150/+0x154/+0x158). The runtime entry points keep those two paths
+     * separate even though the source tensors are shared.
      */
     val postResidualFallbackTensorIndex: S5MegpoidPostResidualFallbackTensorIndex by lazy(
         LazyThreadSafetyMode.PUBLICATION
