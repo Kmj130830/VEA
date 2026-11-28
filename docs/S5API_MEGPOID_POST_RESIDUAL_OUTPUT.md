@@ -350,10 +350,12 @@ retained and the threshold comparison inclusive. This corrects the earlier
 rough interpretation of the mask as a nearest-part AND threshold rule.
 
 Android now provides:
-- `S5MegpoidMultipartOutputModulationBuilder` for position-major
+- `S5MegpoidMultipartOutputModulationBuilder` for part-major
   four-part location, distance, gain and rotation arrays.
-- `S5MegpoidMultipartOutputModulation.accumulatePartInto()` for the
-  native scalar complex-accumulation signs/order.
+- `S5MegpoidMultipartFeaturePlaneExtractor` for the active eight-plane
+  tensor layout: four consecutive real/imaginary pairs, one pair per part.
+- `S5MegpoidMultipartOutputModulation.accumulatePartInto()` and
+  `accumulateAllPartsInto()` for native per-part complex accumulation.
 - `S5MegpoidRuntimeOptionsDescriptor.buildMultipartOutputModulation()`
   and `PreparedMegpoidRuntime.prepareMultipartOutputModulation()`, which
   obtain both selectors and D-values from the selected VTB2 options.
