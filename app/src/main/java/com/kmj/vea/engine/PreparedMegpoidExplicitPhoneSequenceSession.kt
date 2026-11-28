@@ -7,7 +7,11 @@ package com.kmj.vea.engine
 data class PreparedMegpoidExplicitPhoneSequenceResult(
     val alignment: VsmNotePhoneAlignmentResult,
     val phoneFeatureMatrix: S5ApiDefaultPhoneFeatureMatrix,
-    val sequenceOutput: S5MegpoidSequenceTransitionOutput
+    val sequenceOutput: S5MegpoidSequenceTransitionOutput,
+    /** Events after native break/rest preprocessing; indexes match phoneFeatureMatrix rows. */
+    val featureEvents: List<VsmPhoneEvent> = emptyList(),
+    /** Optional native +0x30 time/frame map; it is not yet the result of the VTMG stateful operators. */
+    val frameAlignment: S5ApiTimedPhoneFrameAlignment? = null
 ) {
     val fallbackPhoneLabels: List<String>
         get() = alignment.fallbackPhoneLabels
@@ -39,7 +43,8 @@ class PreparedMegpoidExplicitPhoneSequenceSession(
         descriptor: S5ApiDefaultPhoneFeatureDescriptor,
         epsilon: Float = S5MegpoidResidualBlockShape.DEFAULT_EPSILON,
         gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel,
-        statistics: S5MegpoidStatisticsKernel = NativeS5MegpoidStatisticsKernel
+        statistics: S5MegpoidStatisticsKernel = NativeS5MegpoidStatisticsKernel,
+        eventControlForCategories2To13: Float? = null
     ): PreparedMegpoidExplicitPhoneSequenceResult {
         require(schedule.sampleRate == 44_100) {
             "The current AI Megpoid V7 sequence path expects the recovered 44.1 kHz VSM schedule."
@@ -56,10 +61,18 @@ class PreparedMegpoidExplicitPhoneSequenceSession(
             minimumPhoneSeconds = descriptor.minimumPhoneSecondsAt14,
             maximumPhoneSeconds = descriptor.maximumPhoneSecondsAt18
         )
+        val featureEvents = alignedFeatures.map { it.event }
         val matrix = S5ApiDefaultPhoneFeatureMatrixBuilder.build(
             features = alignedFeatures,
             layout = layout
         )
+        val frameAlignment = eventControlForCategories2To13?.let { eventControl ->
+            S5ApiTimedPhoneFrameAligner.align(
+                events = featureEvents,
+                descriptor = descriptor,
+                eventControlForCategories2To13 = eventControl
+            )
+        }
 
         require(matrix.rowCount > 0) {
             "Phone alignment produced an empty feature matrix."
@@ -78,7 +91,9 @@ class PreparedMegpoidExplicitPhoneSequenceSession(
         return PreparedMegpoidExplicitPhoneSequenceResult(
             alignment = alignment,
             phoneFeatureMatrix = matrix,
-            sequenceOutput = output
+            sequenceOutput = output,
+            featureEvents = featureEvents,
+            frameAlignment = frameAlignment
         )
     }
 
