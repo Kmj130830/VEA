@@ -144,7 +144,7 @@ class S5ApiFrameProjectionStack(
 
     val inputFeatures: Int
     val hiddenFeatures: Int
-    val outputFeatures: Int
+    val outputFeatures: Int = finalProjection.outputFeatures
     val preOutputLayerCount: Int get() = preOutputLayers.size
 
     init {
