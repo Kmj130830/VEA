@@ -103,6 +103,36 @@ data class PreparedMegpoidRuntime(
         )
 
     /**
+     * Creates an utterance-local excitation -> history/window -> forward FFT
+     * session. Hop size and frame window stay explicit because the native
+     * excitation transform's exact frame-hop mapping still needs differential
+     * confirmation; do not infer it automatically from outputSamples=320.
+     */
+    fun createForwardExcitationSession(
+        phaseScale: Float,
+        periodScale: Float,
+        sineDenominatorThreshold: Float,
+        wrapPhase: Boolean,
+        hopSamples: Int,
+        frameWindow: FloatArray,
+        initialHistory: FloatArray = FloatArray(spectrumOutputShape.fftSize),
+        randomSeed: Int = S5MegpoidNativeMersenneTwister.DEFAULT_SEED
+    ): S5MegpoidForwardExcitationSession =
+        S5MegpoidForwardExcitationSession(
+            excitationGenerator = createExcitationGenerator(
+                phaseScale = phaseScale,
+                periodScale = periodScale,
+                sineDenominatorThreshold = sineDenominatorThreshold,
+                wrapPhase = wrapPhase,
+                randomSeed = randomSeed
+            ),
+            fftSize = spectrumOutputShape.fftSize,
+            hopSamples = hopSamples,
+            frameWindow = frameWindow,
+            initialHistory = initialHistory
+        )
+
+    /**
      * Converts a complete, already windowed native-size excitation frame to
      * one-sided complex bins. This requires fftSize samples (1024 for the
      * supplied Megpoid model); it does not assemble the 320-sample chunk into
