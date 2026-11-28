@@ -32,12 +32,12 @@ class S5MegpoidActiveMultipartProjectionStageTest {
             0f
         )
         assertArrayEquals(
-            floatArrayOf(0.95f, -0.65f),
+            floatArrayOf(0.85f, -0.35f),
             stage.copyFoldedBias(),
             1.0e-6f
         )
         assertArrayEquals(
-            floatArrayOf(0f, -0.5f),
+            floatArrayOf(0f, -3.75f),
             stage.copyFoldedScale(),
             0f
         )
