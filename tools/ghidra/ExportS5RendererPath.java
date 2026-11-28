@@ -362,6 +362,76 @@ public class ExportS5RendererPath extends GhidraScript {
                 }
             }
 
+            out.println("## Active multipart output-head and carrier callsite argument windows");
+            out.println();
+            out.println("These instruction windows retain the Win64 register/stack setup and pointer arithmetic immediately before the active output-head calls. They are intended to recover the per-part feature pointers, modulation-table strides, carrier Dense inputs and the order of complex accumulation.");
+            out.println();
+
+            String[][] outputHeadTargets = {
+                {"1800d52b0", "AVX2 complex modulation accumulator"},
+                {"1800d5610", "general complex modulation accumulator"},
+                {"1800cea30", "carrier affine vector path A"},
+                {"1800ceba0", "carrier affine vector path B"},
+                {"1800c3740", "active carrier Dense/GEMM projection"},
+                {"1800c7920", "global feature normalization"},
+                {"1800c5260", "fallback Dense projection"},
+                {"1800c3930", "multipart interpolation dispatcher"}
+            };
+            Function[] outputHeadOwners = {
+                modulationCaller,
+                currentProgram.getFunctionManager().getFunctionAt(toAddr("1800c3930"))
+            };
+            String[] outputHeadOwnerNames = {
+                "FUN_1800c7ad0",
+                "FUN_1800c3930"
+            };
+
+            for (int ownerIndex = 0; ownerIndex < outputHeadOwners.length; ownerIndex++) {
+                Function owner = outputHeadOwners[ownerIndex];
+                if (owner == null) continue;
+                out.println("### Callsite owner: " + outputHeadOwnerNames[ownerIndex] +
+                    " at " + owner.getEntryPoint());
+                out.println();
+
+                for (String[] target : outputHeadTargets) {
+                    Address targetAddress = toAddr(target[0]);
+                    out.println("#### " + targetAddress + " — " + target[1]);
+                    out.println();
+
+                    InstructionIterator instructions =
+                        currentProgram.getListing().getInstructions(owner.getBody(), true);
+                    ArrayDeque<Instruction> preceding = new ArrayDeque<>();
+                    int matchingCalls = 0;
+                    while (instructions.hasNext()) {
+                        monitor.checkCancelled();
+                        Instruction ins = instructions.next();
+                        boolean match = false;
+                        for (Reference ref : ins.getReferencesFrom()) {
+                            if (ref.getReferenceType().isCall() &&
+                                ref.getToAddress().equals(targetAddress)) {
+                                match = true;
+                                break;
+                            }
+                        }
+                        if (match) {
+                            matchingCalls++;
+                            out.println("Callsite: " + ins.getAddress());
+                            out.println("~~~asm");
+                            for (Instruction prior : preceding) {
+                                out.println(prior.getAddress() + "  " + prior.toString());
+                            }
+                            out.println(ins.getAddress() + "  " + ins.toString());
+                            out.println("~~~");
+                            out.println();
+                        }
+                        preceding.addLast(ins);
+                        while (preceding.size() > 88) preceding.removeFirst();
+                    }
+                    if (matchingCalls == 0) out.println("- No direct call recovered in this owner.");
+                    out.println();
+                }
+            }
+
             out.println("## Frame-window generator callers");
             out.println();
             Address frameWindowTarget = toAddr("18012a9a0");
