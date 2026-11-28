@@ -79,7 +79,7 @@ object S5ApiFrameHistoryInterpolator {
                 firstFrameIndex = firstFrameIndex
             )
         } else {
-            require(param8 <= Int.MAX_VALUE.toFloat()) {
+            require(param8.toDouble() <= Int.MAX_VALUE.toDouble()) {
                 "Native frame selector param_8 exceeds the supported index range."
             }
             val secondFrameIndex = param8.toInt()
