@@ -15,7 +15,7 @@ package com.kmj.vea.engine
  * live native parity still requires checking the vendor constructor state and
  * the frame-validity gate.
  */
-class S5MegpoidForwardExcitationSession(
+class S5MegpoidForwardExcitationSession internal constructor(
     private val excitationGenerator: S5MegpoidExcitationGenerator,
     val fftSize: Int,
     val hopSamples: Int,
