@@ -15,6 +15,22 @@ data class PreparedMegpoidExplicitPhoneSequenceResult(
 ) {
     val fallbackPhoneLabels: List<String>
         get() = alignment.fallbackPhoneLabels
+
+    /**
+     * Event feature rows gathered into native frame order when the optional
+     * +0x30 timing map was requested. Timing/control arrays remain available
+     * separately in [frameAlignment].
+     */
+    val frameAlignedPhoneFeatureMatrix: S5ApiFrameAlignedPhoneFeatureMatrix? by lazy(
+        LazyThreadSafetyMode.PUBLICATION
+    ) {
+        frameAlignment?.let { alignment ->
+            S5ApiFrameAlignedPhoneFeatureMatrixBuilder.build(
+                eventFeatures = phoneFeatureMatrix,
+                frameAlignment = alignment
+            )
+        }
+    }
 }
 
 /**

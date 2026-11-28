@@ -193,3 +193,27 @@ VTMG tensor.
    native reference vectors before connecting it to PCM output.
 
 No end-to-end synthesis or native numeric parity is claimed by this component.
+
+
+## Event-row gathering into frame order — Android implementation
+
+The timed alignment arrays identify the source phone-event row for every
+render frame. VEA now exposes that gather operation as
+`S5ApiFrameAlignedPhoneFeatureMatrixBuilder`:
+
+- Input: the row-major event feature matrix from `FUN_18006c720` and the
+  `eventIndexByFrame` array from the recovered timing map.
+- Output: a row-major frame matrix in which each frame receives a copy of
+  the feature row belonging to its selected source event.
+- The builder validates every selected event index against the event-matrix
+  row count and checks allocation geometry before copying.
+- `toFeatureMajor()` exposes the same data in feature-by-frame order for
+  downstream vector/matrix operators.
+
+The optional `PreparedMegpoidExplicitPhoneSequenceResult.frameAlignedPhoneFeatureMatrix`
+property makes this intermediate result available only when the caller
+provided the native frame period and event-control value. Relative start,
+event duration and event control remain separate timing metadata; this
+builder does not fold them into phone-feature rows. It does not execute the
+stateful `FUN_180076080` operators, does not map their descriptors to VTB2
+weights, and does not claim an acoustic spectrum or PCM output.
