@@ -64,11 +64,12 @@ Y[o,p] = inverseStd * GEMM(Wfold, X)[o,p]
 
 `S5MegpoidActiveMultipartProjectionStage` now reproduces this folded form
 from the four decoded VTB2 source tensors. It does not use the direct
-non-multipart +0xC4/+0xCE runtime descriptor. The remaining integration
-boundary is the producer of the actual 32-by-position render-context tensor:
-the explicit-phone sequence path currently ends at an intermediate
-32-channel sequence tensor and has not yet been connected to native
-time/interpolation scheduling for the spectral frame grid.
+non-multipart +0xC4/+0xCE runtime descriptor. The final sequence-slot buffer at render-state +0xE0 is the actual source
+passed into the active 32-to-8 projection. The Android runtime now accepts
+`S5MegpoidSequenceTransitionOutput` directly and validates its 32-channel
+feature-major shape. It only proceeds when the sequence position count matches
+the spectral frame's one-sided bin count; it does not fabricate the missing
+native time/interpolation alignment when those counts differ.
 
 ## Active eight-plane feature layout
 
@@ -130,9 +131,13 @@ complex accumulation.
 
 The history frame comes from a separate carrier-generation input at native
 render-state +0x2E4; it is not the output of the D74 carrier Dense projection.
-`S5MegpoidCarrierFusionFrameInput` keeps the Dense feature input and the two
-history planes as explicit independent inputs. The upstream generator that
-creates those buffers is not yet integrated into Android.
+The carrier Dense input, however, is the same final 32-channel sequence
+tensor at +0xE0. `S5MegpoidCarrierFusionFrameInput` now has a factory that
+takes that sequence output plus the separately generated interleaved complex
+carrier spectrum and splits the spectrum into the two planar D80 history
+inputs. The exact native carrier-spectrum generator behind FUN_18012b140 is
+being traced separately; it must not be replaced by the periodic/noise
+excitation transform FUN_18012b150 without evidence.
 
 ## Spectral frame reconstruction
 
