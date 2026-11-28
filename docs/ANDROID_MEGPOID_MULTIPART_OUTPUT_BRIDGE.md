@@ -19,12 +19,56 @@ The VTB2 properties indexed by
 - `051fe4a0e8e7e92c3c8791bd28f24da8` (Dense weights),
 - `3a9561654ca2e128021a59d14813a88f` (Dense bias),
 
-construct a 32-to-8 post-residual projection for the non-multipart fallback
-branch. The installed AI Megpoid V7 options select D00=4 and D01=true, so this
-fallback projection must not be inserted into the active multipart path.
+provide the shared 32-feature input normalizer and [8,32] Dense matrix/bias
+used by the non-multipart fallback descriptor. The installed AI Megpoid V7
+options select D00=4 and D01=true, so the fallback runtime descriptor itself
+must not be used as the active output operator.
 
-The Android model-package API `preparePostResidualFallbackStage()` remains
-guarded and refuses when active options select multipart output.
+The active branch nevertheless reuses these same four source tensors. Native
+initialization folds them into a different matrix and two row vectors at
+render-root word indices +0x150/+0x154/+0x158 (byte offsets +0x540/+0x550/
++0x560). Android now constructs this folded active operator separately as
+`S5MegpoidActiveMultipartProjectionStage`; the guarded
+`preparePostResidualFallbackStage()` still refuses when multipart output
+is selected.
+
+## Active 32-to-8 folded projection
+
+The active output head consumes a 32-feature render-context tensor before
+the eight planes are split into four complex pairs. The VTB2 source tensors
+are the same four objects already indexed by
+`S5MegpoidPostResidualFallbackTensorIndex`:
+
+- normalizer scale: 32 values;
+- normalizer bias: 32 values;
+- Dense weights: `[8,32,1,1]`;
+- Dense bias: 8 values.
+
+During `FUN_1800ced10`, S5API folds these source values into a row-major
+8-by-32 matrix and two eight-value vectors:
+
+```text
+Wfold[o,i] = W[o,i] * inputScale[i]
+Bfold[o]   = DenseBias[o] + sum_i(W[o,i] * inputBias[i])
+Sfold[o]   = sum_i(Wfold[o,i])
+```
+
+At render time, `FUN_1800c7ad0` obtains one global mean and inverse standard
+deviation over the complete 32-by-position input tensor, computes the
+matrix projection, then applies:
+
+```text
+Y[o,p] = inverseStd * GEMM(Wfold, X)[o,p]
+          + ((-inverseStd * mean) * Sfold[o] + Bfold[o])
+```
+
+`S5MegpoidActiveMultipartProjectionStage` now reproduces this folded form
+from the four decoded VTB2 source tensors. It does not use the direct
+non-multipart +0xC4/+0xCE runtime descriptor. The remaining integration
+boundary is the producer of the actual 32-by-position render-context tensor:
+the explicit-phone sequence path currently ends at an intermediate
+32-channel sequence tensor and has not yet been connected to native
+time/interpolation scheduling for the spectral frame grid.
 
 ## Active eight-plane feature layout
 
@@ -66,8 +110,10 @@ tableIndex = partIndex * positionCount + position
 Each part applies its own feature pair and complex rotation/gain:
 
 ```text
-out.real += (x[part][position] * D46 - y[part][position] * D4C) * D40
-out.imag += (y[part][position] * D46 + x[part][position] * D4C) * D40
+scaledReal = x[part][position] * D40
+scaledImag = y[part][position] * D40
+out.real += D46 * scaledReal - D4C * scaledImag
+out.imag += D4C * scaledReal + D46 * scaledImag
 ```
 
 `S5MegpoidMultipartOutputModulation.accumulateAllPartsInto()` follows the
