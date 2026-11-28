@@ -18,19 +18,25 @@ object S5ApiFrameMath {
     fun nativeFastExp(value: Float): Float {
         require(value.isFinite()) { "Fast exp input must be finite." }
 
-        val scaled = value * LOG2_E
+        // Native assignment stores the multiplication result back to float.
+        val scaled = (value.toDouble() * LOG2_E).toFloat()
         var fractionOffset = if (scaled < 0f) 1f else 0f
         val exponent = if (scaled >= MIN_EXPONENT) scaled else MIN_EXPONENT
         fractionOffset += exponent - exponent.toInt().toFloat()
 
-        var approximation = 27.728024f / (4.8425255f - fractionOffset)
-        approximation += exponent
-        approximation += 121.274055f
-        approximation -= fractionOffset * 1.4901291f
-        approximation *= FLOAT_MANTISSA_SCALE
+        // FUN_18003be50 uses double literals for this polynomial, then casts
+        // the final scaled value to an integer whose low 32 bits are re-read
+        // as float by its callers.
+        val fraction = fractionOffset.toDouble()
+        val exponentValue = exponent.toDouble()
+        val approximation =
+            ((27.728024 / (4.8425255 - fraction) + exponentValue + 121.274055) -
+                fraction * 1.4901291) * FLOAT_MANTISSA_SCALE
 
-        require(approximation.isFinite()) {
-            "Fast exp approximation overflowed before bit reinterpretation."
+        require(approximation.isFinite() &&
+            approximation >= Long.MIN_VALUE.toDouble() &&
+            approximation <= Long.MAX_VALUE.toDouble()) {
+            "Fast exp approximation is outside the native integer conversion range."
         }
         val bits = approximation.toLong().toInt()
         return Float.fromBits(bits)
@@ -50,5 +56,5 @@ object S5ApiFrameMath {
 
     private const val LOG2_E = 1.442695f
     private const val MIN_EXPONENT = -126f
-    private const val FLOAT_MANTISSA_SCALE = 8_388_608f
+    private const val FLOAT_MANTISSA_SCALE = 8_388_608.0
 }
