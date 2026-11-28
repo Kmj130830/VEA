@@ -111,8 +111,10 @@ public class ExportS5RendererPath extends GhidraScript {
                 // construction path; do not infer its fields from matching
                 // offsets in unrelated render-state objects.
                 "18012c740", "180040630", "18012b150", "18012ad70",
-                "18012b140", "18012b320", "18012b330", "180129190",
-                "180129450", "1800db6c0",
+                "18012b140", "18012b320", "18012b330",
+                "18012b4a0", "18012b620", "18012bb30",
+                "180129190", "180129450", "180128a50", "1800db6c0",
+                "180127720", "180127a40",
                 "18012b470", "18012b450", "18012c730", "1800c7ad0",
                 "180128c40", "180129240", "1800bca40", "1800af170",
                 "1800af230", "180126940", "180127220", "180127630",
@@ -185,9 +187,14 @@ public class ExportS5RendererPath extends GhidraScript {
                 {"180040630", "real FFT wrapper"},
                 {"1800c7ad0", "S5API render-state forward path"},
                 {"18012b150", "excitation frame forward transform"},
-                {"18012b140", "native excitation generator into complex carrier frame"},
-                {"18012b320", "alternate native excitation/carrier frame generator"},
-                {"18012b330", "excitation generator substage"},
+                {"18012b140", "carrier-generator wrapper (calls FUN_18012b4a0)"},
+                {"18012b320", "alternate carrier-generator wrapper"},
+                {"18012b4a0", "native carrier frame generator core"},
+                {"18012b620", "per-state carrier transform kernel"},
+                {"18012bb30", "batched/vectorized carrier transform kernel"},
+                {"180127720", "native uniform random conversion used by excitation"},
+                {"180127a40", "native random-state initializer"},
+                {"18012b330", "carrier transform-state dispatch loop"},
                 {"180129190", "noise generator state constructor"},
                 {"180129450", "noise generator state destructor"},
                 {"1800db6c0", "render-state carrier frame buffer allocator"},
@@ -384,9 +391,12 @@ public class ExportS5RendererPath extends GhidraScript {
                 {"1800c7920", "global feature normalization"},
                 {"1800c5260", "fallback Dense projection"},
                 {"1800c3930", "multipart interpolation dispatcher"},
-                {"18012b140", "excitation generator feeding carrier history"},
-                {"18012b320", "alternate carrier generator"},
-                {"18012b330", "carrier generator substage"}
+                {"18012b140", "carrier-generator wrapper"},
+                {"18012b320", "alternate carrier-generator wrapper"},
+                {"18012b4a0", "carrier frame generator core"},
+                {"18012b620", "per-state carrier transform kernel"},
+                {"18012bb30", "batched/vectorized carrier transform kernel"},
+                {"18012b330", "carrier transform-state dispatch loop"}
             };
             Function[] outputHeadOwners = {
                 modulationCaller,
