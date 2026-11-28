@@ -210,11 +210,8 @@ class S5ApiFrameProjectionStack(
             }
         }
 
-    private fun nativeTanh(value: Float): Float {
-        // Equivalent scalar expression used by FUN_180077520.
-        val exponential = exp(-2.0f * value)
-        return 2.0f / (exponential + 1.0f) - 1.0f
-    }
+    private fun nativeTanh(value: Float): Float =
+        S5ApiFrameMath.nativeTanh(value)
 
     companion object {
         const val LEAKY_RELU_SLOPE = 0.01f
