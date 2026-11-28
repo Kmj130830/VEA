@@ -19,7 +19,7 @@ class S5ApiFrameProjectionStackTest {
     )
 
     private fun nativeTanh(value: Float): Float =
-        2f / (exp(-2f * value) + 1f) - 1f
+        S5ApiFrameMath.nativeTanh(value)
 
     @Test
     fun runsFirstAndHiddenProjectionBiasActivationThenFinalProjection() {
