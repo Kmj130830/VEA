@@ -466,6 +466,53 @@ data class PreparedMegpoidRuntime(
     }
 
     /**
+     * Full active sequence-output entry point with the native carrier-source
+     * buffer supplied as interleaved complex bins. The final 32-channel
+     * sequence tensor is reused as the carrier Dense input, while the separate
+     * complex carrier spectrum is split to the two D80 history planes.
+     */
+    @Synchronized
+    fun processActiveMultipartSequenceOutputFrameWithCarrierSpectrumToPcm(
+        sequenceOutput: S5MegpoidSequenceTransitionOutput,
+        modulation: S5MegpoidMultipartOutputModulation,
+        spectralOutputSession: PreparedMegpoidSpectralOutputSession,
+        carrierWorkspace: S5MegpoidCarrierFusionWorkspace,
+        interleavedCarrierSpectrum: FloatArray,
+        carrierScale: Float,
+        carrierAmplitude: Float,
+        carrierParameters: S5MegpoidCarrierFusionActiveParameters? = null,
+        projectionStage: S5MegpoidActiveMultipartProjectionStage =
+            prepareActiveMultipartProjectionStage(),
+        gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel,
+        statistics: S5MegpoidStatisticsKernel = NativeS5MegpoidStatisticsKernel
+    ): FloatArray {
+        check(carrierFusionEnabled) {
+            "The selected voicebank runtime options do not enable carrier fusion."
+        }
+        require(sequenceOutput.positions == spectralOutputSession.complexBinCount) {
+            "Sequence output and spectral frame positions do not match; native frame alignment is required."
+        }
+        val carrierFrame = S5MegpoidCarrierFusionFrameInput
+            .fromSequenceOutputAndInterleavedCarrierSpectrum(
+                workspace = carrierWorkspace,
+                sequenceOutput = sequenceOutput,
+                carrierSpectrumInterleaved = interleavedCarrierSpectrum,
+                scale = carrierScale,
+                amplitude = carrierAmplitude,
+                activeParameters = carrierParameters
+            )
+        return processActiveMultipartSequenceOutputFrameToPcm(
+            sequenceOutput = sequenceOutput,
+            modulation = modulation,
+            spectralOutputSession = spectralOutputSession,
+            carrierFrame = carrierFrame,
+            stage = projectionStage,
+            gemm = gemm,
+            statistics = statistics
+        )
+    }
+
+    /**
      * Applies the active model-backed 32-to-8 projection and then runs the
      * existing four-part modulation, optional carrier fusion, inverse FFT and
      * overlap-add frame path.
