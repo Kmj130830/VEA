@@ -54,7 +54,7 @@ object S5ApiFrameMath {
         return kotlin.math.tanh(value.toDouble()).toFloat()
     }
 
-    private const val LOG2_E = 1.442695f
+    private const val LOG2_E = 1.442695
     private const val MIN_EXPONENT = -126f
     private const val FLOAT_MANTISSA_SCALE = 8_388_608.0
 }
