@@ -24,8 +24,11 @@ data class PreparedMegpoidExplicitPhoneSequenceResult(
  * The caller must supply explicit phone labels in each note and the actual
  * mode-0 phone-feature descriptor. This class intentionally does not invent
  * pronunciation, phone timing, or descriptor values. It also stops at the
- * sequence feature tensor: Megpoid's multipart/carrier output head and final
- * spectrum-to-audio path are separate stages.
+ * event-level sequence feature tensor: an optional +0x30 timed-frame map is
+ * returned as separate metadata when the caller supplies native param_8.
+ * That map does not execute FUN_180076080/FUN_180077520 or create the later
+ * frame-aligned VTMG features. Megpoid's multipart/carrier output head and
+ * final spectrum-to-audio path remain separate stages.
  *
  * Keep one instance for sequential chunks of an utterance. Call resetHistory()
  * when starting a new utterance so the eight residual-block history rings do
