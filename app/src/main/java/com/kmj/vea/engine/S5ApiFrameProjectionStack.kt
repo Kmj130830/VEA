@@ -108,7 +108,7 @@ class S5ApiFrameProjectionLayer(
 }
 
 enum class S5ApiFrameHiddenActivation {
-    /** Native mode +0xF4 == 1: 2 / (exp(-2*x) + 1) - 1. */
+    /** Native mode +0xF4 == 1: S5API fast-exp tanh approximation. */
     TANH,
 
     /** Native mode +0xF4 != 1: x for x >= 0, otherwise x * 0.01. */
