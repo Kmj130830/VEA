@@ -175,7 +175,7 @@ data class S5MegpoidCarrierFusionFrameInput(
             }
             return S5MegpoidCarrierFusionFrameInput(
                 workspace = workspace,
-                inputFeatureMajor = sequenceOutput.features,
+                inputFeatureMajor = sequenceOutput.features.copyOf(),
                 carrierHistoryFirstPlane = first,
                 carrierHistorySecondPlane = second,
                 scale = scale,
