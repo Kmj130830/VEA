@@ -126,6 +126,25 @@ Neither helper invokes the native operator objects or runs the nested
 
 ## Android implementation added
 
+The native first/hidden projection helper `FUN_18007a0a0` was also
+recovered. Its scalar path reads the descriptor's dense matrix in
+`[inputFeature][outputFeature]` order with `outputFeatures` as the row
+stride, and accumulates one input vector into the output vector. When the
+output width is divisible by 64 it dispatches through the aligned function
+pointer stored at state offset +0x398. Android now provides
+`S5ApiFrameInputMajorDenseVectorOperator` for the exact input-major layout;
+an optional `S5ApiFrameAlignedDenseKernel` can supply that accelerated
+branch when its constructor and ABI are recovered. The default scalar path
+matches the native non-aligned accumulation order.
+
+The fast activation helper `FUN_18003be50` was recovered as well. It
+approximates exp, constructs an IEEE-754 float bit pattern in its low 32-bit
+return value, and is used by the `FUN_180076080/FUN_180077520` vector
+activation path. `S5ApiFrameMath` now preserves the double-literal
+polynomial, final integer conversion and float-bit reinterpretation. This is
+kept separate from the `tanhf` calls in `FUN_18003e920`, which use
+`S5ApiFrameMath.standardTanh()`.
+
 Two reusable components now port the arithmetic around this stateful
 frame path:
 
@@ -136,6 +155,10 @@ frame path:
   separate residual vector and tanh after each projection. It then appends
   the caller-supplied tail, multiplies only that tail by the supplied scale,
   and optionally appends the scale as the final sentinel element.
+- `S5ApiFrameInputMajorDenseVectorOperator.kt` implements the native
+  `[inputFeature][outputFeature]` matrix layout and optional 64-wide dispatch.
+- `S5ApiFrameMath.kt` ports the fast exponential/bit-pattern activation used
+  by 076080/077520 separately from platform tanhf.
 - `S5ApiFrameProjectionStack.kt` implements the vector-stack arithmetic from
   `FUN_180077520` as a voicebank-neutral component:
   - `S5ApiFrameVectorOperator` is the operator boundary for native
