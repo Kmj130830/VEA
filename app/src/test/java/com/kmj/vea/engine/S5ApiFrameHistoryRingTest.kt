@@ -18,7 +18,7 @@ class S5ApiFrameHistoryRingTest {
 
         assertEquals(1L, ring.cursor)
         assertArrayEquals(floatArrayOf(1f, 2f, 3f), ring.readDelayed(0), 0f)
-        assertArrayEquals(floatArrayOf(0f, 0f, 0f, 0f), ring.readSlot(1), 0f)
+        assertArrayEquals(floatArrayOf(0f, 0f, 0f), ring.readSlot(1), 0f)
     }
 
     @Test
@@ -69,8 +69,13 @@ class S5ApiFrameHistoryRingTest {
         ring.append(floatArrayOf(3f, 4f))
         ring.append(floatArrayOf(5f, 6f))
 
-        assertArrayEquals(floatArrayOf(5f, 6f, 0f, 0f), ring.readSlot(0), 0f)
-        assertArrayEquals(floatArrayOf(3f, 4f, 0f, 0f), ring.readSlot(1), 0f)
+        assertArrayEquals(floatArrayOf(5f, 6f), ring.readSlot(0), 0f)
+        assertArrayEquals(floatArrayOf(3f, 4f), ring.readSlot(1), 0f)
+        assertArrayEquals(
+            floatArrayOf(3f, 4f, 0f, 0f, 5f, 6f, 0f, 0f),
+            ring.copyHistoryOldestToNewest(),
+            0f
+        )
 
         ring.reset()
         assertEquals(0L, ring.cursor)
