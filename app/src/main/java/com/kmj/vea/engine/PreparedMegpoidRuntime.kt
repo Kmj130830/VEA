@@ -133,6 +133,30 @@ data class PreparedMegpoidRuntime(
         )
 
     /**
+     * Creates the separate FUN_18012b4a0 carrier/noise spectrum session.
+     *
+     * Native AI Megpoid construction supplies hopSamples from render-root
+     * +0x0C, windowCoreLength from +0x61C, invertOddComplexBins from +0x620,
+     * and windowShapeMode from +0x3418. These remain explicit because the
+     * values are render-state fields, not fixed VTB2 model dimensions.
+     */
+    fun createCarrierSpectrumSession(
+        hopSamples: Int,
+        windowCoreLength: Int,
+        windowShapeMode: Int,
+        invertOddComplexBins: Boolean,
+        randomSeed: Int = S5MegpoidCarrierSpectrumSession.NATIVE_RANDOM_SEED
+    ): S5MegpoidCarrierSpectrumSession =
+        S5MegpoidCarrierSpectrumSession(
+            fftSize = spectrumOutputShape.fftSize,
+            hopSamples = hopSamples,
+            windowCoreLength = windowCoreLength,
+            windowShapeMode = windowShapeMode,
+            invertOddComplexBins = invertOddComplexBins,
+            randomSeed = randomSeed
+        )
+
+    /**
      * Converts a complete, already windowed native-size excitation frame to
      * one-sided complex bins. This requires fftSize samples (1024 for the
      * supplied Megpoid model); it does not assemble the 320-sample chunk into
@@ -330,10 +354,12 @@ data class PreparedMegpoidRuntime(
     @Synchronized
     fun resetMultipartOutputFrameState(
         spectralOutputSession: PreparedMegpoidSpectralOutputSession,
-        carrierWorkspace: S5MegpoidCarrierFusionWorkspace? = null
+        carrierWorkspace: S5MegpoidCarrierFusionWorkspace? = null,
+        carrierSpectrumSession: S5MegpoidCarrierSpectrumSession? = null
     ) {
         spectralOutputSession.reset()
         carrierWorkspace?.resetHistory()
+        carrierSpectrumSession?.reset()
     }
 
     /** Actual terminal spectrum representation read from this singer's VTB2 options. */
@@ -507,6 +533,57 @@ data class PreparedMegpoidRuntime(
             spectralOutputSession = spectralOutputSession,
             carrierFrame = carrierFrame,
             stage = projectionStage,
+            gemm = gemm,
+            statistics = statistics
+        )
+    }
+
+    /**
+     * Full active frame path using the native b140 -> b4a0 carrier generator.
+     * The generator emits a delayed, windowed Gaussian-noise spectrum; the
+     * existing carrier adapter splits it into D80's two planar history inputs.
+     *
+     * [carrierInputSamples] corresponds to b4a0's optional input pointer.
+     * Leave it null for the b140 wrapper's native Gaussian source.
+     */
+    @Synchronized
+    fun processActiveMultipartSequenceOutputFrameWithCarrierGeneratorToPcm(
+        sequenceOutput: S5MegpoidSequenceTransitionOutput,
+        modulation: S5MegpoidMultipartOutputModulation,
+        spectralOutputSession: PreparedMegpoidSpectralOutputSession,
+        carrierWorkspace: S5MegpoidCarrierFusionWorkspace,
+        carrierSpectrumSession: S5MegpoidCarrierSpectrumSession,
+        carrierScale: Float,
+        carrierAmplitude: Float,
+        carrierInputSamples: FloatArray? = null,
+        carrierParameters: S5MegpoidCarrierFusionActiveParameters? = null,
+        projectionStage: S5MegpoidActiveMultipartProjectionStage =
+            prepareActiveMultipartProjectionStage(),
+        gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel,
+        statistics: S5MegpoidStatisticsKernel = NativeS5MegpoidStatisticsKernel
+    ): FloatArray {
+        check(carrierFusionEnabled) {
+            "The selected voicebank runtime options do not enable carrier fusion."
+        }
+        require(carrierSpectrumSession.fftSize == spectrumOutputShape.fftSize &&
+            carrierSpectrumSession.fftSize == spectralOutputSession.fftSize) {
+            "Carrier generator, model and spectral output FFT sizes must match."
+        }
+        require(sequenceOutput.positions == spectralOutputSession.complexBinCount) {
+            "Sequence output and spectral frame positions do not match; native frame alignment is required."
+        }
+
+        val carrierSpectrum = carrierSpectrumSession.processFrame(carrierInputSamples)
+        return processActiveMultipartSequenceOutputFrameWithCarrierSpectrumToPcm(
+            sequenceOutput = sequenceOutput,
+            modulation = modulation,
+            spectralOutputSession = spectralOutputSession,
+            carrierWorkspace = carrierWorkspace,
+            interleavedCarrierSpectrum = carrierSpectrum,
+            carrierScale = carrierScale,
+            carrierAmplitude = carrierAmplitude,
+            carrierParameters = carrierParameters,
+            projectionStage = projectionStage,
             gemm = gemm,
             statistics = statistics
         )
