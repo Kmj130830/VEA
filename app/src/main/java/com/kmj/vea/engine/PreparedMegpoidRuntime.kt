@@ -400,6 +400,78 @@ data class PreparedMegpoidRuntime(
     }
 
     /**
+     * Accepts the actual output object returned by the Megpoid sequence
+     * pipeline. Native render state stores this as the final +0xE0 slot and
+     * forwards its [32][positions] tensor directly to the active 32-to-8
+     * output projection.
+     */
+    fun projectActiveMultipartFeatures(
+        sequenceOutput: S5MegpoidSequenceTransitionOutput,
+        stage: S5MegpoidActiveMultipartProjectionStage =
+            prepareActiveMultipartProjectionStage(),
+        gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel,
+        statistics: S5MegpoidStatisticsKernel = NativeS5MegpoidStatisticsKernel
+    ): FloatArray {
+        require(sequenceOutput.channels == 32) {
+            "The native active output head expects 32 sequence channels; got ${sequenceOutput.channels}."
+        }
+        require(sequenceOutput.positions > 0 &&
+            sequenceOutput.features.size.toLong() ==
+            sequenceOutput.channels.toLong() * sequenceOutput.positions.toLong()) {
+            "Sequence output feature tensor dimensions do not match its channel/position metadata."
+        }
+        return projectActiveMultipartFeatures(
+            inputFeatureMajor = sequenceOutput.features,
+            positions = sequenceOutput.positions,
+            stage = stage,
+            gemm = gemm,
+            statistics = statistics
+        )
+    }
+
+    /**
+     * Direct sequence-output overload. No note/phone resampling is performed:
+     * the sequence output must already have the same position count as the
+     * active one-sided spectral frame. The native +0xE0 final sequence slot
+     * is the 32-channel source consumed by the active +0x150/+0x154/+0x158
+     * projection; this method preserves that ownership boundary.
+     */
+    @Synchronized
+    fun processActiveMultipartSequenceOutputFrameToPcm(
+        sequenceOutput: S5MegpoidSequenceTransitionOutput,
+        modulation: S5MegpoidMultipartOutputModulation,
+        spectralOutputSession: PreparedMegpoidSpectralOutputSession,
+        carrierFrame: S5MegpoidCarrierFusionFrameInput? = null,
+        stage: S5MegpoidActiveMultipartProjectionStage =
+            prepareActiveMultipartProjectionStage(),
+        gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel,
+        statistics: S5MegpoidStatisticsKernel = NativeS5MegpoidStatisticsKernel
+    ): FloatArray {
+        require(sequenceOutput.positions == spectralOutputSession.complexBinCount) {
+            "Sequence output has ${sequenceOutput.positions} positions, but the spectral frame requires " +
+                "${spectralOutputSession.complexBinCount}; native time/interpolation alignment is still required."
+        }
+        require(modulation.positionCount == sequenceOutput.positions &&
+            modulation.partCount == runtimeOptions.paramD00) {
+            "Sequence output geometry does not match the active multipart modulation table."
+        }
+        val activeFeatures = projectActiveMultipartFeatures(
+            sequenceOutput = sequenceOutput,
+            stage = stage,
+            gemm = gemm,
+            statistics = statistics
+        )
+        return processMultipartOutputFrameToPcm(
+            outputFeatureMajor = activeFeatures,
+            positionCount = sequenceOutput.positions,
+            modulation = modulation,
+            spectralOutputSession = spectralOutputSession,
+            carrierFrame = carrierFrame,
+            gemm = gemm
+        )
+    }
+
+    /**
      * Applies the active model-backed 32-to-8 projection and then runs the
      * existing four-part modulation, optional carrier fusion, inverse FFT and
      * overlap-add frame path.
