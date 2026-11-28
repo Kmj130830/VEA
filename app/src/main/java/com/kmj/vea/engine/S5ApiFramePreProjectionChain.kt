@@ -123,7 +123,6 @@ class S5ApiFramePreProjectionChain(
 
     private fun applyNativeTanh(values: FloatArray): FloatArray =
         FloatArray(values.size) { index ->
-            val exponential = kotlin.math.exp(-2.0f * values[index])
-            2.0f / (exponential + 1.0f) - 1.0f
+            S5ApiFrameMath.standardTanh(values[index])
         }
 }
