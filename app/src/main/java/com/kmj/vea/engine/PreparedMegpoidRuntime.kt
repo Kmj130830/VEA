@@ -358,6 +358,94 @@ data class PreparedMegpoidRuntime(
         return modelPackage.preparePostResidualFallbackStage(tensorDecoder)
     }
 
+    /**
+     * Builds the active 32-to-D00*2 post-residual projection. This is distinct
+     * from the non-multipart fallback descriptor even though both branches
+     * share the same four source tensors in VTB2.
+     */
+    fun prepareActiveMultipartProjectionStage(
+        tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
+    ): S5MegpoidActiveMultipartProjectionStage {
+        check(runtimeOptions.usesMultiPartOutputHead) {
+            "The selected voicebank does not use the active multipart output head."
+        }
+        return modelPackage.prepareActiveMultipartProjectionStage(tensorDecoder)
+    }
+
+    /**
+     * Converts a feature-major 32-channel tensor into the eight active
+     * real/imaginary feature rows consumed by the native four-part loop.
+     */
+    fun projectActiveMultipartFeatures(
+        inputFeatureMajor: FloatArray,
+        positions: Int,
+        stage: S5MegpoidActiveMultipartProjectionStage =
+            prepareActiveMultipartProjectionStage(),
+        gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel,
+        statistics: S5MegpoidStatisticsKernel = NativeS5MegpoidStatisticsKernel
+    ): FloatArray {
+        check(runtimeOptions.usesMultiPartOutputHead) {
+            "The selected voicebank does not use the active multipart output head."
+        }
+        require(stage.inputFeatures == 32 &&
+            stage.outputFeatures == runtimeOptions.postResidualHeadFeatureWidth) {
+            "The active multipart projection dimensions do not match this voicebank."
+        }
+        return stage.forward(
+            inputFeatureMajor = inputFeatureMajor,
+            positions = positions,
+            gemm = gemm,
+            statistics = statistics
+        )
+    }
+
+    /**
+     * Applies the active model-backed 32-to-8 projection and then runs the
+     * existing four-part modulation, optional carrier fusion, inverse FFT and
+     * overlap-add frame path.
+     *
+     * The input tensor must already be the native render-context feature
+     * matrix [32][positions]. This method does not resample the current
+     * note-event sequence tensor into the spectral frame grid; that upstream
+     * time/interpolation stage remains a separate prerequisite.
+     */
+    @Synchronized
+    fun processActiveMultipartFeatureFrameToPcm(
+        inputFeatureMajor: FloatArray,
+        positionCount: Int,
+        modulation: S5MegpoidMultipartOutputModulation,
+        spectralOutputSession: PreparedMegpoidSpectralOutputSession,
+        carrierFrame: S5MegpoidCarrierFusionFrameInput? = null,
+        stage: S5MegpoidActiveMultipartProjectionStage =
+            prepareActiveMultipartProjectionStage(),
+        gemm: S5MegpoidGemmKernel = NativeS5MegpoidGemmKernel,
+        statistics: S5MegpoidStatisticsKernel = NativeS5MegpoidStatisticsKernel
+    ): FloatArray {
+        require(positionCount == spectralOutputSession.complexBinCount) {
+            "Active feature positions must match the spectral session's " +
+                "${spectralOutputSession.complexBinCount} complex bins."
+        }
+        require(inputFeatureMajor.size.toLong() == 32L * positionCount.toLong()) {
+            "The native active output projection expects a [32][positionCount] input matrix."
+        }
+
+        val activeFeatures = projectActiveMultipartFeatures(
+            inputFeatureMajor = inputFeatureMajor,
+            positions = positionCount,
+            stage = stage,
+            gemm = gemm,
+            statistics = statistics
+        )
+        return processMultipartOutputFrameToPcm(
+            outputFeatureMajor = activeFeatures,
+            positionCount = positionCount,
+            modulation = modulation,
+            spectralOutputSession = spectralOutputSession,
+            carrierFrame = carrierFrame,
+            gemm = gemm
+        )
+    }
+
     /** Exact optional carrier tensor references; null when this voicebank disables carrier fusion. */
     val carrierFusionTensorIndex: S5MegpoidCarrierFusionTensorIndex?
         get() = modelPackage.carrierFusionTensorIndex
