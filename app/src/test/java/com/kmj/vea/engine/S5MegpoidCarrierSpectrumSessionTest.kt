@@ -36,17 +36,21 @@ class S5MegpoidCarrierSpectrumSessionTest {
     fun delaysInitialFramesUntilTheNativeHistoryWindowIsAvailable() {
         val session = session()
 
-        repeat(5) { index ->
+        repeat(4) { index ->
             val spectrum = session.processFrame(
-                floatArrayOf(
-                    index * 4f,
-                    index * 4f + 1f,
-                    index * 4f + 2f,
-                    index * 4f + 3f
-                )
+                FloatArray(4) { index * 4f + it }
             )
             assertArrayEquals(FloatArray(10), spectrum, 0f)
         }
+
+        // Frame 5 has a partially valid source window starting at logical -2.
+        val partial = session.processFrame(floatArrayOf(16f, 17f, 18f, 19f))
+        val partialFrame = floatArrayOf(0f, 0f, 0f, 1f, 2f, 3f, 4f, 5f)
+        val partialWindow = S5MegpoidFrameWindowBuilder.build(8, 0, 0)
+        val partialExpected = S5MegpoidForwardRealFft(8).transform(
+            FloatArray(8) { partialFrame[it] * partialWindow[it] }
+        )
+        assertArrayEquals(partialExpected, partial, 1.0e-6f)
 
         assertEquals(5L, session.processedFrameCount)
         assertEquals(20L, session.logicalSampleCursor)
