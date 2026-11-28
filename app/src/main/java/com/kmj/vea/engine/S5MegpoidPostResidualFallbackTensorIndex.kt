@@ -2,7 +2,7 @@ package com.kmj.vea.engine
 
 import java.util.Base64
 
-/** Exact VTB2 keys populated by FUN_1800ced10 for the non-multi-part fallback head. */
+/** Shared VTB2 normalizer and Dense tensors used by both output-head branches. */
 object S5MegpoidPostResidualFallbackTensorKeys {
     /** FUN_1800e9ac0: +0xC4 normalizer scale, metadata [32]. */
     const val NORMALIZATION_SCALE = "d55956a69b51b6f6dd43bd0cc2467bcf"
@@ -44,9 +44,10 @@ class S5MegpoidPostResidualTensorReference internal constructor(
  *
  *   normalize 32 input features globally -> Dense 32-to-8 projection.
  *
- * This branch is selected only when D01 is false or D00 < 2. The supplied
- * AI Megpoid package instead enables the four-part head (D00=4, D01=true),
- * so this is a fully indexed fallback model branch, not its active main path.
+ * The direct +0xC4/+0xCE descriptor is selected only when D01 is false or
+ * D00 < 2. The same four source tensors are also folded during initialization
+ * of the active D00=4/D01=true branch into +0x150/+0x154/+0x158; see
+ * S5MegpoidActiveMultipartProjectionStage.
  */
 class S5MegpoidPostResidualFallbackStage internal constructor(
     val inputFeatures: Int,
@@ -86,8 +87,9 @@ class S5MegpoidPostResidualFallbackStage internal constructor(
 }
 
 /**
- * Model-backed VTB2 index for the non-multi-part output fallback descriptors
- * at render-root +0xC4 (global normalization) and +0xCE (Dense 32-to-8).
+ * Shared model-backed VTB2 tensor index for the output normalizer/Dense pair.
+ * The native fallback retains direct +0xC4/+0xCE descriptors; the active
+ * multipart path folds these same tensors into +0x150/+0x154/+0x158 buffers.
  */
 class S5MegpoidPostResidualFallbackTensorIndex private constructor(
     val normalizationScale: S5MegpoidPostResidualTensorReference,
