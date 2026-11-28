@@ -1,7 +1,5 @@
 package com.kmj.vea.engine
 
-import kotlin.math.abs
-
 /**
  * Scalar math helpers recovered from S5API FUN_18003be50 and its call sites.
  *
