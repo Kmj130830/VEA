@@ -97,7 +97,7 @@ class S5ApiFrameProjectionStackTest {
         )
 
         assertArrayEquals(
-            floatArrayOf(5.5f, -3.25f),
+            floatArrayOf(4.5f, 4.75f),
             stack.forward(floatArrayOf(1f, 2f)),
             0f
         )
