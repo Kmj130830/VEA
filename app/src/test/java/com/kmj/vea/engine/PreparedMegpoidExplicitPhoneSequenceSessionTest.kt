@@ -124,7 +124,8 @@ class PreparedMegpoidExplicitPhoneSequenceSessionTest {
 
     private fun descriptor(
         categoryWidth: Int = 14,
-        layoutMode: Int = 0
+        layoutMode: Int = 0,
+        framePeriodSeconds: Float? = null
     ) = S5ApiDefaultPhoneFeatureDescriptor(
         categoryWidthAt10 = categoryWidth,
         minimumPhoneSecondsAt14 = 0.005f,
@@ -132,7 +133,8 @@ class PreparedMegpoidExplicitPhoneSequenceSessionTest {
         followingContextCountAt1C = 0,
         precedingContextCountAt20 = 1,
         includeLeadingFlagPairAt24 = false,
-        layoutModeAt25 = layoutMode
+        layoutModeAt25 = layoutMode,
+        framePeriodSecondsAt30 = framePeriodSeconds
     )
 
     @Test
@@ -162,6 +164,62 @@ class PreparedMegpoidExplicitPhoneSequenceSessionTest {
             ),
             fixture.calls
         )
+    }
+
+    @Test
+    fun exposesNativeFrameAlignmentWithoutPretendingItIsTheSequenceOrSpectralOutput() {
+        val fixture = fixture()
+        val result = fixture.session.process(
+            schedule = schedule(),
+            descriptor = descriptor(framePeriodSeconds = 0.01f),
+            gemm = ReferenceS5MegpoidGemmKernel,
+            statistics = ReferenceS5MegpoidStatisticsKernel,
+            eventControlForCategories2To13 = 1f
+        )
+
+        assertEquals(49, result.featureEvents.size)
+        assertEquals(result.phoneFeatureMatrix.rowCount, result.featureEvents.size)
+        assertTrue(result.frameAlignment != null)
+        val frameAlignment = result.frameAlignment!!
+        assertEquals(0.01f, frameAlignment.framePeriodSeconds, 0f)
+        assertEquals(49, frameAlignment.frameCount)
+        assertTrue(frameAlignment.eventIndexByFrame.all { it in result.featureEvents.indices })
+        assertTrue(frameAlignment.eventControlByFrame.all { it == 1f || it == -1f })
+
+        // These are different temporal domains: the timed phone frame map has
+        // 49 slots, while the current neural sequence graph returns 56 slots.
+        // The missing FUN_180076080/FUN_180077520 stateful bridge must align
+        // them before the 513-bin acoustic output head is invoked.
+        assertEquals(56, result.sequenceOutput.positions)
+        assertTrue(frameAlignment.frameCount != result.sequenceOutput.positions)
+    }
+
+    @Test
+    fun keepsNativeFrameAlignmentAbsentWhenTheDescriptorCaptureHasNoPlus30Field() {
+        val fixture = fixture()
+        val result = fixture.session.process(
+            schedule = schedule(),
+            descriptor = descriptor(),
+            gemm = ReferenceS5MegpoidGemmKernel,
+            statistics = ReferenceS5MegpoidStatisticsKernel
+        )
+
+        assertTrue(result.frameAlignment == null)
+        assertEquals(result.phoneFeatureMatrix.rowCount, result.featureEvents.size)
+    }
+
+    @Test
+    fun rejectsFrameAlignmentRequestWithoutNativeFramePeriod() {
+        val fixture = fixture()
+        assertThrows(IllegalStateException::class.java) {
+            fixture.session.process(
+                schedule = schedule(),
+                descriptor = descriptor(),
+                gemm = ReferenceS5MegpoidGemmKernel,
+                statistics = ReferenceS5MegpoidStatisticsKernel,
+                eventControlForCategories2To13 = 1f
+            )
+        }
     }
 
     @Test
