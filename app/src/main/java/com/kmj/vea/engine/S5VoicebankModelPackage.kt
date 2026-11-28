@@ -202,12 +202,29 @@ data class S5VoicebankModelPackage(
      * this creates the folded +0x150/+0x154/+0x158 buffers used by the
      * active multi-part branch in FUN_1800c7ad0.
      */
+    /** Model-constant active output projection, decoded and folded once per package. */
+    val activeMultipartProjectionStage: S5MegpoidActiveMultipartProjectionStage by lazy(
+        LazyThreadSafetyMode.PUBLICATION
+    ) {
+        buildActiveMultipartProjectionStage(NativeS5TypedTensorDecoder)
+    }
+
     fun prepareActiveMultipartProjectionStage(
         tensorDecoder: S5TypedTensorDecoder = NativeS5TypedTensorDecoder
     ): S5MegpoidActiveMultipartProjectionStage {
         check(runtimeOptionsDescriptor.usesMultiPartOutputHead) {
             "The selected AI Megpoid options do not enable the active multipart head."
         }
+        return if (tensorDecoder === NativeS5TypedTensorDecoder) {
+            activeMultipartProjectionStage
+        } else {
+            buildActiveMultipartProjectionStage(tensorDecoder)
+        }
+    }
+
+    private fun buildActiveMultipartProjectionStage(
+        tensorDecoder: S5TypedTensorDecoder
+    ): S5MegpoidActiveMultipartProjectionStage {
         val stage = postResidualFallbackTensorIndex.buildActiveMultipartProjectionStage(tensorDecoder)
         require(stage.inputFeatures == 32 &&
             stage.outputFeatures == runtimeOptionsDescriptor.postResidualHeadFeatureWidth) {
